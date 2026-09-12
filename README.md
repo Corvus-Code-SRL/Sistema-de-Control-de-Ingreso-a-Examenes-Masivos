@@ -1,7 +1,6 @@
+# Sistema-de-Control-de-Ingreso-a-Examenes-Masivos
+Plataforma web para el control de ingreso, validación de estudiantes y gestión de incidentes en exámenes universitarios.
 # SCIEM
-
-**Sistema de Control de Ingreso a Exámenes Masivos**
-
 Proyecto desarrollado por **Corvus Code** para la materia TIS de la Universidad Mayor de San Simón.
 
 ## Estructura del proyecto
