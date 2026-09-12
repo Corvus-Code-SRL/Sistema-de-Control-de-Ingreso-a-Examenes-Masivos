@@ -1,0 +1,51 @@
+# ==========================================
+# VARIABLES DE ENTORNO
+# ==========================================
+.env
+.env.*
+!.env.example
+
+backend/.env
+frontend/.env
+
+
+# ==========================================
+# BACKEND - LARAVEL
+# ==========================================
+backend/vendor/
+backend/storage/logs/*.log
+backend/bootstrap/cache/*.php
+
+
+# ==========================================
+# FRONTEND - REACT
+# ==========================================
+frontend/node_modules/
+frontend/dist/
+
+
+# ==========================================
+# IDE / EDITORES
+# ==========================================
+.idea/
+
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+*.swp
+*.swo
+
+
+# ==========================================
+# SISTEMA OPERATIVO
+# ==========================================
+.DS_Store
+Thumbs.db
+
+
+# ==========================================
+# ARCHIVOS TEMPORALES
+# ==========================================
+*.tmp
+*.temp
