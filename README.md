@@ -95,7 +95,7 @@ deployment/
 Clonar el repositorio:
 
 ```bash
-git clone <URL_DEL_REPOSITORIO>
+git clone https://github.com/Corvus-Code-SRL/Sistema-de-Control-de-Ingreso-a-Examenes-Masivos
 cd Sistema-de-Control-de-Ingreso-a-Examenes-Masivos
 ```
 
