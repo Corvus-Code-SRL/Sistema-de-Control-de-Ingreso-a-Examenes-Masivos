@@ -18,9 +18,9 @@
 - React DOM: 18.3.1
 - TypeScript: 5.7.3
 - Vite: 6.4.3
-- Tailwind CSS: 3.4.19
-- PostCSS: 8.5.28
-- Autoprefixer: 10.5.6
+- Tailwind CSS: 4.3.3
+- @tailwindcss/vite: 4.3.3
+- shadcn CLI: 4.21.0
 
 ## Instalación de dependencias
 
@@ -37,3 +37,8 @@ npm ci
 
 ""No utilizar `composer update` ni actualizar dependencias sin coordinación previa con el equipo.""
 
+UI base:
+- shadcn/ui
+- Radix
+- Lucide Icons
+- Preset Nova
