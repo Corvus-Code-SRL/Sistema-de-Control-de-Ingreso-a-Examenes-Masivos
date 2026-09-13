@@ -37,7 +37,10 @@ Tecnologías principales:
 - React DOM 18.3.1
 - TypeScript 5.7.3
 - Vite 6.4.3
-- Tailwind CSS 3.4.19
+- Tailwind CSS 4.3.3
+- shadcn CLI 4.21.0
+- Radix
+- Lucide Icons
 
 ### Documentación
 
