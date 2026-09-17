@@ -1,600 +1,310 @@
-# Sistema de Control de Ingreso a Exámenes Masivos
+# SCIEM — Sistema de Control de Ingreso a Exámenes Masivos
 
-Plataforma web para el control de ingreso, validación de estudiantes y gestión de incidentes en exámenes universitarios.
+Plataforma web para el control de ingreso, la validación de estudiantes y la gestión de incidentes en exámenes universitarios.
 
-# SCIEM
+Proyecto desarrollado por **Corvus Code S.R.L.** para la Convocatoria Pública **CPTIS-452026-2026**, en el marco de la materia **Taller de Ingeniería de Software (TIS)** de la Universidad Mayor de San Simón (UMSS).
 
-Proyecto desarrollado por **Corvus Code** para la materia TIS de la Universidad Mayor de San Simón.
+---
 
-## Estructura del proyecto
+## Contenido
 
-```text
-SCIEM/
-├── backend/
-├── frontend/
-├── docs/
-├── deployment/
-├── .gitignore
-├── mise.toml
-└── README.md
+- [Funcionalidades principales](#funcionalidades-principales)
+- [Arquitectura](#arquitectura)
+- [Stack tecnológico](#stack-tecnológico)
+- [Estructura del repositorio](#estructura-del-repositorio)
+- [Requisitos previos](#requisitos-previos)
+- [Instalación y ejecución](#instalación-y-ejecución)
+- [Pruebas](#pruebas)
+- [Convenciones](#convenciones)
+- [Flujo de trabajo](#flujo-de-trabajo)
+- [Documentación](#documentación)
+- [Empresa](#empresa)
+
+---
+
+## Funcionalidades principales
+
+- **Seguridad:** cuentas de usuario, roles (Administrador, Docente, Auxiliar), permisos y bitácora de operaciones.
+- **Gestión académica:** materias, grupos y carga de nóminas de estudiantes (CSV, XLSX y PDF).
+- **Exámenes:** creación de exámenes, asignación de grupos y ambientes, invitación a docentes colaboradores y habilitación de auxiliares.
+- **Control de ingreso:** punto de control, identificación y validación de estudiantes, registro de tardanzas e intentos no autorizados, en tiempo real.
+- **Incidencias:** registro y revisión de faltas durante el examen, con evidencia y trazabilidad.
+- **Centrales de riesgo:** historial de antecedentes disciplinarios, con una central académica y otra de admisión independientes entre sí.
+- **Admisión** *(fase posterior)*: modalidades, convocatorias y exámenes de admisión.
+
+---
+
+## Arquitectura
+
+SCIEM utiliza un **monolito modular desacoplado** con **MVC + capa de Services**:
+
+- **Frontend:** SPA en React + TypeScript, organizada por *features*.
+- **Backend:** API REST en Laravel. Los controladores delegan la lógica de negocio a Services organizados por módulo.
+- **Despliegue:** una sola aplicación. Apache sirve el frontend compilado y la API desde el mismo origen.
+
+```mermaid
+flowchart LR
+    A["React + TypeScript<br/>(SPA)"] -- "HTTP / JSON" --> B["API REST<br/>Laravel"]
+    B --> C["FormRequest<br/>(validación)"]
+    C --> D["Services<br/>(lógica de negocio)"]
+    D --> E["Eloquent ORM"]
+    E --> F[("PostgreSQL")]
+    D -. "caché" .-> G[("Redis")]
+    D --> H["Resources<br/>(respuesta JSON)"]
 ```
 
-### Backend
+### Módulos
 
-El directorio `backend/` contiene la API, las reglas de negocio y el acceso a datos desarrollados con Laravel.
+| Módulo backend | Feature(s) frontend | Responsabilidad |
+|---|---|---|
+| `Security` | `auth`, `users`, `audit-log` | Autenticación, cuentas, roles, permisos y bitácora |
+| `Academic` | `subjects`, `groups`, `students` | Materias, grupos y nóminas |
+| `Exams` | `exams`, `classrooms`, `assistants` | Exámenes, ambientes, auxiliares y reportes |
+| `EntryControl` | `entry-control` | Punto de control y validación de ingreso |
+| `Incidents` | `incidents` | Registro y revisión de incidencias |
+| `RiskCenter/Academic` | `risk-center/academic` | Central de Riesgo Académica |
+| `RiskCenter/Admission` | `risk-center/admission` | Central de Riesgo de Admisión |
+| `Admissions` | `admissions` | Procesos de admisión |
 
-Tecnologías principales:
+### Actualización en tiempo real
 
-- PHP 8.0.30
-- Laravel Framework 8.83.29
-- Eloquent ORM
-- Composer 2.9.6
-- PostgreSQL 15.0
-- Redis 7.4.3
+Las pantallas de control de ingreso, seguimiento del examen e incidencias se actualizan mediante **consulta periódica** (hook `usePolling`), un mecanismo compatible con la infraestructura de despliegue disponible.
 
-### Frontend
+> La justificación completa de la arquitectura se documentará en `docs/architecture/justificacion-arquitectura.md` (pendiente de redactar).
 
-El directorio `frontend/` contiene la aplicación web desarrollada con React y TypeScript.
-
-Tecnologías principales:
-
-- Node.js 22.23.2
-- npm 10.9.8
-- React 18.3.1
-- React DOM 18.3.1
-- TypeScript 5.7.3
-- Vite 6.4.3
-- Tailwind CSS 4.3.3
-- @tailwindcss/vite 4.3.3
-- shadcn CLI 4.21.0
-- Radix UI 1.6.7
-- Lucide React 1.45.0
-- tw-animate-css 1.4.0
-
-### Documentación
-
-El directorio `docs/` contiene la documentación técnica y funcional del sistema.
-
-```text
-docs/
-├── architecture/
-├── database/
-├── api/
-├── qa/
-├── user-stories/
-└── diagrams/
-```
-
-### Deployment
-
-El directorio `deployment/` contiene la configuración relacionada con el despliegue del sistema.
-
-```text
-deployment/
-└── docker/
-    ├── backend/
-    ├── frontend/
-    ├── apache/
-    └── redis/
-```
-
-> Docker no es requerido para el desarrollo local. Los integrantes trabajan con las dependencias instaladas directamente en su entorno de desarrollo.
+---
 
 ## Stack tecnológico
 
-### Backend
+Las versiones están fijadas por compatibilidad con los servidores de despliegue de la UMSS. **No actualizar dependencias sin coordinación previa con el equipo.**
 
-- PHP: 8.0.30
-- Laravel Framework: 8.83.29
-- Composer: 2.9.6
-- Apache HTTP Server: 2.4.62
-- PostgreSQL: 15.0
-- Redis: 7.4.3
-- Eloquent ORM: incluido con Laravel
+| Capa | Tecnología | Versión |
+|---|---|---|
+| Backend | PHP | 8.0.30 |
+| | Laravel Framework | 8.83.29 |
+| | Composer | 2.9.6 |
+| | Eloquent ORM | incluido con Laravel |
+| Servidor | Apache HTTP Server | 2.4.62 |
+| Datos | PostgreSQL | 15.0 |
+| | Redis | 7.4.3 |
+| Frontend | Node.js | 22.23.2 |
+| | npm | 10.9.8 |
+| | React / React DOM | 18.3.1 |
+| | TypeScript | 5.7.3 |
+| | Vite | 6.4.3 |
+| | Tailwind CSS / @tailwindcss/vite | 4.3.3 |
+| | shadcn CLI | 4.21.0 |
+| UI base | shadcn/ui · Radix · Lucide Icons · Preset Nova | — |
 
-### Frontend
+Detalle en [`docs/architecture/stack.md`](docs/architecture/stack.md).
 
-- Node.js: 22.23.2
-- npm: 10.9.8
-- React: 18.3.1
-- React DOM: 18.3.1
-- TypeScript: 5.7.3
-- Vite: 6.4.3
-- Tailwind CSS: 4.3.3
-- @tailwindcss/vite: 4.3.3
-- shadcn CLI: 4.21.0
-- Radix UI: 1.6.7
-- Lucide React: 1.45.0
-- tw-animate-css: 1.4.0
+---
 
-## Requisitos para desarrollo
+## Estructura del repositorio
 
-Antes de clonar el proyecto se recomienda disponer de:
-
-```text
-Git
-Node.js 22.23.2
-npm 10.9.8
-PHP 8.0.30
-Composer 2.9.6
-PostgreSQL 15
-```
-
-El proyecto utiliza `mise` para fijar la versión de Node.js mediante el archivo:
+> La estructura de abajo es la **estructura objetivo** documentada en `docs/architecture/`. El scaffold actual ya cubre la mayor parte (carpetas por módulo en `Http/Controllers`, `Http/Requests`, `Services`, `routes/api/`; `deployment/docker/{apache,postgres,redis}`), pero todavía faltan por crear: `docker-compose.yml` y el `Dockerfile`/`sciem.conf` de Apache, `frontend/.env.example`, la configuración de ESLint del frontend, y las traducciones en `backend/resources/lang/es/`.
 
 ```text
-mise.toml
+.
+├── backend/                    # API REST (Laravel 8)
+│   ├── app/
+│   │   ├── Http/
+│   │   │   ├── Controllers/    # Por módulo
+│   │   │   ├── Requests/       # Validación, por módulo
+│   │   │   ├── Resources/      # Formato de respuesta, por módulo
+│   │   │   └── Middleware/
+│   │   ├── Models/             # Modelos Eloquent
+│   │   ├── Policies/           # Autorización
+│   │   ├── Services/           # Lógica de negocio, por módulo
+│   │   └── Support/            # Utilidades transversales (caché, almacenamiento, respuestas)
+│   ├── database/               # Migraciones, factories y seeders
+│   ├── routes/
+│   │   ├── api.php             # Carga las rutas de cada módulo
+│   │   └── api/                # Rutas por módulo
+│   └── tests/                  # Feature/ y Unit/Services/, por módulo
+├── frontend/                   # SPA (React + TypeScript + Vite)
+│   └── src/
+│       ├── app/                # App, providers y router
+│       ├── components/         # ui/ (shadcn), layout/, common/
+│       ├── features/           # Un directorio por funcionalidad
+│       ├── hooks/               # Hooks reutilizables
+│       ├── lib/                # Cliente HTTP y utilidades
+│       ├── types/               # Tipos compartidos
+│       └── config/              # Configuración y variables de entorno
+├── deployment/
+│   └── docker/                 # docker-compose, Apache, PostgreSQL, Redis
+└── docs/
+    └── architecture/           # Arquitectura, stack y decisiones (ADR)
 ```
 
-## Instalación
+Cada feature del frontend sigue esta plantilla (las subcarpetas se crean solo cuando se necesitan):
+
+```text
+features/<feature>/
+├── components/
+├── hooks/
+├── pages/
+├── services/
+├── types/
+└── index.ts        # API pública del feature
+```
+
+---
+
+## Requisitos previos
+
+- PHP 8.0 con las extensiones `pdo_pgsql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json` y `bcmath`
+- Extensión `redis` de PHP (o el paquete `predis/predis`, según `REDIS_CLIENT`)
+- Composer 2
+- Node.js 22 y npm 10
+- PostgreSQL 15
+- Redis 7
+- Docker y Docker Compose *(opcional; el `docker-compose.yml` del proyecto todavía no está creado)*
+
+---
+
+## Instalación y ejecución
 
 ### 1. Clonar el repositorio
 
 ```bash
 git clone https://github.com/Corvus-Code-SRL/Sistema-de-Control-de-Ingreso-a-Examenes-Masivos.git
 cd Sistema-de-Control-de-Ingreso-a-Examenes-Masivos
-```
-
-### 2. Cambiar a la rama de desarrollo
-
-```bash
 git checkout develop
-git pull origin develop
 ```
 
-La rama `develop` constituye la base para el desarrollo de nuevas funcionalidades.
-
-### 3. Configurar Node.js
-
-Si se utiliza `mise`:
-
-```bash
-mise install
-```
-
-Comprobar las versiones:
-
-```bash
-node -v
-npm -v
-```
-
-Versiones esperadas:
-
-```text
-Node.js 22.23.2
-npm 10.9.8
-```
-
-## Configuración del Backend
-
-Entrar al directorio:
+### 2. Backend
 
 ```bash
 cd backend
-```
-
-Instalar exactamente las dependencias definidas en `composer.lock`:
-
-```bash
 composer install
-```
-
-Crear el archivo local de variables de entorno:
-
-```bash
 cp .env.example .env
-```
-
-En Windows PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Generar la clave de Laravel:
-
-```bash
 php artisan key:generate
 ```
 
-### Base de datos
+Configurar la conexión en `.env` (el `.env.example` actual todavía trae los valores por defecto de MySQL — hay que sobrescribirlos):
 
-SCIEM utiliza PostgreSQL.
-
-Cada desarrollador debe crear una base de datos local para el proyecto y configurar sus credenciales en:
-
-```text
-backend/.env
-```
-
-Ejemplo:
-
-```env
+```dotenv
 DB_CONNECTION=pgsql
 DB_HOST=127.0.0.1
 DB_PORT=5432
 DB_DATABASE=sciem
 DB_USERNAME=postgres
 DB_PASSWORD=
+
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
 ```
 
-Las credenciales son locales y no deben subirse al repositorio.
-
-Cuando existan migraciones pendientes:
+Crear las tablas y levantar el servidor:
 
 ```bash
 php artisan migrate
+php artisan serve        # http://localhost:8000
 ```
 
-> No utilizar `php artisan migrate:fresh` sobre una base de datos con información que se desee conservar, ya que elimina las tablas antes de volver a ejecutar las migraciones.
+> Usar `composer install`, **nunca** `composer update`, para respetar las versiones de `composer.lock`.
+> No usar `php artisan migrate:fresh` sobre una base de datos con información que se desee conservar.
 
-## Configuración del Frontend
-
-Desde la raíz del proyecto:
-
-```bash
-cd frontend
-```
-
-Instalar exactamente las dependencias definidas en `package-lock.json`:
-
-```bash
-npm ci
-```
-
-Validar que el frontend compile correctamente:
-
-```bash
-npm run build
-```
-
-### shadcn/ui
-
-shadcn ya se encuentra configurado dentro del proyecto.
-
-No es necesario instalarlo globalmente.
-
-Antes de agregar un componente nuevo se debe comprobar si ya existe en:
-
-```text
-frontend/src/components/ui/
-```
-
-Para agregar un componente nuevo se debe utilizar la versión definida por el proyecto:
-
-```bash
-npm run shadcn -- add <componente>
-```
-
-Ejemplo:
-
-```bash
-npm run shadcn -- add checkbox
-```
-
-No utilizar versiones diferentes del CLI sin coordinación previa con el equipo.
-
-## Ejecución en desarrollo
-
-Para trabajar con el sistema se recomienda utilizar dos terminales.
-
-### Backend
-
-Desde la raíz del proyecto:
-
-```bash
-cd backend
-php artisan serve
-```
-
-Por defecto estará disponible en:
-
-```text
-http://127.0.0.1:8000
-```
-
-### Frontend
-
-En otra terminal:
-
-```bash
-cd frontend
-npm run dev
-```
-
-Por defecto estará disponible en:
-
-```text
-http://localhost:5173
-```
-
-Apache no es necesario para ejecutar el proyecto durante el desarrollo local. Su configuración se considera principalmente para el entorno de despliegue.
-
-## Validación del entorno
-
-Antes de comenzar a desarrollar, cada integrante debe comprobar que los siguientes comandos funcionan correctamente.
-
-### Backend
-
-```bash
-cd backend
-composer install
-php artisan --version
-```
-
-La versión esperada de Laravel es:
-
-```text
-Laravel Framework 8.83.29
-```
-
-### Frontend
+### 3. Frontend
 
 ```bash
 cd frontend
 npm ci
-npm run build
+npm run dev              # http://localhost:5173
 ```
 
-El build debe finalizar sin errores.
+En desarrollo, Vite redirige las peticiones de `/api` al backend (`http://localhost:8000`) para simular el mismo origen del despliegue.
 
-## Arquitectura
+> Usar `npm ci`, **nunca** `npm update`, para respetar las versiones de `package-lock.json`.
 
-SCIEM utiliza una arquitectura cliente-servidor.
+### 4. Entorno con Docker (pendiente)
 
-El flujo general es:
+El despliegue con un solo contenedor Apache (frontend compilado + API en el mismo origen) está definido como objetivo en `docs/architecture/`, pero `docker-compose.yml`, el `Dockerfile` de Apache y `sciem.conf` todavía no existen en `deployment/docker/`. Docker no es necesario para desarrollar localmente.
 
-```text
-React + TypeScript
-        ↓
-      API REST
-        ↓
-      Laravel
-        ↓
-     Services
-        ↓
-     Eloquent
-        ↓
-    PostgreSQL
-```
+---
 
-En el backend se utiliza principalmente el siguiente flujo:
-
-```text
-Route
-  ↓
-Controller
-  ↓
-Form Request
-  ↓
-Service
-  ↓
-Eloquent Model
-  ↓
-PostgreSQL
-```
-
-Redis se considera infraestructura transversal para caché y otros mecanismos que se definan durante el desarrollo.
-
-La documentación detallada de arquitectura se encuentra en:
-
-```text
-docs/architecture/overview.md
-```
-
-El stack tecnológico se encuentra documentado en:
-
-```text
-docs/architecture/stack.md
-```
-
-## Convención de ramas
-
-Las ramas principales son:
-
-```text
-main
-develop
-```
-
-`main` representa las versiones estables del sistema.
-
-`develop` constituye la rama base para el desarrollo.
-
-No se debe desarrollar directamente sobre `main` ni `develop`.
-
-Las ramas de trabajo siguen las siguientes convenciones:
-
-```text
-feature/<descripcion>
-fix/<descripcion>
-hotfix/<descripcion>
-chore/<descripcion>
-release/<version>
-```
-
-Ejemplos:
-
-```text
-feature/registro-estudiantes
-feature/configuracion-examen
-fix/validacion-codigo-sis
-chore/configurar-shadcn
-release/v1.0.0
-```
-
-Las descripciones deben escribirse:
-
-- en español;
-- en minúsculas;
-- utilizando guiones;
-- sin espacios;
-- sin tildes;
-- sin `ñ`;
-- sin caracteres especiales.
-
-### Crear una rama de trabajo
-
-Antes de iniciar una tarea:
+## Pruebas
 
 ```bash
-git checkout develop
-git pull origin develop
-```
+# Backend
+cd backend
+php artisan test
 
-Crear la nueva rama:
-
-```bash
-git checkout -b feature/<descripcion>
-```
-
-Ejemplo:
-
-```bash
-git checkout -b feature/registro-estudiantes
-```
-
-Al terminar el trabajo se debe realizar un Pull Request hacia:
-
-```text
-develop
-```
-
-No se deben realizar Pull Requests de una rama `feature/*` directamente hacia `main`.
-
-## Convención de commits
-
-Se recomienda utilizar mensajes breves y descriptivos.
-
-Ejemplos:
-
-```text
-feat: implementar registro de estudiantes
-fix: corregir validacion de codigo sis
-chore: agregar componente checkbox
-docs: actualizar configuracion de desarrollo
-```
-
-## Gestión de dependencias
-
-Después de clonar el repositorio se debe utilizar:
-
-### Backend
-
-```bash
-composer install
-```
-
-### Frontend
-
-```bash
-npm ci
-```
-
-No utilizar:
-
-```text
-composer update
-npm update
-```
-
-ni actualizar dependencias sin coordinación previa con el equipo.
-
-Los archivos:
-
-```text
-composer.lock
-package-lock.json
-```
-
-deben mantenerse dentro del repositorio para garantizar que todos los integrantes trabajen con las mismas versiones.
-
-El proyecto utiliza versiones exactas de sus dependencias para reducir diferencias entre entornos de desarrollo.
-
-## Estándares del Frontend
-
-Los componentes reutilizables de interfaz se encuentran principalmente en:
-
-```text
-frontend/src/components/ui/
-```
-
-Los componentes globales y reutilizables que no pertenezcan estrictamente al conjunto base de UI pueden ubicarse en:
-
-```text
-frontend/src/components/common/
-```
-
-Los componentes de estructura general de la aplicación se encuentran en:
-
-```text
-frontend/src/components/layout/
-```
-
-Los componentes específicos de una funcionalidad deben mantenerse dentro de su correspondiente `feature`.
-
-Ejemplos:
-
-```text
-frontend/src/features/students/
-frontend/src/features/exams/
-frontend/src/features/groups/
-frontend/src/features/admissions/
-```
-
-Cuando exista un componente base en shadcn o en `components/ui`, debe reutilizarse y adaptarse antes de crear un componente equivalente desde cero.
-
-No se deben crear colores, radios, espaciados o estilos arbitrarios cuando ya exista un token o una regla definida por el Design System de SCIEM.
-
-La interfaz utiliza Lucide como sistema principal de iconografía.
-
-## Centrales de Riesgo
-
-SCIEM mantiene dos contextos independientes para la gestión de riesgo:
-
-```text
-Central de Riesgo Académica
-→ estudiantes de la universidad
-
-Central de Riesgo de Admisión
-→ postulantes
-```
-
-Los registros de ambas centrales no deben mezclarse.
-
-## Recomendaciones de trabajo en equipo
-
-Antes de comenzar a trabajar en una Historia de Usuario:
-
-```bash
-git checkout develop
-git pull origin develop
-git checkout -b feature/<descripcion>
-```
-
-Durante el desarrollo:
-
-- reutilizar componentes existentes antes de crear nuevos;
-- respetar la arquitectura definida;
-- no modificar dependencias sin coordinación;
-- no subir archivos `.env`;
-- no desarrollar directamente sobre `main` o `develop`;
-- mantener los cambios relacionados con una tarea dentro de su rama correspondiente;
-- ejecutar las validaciones del frontend y backend antes de realizar un Pull Request.
-
-Antes de enviar un Pull Request se recomienda comprobar:
-
-```bash
+# Frontend
 cd frontend
 npm run build
 ```
 
-y, para el backend:
+> El frontend todavía no tiene ESLint configurado (`npm run lint` no existe como script); la única validación disponible hoy es que `npm run build` (type-check + build) termine sin errores.
 
-```bash
-cd backend
-php artisan --version
-```
+---
 
-El Pull Request debe realizarse hacia `develop`.
+## Convenciones
+
+### Backend
+
+- Flujo obligatorio: `Controller → FormRequest → Service → Model`; la respuesta se devuelve mediante un `Resource`.
+- Los controladores no contienen lógica de negocio ni consultas Eloquent directas.
+- Las transacciones se abren en los Services.
+- Los modelos usan nombres en inglés y declaran la tabla explícitamente (`protected $table = 'grupo';`).
+- Las Centrales de Riesgo Académica y de Admisión no se referencian entre sí.
+
+Detalle completo (idioma, PSR-12, naming, capas) en [`.claude/rules/code-style-backend.md`](.claude/rules/code-style-backend.md).
+
+### Frontend
+
+| Elemento | Convención | Ejemplo |
+|---|---|---|
+| Componente | `PascalCase.tsx` | `StudentTable.tsx` |
+| Página | `NombrePage.tsx` | `StudentsPage.tsx` |
+| Hook | `useNombre.ts` | `useStudents.ts` |
+| Servicio | `nombreService.ts` | `studentService.ts` |
+| Tipos | `nombre.types.ts` | `student.types.ts` |
+
+- `.tsx` solo para archivos con JSX; el resto, `.ts`.
+- Un feature solo importa de otro feature a través de su `index.ts`.
+- `components/ui/` se gestiona solo con el CLI de shadcn (`npm run shadcn -- add <componente>`); los componentes propios van en `components/common/`.
+- Todas las peticiones HTTP pasan por `lib/api-client.ts`.
+
+### General
+
+- No subir archivos `.env` (ya excluidos vía `.gitignore`).
+- `composer.lock` y `package-lock.json` se mantienen versionados.
+
+---
+
+## Flujo de trabajo
+
+- `develop` es la rama de integración; `main` representa versiones estables. No se desarrolla directamente sobre ninguna de las dos.
+- Cada Historia de Usuario se desarrolla en una rama propia creada desde `develop`, siguiendo el formato y los tipos definidos en [`.claude/rules/git-branches.md`](.claude/rules/git-branches.md) (`feature/HU-XXX-descripcion`, `fix/HU-XXX-descripcion`, `refactor/descripcion`, `release/vX.Y.Z`, `hotfix/vX.Y.Z-descripcion`).
+- Los commits siguen el formato Conventional Commits definido en [`.claude/rules/git-commits.md`](.claude/rules/git-commits.md) (`feat:`, `fix:`, `refactor:`, `docs:`, `style:`, `test:`, `perf:`, `build:`, `ci:`, `chore:`).
+- Los cambios se integran mediante Pull Request hacia `develop`, con revisión de al menos un integrante.
+
+---
+
+## Documentación
+
+| Documento | Descripción |
+|---|---|
+| [`docs/architecture/overview.md`](docs/architecture/overview.md) | Descripción de la arquitectura y sus capas |
+| `docs/architecture/justificacion-arquitectura.md` | Justificación de la arquitectura y de la estructura del repositorio *(pendiente de redactar)* |
+| [`docs/architecture/stack.md`](docs/architecture/stack.md) | Stack tecnológico y versiones |
+| [`docs/architecture/decisions/`](docs/architecture/decisions/) | Registro de decisiones de arquitectura (ADR) |
+| [`.claude/rules/git-branches.md`](.claude/rules/git-branches.md) | Convención de nombres de ramas |
+| [`.claude/rules/git-commits.md`](.claude/rules/git-commits.md) | Convención de mensajes de commit |
+| [`.claude/rules/code-style-backend.md`](.claude/rules/code-style-backend.md) | Estándares de código del backend |
+
+---
+
+## Empresa
+
+| | |
+|---|---|
+| **Razón social** | Corvus Code S.R.L. |
+| **Representante legal** | Carlos Diego Mariscal Segovia |
+| **Correo** | corvuscodesrl@gmail.com |
+| **Consultora TIS** | Leticia Blanco Coca |
+| **Convocatoria** | CPTIS-452026-2026 |
+
+Proyecto académico desarrollado para la materia Taller de Ingeniería de Software — UMSS.
