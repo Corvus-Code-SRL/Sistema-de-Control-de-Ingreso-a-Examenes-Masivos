@@ -61,6 +61,11 @@ class Exam extends Model
 		return $this->belongsTo(ExamType::class, 'id_tipo_examen');
 	}
 
+	public function tipo_examen()
+	{
+		return $this->examType();
+	}
+
 	public function admissionExams()
 	{
 		return $this->hasMany(ExamenAdmision::class, 'id_examen');
@@ -69,6 +74,11 @@ class Exam extends Model
 	public function classrooms()
 	{
 		return $this->belongsToMany(Classroom::class, 'examen_ambiente', 'id_examen', 'id_ambiente');
+	}
+
+	public function ambiente()
+	{
+		return $this->classrooms();
 	}
 
 	public function applicants()
