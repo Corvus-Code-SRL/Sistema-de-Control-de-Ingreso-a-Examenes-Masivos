@@ -6,6 +6,7 @@ use App\Models\Group;
 use App\Support\RecordStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 
@@ -49,6 +50,39 @@ class GroupService
     }
 
     /**
+     * Ubica un grupo por sí solo, con su par materia-carrera y periodo: es la unidad
+     * sobre la que después se prepara la información de estudiantes.
+     */
+    public function showGroup(int $groupId): array
+    {
+        $group = $this->baseGroupQuery()
+            ->where('grupo.id_grupo', $groupId)
+            ->first();
+
+        if ($group === null) {
+            throw new ModelNotFoundException('No existe el grupo indicado.');
+        }
+
+        $pair = $this->subjectCatalog->findSelectablePair(
+            (int) $group->id_carrera,
+            (int) $group->id_materia
+        );
+
+        $this->markOwnGroup($group, $this->subjectCatalog->teacherId());
+
+        $activePeriodId = $this->subjectCatalog->activePeriodId();
+
+        return [
+            'group' => $group,
+            'pair' => $pair,
+            'meta' => [
+                'id_periodo_activo' => $activePeriodId,
+                'es_periodo_activo' => (int) $group->id_periodo === $activePeriodId,
+            ],
+        ];
+    }
+
+    /**
      * El nombre del docente se toma por join: el modelo de usuario todavía apunta a la
      * tabla por defecto de Laravel y su mapeo corresponde a la historia de autenticación.
      */
@@ -82,7 +116,12 @@ class GroupService
         $teacherId = $this->subjectCatalog->teacherId();
 
         return $groups->each(function (Group $group) use ($teacherId): void {
-            $group->es_mio = (string) $group->id_usuario_docente === $teacherId;
+            $this->markOwnGroup($group, $teacherId);
         });
+    }
+
+    private function markOwnGroup(Group $group, string $teacherId): void
+    {
+        $group->es_mio = (string) $group->id_usuario_docente === $teacherId;
     }
 }
