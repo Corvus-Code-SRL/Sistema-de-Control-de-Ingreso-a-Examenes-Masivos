@@ -15,6 +15,14 @@ class GroupResource extends JsonResource
             'gestion' => $this->gestion,
             'activo' => $this->estado === RecordStatus::ACTIVE,
             'es_mio' => (bool) $this->es_mio,
+            'cantidad_estudiantes' => (int) $this->cantidad_estudiantes,
+            'docente' => [
+                'nombre_completo' => implode(' ', array_filter([
+                    $this->docente_nombre,
+                    $this->docente_apellido_paterno,
+                    $this->docente_apellido_materno,
+                ])),
+            ],
             'periodo' => [
                 'id_periodo' => (int) $this->period->id_periodo,
                 'nombre_periodo' => $this->period->nombre_periodo,
