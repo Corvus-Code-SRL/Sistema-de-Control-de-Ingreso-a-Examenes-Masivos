@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Exams;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Solicitud de validación para la creación de un nuevo examen.
@@ -29,14 +30,14 @@ class CreateExamRequest extends FormRequest
         return [
             'nombre_examen'  => 'required|string|max:25',
             'id_materia'     => 'required|integer|exists:materia,id_materia',
-            'categoria'      => 'sometimes|required|string|in:REGULAR,FINAL,MESA,ADMISION',
+            'categoria'      => 'sometimes|required|string|in:REGULAR,MESA,ADMISION',
             'fecha'          => 'required|date|after_or_equal:today',
             'hora_inicio'    => 'required|date_format:H:i',
             'duracion'       => 'required|integer|min:1',
             'ambientes'      => 'required|array|min:1',
             'ambientes.*'    => 'required|integer|exists:ambiente,id_ambiente',
-            //'grupos'         => 'nullable|array',
-            //'grupos.*'       => 'integer|exists:grupo,id_grupo',
+            'grupos'         => 'nullable|array',
+            'grupos.*'       => 'integer|exists:grupo,id_grupo',
             'normas'         => 'nullable|string|max:255',
         ];
     }
@@ -91,6 +92,54 @@ class CreateExamRequest extends FormRequest
             'normas'         => 'normas',
         ];
     }
+
+    /**
+     * Validación adicional para coincidencia de docente, materia y presencia de nómina en grupos.
+     */
+    public function withValidator($validator)
+    {
+        $validator->after(function ($validator) {
+            $grupoIds = $this->input('grupos', []);
+            $idMateria = $this->input('id_materia');
+            $docenteId = auth()->id() ?? DB::table('usuario')->where('estado', 'ACTIVO')->value('id_usuario');
+
+            if (empty($grupoIds) || !is_array($grupoIds)) {
+                return;
+            }
+
+            $grupos = DB::table('grupo')
+                ->whereIn('id_grupo', array_filter($grupoIds, 'is_numeric'))
+                ->get();
+
+            foreach ($grupos as $grupo) {
+                // Validación I1: Grupo debe pertenecer al docente actual
+                if ($docenteId && $grupo->id_usuario_docente != $docenteId) {
+                    $validator->errors()->add(
+                        'grupos',
+                        "El grupo {$grupo->num_grupo} no pertenece al docente actual."
+                    );
+                }
+
+                // Validación I3: Grupo debe pertenecer a la misma materia
+                if ($idMateria && (int) $grupo->id_materia !== (int) $idMateria) {
+                    $validator->errors()->add(
+                        'grupos',
+                        "El grupo {$grupo->num_grupo} no pertenece a la materia seleccionada para el examen."
+                    );
+                }
+
+                // Validación I2: El grupo debe tener una nómina de estudiantes cargada
+                $cantidadEstudiantes = DB::table('grupo_estudiante')
+                    ->where('id_grupo', $grupo->id_grupo)
+                    ->count();
+
+                if ($cantidadEstudiantes === 0) {
+                    $validator->errors()->add(
+                        'grupos',
+                        "El grupo {$grupo->num_grupo} no tiene una nómina de estudiantes cargada."
+                    );
+                }
+            }
+        });
+    }
 }
-
-
