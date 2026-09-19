@@ -1,115 +1,169 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
-import {
-  Home,
-  BookOpen,
-  Users,
-  GraduationCap,
-  UserCheck,
-  FileText,
-  Clock,
-  History,
-  ShieldCheck,
-  AlertTriangle,
-  LogOut
-} from 'lucide-react';
-import { cn } from 'cn';
+import React, { useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { navigationConfig, MenuSection } from '@/config/navigation';
 
-interface MenuItem {
-  label: string;
-  path: string;
-  icon: React.ComponentType<{ className?: string }>;
+interface SidebarProps {
+  sections?: MenuSection[];
+  onToggleCollapse?: (collapsed: boolean) => void;
+  onItemClick?: () => void;
 }
 
-interface MenuSection {
-  title?: string;
-  items: MenuItem[];
-}
+export const Sidebar: React.FC<SidebarProps> = ({
+  sections = navigationConfig,
+  onToggleCollapse,
+  onItemClick,
+}) => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const location = useLocation();
 
-const menuSections: MenuSection[] = [
-  {
-    items: [
-      { label: 'Inicio', path: '/dashboard', icon: Home },
-    ]
-  },
-  {
-    title: 'Gestión Académica',
-    items: [
-      { label: 'Mis Materias', path: '/subjects', icon: BookOpen },
-      { label: 'Grupos Académicos', path: '/groups', icon: Users },
-      { label: 'Nóminas de Estudiantes', path: '/students', icon: GraduationCap },
-      { label: 'Usuarios Auxiliares', path: '/assistants', icon: UserCheck },
-    ]
-  },
-  {
-    title: 'Exámenes',
-    items: [
-      { label: 'Exámenes programados', path: '/exams', icon: FileText },
-      { label: 'Exámenes en Curso', path: '/exams/in-progress', icon: Clock },
-      { label: 'Historial y Reportes', path: '/exams/history', icon: History },
-    ]
-  },
-  {
-    title: 'Central de Riesgo',
-    items: [
-      { label: 'Verificar Antecedentes', path: '/risk-center/verify', icon: ShieldCheck },
-      { label: 'Revisar Incidencias', path: '/incidents', icon: AlertTriangle },
-    ]
-  },
-  {
-    title: 'Cuenta',
-    items: [
-      { label: 'Sesión', path: '/logout', icon: LogOut },
-    ]
-  }
-];
+  const handleToggle = () => {
+    const nextCollapsed = !isCollapsed;
+    setIsCollapsed(nextCollapsed);
+    if (onToggleCollapse) {
+      onToggleCollapse(nextCollapsed);
+    }
+  };
 
-export const Sidebar: React.FC = () => {
   return (
-    <aside className="w-64 bg-[#05383E] text-white flex flex-col justify-between shrink-0 min-h-screen border-r border-[#002D33]">
-      <div className="py-6 px-5 space-y-6">
-        {/* SCIEM Brand Header */}
-        <div className="space-y-1 pb-4 border-b border-[#0A4D54]">
-          <h1 className="text-xl font-bold tracking-tight text-white">SCIEM</h1>
-          <p className="text-[11px] text-[#A2C7CC] leading-tight font-normal">
-            Sistema de Control de<br />Ingreso a Exámenes Masivos
-          </p>
+    <aside
+      className={cn(
+        "bg-[#05383E] text-[#D8ECEE] flex flex-col justify-between shrink-0 min-h-screen border-r border-[#0F4A51] transition-all duration-300 relative select-none",
+        isCollapsed ? "w-[72px]" : "w-[272px]"
+      )}
+    >
+      {/* Top Brand Block */}
+      <div className="flex flex-col">
+        <div
+          className={cn(
+            "h-[76px] flex items-center gap-3 border-b border-[#0F4A51] transition-all duration-300",
+            isCollapsed ? "justify-center px-4" : "px-5"
+          )}
+        >
+          <div className="w-10 h-10 rounded-xl bg-[#005E68] text-white font-bold text-lg flex items-center justify-center shrink-0 shadow-xs border border-[#007A87]/30">
+            S
+          </div>
+
+          {!isCollapsed && (
+            <div className="flex flex-col min-w-0">
+              <span className="font-bold text-[17px] leading-tight text-white tracking-wide">
+                SCIEM
+              </span>
+              <span className="text-[12px] text-[#8FC7CC] leading-tight whitespace-nowrap truncate font-normal">
+                Control de Ingreso a Exámenes
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Navigation Sections */}
-        <div className="space-y-5">
-          {menuSections.map((section, idx) => (
-            <div key={idx} className="space-y-1.5">
-              {section.title && (
-                <p className="px-2 text-xs font-semibold text-[#84ACB1] tracking-wide">
+        {/* Dynamic Navigation Menu Sections */}
+        <nav aria-label="Main Navigation" className="p-3 space-y-4 overflow-y-auto">
+          {sections.map((section) => (
+            <div key={section.id} className="space-y-1">
+              {section.title && !isCollapsed && (
+                <p className="px-3 pt-4 pb-1.5 text-[11px] font-semibold text-[#7FB0B5] uppercase tracking-wider leading-none">
                   {section.title}
                 </p>
               )}
-              <div className="space-y-0.5">
+
+              {section.title && isCollapsed && (
+                <div className="my-2 mx-auto w-6 h-[1px] bg-[#24626A]" />
+              )}
+
+              <div className="space-y-1">
                 {section.items.map((item) => {
                   const Icon = item.icon;
+                  const isActive =
+                    location.pathname === item.path ||
+                    (item.path !== '/' &&
+                      item.path !== '/dashboard' &&
+                      location.pathname.startsWith(item.path));
+
                   return (
                     <NavLink
-                      key={item.path}
+                      key={item.id}
                       to={item.path}
-                      className={({ isActive }) =>
-                        cn(
-                          "flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors duration-150",
-                          isActive
-                            ? "bg-[#005E68] text-white font-semibold shadow-sm"
-                            : "text-[#C7E0E3] hover:bg-[#084850] hover:text-white"
-                        )
-                      }
+                      onClick={onItemClick}
+                      title={isCollapsed ? item.label : undefined}
+                      className={cn(
+                        "relative flex items-center gap-3 h-[40px] px-3 rounded-lg text-sm transition-colors duration-150 group",
+                        isCollapsed ? "justify-center px-0" : "px-3",
+                        isActive
+                          ? "bg-[#005E68] text-white font-semibold shadow-xs"
+                          : "text-[#D8ECEE] font-medium hover:bg-[#084850] hover:text-white"
+                      )}
                     >
-                      <Icon className="h-4 w-4 shrink-0 opacity-85" />
-                      <span>{item.label}</span>
+                      {/* Gold Accent Bar on Active Item */}
+                      {isActive && (
+                        <span className="absolute -left-3 top-2 w-[3px] h-6 rounded-r-sm bg-[#FFCB32] shadow-xs" />
+                      )}
+
+                      <Icon
+                        className={cn(
+                          "h-5 w-5 shrink-0 transition-opacity duration-150",
+                          isActive ? "opacity-100 text-white" : "opacity-80 group-hover:opacity-100"
+                        )}
+                      />
+
+                      {!isCollapsed && (
+                        <span className="flex-1 truncate leading-none">
+                          {item.label}
+                        </span>
+                      )}
+
+                      {/* Optional Counter/Badge */}
+                      {item.badge !== undefined && (
+                        <span
+                          className={cn(
+                            "min-w-5 h-5 px-1.5 rounded-full bg-[#FFCB32] text-[#05383E] text-[11px] font-bold flex items-center justify-center leading-none shrink-0 shadow-xs",
+                            isCollapsed && "absolute top-1 right-1.5 min-w-[16px] h-4 text-[10px] px-1"
+                          )}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
                     </NavLink>
                   );
                 })}
               </div>
             </div>
           ))}
-        </div>
+        </nav>
+      </div>
+
+      {/* Footer & Sidebar Collapse Toggle */}
+      <div className="p-3 border-t border-[#0F4A51] space-y-1">
+        <button
+          type="button"
+          onClick={handleToggle}
+          className={cn(
+            "w-full flex items-center gap-3 h-[38px] px-3 rounded-lg text-xs font-medium text-[#8FC7CC] hover:bg-[#084850] hover:text-white transition-colors duration-150",
+            isCollapsed ? "justify-center px-0" : "px-3"
+          )}
+          title={isCollapsed ? "Expandir menú" : "Contraer menú"}
+        >
+          {isCollapsed ? (
+            <ChevronRight className="h-4 w-4 shrink-0" />
+          ) : (
+            <>
+              <ChevronLeft className="h-4 w-4 shrink-0" />
+              <span>Contraer menú</span>
+            </>
+          )}
+        </button>
+
+        <NavLink
+          to="/logout"
+          title={isCollapsed ? "Cerrar Sesión" : undefined}
+          className={cn(
+            "flex items-center gap-3 h-[38px] px-3 rounded-lg text-xs font-medium text-[#8FC7CC] hover:bg-red-900/40 hover:text-red-200 transition-colors duration-150",
+            isCollapsed ? "justify-center px-0" : "px-3"
+          )}
+        >
+          <LogOut className="h-4 w-4 shrink-0" />
+          {!isCollapsed && <span>Cerrar Sesión</span>}
+        </NavLink>
       </div>
     </aside>
   );
