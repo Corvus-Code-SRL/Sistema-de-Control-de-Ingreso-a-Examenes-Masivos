@@ -1,3 +1,5 @@
+export type ExamCategory = 'REGULAR' | 'FINAL' | 'MESA' | 'ADMISION';
+
 export interface Subject {
   id_materia: number;
   nombre: string;
@@ -8,6 +10,7 @@ export interface Classroom {
   id_ambiente: number;
   nro_aula: string;
   capacidad: number;
+  ubicacion?: string;
 }
 
 export interface Group {
@@ -16,14 +19,19 @@ export interface Group {
   gestion: string;
   estado: string;
   id_materia?: number;
+  cantidad_estudiantes?: number;
   tiene_nomina?: boolean;
   inscritos_count?: number;
+}
+
+export interface AssignGroupsPayload {
+  grupos: number[];
 }
 
 export interface ExamType {
   id_tipo_examen: number;
   nombre: string;
-  categoria: 'REGULAR' | 'FINAL' | 'MESA' | 'ADMISION';
+  categoria: ExamCategory;
 }
 
 export interface Exam {
@@ -51,7 +59,7 @@ export interface ExamFormOptions {
 export interface CreateExamFormData {
   nombre_examen: string;
   id_materia: number | null;
-  categoria: 'REGULAR' | 'FINAL' | 'MESA' | 'ADMISION';
+  categoria: ExamCategory;
   fecha: string;
   hora_inicio: string;
   duracion: number;
@@ -63,7 +71,7 @@ export interface CreateExamFormData {
 export interface CreateExamDto {
   nombre_examen: string;
   id_materia: number;
-  categoria: 'REGULAR' | 'FINAL' | 'MESA' | 'ADMISION';
+  categoria: ExamCategory;
   fecha: string;
   hora_inicio: string;
   duracion: number;
@@ -78,4 +86,32 @@ export interface StepValidationResult {
   isValid: boolean;
   errors: Record<string, string>;
   warnings: Record<string, string>;
+}
+
+export type StepStatus = 'pending' | 'active' | 'completed' | 'error';
+
+export interface ScheduledExamItem {
+  id: number;
+  nombre: string;
+  materia: string;
+  id_materia?: number;
+  grupoStr: string;
+  fechaISO: string;
+  dayNum: string;
+  daySubtitle: string;
+  horario: string;
+  estadoBadge: {
+    label: string;
+    type: 'warn' | 'info' | 'ok' | 'neutral';
+  };
+  aulas: string;
+  habilitadosCount: number;
+  auxiliaresStr: string;
+  canEdit?: boolean;
+}
+
+export interface DayGroupedExams {
+  dayNum: string;
+  daySubtitle: string;
+  exams: ScheduledExamItem[];
 }
