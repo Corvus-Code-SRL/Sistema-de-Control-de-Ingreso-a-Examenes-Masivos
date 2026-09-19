@@ -25,8 +25,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property Collection|InvitacionExamen[] $invitationExams
  * @property Collection|ReporteEstudiante[] $studentReports
  * @property Collection|ReportePostulante[] $applicantReports
- * @property Collection|Grupo[] $groups
- * @property Collection|Estudiante[] $students
+ * @property Collection|Group[] $groups
+ * @property Collection|Student[] $students
  * 
  * @package App\Models
  */
@@ -104,12 +104,12 @@ class Exam extends Model
 
 	public function groups()
 	{
-		return $this->belongsToMany(Grupo::class, 'grupo_examen', 'id_examen', 'id_grupo');
+		return $this->belongsToMany(Group::class, 'grupo_examen', 'id_examen', 'id_grupo');
 	}
 
 	public function students()
 	{
-		return $this->belongsToMany(Estudiante::class, 'examen_estudiante', 'id_examen', 'id_estudiante')
+		return $this->belongsToMany(Student::class, 'examen_estudiante', 'id_examen', 'id_estudiante')
 					->withPivot('estado_habilitacion', 'observacion', 'estado_ingreso', 'hora_ingreso', 'id_grupo');
 	}
 }
