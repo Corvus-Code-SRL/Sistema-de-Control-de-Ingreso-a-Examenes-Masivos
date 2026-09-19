@@ -102,7 +102,7 @@ Detalle en [`docs/architecture/stack.md`](docs/architecture/stack.md).
 
 ## Estructura del repositorio
 
-> La estructura de abajo es la **estructura objetivo** documentada en `docs/architecture/`. El scaffold actual ya cubre la mayor parte (carpetas por módulo en `Http/Controllers`, `Http/Requests`, `Services`, `routes/api/`; `deployment/docker/{apache,postgres,redis}`), pero todavía faltan por crear: `docker-compose.yml` y el `Dockerfile`/`sciem.conf` de Apache, `frontend/.env.example`, la configuración de ESLint del frontend, y las traducciones en `backend/resources/lang/es/`.
+> La estructura de abajo es la **estructura objetivo** documentada en `docs/architecture/`. El scaffold actual ya cubre la mayor parte (carpetas por módulo en `Http/Controllers`, `Http/Requests`, `Services`, `routes/api/`; `deployment/docker/{apache,postgres,redis}`), pero todavía faltan por crear: el `docker-compose.yml` de despliegue y el `Dockerfile`/`sciem.conf` de Apache, `frontend/.env.example`, la configuración de ESLint del frontend, y las traducciones en `backend/resources/lang/es/`.
 
 ```text
 .
@@ -159,7 +159,7 @@ features/<feature>/
 - Node.js 22 y npm 10
 - PostgreSQL 15
 - Redis 7
-- Docker y Docker Compose *(opcional; el `docker-compose.yml` del proyecto todavía no está creado)*
+- Docker y Docker Compose *(opcional; permite ejecutar el backend sin instalar PHP, PostgreSQL ni Redis: ver [`deployment/docker/README.md`](deployment/docker/README.md))*
 
 ---
 
@@ -218,9 +218,11 @@ En desarrollo, Vite redirige las peticiones de `/api` al backend (`http://localh
 
 > Usar `npm ci`, **nunca** `npm update`, para respetar las versiones de `package-lock.json`.
 
-### 4. Entorno con Docker (pendiente)
+### 4. Entorno con Docker (opcional)
 
-El despliegue con un solo contenedor Apache (frontend compilado + API en el mismo origen) está definido como objetivo en `docs/architecture/`, pero `docker-compose.yml`, el `Dockerfile` de Apache y `sciem.conf` todavía no existen en `deployment/docker/`. Docker no es necesario para desarrollar localmente.
+Para desarrollar sin instalar PHP, PostgreSQL ni Redis en el sistema, el backend puede ejecutarse con Docker Compose. La guía está en [`deployment/docker/README.md`](deployment/docker/README.md).
+
+El despliegue con un solo contenedor Apache (frontend compilado + API en el mismo origen) sigue pendiente: el `docker-compose.yml` de despliegue, el `Dockerfile` de Apache y `sciem.conf` todavía no existen.
 
 ---
 
@@ -290,6 +292,7 @@ Detalle completo (idioma, PSR-12, naming, capas) en [`.claude/rules/code-style-b
 | [`docs/architecture/overview.md`](docs/architecture/overview.md) | Descripción de la arquitectura y sus capas |
 | `docs/architecture/justificacion-arquitectura.md` | Justificación de la arquitectura y de la estructura del repositorio *(pendiente de redactar)* |
 | [`docs/architecture/stack.md`](docs/architecture/stack.md) | Stack tecnológico y versiones |
+| [`deployment/docker/README.md`](deployment/docker/README.md) | Entorno de desarrollo con Docker (PHP, PostgreSQL y Redis) |
 | [`docs/architecture/decisions/`](docs/architecture/decisions/) | Registro de decisiones de arquitectura (ADR) |
 | [`.claude/rules/git-branches.md`](.claude/rules/git-branches.md) | Convención de nombres de ramas |
 | [`.claude/rules/git-commits.md`](.claude/rules/git-commits.md) | Convención de mensajes de commit |
