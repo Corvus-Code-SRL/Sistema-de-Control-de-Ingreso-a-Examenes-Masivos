@@ -6,12 +6,11 @@ use App\Models\Group;
 use App\Models\SubjectCareer;
 use App\Support\RecordStatus;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Consulta el catálogo institucional de materias y los grupos de un par materia-carrera.
+ * Consulta el catálogo institucional de materias como pares materia-carrera.
  *
  * El docente no tiene relación directa con la materia: su vínculo se deriva de los
  * grupos que dicta en el periodo activo.
@@ -38,31 +37,16 @@ class SubjectCatalogService
         ];
     }
 
-    public function listGroupsForPair(int $careerId, int $subjectId): array
+    /**
+     * Resuelve el par que el docente fija como contexto de trabajo: debe existir y estar activo.
+     */
+    public function findSelectablePair(int $careerId, int $subjectId): SubjectCareer
     {
         $pair = $this->findPairOrFail($careerId, $subjectId);
 
         $this->assertPairIsSelectable($pair);
 
-        $groups = $this->markOwnGroups(
-            Group::query()
-                ->where('id_carrera', $careerId)
-                ->where('id_materia', $subjectId)
-                ->where('id_periodo', $this->activePeriodId())
-                ->with('period')
-                ->orderBy('num_grupo')
-                ->get()
-        );
-
-        return [
-            'pair' => $pair,
-            'groups' => $groups,
-            'meta' => [
-                'total' => $groups->count(),
-                'total_mios' => $groups->where('es_mio', true)->count(),
-                'id_periodo_activo' => $this->activePeriodId(),
-            ],
-        ];
+        return $pair;
     }
 
     public function activePeriodId(): int
@@ -70,7 +54,7 @@ class SubjectCatalogService
         return (int) config('sciem.periodo_activo_id');
     }
 
-    private function teacherId(): string
+    public function teacherId(): string
     {
         return (string) config('sciem.docente_fijo_id');
     }
@@ -132,14 +116,5 @@ class SubjectCatalogService
                 . 'y no puede establecerse como contexto de trabajo.',
             ],
         ]);
-    }
-
-    private function markOwnGroups(Collection $groups): Collection
-    {
-        $teacherId = $this->teacherId();
-
-        return $groups->each(function (Group $group) use ($teacherId): void {
-            $group->es_mio = (string) $group->id_usuario_docente === $teacherId;
-        });
     }
 }
