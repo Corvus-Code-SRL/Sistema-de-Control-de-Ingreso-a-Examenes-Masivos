@@ -17,3 +17,8 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
+
+// Cada módulo declara sus rutas en routes/api/<modulo>.php.
+foreach (glob(base_path('routes/api/*.php')) as $moduleRoutes) {
+    require $moduleRoutes;
+}
