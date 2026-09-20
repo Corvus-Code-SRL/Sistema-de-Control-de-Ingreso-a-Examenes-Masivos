@@ -758,6 +758,36 @@ class StudentRosterHttpTest extends TestCase
         );
     }
 
+    public function test_rechaza_nomina_sin_estudiantes(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $group = $this->ownActiveGroup();
+
+        $csv = 'Estudiante,Apellidos,Nombres';
+
+        $file = UploadedFile::fake()->createWithContent(
+            'nomina.csv',
+            $csv
+        );
+
+        $response = $this->post(
+            '/api/grupos/' . $group->id_grupo . '/nomina/preview',
+            [
+                'archivo' => $file,
+            ],
+            [
+                'Accept' => 'application/json',
+            ]
+        );
+
+        $response
+            ->assertStatus(422)
+            ->assertJson([
+                'message' => 'La nómina no contiene estudiantes.',
+            ]);
+    }
+
     private function validRosterCsv(): UploadedFile
     {
         $csv = implode(PHP_EOL, [
