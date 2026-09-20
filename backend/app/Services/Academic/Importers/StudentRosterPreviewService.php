@@ -3,6 +3,7 @@
 namespace App\Services\Academic\Importers;
 
 use App\Services\Academic\StudentRosterGroupAccess;
+use App\Exceptions\Academic\StudentRosterFileException;
 use LogicException;
 
 class StudentRosterPreviewService
@@ -43,6 +44,12 @@ class StudentRosterPreviewService
         $analysis = $this->analyzer->analyze(
             $reader->read($path)
         );
+
+        if ($analysis->totalRows() === 0) {
+            throw new StudentRosterFileException(
+                'La nómina no contiene estudiantes.'
+            );
+        }
 
         $matches = $this->databaseMatcher->classify(
             $groupId,
