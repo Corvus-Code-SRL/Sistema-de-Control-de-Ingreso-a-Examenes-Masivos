@@ -32,7 +32,7 @@ class GroupController extends Controller
     }
 
     /**
-     * HU-18: registra un grupo dentro de un par materia-carrera.
+     * registra un grupo dentro de un par materia-carrera.
      */
     public function store(StoreGrupoRequest $request): JsonResponse
     {
@@ -41,6 +41,19 @@ class GroupController extends Controller
         return ApiResponse::created(
             $this->groupPayload($result),
             'Grupo registrado correctamente.'
+        );
+    }
+
+    /**
+     * actualiza los datos habilitados de un grupo existente.
+     */
+    public function update(UpdateGrupoRequest $request, int $id_grupo): JsonResponse
+    {
+        $result = $this->groupService->updateGroup($id_grupo, $request->validated());
+
+        return ApiResponse::success(
+            $this->groupPayload($result),
+            'Grupo actualizado correctamente.'
         );
     }
 

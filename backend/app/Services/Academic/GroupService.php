@@ -138,6 +138,50 @@ class GroupService
     }
 
     /**
+     * id_carrera, id_materia e id_usuario_docente son inmutables: se leen del
+     * propio grupo, nunca del payload recibido, aunque el FormRequest los reciba.
+     */
+    public function updateGroup(int $groupId, array $data): array
+    {
+        $group = Group::query()->find($groupId);
+
+        if ($group === null) {
+            throw new ModelNotFoundException('No existe el grupo indicado.');
+        }
+
+        $this->assertGroupBelongsToTeacher($group);
+
+        $periodId = (int) ($data['id_periodo'] ?? $group->id_periodo);
+        $period = $this->findPeriodOrFail($periodId);
+
+        $this->assertNoDuplicateGroup(
+            (int) $group->id_carrera,
+            (int) $group->id_materia,
+            $data['num_grupo'],
+            $this->groupManagementFor($period),
+            $periodId,
+            (int) $group->id_grupo
+        );
+
+        DB::transaction(function () use ($group, $data, $period) {
+            try {
+                $group->fill([
+                    'num_grupo' => $data['num_grupo'],
+                    'gestion' => $this->groupManagementFor($period),
+                    'id_periodo' => $period->id_periodo,
+                ]);
+                $group->save();
+            } catch (QueryException $exception) {
+                throw $this->isUniqueViolation($exception)
+                    ? $this->duplicateGroupException()
+                    : $exception;
+            }
+        });
+
+        return $this->showGroup((int) $group->id_grupo);
+    }
+
+    /**
      * El mockup de "Nuevo grupo" (02-materias.html) solo pide N° de grupo y
      * Período académico: no hay un input de "Gestión" independiente. grupo.gestion
      * (varchar) se deriva del periodo.gestion (smallint) del período elegido.
@@ -245,5 +289,15 @@ class GroupService
     {
         // 23505 es el SQLSTATE de "unique_violation" en PostgreSQL.
         return $exception->getCode() === '23505';
+    }
+
+    /**
+     *un docente no opera grupos ajenos.
+     */
+    private function assertGroupBelongsToTeacher(Group $group): void
+    {
+        if ((string) $group->id_usuario_docente !== $this->subjectCatalog->teacherId()) {
+            throw new AuthorizationException('No tiene permiso sobre este grupo.');
+        }
     }
 }

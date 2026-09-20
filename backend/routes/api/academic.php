@@ -20,3 +20,5 @@ Route::get(
 Route::get('grupos/{id_grupo}', [GroupController::class, 'show']);
 
 Route::post('grupos', [GroupController::class, 'store']);
+
+Route::put('grupos/{id_grupo}', [GroupController::class, 'update']);
