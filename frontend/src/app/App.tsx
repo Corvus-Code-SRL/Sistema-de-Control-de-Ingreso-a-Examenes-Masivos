@@ -1,10 +1,13 @@
+import { SubjectProvider } from '../features/academic/context/SubjectContext';
+import SubjectSelector from '../features/academic/components/SubjectSelector';
+
 function App() {
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <h1 className="text-3xl font-bold">
-        SCIEM
-      </h1>
-    </main>
+    <SubjectProvider>
+      <main className="min-h-screen p-4">
+        <SubjectSelector />
+      </main>
+    </SubjectProvider>
   )
 }
 
