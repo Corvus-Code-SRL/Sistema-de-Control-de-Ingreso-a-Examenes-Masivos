@@ -1,11 +1,11 @@
+import { CuentasPage } from '../features/users/pages/CuentasPage';
+
 function App() {
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <h1 className="text-3xl font-bold">
-        SCIEM
-      </h1>
+    <main className="min-h-screen bg-[#F3F8F8]">
+      <CuentasPage />
     </main>
-  )
+  );
 }
 
-export default App
+export default App;
