@@ -1,11 +1,14 @@
-import { CuentasPage } from '../features/users/pages/CuentasPage';
+import { SubjectProvider } from '../features/academic/context/SubjectContext';
+import SubjectSelector from '../features/academic/components/SubjectSelector';
 
 function App() {
   return (
-    <main className="min-h-screen bg-[#F3F8F8]">
-      <CuentasPage />
-    </main>
-  );
+    <SubjectProvider>
+      <main className="min-h-screen p-4">
+        <SubjectSelector />
+      </main>
+    </SubjectProvider>
+  )
 }
 
-export default App;
+export default App

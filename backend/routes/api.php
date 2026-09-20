@@ -1,10 +1,24 @@
 <?php
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
- * Cada módulo define sus rutas en su propio archivo.
- * El prefijo /api y el middleware 'api' los aplica RouteServiceProvider.
- */
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register API routes for your application. These
+| routes are loaded by the RouteServiceProvider within a group which
+| is assigned the "api" middleware group. Enjoy building your API!
+|
+*/
 
-require __DIR__ . '/api/security.php';
+Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+    return $request->user();
+});
+
+// Cada módulo declara sus rutas en routes/api/<modulo>.php.
+foreach (glob(base_path('routes/api/*.php')) as $moduleRoutes) {
+    require $moduleRoutes;
+}
