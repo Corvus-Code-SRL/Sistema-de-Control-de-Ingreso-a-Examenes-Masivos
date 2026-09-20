@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/api-client'
 import type { PageRequest } from '@/types/api.types'
-import type { SubjectCatalogPage, SubjectCatalogResponse } from '../types/subject.types'
+import type { SubjectCatalogPage, SubjectCatalogResponse, MateriaFormState } from '../types/subject.types'
 
 export const DEFAULT_PER_PAGE = 8
 
@@ -52,4 +52,30 @@ function toPage(
     meta: response.meta,
     mensaje: response.mensaje ?? null,
   }
+}
+/* ==========================================================================
+    HU-006 (Registrar Materia)
+   ========================================================================== */
+
+/**
+ * Envía el formulario para registrar una nueva materia en el catálogo.
+ */
+export async function registrarMateria(data: MateriaFormState) {
+  // Como el apiClient actual solo está tipado para GET, usamos fetch nativo.
+  const response = await fetch('/api/materias', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    // Si Laravel devuelve error de validación (422), lo lanzamos para que la UI lo atrape
+    const errorData = await response.json();
+    throw errorData; 
+  }
+
+  return response.json();
 }
