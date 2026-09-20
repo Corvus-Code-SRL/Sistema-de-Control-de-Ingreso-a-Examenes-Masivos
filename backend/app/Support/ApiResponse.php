@@ -11,7 +11,7 @@ class ApiResponse
         $payload = ['data' => $data];
 
         if ($message !== null) {
-            $payload['message'] = $message;
+            $payload['mensaje'] = $message;
         }
 
         return response()->json($payload, $status);
@@ -22,6 +22,10 @@ class ApiResponse
         return self::success($data, $message, 201);
     }
 
+    /**
+     * Los errores conservan la clave `message` de Laravel: es la que leen el
+     * manejador de excepciones y el cliente HTTP del frontend.
+     */
     public static function error(string $message, int $status = 400, array $extra = []): JsonResponse
     {
         return response()->json(array_merge(['message' => $message], $extra), $status);

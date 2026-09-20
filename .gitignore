@@ -23,7 +23,6 @@ backend/bootstrap/cache/*.php
 frontend/node_modules/
 frontend/dist/
 
-
 # ==========================================
 # IDE / EDITORES
 # ==========================================

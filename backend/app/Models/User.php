@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Str;
 
 class User extends Model
@@ -62,7 +63,7 @@ class User extends Model
      * Eloquent no soporta PK compuestas en un modelo, por eso se trata
      * como tabla pivot mediante belongsToMany.
      */
-    public function roles()
+    public function roles(): BelongsToMany
     {
         return $this->belongsToMany(Role::class, 'usuario_rol', 'id_usuario', 'id_rol')
                     ->withPivot('fecha_inicio', 'fecha_fin');
