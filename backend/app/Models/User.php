@@ -4,10 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable; // <--- Cambio aquí
 use Illuminate\Support\Str;
 
-class User extends Model
+class User extends Authenticatable // <--- Cambio aquí
 {
     use HasFactory;
 
