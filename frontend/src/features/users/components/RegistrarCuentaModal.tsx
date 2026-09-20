@@ -33,7 +33,7 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
     setBackendErrorMsg('');
 
     try {
-      const response = await fetch(`http://localhost:8000/api/sis/verificar/${codSis}`, {
+      const response = await fetch(`/api/sis/verificar/${codSis}`, {
         headers: { 'Accept': 'application/json' }
       });
 
@@ -88,7 +88,7 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
     setFormErrors({});
 
     try {
-      const response = await fetch('http://localhost:8000/api/usuarios', {
+      const response = await fetch('/api/usuarios', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
