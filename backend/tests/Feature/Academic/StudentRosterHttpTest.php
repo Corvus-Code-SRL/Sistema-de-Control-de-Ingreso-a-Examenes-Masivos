@@ -788,6 +788,35 @@ class StudentRosterHttpTest extends TestCase
             ]);
     }
 
+    public function test_rechaza_archivo_que_supera_limite_de_10_mb(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $group = $this->ownActiveGroup();
+
+        $file = UploadedFile::fake()->create(
+            'nomina.csv',
+            10241,
+            'text/csv'
+        );
+
+        $response = $this->post(
+            '/api/grupos/' . $group->id_grupo . '/nomina/preview',
+            [
+                'archivo' => $file,
+            ],
+            [
+                'Accept' => 'application/json',
+            ]
+        );
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonValidationErrors([
+                'archivo',
+            ]);
+    }
+
     private function validRosterCsv(): UploadedFile
     {
         $csv = implode(PHP_EOL, [
