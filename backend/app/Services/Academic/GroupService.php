@@ -3,18 +3,22 @@
 namespace App\Services\Academic;
 
 use App\Models\Group;
+use App\Models\Period;
 use App\Support\RecordStatus;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
- * Consulta los grupos académicos de un par materia-carrera.
+ * Consulta y gestiona los grupos académicos de un par materia-carrera.
  *
- * El par se valida siempre contra el catálogo: un grupo solo es consultable si su
- * materia está activa en la carrera a la que pertenece.
+ * El par se valida siempre contra el catálogo: un grupo solo es consultable o
+ * registrable si su materia está activa en la carrera a la que pertenece.
  */
 class GroupService
 {
@@ -83,6 +87,80 @@ class GroupService
     }
 
     /**
+     * Registra un nuevo grupo dentro de un par materia-carrera (HU-18).
+     *
+     * "El docente tiene permiso sobre la materia" (CA 7) se resuelve igual que en
+     * el resto del módulo: el par debe existir y estar activo en el catálogo
+     * institucional (findSelectablePair). No existe una asignación docente-materia
+     * previa en el esquema: la pertenencia de un grupo a un docente nace en el
+     * propio registro (id_usuario_docente = docente que lo crea).
+     */
+    public function storeGroup(array $data): array
+    {
+        $pair = $this->subjectCatalog->findSelectablePair(
+            (int) $data['id_carrera'],
+            (int) $data['id_materia']
+        );
+
+        $periodId = (int) ($data['id_periodo'] ?? $this->subjectCatalog->activePeriodId());
+        $period = $this->findPeriodOrFail($periodId);
+
+        $this->assertNoDuplicateGroup(
+            (int) $pair->id_carrera,
+            (int) $pair->id_materia,
+            $data['num_grupo'],
+            $this->groupManagementFor($period),
+            $periodId
+        );
+
+        $group = DB::transaction(function () use ($pair, $data, $period) {
+            try {
+                return Group::create([
+                    'id_carrera' => $pair->id_carrera,
+                    'id_materia' => $pair->id_materia,
+                    'num_grupo' => $data['num_grupo'],
+                    'gestion' => $this->groupManagementFor($period),
+                    'estado' => RecordStatus::ACTIVE,
+                    'id_usuario_docente' => $this->subjectCatalog->teacherId(),
+                    'id_periodo' => $period->id_periodo,
+                ]);
+            } catch (QueryException $exception) {
+                // Red de seguridad ante una carrera entre dos solicitudes casi
+                // simultáneas: la validación de arriba ya cubre el caso normal,
+                // pero la constraint unq_grupo es la garantía real a nivel de datos.
+                throw $this->isUniqueViolation($exception)
+                    ? $this->duplicateGroupException()
+                    : $exception;
+            }
+        });
+
+        return $this->showGroup((int) $group->id_grupo);
+    }
+
+    /**
+     * El mockup de "Nuevo grupo" (02-materias.html) solo pide N° de grupo y
+     * Período académico: no hay un input de "Gestión" independiente. grupo.gestion
+     * (varchar) se deriva del periodo.gestion (smallint) del período elegido.
+     */
+    private function findPeriodOrFail(int $periodId): Period
+    {
+        $period = Period::query()->find($periodId);
+
+        if ($period === null) {
+            throw ValidationException::withMessages([
+                'id_periodo' => ['El período académico seleccionado no existe.'],
+            ]);
+        }
+
+        return $period;
+    }
+
+    private function groupManagementFor(Period $period): string
+    {
+        return (string) $period->gestion;
+    }
+
+    /**
      * El nombre del docente se toma por join: el modelo de usuario todavía apunta a la
      * tabla por defecto de Laravel y su mapeo corresponde a la historia de autenticación.
      */
@@ -123,5 +201,49 @@ class GroupService
     private function markOwnGroup(Group $group, string $teacherId): void
     {
         $group->es_mio = (string) $group->id_usuario_docente === $teacherId;
+    }
+
+    /**
+     * CA 8 (HU-18) y CA 5 (HU-19): la quíntupla completa (carrera, materia, número
+     * de grupo, gestión, período) es lo que define duplicidad, nunca la materia sola.
+     */
+    private function assertNoDuplicateGroup(
+        int $careerId,
+        int $subjectId,
+        string $groupNumber,
+        string $management,
+        int $periodId,
+        ?int $excludeGroupId = null
+    ): void {
+        $exists = Group::query()
+            ->where('id_carrera', $careerId)
+            ->where('id_materia', $subjectId)
+            ->where('num_grupo', $groupNumber)
+            ->where('gestion', $management)
+            ->where('id_periodo', $periodId)
+            ->when($excludeGroupId !== null, function (Builder $query) use ($excludeGroupId): void {
+                $query->where('id_grupo', '!=', $excludeGroupId);
+            })
+            ->exists();
+
+        if ($exists) {
+            throw $this->duplicateGroupException();
+        }
+    }
+
+    private function duplicateGroupException(): ValidationException
+    {
+        return ValidationException::withMessages([
+            'num_grupo' => [
+                'Ya existe un grupo con esta identificación en la misma materia, '
+                . 'carrera, gestión y período.',
+            ],
+        ]);
+    }
+
+    private function isUniqueViolation(QueryException $exception): bool
+    {
+        // 23505 es el SQLSTATE de "unique_violation" en PostgreSQL.
+        return $exception->getCode() === '23505';
     }
 }
