@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   BookOpen,
+  Building2,
   CalendarClock,
   ClipboardList,
   DoorOpen,
@@ -9,11 +10,13 @@ import {
   History,
   Home,
   PlaySquare,
+  ScrollText,
   ShieldCheck,
   SquarePen,
   Users,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import type { Area } from '@/features/auth'
 
 export interface NavItem {
   label: string
@@ -35,7 +38,7 @@ export interface NavGroup {
  * dar la forma completa del producto, pero sin destino: un enlace que no lleva
  * a ninguna parte confunde más que uno visiblemente pendiente.
  */
-export const navigation: NavGroup[] = [
+const navegacionDocente: NavGroup[] = [
   { items: [{ label: 'Inicio', icon: Home }] },
   {
     label: 'Gestión académica',
@@ -64,5 +67,31 @@ export const navigation: NavGroup[] = [
     ],
   },
 ]
+
+/**
+ * Navegación lateral del administrador.
+ *
+ * De momento solo Cuentas tiene pantalla (HU-01). Materias, facultades y
+ * carreras son el catálogo institucional que administran HU-06 y HU-07, aún sin
+ * construir, así que se listan deshabilitadas igual que las del docente.
+ */
+const navegacionAdministrador: NavGroup[] = [
+  { items: [{ label: 'Inicio', icon: Home }] },
+  {
+    label: 'Administración',
+    items: [
+      { label: 'Cuentas', icon: Users, to: '/cuentas' },
+      { label: 'Materias', icon: BookOpen },
+      { label: 'Facultades', icon: Building2 },
+      { label: 'Carreras', icon: GraduationCap },
+      { label: 'Bitácora', icon: ScrollText },
+    ],
+  },
+]
+
+export const navigationByArea: Record<Area, NavGroup[]> = {
+  docente: navegacionDocente,
+  administrador: navegacionAdministrador,
+}
 
 export const shieldIcon = ShieldCheck
