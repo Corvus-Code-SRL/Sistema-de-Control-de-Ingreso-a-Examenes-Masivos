@@ -10,3 +10,5 @@ use Illuminate\Support\Facades\Route;
 // HU-001
 Route::post('/usuarios', [UserController::class, 'store'])
      ->name('usuarios.store');
+
+Route::get('/sis/verificar/{cod_sis}', [UserController::class, 'verificarSis']);
