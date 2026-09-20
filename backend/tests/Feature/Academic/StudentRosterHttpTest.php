@@ -490,6 +490,130 @@ class StudentRosterHttpTest extends TestCase
             ]);
     }
 
+    public function test_rechaza_preview_de_grupo_de_otro_docente(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $group = Group::query()
+            ->where(
+                'id_usuario_docente',
+                $this->otroDocenteId
+            )
+            ->where(
+                'id_periodo',
+                $this->periodoActivoId
+            )
+            ->where(
+                'estado',
+                RecordStatus::ACTIVE
+            )
+            ->firstOrFail();
+
+        $response = $this->post(
+            '/api/grupos/' . $group->id_grupo . '/nomina/preview',
+            [
+                'archivo' => $this->validRosterCsv(),
+            ],
+            [
+                'Accept' => 'application/json',
+            ]
+        );
+
+        $response->assertStatus(403);
+    }
+
+    public function test_rechaza_preview_de_grupo_inactivo(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $activeGroup = $this->ownActiveGroup();
+
+        $group = Group::create([
+            'id_carrera' => $activeGroup->id_carrera,
+            'id_materia' => $activeGroup->id_materia,
+            'num_grupo' => '99',
+            'gestion' => $activeGroup->gestion,
+            'estado' => RecordStatus::INACTIVE,
+            'id_usuario_docente' => $this->docenteId,
+            'id_periodo' => $this->periodoActivoId,
+        ]);
+
+        $response = $this->post(
+            '/api/grupos/' . $group->id_grupo . '/nomina/preview',
+            [
+                'archivo' => $this->validRosterCsv(),
+            ],
+            [
+                'Accept' => 'application/json',
+            ]
+        );
+
+        $response->assertStatus(422);
+    }
+
+    public function test_rechaza_preview_de_grupo_de_periodo_anterior(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $group = Group::query()
+            ->where(
+                'id_usuario_docente',
+                $this->docenteId
+            )
+            ->where(
+                'id_periodo',
+                '!=',
+                $this->periodoActivoId
+            )
+            ->where(
+                'estado',
+                RecordStatus::ACTIVE
+            )
+            ->firstOrFail();
+
+        $response = $this->post(
+            '/api/grupos/' . $group->id_grupo . '/nomina/preview',
+            [
+                'archivo' => $this->validRosterCsv(),
+            ],
+            [
+                'Accept' => 'application/json',
+            ]
+        );
+
+        $response->assertStatus(422);
+    }
+
+    public function test_rechaza_preview_de_grupo_inexistente(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $response = $this->post(
+            '/api/grupos/999999999/nomina/preview',
+            [
+                'archivo' => $this->validRosterCsv(),
+            ],
+            [
+                'Accept' => 'application/json',
+            ]
+        );
+
+        $response->assertStatus(404);
+    }
+
+    private function validRosterCsv(): UploadedFile
+    {
+        $csv = implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres',
+            '20269999,PEREZ ROJAS,ANA MARIA',
+        ]);
+
+        return UploadedFile::fake()->createWithContent(
+            'nomina.csv',
+            $csv
+        );
+    }
+
     private function ownActiveGroup(): Group
     {
         return Group::query()
