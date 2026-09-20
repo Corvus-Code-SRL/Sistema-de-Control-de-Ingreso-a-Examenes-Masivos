@@ -99,6 +99,60 @@ class StudentRosterDatabaseMatcherTest extends TestCase
         $this->assertNull($new->studentId());
     }
 
+    public function test_identifica_inscripcion_inactiva_sin_reactivarla(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $groupId = $this->ownGroupId();
+
+        $student = $this->createStudent(
+            '20230456',
+            '10000003'
+        );
+
+        DB::table('grupo_estudiante')->insert([
+            'id_grupo' => $groupId,
+            'id_estudiante' => $student->id_estudiante,
+            'fecha_inscripcion' => '2026-08-15',
+            'estado' => RecordStatus::INACTIVE,
+        ]);
+
+        $analysis = $this->analyze([
+            new StudentRosterRow(
+                2,
+                '20230456',
+                'VARGAS FLORES',
+                'MARIA'
+            ),
+        ]);
+
+        $matches = (new StudentRosterDatabaseMatcher())
+            ->classify($groupId, $analysis);
+
+        $this->assertCount(1, $matches);
+
+        $this->assertSame(
+            StudentRosterDatabaseMatch::INACTIVE_ENROLLMENT,
+            $matches[0]->status()
+        );
+
+        $this->assertSame(
+            $student->id_estudiante,
+            $matches[0]->studentId()
+        );
+
+        $this->assertSame(
+            RecordStatus::INACTIVE,
+            DB::table('grupo_estudiante')
+                ->where('id_grupo', $groupId)
+                ->where(
+                    'id_estudiante',
+                    $student->id_estudiante
+                )
+                ->value('estado')
+        );
+    }
+
     public function test_ignora_filas_inconsistentes_en_la_comparacion(): void
     {
         $this->seedAcademicCatalog();
