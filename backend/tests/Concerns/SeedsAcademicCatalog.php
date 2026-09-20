@@ -39,6 +39,14 @@ trait SeedsAcademicCatalog
 
     protected int $periodoAnteriorId;
 
+    protected int $grupoPropioId;
+
+    protected int $grupoAjenoId;
+
+    protected int $grupoPeriodoAnteriorId;
+
+    protected int $grupoParInactivoId;
+
     protected function seedAcademicCatalog(): void
     {
         $this->seedTeachers();
@@ -125,17 +133,71 @@ trait SeedsAcademicCatalog
     private function seedGroups(): void
     {
         // Dos grupos propios en (Sistemas, Calculo II): el par es "mi materia".
-        $this->createGroup($this->sistemasId, $this->calculoId, '1', $this->docenteId, $this->periodoActivoId);
+        $this->grupoPropioId = $this->createGroup(
+            $this->sistemasId,
+            $this->calculoId,
+            '1',
+            $this->docenteId,
+            $this->periodoActivoId
+        );
         $this->createGroup($this->sistemasId, $this->calculoId, '2', $this->docenteId, $this->periodoActivoId);
 
         // Grupo de otro docente en el mismo par.
-        $this->createGroup($this->sistemasId, $this->calculoId, '3', $this->otroDocenteId, $this->periodoActivoId);
+        $this->grupoAjenoId = $this->createGroup(
+            $this->sistemasId,
+            $this->calculoId,
+            '3',
+            $this->otroDocenteId,
+            $this->periodoActivoId
+        );
 
         // Grupo propio pero de un periodo anterior: no debe contar como "mi materia".
-        $this->createGroup($this->informaticaId, $this->calculoId, '1', $this->docenteId, $this->periodoAnteriorId);
+        $this->grupoPeriodoAnteriorId = $this->createGroup(
+            $this->informaticaId,
+            $this->calculoId,
+            '1',
+            $this->docenteId,
+            $this->periodoAnteriorId
+        );
 
         // Par donde el docente no dicta ningun grupo.
         $this->createGroup($this->sistemasId, $this->basesDatosId, '1', $this->otroDocenteId, $this->periodoActivoId);
+
+        // Grupo de otro docente en un par INACTIVO: existe, pero no es contexto de trabajo.
+        $this->grupoParInactivoId = $this->createGroup(
+            $this->informaticaId,
+            $this->basesDatosId,
+            '1',
+            $this->otroDocenteId,
+            $this->periodoActivoId
+        );
+    }
+
+    /**
+     * Inscribe estudiantes en el grupo: los ACTIVOS primero y luego los retirados (INACTIVO).
+     */
+    protected function enrollStudents(int $groupId, int $active, int $withdrawn = 0): void
+    {
+        $total = $active + $withdrawn;
+
+        for ($i = 1; $i <= $total; $i++) {
+            $code = $groupId . str_pad((string) $i, 4, '0', STR_PAD_LEFT);
+
+            $studentId = DB::table('estudiante')->insertGetId([
+                'cod_sis' => $code,
+                'ci' => $code,
+                'nombre' => "Estudiante {$i}",
+                'apellido_paterno' => 'Prueba',
+                'estado' => RecordStatus::ACTIVE,
+            ], 'id_estudiante');
+
+            DB::table('grupo_estudiante')->insert([
+                'id_grupo' => $groupId,
+                'id_estudiante' => $studentId,
+                'fecha_inscripcion' => '2026-02-15',
+                'estado' => $i <= $active ? RecordStatus::ACTIVE : RecordStatus::INACTIVE,
+            ]);
+        }
     }
 
     private function seedTeachers(): void
@@ -179,8 +241,8 @@ trait SeedsAcademicCatalog
         string $number,
         string $teacherId,
         int $periodId
-    ): void {
-        Group::create([
+    ): int {
+        return Group::create([
             'id_carrera' => $careerId,
             'id_materia' => $subjectId,
             'num_grupo' => $number,
@@ -188,6 +250,6 @@ trait SeedsAcademicCatalog
             'estado' => RecordStatus::ACTIVE,
             'id_usuario_docente' => $teacherId,
             'id_periodo' => $periodId,
-        ]);
+        ])->id_grupo;
     }
 }

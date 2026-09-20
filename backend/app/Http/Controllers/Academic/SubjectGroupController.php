@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Academic\ShowSubjectCareerGroupsRequest;
 use App\Http\Resources\Academic\GroupResource;
 use App\Http\Resources\Academic\SubjectCareerResource;
-use App\Services\Academic\SubjectCatalogService;
+use App\Services\Academic\GroupService;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -14,18 +14,18 @@ use Illuminate\Http\JsonResponse;
  */
 class SubjectGroupController extends Controller
 {
-    private SubjectCatalogService $subjectCatalog;
+    private GroupService $groupService;
 
-    public function __construct(SubjectCatalogService $subjectCatalog)
+    public function __construct(GroupService $groupService)
     {
-        $this->subjectCatalog = $subjectCatalog;
+        $this->groupService = $groupService;
     }
 
     public function index(ShowSubjectCareerGroupsRequest $request): JsonResponse
     {
         $validated = $request->validated();
 
-        $result = $this->subjectCatalog->listGroupsForPair(
+        $result = $this->groupService->listGroupsForPair(
             (int) $validated['id_carrera'],
             (int) $validated['id_materia']
         );

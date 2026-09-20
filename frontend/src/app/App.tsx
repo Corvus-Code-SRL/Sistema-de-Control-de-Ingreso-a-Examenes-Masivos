@@ -1,13 +1,14 @@
-import { SubjectProvider } from '../features/academic/context/SubjectContext';
-import SubjectSelector from '../features/academic/components/SubjectSelector';
+import { BrowserRouter } from 'react-router-dom'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { AppRouter } from './router/AppRouter'
 
 function App() {
   return (
-    <SubjectProvider>
-      <main className="min-h-screen p-4">
-        <SubjectSelector />
-      </main>
-    </SubjectProvider>
+    <BrowserRouter>
+      <TooltipProvider>
+        <AppRouter />
+      </TooltipProvider>
+    </BrowserRouter>
   )
 }
 
