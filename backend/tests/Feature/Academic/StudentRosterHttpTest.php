@@ -429,6 +429,67 @@ class StudentRosterHttpTest extends TestCase
         ]);
     }
 
+    public function test_rechaza_xlsx_corrupto_con_error_controlado(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $group = $this->ownActiveGroup();
+
+        $file = UploadedFile::fake()->createWithContent(
+            'nomina.xlsx',
+            'esto no es un archivo XLSX valido'
+        );
+
+        $response = $this->post(
+            '/api/grupos/' . $group->id_grupo . '/nomina/preview',
+            [
+                'archivo' => $file,
+            ],
+            [
+                'Accept' => 'application/json',
+            ]
+        );
+
+        $response
+            ->assertStatus(422)
+            ->assertJson([
+                'message' => 'No se pudo procesar el archivo XLSX.',
+            ]);
+    }
+
+    public function test_rechaza_csv_sin_columnas_requeridas(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $group = $this->ownActiveGroup();
+
+        $csv = implode(PHP_EOL, [
+            'Estudiante,Nombres',
+            '20260030,ANA MARIA',
+        ]);
+
+        $file = UploadedFile::fake()->createWithContent(
+            'nomina.csv',
+            $csv
+        );
+
+        $response = $this->post(
+            '/api/grupos/' . $group->id_grupo . '/nomina/preview',
+            [
+                'archivo' => $file,
+            ],
+            [
+                'Accept' => 'application/json',
+            ]
+        );
+
+        $response
+            ->assertStatus(422)
+            ->assertJson([
+                'message' => 'Falta la columna requerida: apellidos.',
+            ]);
+    }
+
     private function ownActiveGroup(): Group
     {
         return Group::query()
