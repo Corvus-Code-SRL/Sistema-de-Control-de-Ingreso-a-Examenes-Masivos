@@ -2,6 +2,8 @@
 
 namespace App\Services\Academic\Importers;
 
+use App\Exceptions\Academic\StudentRosterFileException;
+use PhpOffice\PhpSpreadsheet\Reader\Exception as ReaderException;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
 use RuntimeException;
 
@@ -25,8 +27,8 @@ class XlsxStudentRosterReader implements StudentRosterReader
 
         try {
             $spreadsheet = $reader->load($path);
-        } catch (\Throwable $exception) {
-            throw new RuntimeException(
+        } catch (ReaderException $exception) {
+            throw new StudentRosterFileException(
                 'No se pudo procesar el archivo XLSX.',
                 0,
                 $exception
@@ -48,7 +50,7 @@ class XlsxStudentRosterReader implements StudentRosterReader
             )[1];
 
             if ($this->isEmptyRow($headerRow)) {
-                throw new RuntimeException(
+                throw new StudentRosterFileException(
                     'El archivo XLSX está vacío.'
                 );
             }
@@ -125,7 +127,7 @@ class XlsxStudentRosterReader implements StudentRosterReader
     {
         foreach (self::REQUIRED_HEADERS as $requiredHeader) {
             if (!array_key_exists($requiredHeader, $headers)) {
-                throw new RuntimeException(
+                throw new StudentRosterFileException(
                     'Falta la columna requerida: '
                     . $requiredHeader
                     . '.'

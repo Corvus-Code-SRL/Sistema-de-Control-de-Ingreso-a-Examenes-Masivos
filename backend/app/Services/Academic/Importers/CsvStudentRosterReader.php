@@ -2,6 +2,7 @@
 
 namespace App\Services\Academic\Importers;
 
+use App\Exceptions\Academic\StudentRosterFileException;
 use RuntimeException;
 
 class CsvStudentRosterReader implements StudentRosterReader
@@ -28,7 +29,7 @@ class CsvStudentRosterReader implements StudentRosterReader
             $header = fgetcsv($handle, 0, $delimiter);
 
             if ($header === false) {
-                throw new RuntimeException(
+                throw new StudentRosterFileException(
                     'El archivo CSV no contiene encabezados.'
                 );
             }
@@ -71,7 +72,7 @@ class CsvStudentRosterReader implements StudentRosterReader
         $firstLine = fgets($handle);
 
         if ($firstLine === false) {
-            throw new RuntimeException(
+            throw new StudentRosterFileException(
                 'El archivo CSV está vacío.'
             );
         }
@@ -103,7 +104,7 @@ class CsvStudentRosterReader implements StudentRosterReader
                 $requiredHeader,
                 $normalizedHeaders
             )) {
-                throw new RuntimeException(
+                throw new StudentRosterFileException(
                     "Falta la columna requerida: {$requiredHeader}."
                 );
             }
