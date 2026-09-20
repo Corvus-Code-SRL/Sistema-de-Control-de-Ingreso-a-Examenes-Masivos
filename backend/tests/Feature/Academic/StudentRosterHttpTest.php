@@ -218,6 +218,93 @@ class StudentRosterHttpTest extends TestCase
             ]);
     }
 
+    public function test_rechaza_preview_sin_archivo(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $group = $this->ownActiveGroup();
+
+        $response = $this->postJson(
+            '/api/grupos/' . $group->id_grupo . '/nomina/preview',
+            []
+        );
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonValidationErrors([
+                'archivo',
+            ]);
+    }
+
+    public function test_rechaza_archivo_con_extension_no_permitida(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $group = $this->ownActiveGroup();
+
+        $file = UploadedFile::fake()->create(
+            'nomina.pdf',
+            10,
+            'application/pdf'
+        );
+
+        $response = $this->post(
+            '/api/grupos/' . $group->id_grupo . '/nomina/preview',
+            [
+                'archivo' => $file,
+            ],
+            [
+                'Accept' => 'application/json',
+            ]
+        );
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonValidationErrors([
+                'archivo',
+            ]);
+    }
+
+    public function test_rechaza_valor_que_no_es_archivo(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $group = $this->ownActiveGroup();
+
+        $response = $this->postJson(
+            '/api/grupos/' . $group->id_grupo . '/nomina/preview',
+            [
+                'archivo' => 'esto-no-es-un-archivo',
+            ]
+        );
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonValidationErrors([
+                'archivo',
+            ]);
+    }
+
+    public function test_rechaza_token_con_formato_invalido(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $group = $this->ownActiveGroup();
+
+        $response = $this->postJson(
+            '/api/grupos/' . $group->id_grupo . '/nomina/confirm',
+            [
+                'token' => 'token-invalido',
+            ]
+        );
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonValidationErrors([
+                'token',
+            ]);
+    }
+
     private function ownActiveGroup(): Group
     {
         return Group::query()
