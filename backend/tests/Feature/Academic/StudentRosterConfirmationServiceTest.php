@@ -71,7 +71,10 @@ class StudentRosterConfirmationServiceTest extends TestCase
 
         $result = $this->confirmationService(
             $store
-        )->confirm($token);
+        )->confirm(
+            (int) $group->id_grupo,
+            $token
+        );
 
         $this->assertSame(1, $result->totalRows());
         $this->assertSame(0, $result->inconsistentRows());
@@ -107,10 +110,13 @@ class StudentRosterConfirmationServiceTest extends TestCase
     {
         $this->seedAcademicCatalog();
 
+        $group = $this->ownActiveGroup();
+
         $store = $this->previewStore();
 
         try {
             $this->confirmationService($store)->confirm(
+                (int) $group->id_grupo,
                 str_repeat('a', 64)
             );
 
@@ -155,6 +161,7 @@ class StudentRosterConfirmationServiceTest extends TestCase
 
         try {
             $this->confirmationService($store)->confirm(
+                (int) $group->id_grupo,
                 $token
             );
 
@@ -225,7 +232,10 @@ class StudentRosterConfirmationServiceTest extends TestCase
         );
 
         try {
-            $service->confirm($token);
+            $service->confirm(
+                (int) $group->id_grupo,
+                $token
+            );
 
             $this->fail(
                 'La confirmación debía fallar.'
@@ -243,6 +253,78 @@ class StudentRosterConfirmationServiceTest extends TestCase
 
         $this->assertDatabaseMissing('estudiante', [
             'cod_sis' => '20250003',
+        ]);
+    }
+
+    public function test_rechaza_token_de_otro_grupo_sin_consumirlo(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $groups = Group::query()
+            ->where(
+                'id_usuario_docente',
+                $this->docenteId
+            )
+            ->where(
+                'id_periodo',
+                $this->periodoActivoId
+            )
+            ->where(
+                'estado',
+                RecordStatus::ACTIVE
+            )
+            ->orderBy('id_grupo')
+            ->get();
+
+        $this->assertCount(2, $groups);
+
+        $previewGroup = $groups[0];
+        $requestedGroup = $groups[1];
+
+        $store = $this->previewStore();
+
+        $token = $store->store(
+            (int) $previewGroup->id_grupo,
+            $this->docenteId,
+            $this->analyze([
+                new StudentRosterRow(
+                    2,
+                    '20250004',
+                    'ROJAS',
+                    'CARLOS'
+                ),
+            ])
+        );
+
+        try {
+            $this->confirmationService($store)->confirm(
+                (int) $requestedGroup->id_grupo,
+                $token
+            );
+
+            $this->fail(
+                'La confirmación debía rechazar el grupo incorrecto.'
+            );
+        } catch (
+            StudentRosterPreviewUnavailableException $exception
+        ) {
+            $this->assertSame(
+                422,
+                $exception->getStatusCode()
+            );
+
+            $this->assertSame(
+                'El preview no corresponde al grupo indicado.',
+                $exception->getMessage()
+            );
+        }
+
+        $this->assertNotNull(
+            $store->find($token)
+        );
+
+        $this->assertDatabaseMissing('estudiante', [
+            'cod_sis' => '20250004',
         ]);
     }
 
