@@ -6,6 +6,7 @@ import type {
   GroupMutationResponse,
   SubjectGroups,
   SubjectGroupsResponse,
+  UpdateGroupPayload,
 } from '../types/group.types'
 
 /**
@@ -53,6 +54,26 @@ export async function createGroup(
 ): Promise<GroupMutationResponse['data']> {
   const response = await apiClient<GroupMutationResponse>('/grupos', {
     method: 'POST',
+    body: payload,
+    signal,
+  })
+
+  return response.data
+}
+
+/**
+ * Actualiza los datos habilitados de un grupo existente.
+ *
+ * `payload` nunca incluye id_carrera/id_materia/id_usuario_docente: son
+ * inmutables y el backend los ignora aunque se envíen.
+ */
+export async function updateGroup(
+  groupId: number,
+  payload: UpdateGroupPayload,
+  signal?: AbortSignal
+): Promise<GroupMutationResponse['data']> {
+  const response = await apiClient<GroupMutationResponse>(`/grupos/${groupId}`, {
+    method: 'PUT',
     body: payload,
     signal,
   })

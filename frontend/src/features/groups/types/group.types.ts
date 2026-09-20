@@ -110,6 +110,16 @@ export interface CreateGroupPayload {
 }
 
 /**
+ * No incluye id_carrera, id_materia ni id_usuario_docente: son inmutables
+ * y el backend los ignora aunque se envíen. Tampoco "gestion", por el
+ * mismo motivo que CreateGroupPayload.
+ */
+export interface UpdateGroupPayload {
+  num_grupo: string
+  id_periodo?: number
+}
+
+/**
  * Respuesta de crear/actualizar un grupo.
  *
  * No usa `ResourceResponse<TData, TMeta>` (de `types/api.types.ts`) a propósito:

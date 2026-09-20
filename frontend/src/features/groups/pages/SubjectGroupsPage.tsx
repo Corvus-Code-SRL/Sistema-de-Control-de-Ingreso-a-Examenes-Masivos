@@ -10,6 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ActualizarGrupoForm } from '../components/GroupUpdateForm'
 import { GroupListItem } from '../components/GroupListItem'
 import { GroupsTable } from '../components/GroupsTable'
 import { RegistrarGrupoForm } from '../components/GroupRegisterForm'
@@ -113,12 +114,12 @@ export function SubjectGroupsPage() {
         {!isLoading && !error && !isEmpty && (
           <>
             <div className="hidden md:block">
-              <GroupsTable groups={groups} />
+              <GroupsTable groups={groups} onEdit={setEditingGroup} />
             </div>
 
             <ul className="md:hidden">
               {groups.map((group) => (
-                <GroupListItem key={group.id_grupo} group={group} />
+                <GroupListItem key={group.id_grupo} group={group} onEdit={setEditingGroup} />
               ))}
             </ul>
           </>
@@ -144,6 +145,25 @@ export function SubjectGroupsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* HU-19 */}
+      <Dialog open={editingGroup !== null} onOpenChange={(open) => !open && setEditingGroup(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Actualizar grupo</DialogTitle>
+          </DialogHeader>
+          {editingGroup && (
+            <ActualizarGrupoForm
+              group={editingGroup}
+              subjectCareerLabel={subjectCareerLabel}
+              onCancel={() => setEditingGroup(null)}
+              onUpdated={() => {
+                setEditingGroup(null)
+                reload()
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </AppShell>
   )
 }
