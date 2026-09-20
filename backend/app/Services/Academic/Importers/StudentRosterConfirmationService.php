@@ -28,6 +28,7 @@ class StudentRosterConfirmationService
     }
 
     public function confirm(
+        int $groupId,
         string $token
     ): StudentRosterConfirmationResult {
         $preview = $this->previewStore->find($token);
@@ -50,8 +51,15 @@ class StudentRosterConfirmationService
             );
         }
 
+        if ($preview->groupId() !== $groupId) {
+            throw new StudentRosterPreviewUnavailableException(
+                'El preview no corresponde al grupo indicado.',
+                422
+            );
+        }
+
         $group = $this->groupAccess->getAvailable(
-            $preview->groupId()
+            $groupId
         );
 
         $analysis = $this->analyzer->analyze(
