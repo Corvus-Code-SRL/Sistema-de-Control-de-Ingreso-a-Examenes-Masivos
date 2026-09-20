@@ -4,6 +4,7 @@ namespace App\Services\Academic\Importers;
 
 use App\Models\Student;
 use Illuminate\Support\Facades\DB;
+use App\Support\RecordStatus;
 
 class StudentRosterDatabaseMatcher
 {
@@ -42,21 +43,23 @@ class StudentRosterDatabaseMatcher
             ->map(static fn ($id): int => (int) $id)
             ->all();
 
-        $enrolledStudentIds = [];
+        $enrollmentStatusByStudentId = [];
 
         if ($studentIds !== []) {
-            $enrolledStudentIds = DB::table('grupo_estudiante')
+            $enrollments = DB::table('grupo_estudiante')
                 ->where('id_grupo', $groupId)
                 ->whereIn('id_estudiante', $studentIds)
-                ->pluck('id_estudiante')
-                ->map(static fn ($id): int => (int) $id)
-                ->all();
-        }
+                ->get([
+                    'id_estudiante',
+                    'estado',
+                ]);
 
-        $enrolledLookup = array_fill_keys(
-            $enrolledStudentIds,
-            true
-        );
+            foreach ($enrollments as $enrollment) {
+                $enrollmentStatusByStudentId[
+                    (int) $enrollment->id_estudiante
+                ] = $enrollment->estado;
+            }
+        }
 
         $matches = [];
 
@@ -81,9 +84,17 @@ class StudentRosterDatabaseMatcher
 
             $studentId = (int) $student->id_estudiante;
 
-            $status = isset($enrolledLookup[$studentId])
-                ? StudentRosterDatabaseMatch::ALREADY_ENROLLED
-                : StudentRosterDatabaseMatch::EXISTING_STUDENT;
+            $enrollmentStatus = $enrollmentStatusByStudentId[
+                $studentId
+            ] ?? null;
+
+            if ($enrollmentStatus === RecordStatus::ACTIVE) {
+                $status = StudentRosterDatabaseMatch::ALREADY_ENROLLED;
+            } elseif ($enrollmentStatus === RecordStatus::INACTIVE) {
+                $status = StudentRosterDatabaseMatch::INACTIVE_ENROLLMENT;
+            } else {
+                $status = StudentRosterDatabaseMatch::EXISTING_STUDENT;
+            }
 
             $matches[] = new StudentRosterDatabaseMatch(
                 $rowAnalysis,
