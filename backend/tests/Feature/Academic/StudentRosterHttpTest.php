@@ -15,6 +15,8 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\SeedsAcademicCatalog;
 use Tests\TestCase;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class StudentRosterHttpTest extends TestCase
 {
@@ -303,6 +305,128 @@ class StudentRosterHttpTest extends TestCase
             ->assertJsonValidationErrors([
                 'token',
             ]);
+    }
+
+    public function test_genera_preview_desde_archivo_xlsx_real(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $group = $this->ownActiveGroup();
+
+        $spreadsheet = new Spreadsheet();
+
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $sheet->fromArray([
+            [
+                'Estudiante',
+                'Apellidos',
+                'Nombres',
+                '1er Parcial',
+            ],
+            [
+                '00123456',
+                'MAMANI QUISPE',
+                'LUIS ALBERTO',
+                80,
+            ],
+            [
+                '20260020',
+                'ROJAS FLORES',
+                'MARIA',
+                90,
+            ],
+        ]);
+
+        $path = tempnam(
+            sys_get_temp_dir(),
+            'sciem_xlsx_'
+        );
+
+        if ($path === false) {
+            $this->fail(
+                'No fue posible crear el archivo XLSX temporal.'
+            );
+        }
+
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($path);
+
+        $spreadsheet->disconnectWorksheets();
+
+        $file = new UploadedFile(
+            $path,
+            'nomina.xlsx',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            null,
+            true
+        );
+
+        try {
+            $response = $this->post(
+                '/api/grupos/' . $group->id_grupo . '/nomina/preview',
+                [
+                    'archivo' => $file,
+                ],
+                [
+                    'Accept' => 'application/json',
+                ]
+            );
+        } finally {
+            if (is_file($path)) {
+                unlink($path);
+            }
+        }
+
+        $response->assertOk();
+
+        $response->assertJson([
+            'data' => [
+                'total_filas' => 2,
+                'filas_validas' => 2,
+                'filas_inconsistentes' => 0,
+                'filas' => [
+                    [
+                        'numero_fila' => 2,
+                        'codigo_sis' => '00123456',
+                        'apellidos' => 'MAMANI QUISPE',
+                        'nombres' => 'LUIS ALBERTO',
+                        'estado' => StudentRosterDatabaseMatch::NEW_STUDENT,
+                        'errores' => [],
+                    ],
+                    [
+                        'numero_fila' => 3,
+                        'codigo_sis' => '20260020',
+                        'apellidos' => 'ROJAS FLORES',
+                        'nombres' => 'MARIA',
+                        'estado' => StudentRosterDatabaseMatch::NEW_STUDENT,
+                        'errores' => [],
+                    ],
+                ],
+            ],
+        ]);
+
+        $token = $response->json(
+            'data.token'
+        );
+
+        $this->assertIsString($token);
+
+        $this->assertMatchesRegularExpression(
+            '/^[a-f0-9]{64}$/',
+            $token
+        );
+
+        /*
+        * El preview XLSX tampoco debe persistir estudiantes.
+        */
+        $this->assertDatabaseMissing('estudiante', [
+            'cod_sis' => '00123456',
+        ]);
+
+        $this->assertDatabaseMissing('estudiante', [
+            'cod_sis' => '20260020',
+        ]);
     }
 
     private function ownActiveGroup(): Group
