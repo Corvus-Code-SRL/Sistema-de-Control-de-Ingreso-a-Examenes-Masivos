@@ -85,4 +85,34 @@ class StudentRosterRowValidatorTest extends TestCase
 
         $this->assertSame([], $errors);
     }
+
+    public function testItRejectsLastNamesLongerThanTemporaryDatabaseLimit(): void
+    {
+        $row = new StudentRosterRow(
+            8,
+            '20200240',
+            str_repeat('A', 31),
+            'JOSE DIEGO'
+        );
+
+        $errors = (new StudentRosterRowValidator())->validate($row);
+
+        $this->assertSame([
+            'last_names_too_long',
+        ], $errors);
+    }
+
+    public function testItAcceptsLastNamesAtTemporaryDatabaseLimit(): void
+    {
+        $row = new StudentRosterRow(
+            9,
+            '20200240',
+            str_repeat('A', 30),
+            'JOSE DIEGO'
+        );
+
+        $errors = (new StudentRosterRowValidator())->validate($row);
+
+        $this->assertSame([], $errors);
+    }
 }
