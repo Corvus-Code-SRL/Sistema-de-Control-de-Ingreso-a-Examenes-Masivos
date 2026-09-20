@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Role extends Model
 {
@@ -18,7 +19,7 @@ class Role extends Model
 
     protected $casts = ['fecha_registro' => 'datetime'];
 
-    public function usuarios()
+    public function usuarios(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'usuario_rol', 'id_rol', 'id_usuario')
                     ->withPivot('fecha_inicio', 'fecha_fin');
