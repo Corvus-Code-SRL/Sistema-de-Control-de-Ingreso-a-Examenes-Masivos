@@ -35,7 +35,7 @@ export function DataPagination({
   return (
     <nav
       aria-label="Paginación"
-      className="flex flex-col gap-3 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+      className="flex flex-col gap-3 border-t border-border-soft px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
     >
       <p className="text-sm text-muted-foreground" aria-live="polite">
         Mostrando {first}–{last} de {total} {itemLabel}
@@ -52,7 +52,7 @@ export function DataPagination({
           <span className="sr-only sm:not-sr-only">Anterior</span>
         </Button>
 
-        <span className="px-2 text-sm text-muted-foreground">
+        <span className="sciem-tnum px-2 text-sm text-muted-foreground">
           Página {page} de {totalPages}
         </span>
 

@@ -102,7 +102,7 @@ export function AppShell({
           </div>
 
           {period && (
-            <span className="hidden shrink-0 rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground sm:inline">
+            <span className="hidden shrink-0 rounded-md bg-brand-soft px-2 py-1 text-xs font-medium text-brand-deep sm:inline">
               Período {period}
             </span>
           )}

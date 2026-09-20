@@ -15,7 +15,7 @@ export function GroupOwnerCell({ group }: GroupOwnerCellProps) {
   return (
     <div className="flex items-center gap-2">
       <Avatar className="size-6 shrink-0">
-        <AvatarFallback className="text-[10px]">{initials(group.docente.nombre_completo)}</AvatarFallback>
+        <AvatarFallback className="bg-brand-soft text-[10px] font-semibold text-brand-deep">{initials(group.docente.nombre_completo)}</AvatarFallback>
       </Avatar>
 
       <span className="truncate text-sm">{group.docente.nombre_completo}</span>

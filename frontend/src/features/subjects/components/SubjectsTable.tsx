@@ -1,5 +1,4 @@
 import { BookmarkCheck, Ban } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -22,11 +21,11 @@ export function SubjectsTable({ subjects }: SubjectsTableProps) {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Código</TableHead>
-          <TableHead>Materia</TableHead>
-          <TableHead>Carrera</TableHead>
-          <TableHead className="text-right">Grupos</TableHead>
-          <TableHead>Estado</TableHead>
+          <TableHead className="sciem-overline text-muted-foreground">Código</TableHead>
+          <TableHead className="sciem-overline text-muted-foreground">Materia</TableHead>
+          <TableHead className="sciem-overline text-muted-foreground">Carrera</TableHead>
+          <TableHead className="sciem-overline text-right text-muted-foreground">Grupos</TableHead>
+          <TableHead className="sciem-overline text-muted-foreground">Estado</TableHead>
           <TableHead className="text-right">
             <span className="sr-only">Acciones</span>
           </TableHead>
@@ -39,7 +38,7 @@ export function SubjectsTable({ subjects }: SubjectsTableProps) {
             key={subjectCareerKey(subject)}
             className={cn(!subject.activa && 'opacity-60')}
           >
-            <TableCell className="font-mono text-xs text-muted-foreground">
+            <TableCell className="sciem-tnum text-xs font-semibold tracking-wider text-muted-foreground">
               {subject.codigo}
             </TableCell>
 
@@ -47,24 +46,26 @@ export function SubjectsTable({ subjects }: SubjectsTableProps) {
 
             <TableCell className="text-muted-foreground">{subject.carrera.nombre}</TableCell>
 
-            <TableCell className="text-right tabular-nums">{subject.cantidad_grupos}</TableCell>
+            <TableCell className="sciem-tnum text-right font-medium">{subject.cantidad_grupos}</TableCell>
 
             <TableCell>
               <div className="flex flex-wrap items-center gap-1.5">
                 {subject.activa ? (
-                  <Badge variant="outline">Activa</Badge>
+                  <span className="inline-flex w-fit items-center rounded-full bg-ok-soft px-2 py-0.5 text-xs font-medium text-ok-fg">
+                    Activa
+                  </span>
                 ) : (
-                  <Badge variant="secondary">
+                  <span className="inline-flex w-fit items-center gap-1 rounded-full bg-sunken px-2 py-0.5 text-xs font-medium text-muted-foreground">
                     <Ban className="size-3" aria-hidden="true" />
                     Inactiva
-                  </Badge>
+                  </span>
                 )}
 
                 {subject.es_mia && (
-                  <Badge variant="default">
+                  <span className="inline-flex w-fit items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-deep">
                     <BookmarkCheck className="size-3" aria-hidden="true" />
                     Mis materias
-                  </Badge>
+                  </span>
                 )}
               </div>
             </TableCell>

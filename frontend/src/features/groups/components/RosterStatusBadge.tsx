@@ -1,5 +1,4 @@
 import { CheckCircle2, FileWarning } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { hasRoster, type Group } from '../types/group.types'
 
 interface RosterStatusBadgeProps {
@@ -15,18 +14,18 @@ interface RosterStatusBadgeProps {
 export function RosterStatusBadge({ group }: RosterStatusBadgeProps) {
   if (hasRoster(group)) {
     return (
-      <Badge variant="outline">
+      <span className="inline-flex w-fit shrink-0 items-center gap-1 rounded-full bg-ok-soft px-2 py-0.5 text-xs font-medium text-ok-fg">
         <CheckCircle2 className="size-3" aria-hidden="true" />
         Nómina cargada
-      </Badge>
+      </span>
     )
   }
 
   return (
-    <Badge variant="secondary">
+    <span className="inline-flex w-fit shrink-0 items-center gap-1 rounded-full bg-warn-soft px-2 py-0.5 text-xs font-medium text-warn-fg">
       <FileWarning className="size-3" aria-hidden="true" />
       Sin nómina
-    </Badge>
+    </span>
   )
 }
 
@@ -41,5 +40,5 @@ export function EnrolledCount({ group }: RosterStatusBadgeProps) {
     )
   }
 
-  return <span className="tabular-nums">{group.cantidad_estudiantes}</span>
+  return <span className="sciem-tnum font-medium">{group.cantidad_estudiantes}</span>
 }

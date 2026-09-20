@@ -27,7 +27,7 @@ export function CourseCard({ course }: CourseCardProps) {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 space-y-0.5">
             <p className="truncate text-xs text-muted-foreground">{subject.carrera.nombre}</p>
-            <p className="truncate text-base font-semibold text-foreground">{subject.nombre}</p>
+            <p className="sciem-h3 truncate">{subject.nombre}</p>
             <p className="text-sm font-medium text-muted-foreground">{groupLabel(group)}</p>
           </div>
 
@@ -41,7 +41,7 @@ export function CourseCard({ course }: CourseCardProps) {
         <div className="flex items-baseline gap-1.5 text-sm">
           {hasRoster(group) ? (
             <>
-              <span className="text-lg font-semibold tabular-nums text-foreground">
+              <span className="sciem-tnum text-lg font-semibold text-brand">
                 {group.cantidad_estudiantes}
               </span>
               <span className="text-muted-foreground">

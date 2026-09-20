@@ -1,5 +1,4 @@
 import { Ban, BookmarkCheck } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { SubjectGroupsAction } from './SubjectGroupsAction'
 import type { SubjectCareer } from '../types/subject.types'
@@ -24,20 +23,20 @@ export function SubjectListItem({ subject }: SubjectListItemProps) {
     >
       <div className="min-w-0 flex-1 space-y-0.5">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="font-mono text-xs text-muted-foreground">{subject.codigo}</span>
+          <span className="sciem-tnum text-xs font-semibold tracking-wider text-muted-foreground">{subject.codigo}</span>
 
           {subject.es_mia && (
-            <Badge variant="default">
+            <span className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-deep">
               <BookmarkCheck className="size-3" aria-hidden="true" />
               Mía
-            </Badge>
+            </span>
           )}
 
           {!subject.activa && (
-            <Badge variant="secondary">
+            <span className="inline-flex items-center gap-1 rounded-full bg-sunken px-2 py-0.5 text-xs font-medium text-muted-foreground">
               <Ban className="size-3" aria-hidden="true" />
               Inactiva
-            </Badge>
+            </span>
           )}
         </div>
 

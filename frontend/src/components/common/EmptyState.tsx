@@ -32,13 +32,13 @@ export function EmptyState({
     >
       <span
         aria-hidden="true"
-        className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground"
+        className="flex size-12 items-center justify-center rounded-full bg-brand-soft text-brand-deep"
       >
         <Icon className="size-6" />
       </span>
 
       <div className="space-y-1">
-        <p className="text-base font-medium text-foreground">{title}</p>
+        <p className="sciem-h3">{title}</p>
         <p className="mx-auto max-w-md text-sm text-muted-foreground">{description}</p>
       </div>
 

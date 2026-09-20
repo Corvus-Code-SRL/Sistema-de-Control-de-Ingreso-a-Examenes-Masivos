@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { RosterStatusBadge } from './RosterStatusBadge'
 import { hasRoster, type GroupDetail } from '../types/group.types'
@@ -19,8 +18,8 @@ export function CourseHeader({ detail }: CourseHeaderProps) {
   return (
     <Card className="grid gap-4 p-4 sm:grid-cols-3">
       <div className="space-y-0.5">
-        <p className="text-xs text-muted-foreground">Inscritos</p>
-        <p className="text-2xl font-semibold tabular-nums text-foreground">
+        <p className="sciem-overline text-muted-foreground">Inscritos</p>
+        <p className="sciem-tnum text-2xl font-semibold text-brand">
           {hasRoster(group) ? (
             group.cantidad_estudiantes
           ) : (
@@ -33,18 +32,22 @@ export function CourseHeader({ detail }: CourseHeaderProps) {
       </div>
 
       <div className="space-y-1">
-        <p className="text-xs text-muted-foreground">Nómina</p>
+        <p className="sciem-overline text-muted-foreground">Nómina</p>
         <RosterStatusBadge group={group} />
       </div>
 
       <div className="space-y-1">
-        <p className="text-xs text-muted-foreground">Período</p>
+        <p className="sciem-overline text-muted-foreground">Período</p>
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-sm font-medium text-foreground">
             {group.periodo.nombre_periodo}
           </span>
 
-          {!meta.es_periodo_activo && <Badge variant="secondary">Período anterior</Badge>}
+          {!meta.es_periodo_activo && (
+            <span className="inline-flex items-center rounded-full bg-warn-soft px-2 py-0.5 text-xs font-medium text-warn-fg">
+              Período anterior
+            </span>
+          )}
         </div>
       </div>
     </Card>

@@ -22,10 +22,10 @@ export function GroupsTable({ groups }: GroupsTableProps) {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>N° de grupo</TableHead>
-          <TableHead>Docente</TableHead>
-          <TableHead className="text-right">Inscritos</TableHead>
-          <TableHead>Nómina</TableHead>
+          <TableHead className="sciem-overline text-muted-foreground">N° de grupo</TableHead>
+          <TableHead className="sciem-overline text-muted-foreground">Docente</TableHead>
+          <TableHead className="sciem-overline text-right text-muted-foreground">Inscritos</TableHead>
+          <TableHead className="sciem-overline text-muted-foreground">Nómina</TableHead>
           <TableHead className="text-right">
             <span className="sr-only">Acciones</span>
           </TableHead>

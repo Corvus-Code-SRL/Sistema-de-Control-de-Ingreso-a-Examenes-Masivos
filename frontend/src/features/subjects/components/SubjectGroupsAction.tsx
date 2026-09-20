@@ -19,7 +19,7 @@ interface SubjectGroupsActionProps {
 export function SubjectGroupsAction({ subject, compact = false }: SubjectGroupsActionProps) {
   if (!subject.activa) {
     return (
-      <span className="text-xs text-muted-foreground">No seleccionable</span>
+      <span className="text-xs text-dis-text">No seleccionable</span>
     )
   }
 

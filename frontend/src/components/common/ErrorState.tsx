@@ -23,13 +23,13 @@ export function ErrorState({ error, onRetry, className }: ErrorStateProps) {
     >
       <span
         aria-hidden="true"
-        className="flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive"
+        className="flex size-12 items-center justify-center rounded-full bg-danger-soft text-danger-fg"
       >
         <AlertCircle className="size-6" />
       </span>
 
       <div className="space-y-1">
-        <p className="text-base font-medium text-foreground">No se pudo cargar la información</p>
+        <p className="sciem-h3">No se pudo cargar la información</p>
         <p className="mx-auto max-w-md text-sm text-muted-foreground">{error.message}</p>
       </div>
 
