@@ -163,4 +163,130 @@ class GroupControllerTest extends TestCase
 
         $this->assertDatabaseHas('grupo', ['id_periodo' => $period->id_periodo]);
     }
+
+    public function test_actualiza_un_grupo_existente(): void
+    {
+        $pair = $this->activePair();
+        $period = $this->activePeriod(2026);
+
+        $group = Group::create([
+            'id_carrera' => $pair->id_carrera,
+            'id_materia' => $pair->id_materia,
+            'num_grupo' => 'A',
+            'gestion' => (string) $period->gestion,
+            'estado' => RecordStatus::ACTIVE,
+            'id_usuario_docente' => config('sciem.docente_fijo_id'),
+            'id_periodo' => $period->id_periodo,
+        ]);
+
+        $response = $this->putJson("/api/grupos/{$group->id_grupo}", [
+            'num_grupo' => 'B',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('grupo', ['id_grupo' => $group->id_grupo, 'num_grupo' => 'B']);
+    }
+
+    /**
+     * La duplicidad se verifica excluyendo el propio registro:
+     * actualizar un grupo sin cambiar su identificación no debe fallar.
+     */
+    public function test_actualizar_sin_cambios_no_genera_falso_positivo_de_duplicidad(): void
+    {
+        $pair = $this->activePair();
+        $period = $this->activePeriod(2026);
+
+        $group = Group::create([
+            'id_carrera' => $pair->id_carrera,
+            'id_materia' => $pair->id_materia,
+            'num_grupo' => 'A',
+            'gestion' => (string) $period->gestion,
+            'estado' => RecordStatus::ACTIVE,
+            'id_usuario_docente' => config('sciem.docente_fijo_id'),
+            'id_periodo' => $period->id_periodo,
+        ]);
+
+        $response = $this->putJson("/api/grupos/{$group->id_grupo}", [
+            'num_grupo' => 'A',
+        ]);
+
+        $response->assertStatus(200);
+    }
+
+    public function test_rechaza_la_actualizacion_de_un_grupo_de_otro_docente(): void
+    {
+        $pair = $this->activePair();
+        $period = $this->activePeriod(2026);
+
+        $group = Group::create([
+            'id_carrera' => $pair->id_carrera,
+            'id_materia' => $pair->id_materia,
+            'num_grupo' => 'A',
+            'gestion' => (string) $period->gestion,
+            'estado' => RecordStatus::ACTIVE,
+            'id_usuario_docente' => (string) Str::uuid(), // otro docente, no el de config()
+            'id_periodo' => $period->id_periodo,
+        ]);
+
+        $response = $this->putJson("/api/grupos/{$group->id_grupo}", [
+            'num_grupo' => 'B',
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_ignora_intentos_de_cambiar_la_materia_de_origen(): void
+    {
+        $pair = $this->activePair();
+        $period = $this->activePeriod(2026);
+        $otherCareer = Career::factory()->create(['estado' => RecordStatus::ACTIVE]);
+
+        $group = Group::create([
+            'id_carrera' => $pair->id_carrera,
+            'id_materia' => $pair->id_materia,
+            'num_grupo' => 'A',
+            'gestion' => (string) $period->gestion,
+            'estado' => RecordStatus::ACTIVE,
+            'id_usuario_docente' => config('sciem.docente_fijo_id'),
+            'id_periodo' => $period->id_periodo,
+        ]);
+
+        $this->putJson("/api/grupos/{$group->id_grupo}", [
+            'id_carrera' => $otherCareer->id_carrera, // se intenta cambiar; debe ignorarse
+            'num_grupo' => 'A',
+        ])->assertStatus(200);
+
+        $this->assertDatabaseHas('grupo', [
+            'id_grupo' => $group->id_grupo,
+            'id_carrera' => $pair->id_carrera, // conserva la original
+        ]);
+    }
+
+    public function test_actualizar_el_periodo_recalcula_la_gestion(): void
+    {
+        $pair = $this->activePair();
+        $period2026 = $this->activePeriod(2026);
+        $period2027 = Period::factory()->create(['gestion' => 2027]);
+
+        $group = Group::create([
+            'id_carrera' => $pair->id_carrera,
+            'id_materia' => $pair->id_materia,
+            'num_grupo' => 'A',
+            'gestion' => (string) $period2026->gestion,
+            'estado' => RecordStatus::ACTIVE,
+            'id_usuario_docente' => config('sciem.docente_fijo_id'),
+            'id_periodo' => $period2026->id_periodo,
+        ]);
+
+        $this->putJson("/api/grupos/{$group->id_grupo}", [
+            'num_grupo' => 'A',
+            'id_periodo' => $period2027->id_periodo,
+        ])->assertStatus(200);
+
+        $this->assertDatabaseHas('grupo', [
+            'id_grupo' => $group->id_grupo,
+            'id_periodo' => $period2027->id_periodo,
+            'gestion' => '2027',
+        ]);
+    }
 }
