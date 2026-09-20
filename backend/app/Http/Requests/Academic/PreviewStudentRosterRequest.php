@@ -20,6 +20,7 @@ class PreviewStudentRosterRequest extends FormRequest
                 'min:1',
             ],
             'archivo' => [
+                'bail',
                 'required',
                 'file',
                 'max:10240',
