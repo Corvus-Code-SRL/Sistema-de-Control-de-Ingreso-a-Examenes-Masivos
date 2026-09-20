@@ -601,6 +601,163 @@ class StudentRosterHttpTest extends TestCase
         $response->assertStatus(404);
     }
 
+    public function test_mantiene_estados_de_inscripcion_al_confirmar_por_http(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $group = $this->ownActiveGroup();
+
+        $alreadyEnrolledStudent = Student::create([
+            'cod_sis' => '20261001',
+            'ci' => '14000001',
+            'nombre' => 'ANA',
+            'apellido_paterno' => 'PEREZ',
+            'apellido_materno' => null,
+            'correo_institucional' => null,
+            'telefono' => null,
+            'estado' => RecordStatus::ACTIVE,
+        ]);
+
+        $inactiveStudent = Student::create([
+            'cod_sis' => '20261002',
+            'ci' => '14000002',
+            'nombre' => 'LUIS',
+            'apellido_paterno' => 'ROJAS',
+            'apellido_materno' => null,
+            'correo_institucional' => null,
+            'telefono' => null,
+            'estado' => RecordStatus::ACTIVE,
+        ]);
+
+        DB::table('grupo_estudiante')->insert([
+            [
+                'id_grupo' => $group->id_grupo,
+                'id_estudiante' => $alreadyEnrolledStudent->id_estudiante,
+                'fecha_inscripcion' => '2026-08-01',
+                'estado' => RecordStatus::ACTIVE,
+            ],
+            [
+                'id_grupo' => $group->id_grupo,
+                'id_estudiante' => $inactiveStudent->id_estudiante,
+                'fecha_inscripcion' => '2026-08-02',
+                'estado' => RecordStatus::INACTIVE,
+            ],
+        ]);
+
+        $csv = implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres',
+            '20261001,PEREZ,ANA',
+            '20261002,ROJAS,LUIS',
+        ]);
+
+        $file = UploadedFile::fake()->createWithContent(
+            'nomina.csv',
+            $csv
+        );
+
+        $previewResponse = $this->post(
+            '/api/grupos/' . $group->id_grupo . '/nomina/preview',
+            [
+                'archivo' => $file,
+            ],
+            [
+                'Accept' => 'application/json',
+            ]
+        );
+
+        $previewResponse
+            ->assertOk()
+            ->assertJson([
+                'data' => [
+                    'total_filas' => 2,
+                    'filas_validas' => 2,
+                    'filas_inconsistentes' => 0,
+                    'filas' => [
+                        [
+                            'codigo_sis' => '20261001',
+                            'estado' => StudentRosterDatabaseMatch::ALREADY_ENROLLED,
+                        ],
+                        [
+                            'codigo_sis' => '20261002',
+                            'estado' => StudentRosterDatabaseMatch::INACTIVE_ENROLLMENT,
+                        ],
+                    ],
+                ],
+            ]);
+
+        $token = $previewResponse->json('data.token');
+
+        $this->assertIsString($token);
+
+        $confirmationResponse = $this->postJson(
+            '/api/grupos/' . $group->id_grupo . '/nomina/confirm',
+            [
+                'token' => $token,
+            ]
+        );
+
+        $confirmationResponse
+            ->assertOk()
+            ->assertJson([
+                'data' => [
+                    'total_filas' => 2,
+                    'filas_inconsistentes' => 0,
+                    'estudiantes_creados' => 0,
+                    'estudiantes_inscritos' => 0,
+                    'ya_inscritos' => 1,
+                    'inscripciones_inactivas' => 1,
+                ],
+            ]);
+
+        /*
+        * La inscripción activa sigue activa y no se duplica.
+        */
+        $this->assertSame(
+            1,
+            DB::table('grupo_estudiante')
+                ->where('id_grupo', $group->id_grupo)
+                ->where(
+                    'id_estudiante',
+                    $alreadyEnrolledStudent->id_estudiante
+                )
+                ->count()
+        );
+
+        $this->assertDatabaseHas('grupo_estudiante', [
+            'id_grupo' => $group->id_grupo,
+            'id_estudiante' => $alreadyEnrolledStudent->id_estudiante,
+            'fecha_inscripcion' => '2026-08-01',
+            'estado' => RecordStatus::ACTIVE,
+        ]);
+
+        /*
+        * La inscripción inactiva NO se reactiva automáticamente.
+        */
+        $this->assertDatabaseHas('grupo_estudiante', [
+            'id_grupo' => $group->id_grupo,
+            'id_estudiante' => $inactiveStudent->id_estudiante,
+            'fecha_inscripcion' => '2026-08-02',
+            'estado' => RecordStatus::INACTIVE,
+        ]);
+
+        /*
+        * Tampoco se crean estudiantes duplicados.
+        */
+        $this->assertSame(
+            1,
+            Student::query()
+                ->where('cod_sis', '20261001')
+                ->count()
+        );
+
+        $this->assertSame(
+            1,
+            Student::query()
+                ->where('cod_sis', '20261002')
+                ->count()
+        );
+    }
+
     private function validRosterCsv(): UploadedFile
     {
         $csv = implode(PHP_EOL, [
