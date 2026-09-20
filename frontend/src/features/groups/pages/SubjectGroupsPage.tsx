@@ -1,4 +1,5 @@
-import { Info, Layers } from 'lucide-react'
+import { useState } from 'react'
+import { Info, Layers, Plus } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -6,16 +7,24 @@ import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { GroupListItem } from '../components/GroupListItem'
 import { GroupsTable } from '../components/GroupsTable'
+import { RegistrarGrupoForm } from '../components/GroupRegisterForm'
 import { useSubjectGroups } from '../hooks/useSubjectGroups'
+import type { Group } from '../types/group.types'
 
 /**
  * Grupos de un par materia-carrera (artboards 1.4 y 1.5).
  *
  * Lista todos los grupos del par, propios y ajenos, porque el docente necesita
  * ver la materia completa aunque solo pueda abrir los suyos.
+ *
+ * HU-18/HU-19: "Nuevo grupo" en el header y "Editar" por fila (solo en los
+ * grupos propios) abren el formulario correspondiente en un Dialog; al
+ * confirmar, se recarga el listado con el `reload()` que ya expone el hook.
  */
 export function SubjectGroupsPage() {
   const params = useParams()
@@ -27,7 +36,11 @@ export function SubjectGroupsPage() {
     subjectId
   )
 
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [editingGroup, setEditingGroup] = useState<Group | null>(null)
+
   const title = subject?.nombre ?? 'Grupos de la materia'
+  const subjectCareerLabel = subject ? `${subject.nombre} · ${subject.carrera.nombre}` : ''
 
   return (
     <AppShell
@@ -46,6 +59,14 @@ export function SubjectGroupsPage() {
               <span aria-hidden="true">·</span>
               <span>{subject.carrera.nombre}</span>
             </span>
+          )
+        }
+        actions={
+          subject && (
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <Plus className="size-4" aria-hidden="true" />
+              Nuevo grupo
+            </Button>
           )
         }
       />
@@ -78,6 +99,14 @@ export function SubjectGroupsPage() {
                 ? `${subject.nombre} no tiene grupos registrados en ${subject.carrera.nombre} para el período vigente.`
                 : 'Esta materia no tiene grupos registrados para el período vigente.'
             }
+            action={
+              subject && (
+                <Button onClick={() => setIsCreateOpen(true)}>
+                  <Plus className="size-4" aria-hidden="true" />
+                  Registrar el primer grupo
+                </Button>
+              )
+            }
           />
         )}
 
@@ -95,6 +124,26 @@ export function SubjectGroupsPage() {
           </>
         )}
       </Card>
+
+      {/* HU-18 */}
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nuevo grupo</DialogTitle>
+          </DialogHeader>
+          <RegistrarGrupoForm
+            careerId={careerId}
+            subjectId={subjectId}
+            subjectCareerLabel={subjectCareerLabel}
+            onCancel={() => setIsCreateOpen(false)}
+            onRegistered={() => {
+              setIsCreateOpen(false)
+              reload()
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
     </AppShell>
   )
 }
