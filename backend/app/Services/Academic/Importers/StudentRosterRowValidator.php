@@ -8,6 +8,8 @@ class StudentRosterRowValidator
 
     private const MAX_FIRST_NAMES_LENGTH = 50;
 
+    private const MAX_LAST_NAMES_LENGTH = 30;
+
     /**
      * @return array<int, string>
      */
@@ -39,6 +41,13 @@ class StudentRosterRowValidator
             && mb_strlen($row->firstNames()) > self::MAX_FIRST_NAMES_LENGTH
         ) {
             $errors[] = 'first_names_too_long';
+        }
+
+        if (
+            $row->lastNames() !== null
+            && mb_strlen($row->lastNames()) > self::MAX_LAST_NAMES_LENGTH
+        ) {
+            $errors[] = 'last_names_too_long';
         }
 
         return $errors;
