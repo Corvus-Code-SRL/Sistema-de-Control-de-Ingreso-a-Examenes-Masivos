@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Academic;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Academic\ShowGroupRequest;
-use App\Http\Requests\Academic\StoreGrupoRequest;
-use App\Http\Requests\Academic\UpdateGrupoRequest;
+use App\Http\Requests\Academic\StoreGroupRequest;
+use App\Http\Requests\Academic\UpdateGroupRequest;
 use App\Http\Resources\Academic\GroupResource;
 use App\Http\Resources\Academic\SubjectCareerResource;
 use App\Services\Academic\GroupService;
@@ -32,9 +32,9 @@ class GroupController extends Controller
     }
 
     /**
-     * registra un grupo dentro de un par materia-carrera.
+     * HU-18: registra un grupo dentro de un par materia-carrera.
      */
-    public function store(StoreGrupoRequest $request): JsonResponse
+    public function store(StoreGroupRequest $request): JsonResponse
     {
         $result = $this->groupService->storeGroup($request->validated());
 
@@ -47,7 +47,7 @@ class GroupController extends Controller
     /**
      * actualiza los datos habilitados de un grupo existente.
      */
-    public function update(UpdateGrupoRequest $request, int $id_grupo): JsonResponse
+    public function update(UpdateGroupRequest $request, int $id_grupo): JsonResponse
     {
         $result = $this->groupService->updateGroup($id_grupo, $request->validated());
 

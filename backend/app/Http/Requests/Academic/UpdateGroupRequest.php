@@ -4,7 +4,7 @@ namespace App\Http\Requests\Academic;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class UpdateGrupoRequest extends FormRequest
+class UpdateGroupRequest extends FormRequest
 {
     public function authorize(): bool
     {

@@ -11,7 +11,7 @@ use Illuminate\Foundation\Http\FormRequest;
  * par materia-carrera exista y esté activo (CA 3, 7) se resuelven en
  * GroupService: dependen de datos que este FormRequest no tiene cargados.
  */
-class StoreGrupoRequest extends FormRequest
+class StoreGroupRequest extends FormRequest
 {
     public function authorize(): bool
     {
