@@ -17,10 +17,9 @@ export interface UseGroupDetailResult {
 /**
  * Detalle de un grupo, con el permiso ya resuelto.
  *
- * El acceso se decide por `es_mio`, que es el dato que devuelve la API: hoy
- * responde 200 para cualquier grupo y marca la propiedad en el recurso. Un 403
- * se trata igual por si el backend empieza a rechazarlo en el servidor, de modo
- * que la vista tiene un único estado de «no es suyo» venga de donde venga.
+ * Quien decide es el backend: responde 403 cuando el grupo es de otro docente.
+ * `es_mio` se sigue revisando como respaldo, de modo que la vista tiene un
+ * único estado de «no es suyo» venga de donde venga.
  */
 export function useGroupDetail(groupId: number): UseGroupDetailResult {
   const resource = useAsyncResource<GroupDetail>(
