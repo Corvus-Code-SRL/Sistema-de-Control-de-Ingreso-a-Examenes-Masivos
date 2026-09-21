@@ -9,6 +9,7 @@ import {
   CalendarPlus,
   AlertCircle
 } from 'lucide-react';
+import { ExamStatus } from '../types/exams.types';
 
 interface ExamItem {
   id: number;
@@ -22,7 +23,7 @@ interface ExamItem {
   postulantes: number;
   auxiliares: { initials: string; active?: boolean }[];
   auxiliaresText: string;
-  estado: 'PROGRAMADO' | 'EN PREPARACIÓN' | 'BORRADOR';
+  estado: ExamStatus;
 }
 
 export const ExamsPage: React.FC = () => {
@@ -30,28 +31,19 @@ export const ExamsPage: React.FC = () => {
   const [exams] = useState<ExamItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const renderStatusBadge = (estado: ExamItem['estado']) => {
-    switch (estado) {
-      case 'PROGRAMADO':
-        return (
-          <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#DFF1E7] text-[#15803D]">
-            PROGRAMADO
-          </span>
-        );
-      case 'EN PREPARACIÓN':
-        return (
-          <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#D8ECEE] text-[#005E68]">
-            EN PREPARACIÓN
-          </span>
-        );
-      case 'BORRADOR':
-        return (
-          <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#FFF3C7] text-[#9A6F00]">
-            BORRADOR
-          </span>
-        );
-    }
+  const statusBadges: Record<ExamStatus, { label: string; className: string }> = {
+    PROGRAMADO: { label: 'PROGRAMADO', className: 'bg-[#DFF1E7] text-[#15803D]' },
+    EN_INGRESO: { label: 'EN INGRESO', className: 'bg-[#D8ECEE] text-[#005E68]' },
+    EN_CURSO: { label: 'EN CURSO', className: 'bg-[#D8ECEE] text-[#005E68]' },
+    FINALIZADO: { label: 'FINALIZADO', className: 'bg-[#EEEEEE] text-[#4A4A4A]' },
+    CANCELADO: { label: 'CANCELADO', className: 'bg-[#FDE2E2] text-[#B42318]' },
   };
+
+  const renderStatusBadge = (estado: ExamStatus) => (
+    <span className={`px-3 py-1 rounded-full text-[11px] font-bold ${statusBadges[estado].className}`}>
+      {statusBadges[estado].label}
+    </span>
+  );
 
   const filteredExams = exams.filter((exam) => {
     if (!searchTerm.trim()) return true;
@@ -73,7 +65,7 @@ export const ExamsPage: React.FC = () => {
           </p>
         </div>
         <Button
-          onClick={() => navigate('/exams/new')}
+          onClick={() => navigate('/examenes/nuevo')}
           className="bg-[#005E68] hover:bg-[#00555E] text-white font-semibold text-xs px-4 py-2.5 rounded-lg gap-2 shadow-xs"
         >
           <Plus className="h-4 w-4" /> Nuevo examen
@@ -94,7 +86,7 @@ export const ExamsPage: React.FC = () => {
           </div>
 
           <Button
-            onClick={() => navigate('/exams/new')}
+            onClick={() => navigate('/examenes/nuevo')}
             className="bg-[#005E68] hover:bg-[#00555E] text-white font-semibold text-xs px-5 py-2.5 rounded-lg gap-2 mt-2"
           >
             <Plus className="h-4 w-4" /> Programar mi primer examen
@@ -203,10 +195,10 @@ export const ExamsPage: React.FC = () => {
                       <td className="py-4 px-5 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() => navigate('/exams/new')}
+                            onClick={() => navigate('/examenes/nuevo')}
                             className="px-3 py-1 bg-[#F3F8F8] border border-[#DDDDDD] hover:bg-white text-[#2C2C2C] font-semibold text-xs rounded-md transition-colors"
                           >
-                            {exam.estado === 'BORRADOR' ? 'Completar' : 'Configurar'}
+                            Configurar
                           </button>
                           <button className="p-1 text-[#6C757D] hover:text-[#2C2C2C] rounded-md hover:bg-gray-100">
                             <MoreVertical className="h-4 w-4" />

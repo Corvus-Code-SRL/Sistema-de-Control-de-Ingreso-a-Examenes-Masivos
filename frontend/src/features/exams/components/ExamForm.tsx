@@ -1,14 +1,20 @@
 import React from 'react';
-import { CreateExamFormData, Subject, Classroom } from '../types/exams.types';
+import { CreateExamFormData, SubjectCareerOption, Classroom } from '../types/exams.types';
+import { localToday, MAX_DURATION_MINUTES } from '../utils/examValidators';
 import { Calendar as CalendarIcon, Clock as ClockIcon, ChevronDown } from 'lucide-react';
 
 interface Props {
   formData: CreateExamFormData;
-  subjects: Subject[];
+  subjects: SubjectCareerOption[];
   classrooms: Classroom[];
   errors: Record<string, string>;
   warnings: Record<string, string>;
   updateFormData: (fields: Partial<CreateExamFormData>) => void;
+}
+
+/** El par viaja como una sola opción del select: "idCarrera-idMateria". */
+function pairKey(pair: { id_carrera: number; id_materia: number }): string {
+  return `${pair.id_carrera}-${pair.id_materia}`;
 }
 
 export const ExamForm: React.FC<Props> = ({
@@ -55,7 +61,6 @@ export const ExamForm: React.FC<Props> = ({
               className="w-full px-3.5 py-2.5 bg-white border border-[#DDDDDD] rounded-lg text-xs outline-none focus:border-[#005E68] text-[#2C2C2C] appearance-none cursor-pointer pr-9 font-medium"
             >
               <option value="REGULAR">REGULAR</option>
-              <option value="FINAL">FINAL</option>
               <option value="MESA">MESA</option>
               <option value="ADMISION">ADMISION</option>
             </select>
@@ -71,6 +76,7 @@ export const ExamForm: React.FC<Props> = ({
             <input
               id="fecha"
               type="date"
+              min={localToday()}
               value={formData.fecha}
               onChange={(e) => updateFormData({ fecha: e.target.value })}
               className={`w-full px-3.5 py-2.5 bg-white border ${errors.fecha ? 'border-red-500' : 'border-[#DDDDDD]'
@@ -84,28 +90,33 @@ export const ExamForm: React.FC<Props> = ({
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="id_materia" className="block text-xs font-bold text-[#2C2C2C]">
+          <label htmlFor="materia" className="block text-xs font-bold text-[#2C2C2C]">
             Materia *
           </label>
           <div className="relative">
             <select
-              id="id_materia"
-              value={formData.id_materia ?? ''}
-              onChange={(e) => updateFormData({ id_materia: e.target.value ? Number(e.target.value) : null })}
-              className={`w-full px-3.5 py-2.5 bg-white border ${errors.id_materia ? 'border-red-500' : 'border-[#DDDDDD]'
+              id="materia"
+              value={formData.materia ? pairKey(formData.materia) : ''}
+              onChange={(e) => {
+                const pair = subjects.find((sub) => pairKey(sub) === e.target.value);
+                updateFormData({
+                  materia: pair ? { id_carrera: pair.id_carrera, id_materia: pair.id_materia } : null,
+                });
+              }}
+              className={`w-full px-3.5 py-2.5 bg-white border ${errors.materia ? 'border-red-500' : 'border-[#DDDDDD]'
                 } rounded-lg text-xs outline-none focus:border-[#005E68] text-[#2C2C2C] appearance-none cursor-pointer pr-9 font-medium`}
             >
               <option value="">Seleccionar Materia...</option>
               {subjects.map((sub) => (
-                <option key={sub.id_materia} value={sub.id_materia}>
-                  {sub.nombre}
+                <option key={pairKey(sub)} value={pairKey(sub)}>
+                  {sub.nombre} — {sub.carrera}
                 </option>
               ))}
             </select>
             <ChevronDown className="h-4 w-4 text-[#6C757D] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
-          {errors.id_materia && (
-            <p className="text-[11px] text-red-600 font-medium">{errors.id_materia}</p>
+          {errors.materia && (
+            <p className="text-[11px] text-red-600 font-medium">{errors.materia}</p>
           )}
         </div>
 
@@ -117,6 +128,8 @@ export const ExamForm: React.FC<Props> = ({
             id="duracion"
             type="number"
             min={1}
+            max={MAX_DURATION_MINUTES}
+            step={1}
             placeholder="90"
             value={formData.duracion || ''}
             onChange={(e) => {

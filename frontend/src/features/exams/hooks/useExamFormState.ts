@@ -1,27 +1,30 @@
 import { useState, useCallback } from 'react';
 import { CreateExamFormData } from '../types/exams.types';
+import { localToday } from '../utils/examValidators';
 
-const defaultFormData: CreateExamFormData = {
-  nombre_examen: '',
-  id_materia: null,
-  categoria: 'REGULAR',
-  fecha: new Date().toISOString().split('T')[0],
-  hora_inicio: '08:00',
-  duracion: 90,
-  ambientes: [],
-  grupos: [],
-  normas: '',
-};
+function emptyForm(): CreateExamFormData {
+  return {
+    nombre_examen: '',
+    materia: null,
+    categoria: 'REGULAR',
+    fecha: localToday(),
+    hora_inicio: '08:00',
+    duracion: 90,
+    ambientes: [],
+    grupos: [],
+    normas: '',
+  };
+}
 
-export function useExamFormState(initialState: CreateExamFormData = defaultFormData) {
-  const [formData, setFormData] = useState<CreateExamFormData>(initialState);
+export function useExamFormState(initialState?: CreateExamFormData) {
+  const [formData, setFormData] = useState<CreateExamFormData>(() => initialState ?? emptyForm());
 
   const updateFormData = useCallback((fields: Partial<CreateExamFormData>) => {
     setFormData((prev) => ({ ...prev, ...fields }));
   }, []);
 
   const resetFormData = useCallback(() => {
-    setFormData(defaultFormData);
+    setFormData(emptyForm());
   }, []);
 
   return {

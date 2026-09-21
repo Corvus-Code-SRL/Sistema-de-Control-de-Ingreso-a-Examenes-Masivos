@@ -34,7 +34,7 @@ export interface NavGroup {
 /**
  * Navegación lateral del docente.
  *
- * Solo Materias y Mis cursos existen en esta historia. El resto se lista para
+ * Materias, Mis cursos y Nuevo examen (HU-24) existen. El resto se lista para
  * dar la forma completa del producto, pero sin destino: un enlace que no lleva
  * a ninguna parte confunde más que uno visiblemente pendiente.
  */
@@ -51,7 +51,7 @@ const navegacionDocente: NavGroup[] = [
   {
     label: 'Exámenes',
     items: [
-      { label: 'Nuevo examen', icon: SquarePen },
+      { label: 'Nuevo examen', icon: SquarePen, to: '/examenes/nuevo' },
       { label: 'Programados', icon: CalendarClock },
       { label: 'Control de ingreso', icon: DoorOpen },
       { label: 'En curso', icon: PlaySquare },
