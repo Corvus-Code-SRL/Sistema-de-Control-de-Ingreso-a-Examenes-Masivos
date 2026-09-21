@@ -18,6 +18,7 @@
 - React DOM: 18.3.1
 - TypeScript: 5.7.3
 - Vite: 6.4.3
+- React Router: 7.18.4 (modo declarativo; SPA sin SSR)
 - Tailwind CSS: 4.3.3
 - @tailwindcss/vite: 4.3.3
 - shadcn CLI: 4.21.0
@@ -42,3 +43,8 @@ UI base:
 - Radix
 - Lucide Icons
 - Preset Nova
+- Tipografía: Inter para toda la interfaz; Poppins solo para la marca (logo y wordmark "SCIEM")
+
+## Despliegue del frontend
+
+En producción, Apache debe reescribir las rutas del frontend que no correspondan a un archivo existente (ni a `/api`) hacia `index.html`, para que el router del navegador resuelva URLs como `/examenes/en-curso` al recargar la página.

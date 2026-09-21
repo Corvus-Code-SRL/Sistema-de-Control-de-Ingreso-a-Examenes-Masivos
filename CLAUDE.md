@@ -33,7 +33,7 @@ React + TS → REST API → Controller → Form Request → Service → Eloquent
 - Redis es infraestructura transversal (cache, sesiones, colas).
 - Modelos: nombre de clase en inglés, `protected $table` explícito (tabla en español, ej. `'grupo'`).
 - Rutas por módulo en `routes/api/<modulo>.php`, cargadas desde `routes/api.php`.
-- Frontend: `components/ui` (primitivas shadcn — revisar antes de crear una nueva), `components/layout`, `components/common`, `features/<nombre>/` (cada feature con components/pages/services/hooks/types propios, expuestos solo vía su `index.ts` — un feature nunca importa de rutas internas de otro). Alias `@/*` → `src/*`. Naming: `PascalCase.tsx` (componentes), `useNombre.ts` (hooks), `nombreService.ts` (servicios), `nombre.types.ts` (tipos). Toda llamada HTTP pasa por `lib/api-client.ts`.
+- Frontend: `components/ui` (primitivas shadcn — revisar antes de crear una nueva), `components/layout`, `components/common`, `features/<nombre>/` (cada feature con components/pages/services/hooks/types propios, expuestos solo vía su `index.ts` — un feature nunca importa de rutas internas de otro). Alias `@/*` → `src/*`. Naming: `PascalCase.tsx` (componentes), `useNombre.ts` (hooks), `nombreService.ts` (servicios), `nombre.types.ts` (tipos). Toda llamada HTTP pasa por `lib/api-client.ts`. Las páginas nuevas se registran en `src/config/navigation.ts` (fuente única de navegación y rutas). La navegación interna siempre usa el router (`Link`/`NavLink`, `useNavigate`), nunca `<a href>` ni `window.location`.
 
 ### Módulos
 

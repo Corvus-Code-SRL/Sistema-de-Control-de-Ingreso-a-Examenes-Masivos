@@ -92,9 +92,10 @@ Las versiones están fijadas por compatibilidad con los servidores de despliegue
 | | React / React DOM | 18.3.1 |
 | | TypeScript | 5.7.3 |
 | | Vite | 6.4.3 |
+| | React Router | 7.18.4 |
 | | Tailwind CSS / @tailwindcss/vite | 4.3.3 |
 | | shadcn CLI | 4.21.0 |
-| UI base | shadcn/ui · Radix · Lucide Icons · Preset Nova | — |
+| UI base | shadcn/ui · Radix · Lucide Icons · Preset Nova · Tipografía Inter (Poppins solo para la marca) | — |
 
 Detalle en [`docs/architecture/stack.md`](docs/architecture/stack.md).
 
