@@ -1,23 +1,36 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Search, Info, X, ChevronLeft, ArrowRight, Pencil,
   RefreshCw, CheckCircle, GraduationCap, AlertCircle, Lock, Check, Trash2
 } from 'lucide-react';
-import { env } from '@/config/env';
+import { ApiError } from '@/lib/api-client';
+import { registerUser, verifySisCode } from '../services/usersService';
+import type { SisPerson } from '../types/users.types';
 
 interface RegistrarCuentaModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: (userData: any) => void;
+  onSuccess?: (userData: SisPerson) => void;
 }
 
 export type ErrorType = 'not_found' | 'duplicate' | 'sis_down' | null;
+
+/** Primer mensaje de cada campo rechazado; sin campos, el mensaje general del servidor. */
+function toFormErrors(error: ApiError): Record<string, string> {
+  const fieldErrors = Object.fromEntries(
+    Object.entries(error.errors).map(([field, messages]) => [field, messages[0] ?? ''])
+  );
+
+  return Object.keys(fieldErrors).length > 0 ? fieldErrors : { general: error.message };
+}
 
 export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [paso, setPaso] = useState<1 | 2 | 'success'>(1);
   const [codSis, setCodSis] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
-  const [sisData, setSisData] = useState<any>(null);
+  const [sisData, setSisData] = useState<SisPerson | null>(null);
+  // Una verificación en curso se aborta al cancelar: su respuesta no debe revivir el registro.
+  const verification = useRef<AbortController | null>(null);
   const [errorType, setErrorType] = useState<ErrorType>(null);
   const [backendErrorMsg, setBackendErrorMsg] = useState('');
 
@@ -33,44 +46,30 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
     setErrorType(null);
     setBackendErrorMsg('');
 
+    verification.current?.abort();
+    const controller = new AbortController();
+    verification.current = controller;
+
     try {
-      const response = await fetch(`${env.apiUrl}/sis/verificar/${codSis}`, {
-        headers: { 'Accept': 'application/json' }
-      });
-
-      if (response.status === 503) {
-        setErrorType('sis_down');
-        setIsVerifying(false);
-        return;
-      }
-
-      const data = await response.json();
-
-      if (response.status === 422) {
-        const mensajeError = data.errors?.cod_sis?.[0] || data.message || '';
-        setBackendErrorMsg(mensajeError);
-
-        if (mensajeError.toLowerCase().includes('ya existe')) {
-          setErrorType('duplicate');
-        } else {
-          setErrorType('not_found');
-        }
-        setIsVerifying(false);
-        return;
-      }
-
-      if (response.ok) {
-        setSisData(data.data);
-        return;
-      }
-
-      // Cualquier otra respuesta del servidor deja la verificación sin resolver:
-      // se muestra el mismo aviso que un fallo de red en vez de fallar en silencio.
-      setErrorType('sis_down');
+      setSisData(await verifySisCode(codSis, controller.signal));
     } catch (error) {
+      if (controller.signal.aborted) return;
+
+      if (error instanceof ApiError && error.isValidation) {
+        const mensajeError = error.errors.cod_sis?.[0] || error.message || '';
+        setBackendErrorMsg(mensajeError);
+        setErrorType(mensajeError.toLowerCase().includes('ya existe') ? 'duplicate' : 'not_found');
+        return;
+      }
+
+      // 503, fallo de red o cualquier otra respuesta: la verificación queda sin resolver
+      // y se muestra el aviso de SIS no disponible en vez de fallar en silencio.
       setErrorType('sis_down');
     } finally {
-      setIsVerifying(false);
+      if (verification.current === controller) {
+        verification.current = null;
+        setIsVerifying(false);
+      }
     }
   };
 
@@ -85,7 +84,7 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
       newErrors.telefono = 'El teléfono debe tener 8 dígitos.';
     }
 
-    if (Object.keys(newErrors).length > 0) {
+    if (Object.keys(newErrors).length > 0 || !sisData) {
       setFormErrors(newErrors);
       return;
     }
@@ -94,39 +93,28 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
     setFormErrors({});
 
     try {
-      const response = await fetch(`${env.apiUrl}/usuarios`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        // Los nombres de campo son los que declara StoreUserRequest.
-        body: JSON.stringify({
-          cod_sis: codSis,
-          nombre: sisData.nombre,
-          apellido_paterno: sisData.paterno,
-          apellido_materno: sisData.materno,
-          correo: correo,
-          telefono: telefono,
-          tipo_institucional: sisData.tipo,
-          facultad: sisData.facultad
-        })
+      // Solo los campos que declara StoreUserRequest: teléfono, tipo y facultad no se persisten.
+      await registerUser({
+        cod_sis: codSis,
+        nombre: sisData.nombre,
+        apellido_paterno: sisData.paterno,
+        apellido_materno: sisData.materno,
+        correo,
       });
-
-      if (response.ok) {
-        setPaso('success');
-      } else {
-        const data = await response.json();
-        setFormErrors(data.errors || { general: data.message });
-      }
+      setPaso('success');
     } catch (error) {
-      setFormErrors({ general: 'Error de conexión con el servidor.' });
+      setFormErrors(
+        error instanceof ApiError ? toFormErrors(error) : { general: 'Error de conexión con el servidor.' }
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleCerrar = () => {
+    // Con la cuenta ya enviada no hay nada que cancelar: el registro está confirmado.
+    if (isSubmitting) return;
+
     if ((sisData || paso === 2) && paso !== 'success') {
       setShowCancelConfirm(true);
     } else {
@@ -135,10 +123,14 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
   };
 
   const cerrarPorCompleto = () => {
+    verification.current?.abort();
+    verification.current = null;
+    setIsVerifying(false);
     setPaso(1);
     setCodSis('');
     setSisData(null);
     setErrorType(null);
+    setBackendErrorMsg('');
     setCorreo('');
     setTelefono('');
     setFormErrors({});
@@ -179,7 +171,7 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
         )}
 
         <div className="md:hidden flex items-center gap-2 h-14 px-2 border-b border-border-soft bg-surface shrink-0">
-          <button onClick={handleCerrar} className="w-10 h-10 flex items-center justify-center text-muted-foreground rounded-[8px]">
+          <button onClick={handleCerrar} disabled={isSubmitting} aria-label="Cancelar registro" className="w-10 h-10 flex items-center justify-center text-muted-foreground rounded-[8px]">
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div className="flex-1 font-semibold text-[16px] text-text truncate">Registrar cuenta</div>
@@ -192,7 +184,7 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
               {paso === 1 ? 'Paso 1 de 2' : paso === 2 ? 'Paso 2 de 2' : 'Registrada a las 09:14 · queda en la bitácora'}
             </p>
           </div>
-          <button onClick={handleCerrar} className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:bg-bg-app rounded-[8px] transition-colors">
+          <button onClick={handleCerrar} disabled={isSubmitting} aria-label="Cancelar registro" className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:bg-bg-app rounded-[8px] transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -217,12 +209,18 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
             </div>
           )}
 
+          {paso !== 'success' && (
+            <p className="text-[13px] text-muted-foreground">
+              Los campos marcados con <span aria-hidden="true" className="text-danger">*</span> son obligatorios.
+            </p>
+          )}
+
           {paso === 1 && (
             <>
               <div className="flex flex-col md:flex-row items-start md:items-start gap-3 md:gap-4">
                 <div className="flex flex-col gap-1.5 w-full md:flex-1">
-                  <label className="text-[14px] font-medium text-text flex items-center gap-1">
-                    Código SIS <span className="text-danger">*</span>
+                  <label htmlFor="registro-cod-sis" className="text-[14px] font-medium text-text flex items-center gap-1">
+                    Código SIS <span aria-hidden="true" className="text-danger">*</span>
                   </label>
                   
                   <div className={`flex items-center gap-2 h-10 px-3 rounded-[8px] border bg-surface transition-all ${
@@ -234,7 +232,10 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
                   }`}>
                     <span className={`${hasInputError ? 'text-danger' : 'text-subtle'} font-medium select-none`}>#</span>
                     <input 
+                      id="registro-cod-sis"
                       type="text" 
+                      aria-required="true"
+                      aria-invalid={hasInputError}
                       value={codSis}
                       onChange={(e) => {
                         setCodSis(e.target.value);
@@ -364,7 +365,7 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[14px] font-medium text-text flex items-center gap-1">Nombre <span className="text-danger">*</span></label>
+                  <label className="text-[14px] font-medium text-text flex items-center gap-1">Nombre <span aria-hidden="true" className="text-danger">*</span></label>
                   <div className="flex items-center gap-2 h-10 px-3 rounded-[8px] border border-border-strong bg-bg-app text-muted-foreground select-none">
                     <Lock className="w-4 h-4 text-subtle" />
                     <span className="flex-1 truncate text-[14px]">{sisData.nombre}</span>
@@ -372,7 +373,7 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
                   <div className="text-[13px] text-muted-foreground">Según el SIS.</div>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[14px] font-medium text-text flex items-center gap-1">Apellido paterno <span className="text-danger">*</span></label>
+                  <label className="text-[14px] font-medium text-text flex items-center gap-1">Apellido paterno <span aria-hidden="true" className="text-danger">*</span></label>
                   <div className="flex items-center gap-2 h-10 px-3 rounded-[8px] border border-border-strong bg-bg-app text-muted-foreground select-none">
                     <Lock className="w-4 h-4 text-subtle" />
                     <span className="flex-1 truncate text-[14px]">{sisData.paterno}</span>
@@ -389,11 +390,14 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[14px] font-medium text-text flex items-center gap-1">Correo institucional <span className="text-danger">*</span></label>
+                  <label htmlFor="registro-correo" className="text-[14px] font-medium text-text flex items-center gap-1">Correo institucional <span aria-hidden="true" className="text-danger">*</span></label>
                   <div className={`flex items-center gap-2 h-10 px-3 rounded-[8px] border bg-surface transition-all ${formErrors.correo ? 'border-danger shadow-[0_0_0_3px_rgba(217,45,32,0.12)] text-danger' : 'border-border-strong focus-within:border-brand focus-within:shadow-[var(--focus-ring)]'}`}>
                     <svg className={`w-4 h-4 shrink-0 ${formErrors.correo ? 'text-danger' : 'text-subtle'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
                     <input 
+                      id="registro-correo"
                       type="email" 
+                      aria-required="true"
+                      aria-invalid={!!formErrors.correo}
                       value={correo}
                       onChange={(e) => { setCorreo(e.target.value); setFormErrors(prev => ({...prev, correo: ''})); }}
                       className="flex-1 w-full bg-transparent outline-none text-[14px] text-text" 
@@ -407,9 +411,10 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
                 </div>
                 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[14px] font-medium text-text flex items-center gap-1">Teléfono <span className="text-muted-foreground font-normal">(opcional)</span></label>
+                  <label htmlFor="registro-telefono" className="text-[14px] font-medium text-text flex items-center gap-1">Teléfono <span className="text-muted-foreground font-normal">(opcional)</span></label>
                   <div className={`flex items-center gap-2 h-10 px-3 rounded-[8px] border bg-surface transition-all ${formErrors.telefono ? 'border-danger shadow-[0_0_0_3px_rgba(217,45,32,0.12)] text-danger' : 'border-border-strong focus-within:border-brand focus-within:shadow-[var(--focus-ring)]'}`}>
                     <input 
+                      id="registro-telefono"
                       type="text" 
                       value={telefono}
                       onChange={(e) => { setTelefono(e.target.value); setFormErrors(prev => ({...prev, telefono: ''})); }}
@@ -495,7 +500,7 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
                 <ChevronLeft className="w-4 h-4" /> Atrás
               </button>
               <div className="flex flex-col-reverse md:flex-row gap-3 w-full md:w-auto">
-                <button onClick={handleCerrar} className="w-full md:w-auto h-10 px-4 flex items-center justify-center rounded-[10px] border border-border-strong bg-surface text-text text-[14px] font-semibold hover:bg-sunken transition-colors">
+                <button onClick={handleCerrar} disabled={isSubmitting} className="w-full md:w-auto h-10 px-4 flex items-center justify-center rounded-[10px] border border-border-strong bg-surface text-text text-[14px] font-semibold hover:bg-sunken transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                   Cancelar
                 </button>
                 <button 
@@ -522,7 +527,7 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
                 <button 
                   onClick={() => { 
                     handleCerrar(); 
-                    if(onSuccess) onSuccess(sisData); 
+                    if (onSuccess && sisData) onSuccess(sisData); 
                   }} 
                   className="w-full md:w-auto h-10 px-4 flex items-center justify-center rounded-[10px] border border-border-strong bg-surface text-text text-[14px] font-semibold hover:bg-sunken transition-colors"
                 >
@@ -531,7 +536,7 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
                 <button 
                   onClick={() => { 
                     handleCerrar(); 
-                    if(onSuccess) onSuccess(sisData); 
+                    if (onSuccess && sisData) onSuccess(sisData); 
                   }} 
                   className="w-full md:w-auto h-10 px-4 flex items-center justify-center gap-2 rounded-[10px] bg-brand text-primary-foreground text-[14px] font-semibold hover:bg-brand-active transition-colors"
                 >
