@@ -1,13 +1,58 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./assets/fonts/inter-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/poppins-700.woff2") format("woff2");
+}
 
 @custom-variant dark (&:is(.dark *));
 
+/* Modo compacto por ALTURA de viewport: ajusta el ritmo vertical del sidebar en
+   ventanas bajas para que el nav entre sin scroll. No confundir con el sidebar
+   colapsado, que es estado de React y depende del ancho. */
+@custom-variant compact (@media (max-height: 840px));
+
+/* Scrollbar fino y discreto con los tokens del sidebar. Se usa en el nav, que
+   solo scrollea en ventanas muy bajas. */
+@utility scrollbar-sidebar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-sidebar-divider) transparent;
+
+  /* Fallback para navegadores sin scrollbar-width/scrollbar-color. */
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--color-sidebar-divider);
+    border-radius: var(--radius-4xl);
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-sidebar-label);
+  }
+}
+
 @theme inline {
-  --font-heading: "Geist Variable", sans-serif;
-  --font-sans: "Geist Variable", sans-serif;
+  --font-heading: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  /* Solo para el logo "S" y el wordmark "SCIEM". */
+  --font-brand: "Poppins", ui-sans-serif, system-ui, sans-serif;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -50,6 +95,15 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-highlight: var(--sidebar-highlight);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-label: var(--sidebar-label);
+  --color-sidebar-divider: var(--sidebar-divider);
+  --color-sidebar-live-text: var(--sidebar-live-text);
+  --color-sidebar-live-dot: var(--sidebar-live-dot);
+  --color-sidebar-popover: var(--sidebar-popover);
+  --color-sidebar-popover-border: var(--sidebar-popover-border);
+  --color-sidebar-danger: var(--sidebar-danger);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -63,7 +117,7 @@
 @layer base {
   .theme {
     --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif
   }
   :root {
     --background: oklch(1 0 0);
@@ -90,14 +144,23 @@
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
     --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0)
+    --sidebar: #05383E;
+    --sidebar-foreground: #D8ECEE;
+    --sidebar-primary: #005E68;
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent: #0B474E;
+    --sidebar-accent-foreground: #FFFFFF;
+    --sidebar-border: #0F4A51;
+    --sidebar-ring: #FFCB32;
+    --sidebar-highlight: #FFCB32;
+    --sidebar-muted: #8FC7CC;
+    --sidebar-label: #7FB0B5;
+    --sidebar-divider: #24626A;
+    --sidebar-live-text: #7FD4A6;
+    --sidebar-live-dot: #2FA66A;
+    --sidebar-popover: #0B474E;
+    --sidebar-popover-border: #1E5A61;
+    --sidebar-danger: #F4A8A2
   }
   .dark {
     --background: oklch(0.145 0 0);
