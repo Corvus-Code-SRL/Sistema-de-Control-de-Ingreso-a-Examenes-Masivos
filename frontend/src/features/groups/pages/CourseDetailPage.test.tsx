@@ -60,14 +60,20 @@ describe('CourseDetailPage', () => {
     expect(screen.queryByText('Victor Perez')).not.toBeInTheDocument()
   })
 
-  it('niega el acceso igual cuando el servidor responde 403', async () => {
-    mockApiOnce({ status: 403, body: { message: 'No autorizado.' } })
+  it('muestra el acceso denegado cuando el servidor responde 403', async () => {
+    mockApiOnce({
+      status: 403,
+      body: { message: 'Solo el docente que dicta el grupo puede ver su detalle.' },
+    })
 
     renderPage(200)
     await waitForLoad()
 
     expect(screen.getByText('Este curso no es suyo')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /ir a mis cursos/i })).toBeInTheDocument()
     expect(screen.queryByRole('tab')).not.toBeInTheDocument()
+    // Es un estado propio, no el error genérico de carga.
+    expect(screen.queryByText(/no se pudo cargar/i)).not.toBeInTheDocument()
     // No se ofrece reintentar: repetir la petición daría el mismo resultado.
     expect(screen.queryByRole('button', { name: /reintentar/i })).not.toBeInTheDocument()
   })
