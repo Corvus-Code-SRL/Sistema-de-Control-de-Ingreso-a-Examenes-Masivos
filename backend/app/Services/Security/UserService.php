@@ -2,6 +2,7 @@
 
 namespace App\Services\Security;
 
+use App\Exceptions\Security\DuplicateAccountException;
 use App\Exceptions\Security\SisNoDisponibleException;
 use App\Exceptions\Security\SisNoValidoException;
 use App\Models\User;
@@ -56,15 +57,44 @@ class UserService
         });
     }
 
-    /** CA 2, 3 y 10 — verificación contra la fuente institucional. */
-    private function validarContraSis(string $codSis): void
+    /**
+     * Paso previo al registro: confirma que el código SIS puede recibir una cuenta
+     * y devuelve los datos de la persona según el SIS.
+     *
+     * El duplicado se revisa antes que la existencia en el SIS, para avisar
+     * de la cuenta existente aunque el código también sea válido.
+     */
+    public function verifySisCode(string $codSis): array
     {
-        if (! $this->sis->estaDisponible()) {
-            throw new SisNoDisponibleException();   // -> 503
+        $this->assertSisAvailable();
+
+        $existing = User::where('cod_sis', $codSis)->first();
+
+        if ($existing !== null) {
+            throw new DuplicateAccountException($existing->nombre_completo);   // -> 422
         }
 
         if (! $this->sis->existePersona($codSis)) {
             throw new SisNoValidoException();       // -> 422
+        }
+
+        return $this->sis->personData($codSis);
+    }
+
+    /** CA 2, 3 y 10 — verificación contra la fuente institucional. */
+    private function validarContraSis(string $codSis): void
+    {
+        $this->assertSisAvailable();
+
+        if (! $this->sis->existePersona($codSis)) {
+            throw new SisNoValidoException();       // -> 422
+        }
+    }
+
+    private function assertSisAvailable(): void
+    {
+        if (! $this->sis->estaDisponible()) {
+            throw new SisNoDisponibleException();   // -> 503
         }
     }
 
