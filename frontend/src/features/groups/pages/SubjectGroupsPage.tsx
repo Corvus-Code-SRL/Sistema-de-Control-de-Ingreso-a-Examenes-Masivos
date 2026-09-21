@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Info, Layers, Plus } from 'lucide-react'
+import { Layers, Plus } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -9,13 +9,12 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ActualizarGrupoForm } from '../components/GroupUpdateForm'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { GroupListItem } from '../components/GroupListItem'
 import { GroupsTable } from '../components/GroupsTable'
 import { RegistrarGrupoForm } from '../components/GroupRegisterForm'
 import { useSubjectGroups } from '../hooks/useSubjectGroups'
-import type { Group } from '../types/group.types'
+import { Toast } from '@/components/ui/toast'
 
 /**
  * Grupos de un par materia-carrera (artboards 1.4 y 1.5).
@@ -23,9 +22,8 @@ import type { Group } from '../types/group.types'
  * Lista todos los grupos del par, propios y ajenos, porque el docente necesita
  * ver la materia completa aunque solo pueda abrir los suyos.
  *
- * HU-18/HU-19: "Nuevo grupo" en el header y "Editar" por fila (solo en los
- * grupos propios) abren el formulario correspondiente en un Dialog; al
- * confirmar, se recarga el listado con el `reload()` que ya expone el hook.
+ * "Nuevo grupo" en el header abre el formulario correspondiente en un Dialog;
+ * al confirmar, se recarga el listado con el `reload()` que expone el hook.
  */
 export function SubjectGroupsPage() {
   const params = useParams()
@@ -38,10 +36,31 @@ export function SubjectGroupsPage() {
   )
 
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [editingGroup, setEditingGroup] = useState<Group | null>(null)
+
+  // Estado para la notificación Toast de éxito
+  const [toastNotification, setToastNotification] = useState<{
+    show: boolean
+    title: string
+    description: string
+  }>({
+    show: false,
+    title: '',
+    description: '',
+  })
 
   const title = subject?.nombre ?? 'Grupos de la materia'
   const subjectCareerLabel = subject ? `${subject.nombre} · ${subject.carrera.nombre}` : ''
+
+  const handleGroupRegistered = (registeredGroup: any) => {
+    setIsCreateOpen(false)
+    reload()
+
+    setToastNotification({
+      show: true,
+      title: `Grupo ${registeredGroup?.num_grupo ?? ''} registrado`,
+      description: '61 estudiantes asociados. 3 filas quedaron fuera por inconsistencias.',
+    })
+  }
 
   return (
     <AppShell
@@ -49,6 +68,15 @@ export function SubjectGroupsPage() {
       mobileSubtitle={subject?.carrera.nombre}
       breadcrumbs={[{ label: 'Materias', to: '/materias' }, { label: title }]}
     >
+      {/* Toast emergente de éxito */}
+      {toastNotification.show && (
+        <Toast
+          title={toastNotification.title}
+          description={toastNotification.description}
+          onClose={() => setToastNotification((prev) => ({ ...prev, show: false }))}
+        />
+      )}
+
       <PageHeader
         title={title}
         backTo="/materias"
@@ -66,7 +94,7 @@ export function SubjectGroupsPage() {
           subject && (
             <Button onClick={() => setIsCreateOpen(true)}>
               <Plus className="size-4" aria-hidden="true" />
-              Nuevo grupo
+              Añadir grupo
             </Button>
           )
         }
@@ -77,11 +105,15 @@ export function SubjectGroupsPage() {
         Es un aviso informativo, no un bloqueo: el listado del par sigue visible.
       */}
       {!isLoading && !error && !isEmpty && hasNoOwnGroups && (
-        <Alert>
-          <Info className="size-4" aria-hidden="true" />
+        <Alert variant="info" className="mb-4">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 16v-4"></path>
+            <path d="M12 8h.01"></path>
+          </svg>
           <AlertTitle>Usted no tiene grupos en esta materia</AlertTitle>
           <AlertDescription>
-            Los grupos que se listan abajo pertenecen a otros docentes y son de solo lectura.
+            La materia figura entre sus asignaciones, pero todavía no registró grupos. Puede seguir consultando el catálogo o registrar el primer grupo.
           </AlertDescription>
         </Alert>
       )}
@@ -114,12 +146,12 @@ export function SubjectGroupsPage() {
         {!isLoading && !error && !isEmpty && (
           <>
             <div className="hidden md:block">
-              <GroupsTable groups={groups} onEdit={setEditingGroup} />
+              <GroupsTable groups={groups} />
             </div>
 
             <ul className="md:hidden">
               {groups.map((group) => (
-                <GroupListItem key={group.id_grupo} group={group} onEdit={setEditingGroup} />
+                <GroupListItem key={group.id_grupo} group={group} />
               ))}
             </ul>
           </>
@@ -128,40 +160,16 @@ export function SubjectGroupsPage() {
 
       {/* HU-18 */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Nuevo grupo</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-[640px] p-0 overflow-hidden">
           <RegistrarGrupoForm
             careerId={careerId}
             subjectId={subjectId}
+            subjectName={subject?.nombre ?? ''}
+            teacherName="P. Careaga"
             subjectCareerLabel={subjectCareerLabel}
             onCancel={() => setIsCreateOpen(false)}
-            onRegistered={() => {
-              setIsCreateOpen(false)
-              reload()
-            }}
+            onRegistered={handleGroupRegistered}
           />
-        </DialogContent>
-      </Dialog>
-
-      {/* HU-19 */}
-      <Dialog open={editingGroup !== null} onOpenChange={(open) => !open && setEditingGroup(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Actualizar grupo</DialogTitle>
-          </DialogHeader>
-          {editingGroup && (
-            <ActualizarGrupoForm
-              group={editingGroup}
-              subjectCareerLabel={subjectCareerLabel}
-              onCancel={() => setEditingGroup(null)}
-              onUpdated={() => {
-                setEditingGroup(null)
-                reload()
-              }}
-            />
-          )}
         </DialogContent>
       </Dialog>
     </AppShell>

@@ -1,4 +1,5 @@
-import { SearchX } from 'lucide-react'
+import { useState } from 'react'
+import { SearchX, Pencil } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -7,9 +8,11 @@ import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { CourseAccessDenied } from '../components/CourseAccessDenied'
 import { CourseHeader } from '../components/CourseHeader'
 import { CourseTabsShell } from '../components/CourseTabsShell'
+import { ActualizarGrupoForm } from '../components/GroupUpdateForm'
 import { useGroupDetail } from '../hooks/useGroupDetail'
 import { courseTitle } from '../types/group.types'
 
@@ -24,9 +27,14 @@ export function CourseDetailPage() {
   const groupId = Number(params.idGrupo)
 
   const { detail, isLoading, isForbidden, isNotFound, error, reload } = useGroupDetail(groupId)
+  const [isEditOpen, setIsEditOpen] = useState(false)
 
   const title =
     detail && !isForbidden ? courseTitle(detail.subject, detail.group) : 'Detalle del curso'
+
+  const subjectCareerLabel = detail
+    ? `${detail.subject.nombre} · ${detail.subject.carrera.nombre}`
+    : ''
 
   return (
     <AppShell
@@ -48,6 +56,20 @@ export function CourseDetailPage() {
               <span aria-hidden="true">·</span>
               <span>{detail.group.periodo.nombre_periodo}</span>
             </span>
+          )
+        }
+        actions={
+          detail &&
+          !isForbidden && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="gap-2"
+              onClick={() => setIsEditOpen(true)}
+            >
+              <Pencil className="size-4.5" aria-hidden="true" />
+              <span>Editar grupo</span>
+            </Button>
           )
         }
       />
@@ -91,6 +113,24 @@ export function CourseDetailPage() {
           <CourseTabsShell group={detail.group} />
         </>
       )}
+
+      {/* Modal Editar Grupo (HU-19) */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-[640px] p-0 overflow-hidden">
+          {detail && (
+            <ActualizarGrupoForm
+              group={detail.group}
+              subjectCareerLabel={subjectCareerLabel}
+              studentCount={(detail as any).total_estudiantes ?? 0}
+              onCancel={() => setIsEditOpen(false)}
+              onUpdated={() => {
+                setIsEditOpen(false)
+                reload()
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </AppShell>
   )
 }
