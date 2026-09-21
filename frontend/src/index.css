@@ -1,47 +1,226 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
 
+/* Inter para toda la interfaz; Poppins solo para el wordmark del sidebar. */
+@import "@fontsource-variable/inter";
+@import "@fontsource/poppins/700.css";
+
+/*
+ * Los tokens solo definen el tema claro, así que `dark:` se ata a una clase que
+ * nadie aplica. Sin esto volvería a su comportamiento por defecto en Tailwind 4
+ * —`prefers-color-scheme`— y las primitivas mezclarían estilos oscuros con una
+ * paleta clara en cuanto el sistema operativo estuviera en modo oscuro.
+ */
 @custom-variant dark (&:is(.dark *));
 
-@theme inline {
-  --font-heading: "Geist Variable", sans-serif;
-  --font-sans: "Geist Variable", sans-serif;
+/* ============================================================
+   SCIEM — Tokens de diseño
+   Fuente: docs/design/sciem-tokens.css (mockups aprobados).
 
+   REGLA: ningún componente usa colores literales ni utilidades
+   por defecto de Tailwind (gray-500, slate-800, etc.).
+   Todo color sale de estos tokens.
+   ============================================================ */
+
+/* ---------- 1. Paleta cruda ---------- */
+:root {
+  /* Marca — teal institucional */
+  --sciem-brand: #005E68;
+  --sciem-brand-hover: #00555E;
+  --sciem-brand-active: #004B53;
+  --sciem-brand-soft: #D8ECEE;
+  --sciem-brand-deep: #05383E;
+
+  /* Acento — ámbar */
+  --sciem-accent: #FFCB32;
+  --sciem-accent-hover: #E8B720;
+
+  /* Superficies */
+  --sciem-bg-app: #F3F8F8;
+  --sciem-surface: #FFFFFF;
+  --sciem-sunken: #F7FAFA;
+  --sciem-border: #DDDDDD;
+  --sciem-border-strong: #C7D2D3;
+
+  /* Texto */
+  --sciem-text: #2C2C2C;
+  --sciem-muted: #6C757D;
+  --sciem-subtle: #8A969B;
+
+  /* Estado: éxito */
+  --sciem-ok: #15803D;
+  --sciem-ok-soft: #DFF1E7;
+  --sciem-ok-fg: #0F5C2C;
+
+  /* Estado: error */
+  --sciem-danger: #D92D20;
+  --sciem-danger-soft: #FDE2E1;
+  --sciem-danger-fg: #A21B12;
+
+  /* Estado: advertencia */
+  --sciem-warn: #FFCB32;
+  --sciem-warn-soft: #FFF4D6;
+  --sciem-warn-border: #F5DC8C;
+  --sciem-warn-fg: #7A5B00;
+
+  /* Estado: información */
+  --sciem-info: #1D4E89;
+  --sciem-info-soft: #E4EDF9;
+  --sciem-info-border: #BDD3EE;
+
+  /* Deshabilitado */
+  --sciem-dis-text: #AAB8BA;
+  --sciem-dis-bg: #F3F8F8;
+  --sciem-dis-border: #DDDDDD;
+
+  /* Sidebar (fondo oscuro) */
+  --sciem-sb-bg: #05383E;
+  --sciem-sb-border: #0F4A51;
+  --sciem-sb-text: #D8ECEE;
+  --sciem-sb-sub: #8FC7CC;
+  --sciem-sb-group: #7FB0B5;
+  --sciem-sb-divider: #24626A;
+  --sciem-sb-hover: #0B474E;
+  --sciem-sb-active: #1E5A61;
+
+  /* Scrim de modales */
+  --sciem-scrim: rgba(16, 28, 30, .55);
+
+  /* Radios */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-pill: 9999px;
+
+  /* Sombras */
+  --shadow-sm: 0 1px 2px rgba(5, 56, 62, .06);
+  --shadow-md: 0 4px 12px rgba(5, 56, 62, .10);
+  --shadow-lg: 0 12px 32px rgba(5, 56, 62, .16);
+
+  /* Foco — siempre visible, nunca outline:none sin reemplazo */
+  --focus-ring: 0 0 0 2px #fff, 0 0 0 4px rgba(0, 94, 104, .30);
+}
+
+/* ---------- 2. Mapeo a las variables semánticas de shadcn ---------- */
+/* shadcn lee estos nombres. Sin este bloque los componentes salen
+   en la escala de grises por defecto. */
+:root {
+  --background: var(--sciem-bg-app);
+  --foreground: var(--sciem-text);
+
+  --card: var(--sciem-surface);
+  --card-foreground: var(--sciem-text);
+
+  --popover: var(--sciem-surface);
+  --popover-foreground: var(--sciem-text);
+
+  --primary: var(--sciem-brand);
+  --primary-foreground: #FFFFFF;
+
+  --secondary: var(--sciem-brand-soft);
+  --secondary-foreground: var(--sciem-brand-deep);
+
+  --muted: var(--sciem-sunken);
+  --muted-foreground: var(--sciem-muted);
+
+  --accent: var(--sciem-accent);
+  --accent-foreground: #2C2C2C;
+
+  --destructive: var(--sciem-danger);
+  --destructive-foreground: #FFFFFF;
+
+  --border: var(--sciem-border);
+  --input: var(--sciem-border-strong);
+  --ring: var(--sciem-brand);
+
+  --radius: var(--radius-md);
+
+  /* Sidebar de shadcn */
+  --sidebar: var(--sciem-sb-bg);
+  --sidebar-foreground: var(--sciem-sb-text);
+  --sidebar-primary: var(--sciem-accent);
+  --sidebar-primary-foreground: var(--sciem-brand-deep);
+  --sidebar-accent: var(--sciem-sb-active);
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: var(--sciem-sb-border);
+  --sidebar-ring: var(--sciem-accent);
+}
+
+/* ---------- 3. Exposición a Tailwind 4 ---------- */
+/* Habilita utilidades como bg-brand, text-muted, border-strong. */
+@theme inline {
+  --color-brand: var(--sciem-brand);
+  --color-brand-hover: var(--sciem-brand-hover);
+  --color-brand-active: var(--sciem-brand-active);
+  --color-brand-soft: var(--sciem-brand-soft);
+  --color-brand-deep: var(--sciem-brand-deep);
+
+  --color-accent-brand: var(--sciem-accent);
+  --color-accent-brand-hover: var(--sciem-accent-hover);
+
+  --color-bg-app: var(--sciem-bg-app);
+  --color-surface: var(--sciem-surface);
+  --color-sunken: var(--sciem-sunken);
+  --color-border-soft: var(--sciem-border);
+  --color-border-strong: var(--sciem-border-strong);
+
+  --color-text: var(--sciem-text);
+  --color-subtle: var(--sciem-subtle);
+
+  /*
+   * `muted` es el único nombre que significa dos cosas distintas: en la paleta
+   * es el gris de texto (#6C757D) y en shadcn es la superficie sutil (#F7FAFA).
+   * Tailwind genera `bg-muted` y `text-muted` de un solo token, así que aquí se
+   * reserva para la superficie —que es lo que esperan button, badge y avatar— y
+   * el gris de texto se usa como `text-muted-foreground`, ya mapeado arriba.
+   */
+  --color-muted: var(--muted);
+
+  --color-ok: var(--sciem-ok);
+  --color-ok-soft: var(--sciem-ok-soft);
+  --color-ok-fg: var(--sciem-ok-fg);
+
+  --color-danger: var(--sciem-danger);
+  --color-danger-soft: var(--sciem-danger-soft);
+  --color-danger-fg: var(--sciem-danger-fg);
+
+  --color-warn: var(--sciem-warn);
+  --color-warn-soft: var(--sciem-warn-soft);
+  --color-warn-border: var(--sciem-warn-border);
+  --color-warn-fg: var(--sciem-warn-fg);
+
+  --color-info: var(--sciem-info);
+  --color-info-soft: var(--sciem-info-soft);
+  --color-info-border: var(--sciem-info-border);
+
+  --color-sb-sub: var(--sciem-sb-sub);
+  --color-sb-group: var(--sciem-sb-group);
+  --color-sb-divider: var(--sciem-sb-divider);
+  --color-sb-hover: var(--sciem-sb-hover);
+
+  --color-dis-text: var(--sciem-dis-text);
+
+  /* Nombres que shadcn usa para generar sus utilidades de color. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
-
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
-
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
-
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
-
-  --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
-
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-
   --color-destructive: var(--destructive);
-
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -51,94 +230,67 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+
+  --font-sans: "Inter Variable", "Inter", system-ui, sans-serif;
+  --font-brand: "Poppins", "Inter", sans-serif;
 }
 
+/* ---------- 4. Tipografía ---------- */
+/* Inter para TODA la interfaz. Poppins se reserva exclusivamente
+   para el wordmark "SCIEM" del sidebar; no se usa en títulos de
+   página, tablas, botones ni ningún otro texto de la app. */
+
 @layer base {
-  .theme {
-    --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif
-  }
-  :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0)
-  }
-  .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0)
-  }
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
+
   html {
     @apply font-sans;
   }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--sciem-text);
+    background: var(--sciem-bg-app);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Escala tipográfica */
+.sciem-h1 { font-size: 28px; line-height: 36px; font-weight: 600; letter-spacing: -.01em; }
+.sciem-h2 { font-size: 18px; line-height: 28px; font-weight: 600; }
+.sciem-h3 { font-size: 16px; line-height: 24px; font-weight: 600; }
+.sciem-label { font-size: 14px; line-height: 20px; font-weight: 500; }
+.sciem-body { font-size: 14px; line-height: 20px; font-weight: 400; }
+.sciem-supporting { font-size: 13px; line-height: 18px; font-weight: 400; }
+.sciem-caption { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--sciem-muted); }
+
+/* Overline: 11px, mayúsculas, tracking amplio. Usado en los
+   encabezados de grupo del sidebar y en las cabeceras de tabla. */
+.sciem-overline {
+  font-size: 11px; line-height: 16px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase;
+}
+
+/* En móvil el título de página baja de 28px a 22px. */
+@media (max-width: 767px) {
+  .sciem-h1 { font-size: 22px; line-height: 28px; }
+}
+
+/* Cifras tabulares: obligatorio en códigos SIS, números de grupo,
+   conteos y cualquier columna numérica alineada. */
+.sciem-tnum { font-variant-numeric: tabular-nums; }
+
+/* Wordmark del sidebar — único uso de Poppins */
+.sciem-wordmark {
+  font-family: var(--font-brand);
+  font-weight: 700; font-size: 17px; line-height: 1.1;
+  letter-spacing: .02em; color: #FFFFFF;
 }

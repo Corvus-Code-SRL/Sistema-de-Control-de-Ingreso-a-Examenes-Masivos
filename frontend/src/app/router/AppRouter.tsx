@@ -1,0 +1,60 @@
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { useCurrentUser } from '@/features/auth'
+import { CreateExamPage, ExamsPage } from '@/features/exams'
+import { CourseDetailPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
+import { SubjectsPage } from '@/features/subjects'
+import { CuentaDetallePage, CuentasPage } from '@/features/users'
+
+/**
+ * Rutas de la gestión académica del docente.
+ *
+ * El contexto de trabajo viaja en la URL como par carrera-materia, nunca como
+ * materia sola: es lo que permite compartir o recargar una vista sin perderlo.
+ */
+function DocenteRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/materias" replace />} />
+      <Route path="/materias" element={<SubjectsPage />} />
+      <Route
+        path="/carreras/:idCarrera/materias/:idMateria/grupos"
+        element={<SubjectGroupsPage />}
+      />
+      <Route path="/mis-cursos" element={<MyCoursesPage />} />
+      <Route path="/cursos/:idGrupo" element={<CourseDetailPage />} />
+      <Route path="/exams" element={<ExamsPage />} />
+      <Route path="/exams/new" element={<CreateExamPage />} />
+      <Route path="*" element={<Navigate to="/materias" replace />} />
+    </Routes>
+  )
+}
+
+/**
+ * Rutas de la administración del catálogo institucional.
+ *
+ * Solo Cuentas existe (HU-01). Materias, facultades y carreras llegan con
+ * HU-06 y HU-07, y hasta entonces su enlace se dibuja deshabilitado.
+ */
+function AdministradorRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/cuentas" replace />} />
+      <Route path="/cuentas" element={<CuentasPage />} />
+      <Route path="/cuentas/:idUsuario" element={<CuentaDetallePage />} />
+      <Route path="*" element={<Navigate to="/cuentas" replace />} />
+    </Routes>
+  )
+}
+
+/**
+ * Cada área tiene su propio juego de rutas, incluido su destino por defecto.
+ *
+ * Esto no es una guarda de seguridad: mientras no exista autenticación, el área
+ * la elige a mano quien desarrolla. Separarlas evita que una URL de un área
+ * caiga en la pantalla de la otra.
+ */
+export function AppRouter() {
+  const { area } = useCurrentUser()
+
+  return area === 'administrador' ? <AdministradorRoutes /> : <DocenteRoutes />
+}

@@ -5,12 +5,10 @@ use App\Http\Controllers\Exams\ExamController;
 
 // Rutas del módulo: exams
 
-// ============================================================================================
-// EXAMS - Exámenes
-// ============================================================================================
+Route::prefix('exams')->group(function () {
+    // Crear examen
+    Route::post('/', [ExamController::class, 'crear']);
 
-// Crear examen
-Route::post('/', [ExamController::class, 'crear']);
-
-// Obtener datos para formulario de examen
-Route::get('/form-data', [ExamController::class, 'obtenerDatosFormulario']);
+    // Obtener datos para formulario de examen
+    Route::get('/form-data', [ExamController::class, 'obtenerDatosFormulario']);
+});

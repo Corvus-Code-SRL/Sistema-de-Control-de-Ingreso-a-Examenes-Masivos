@@ -1,0 +1,53 @@
+# Entorno de desarrollo local de SCIEM.
+# Uso (desde la raiz del repo):
+#   docker compose -f deployment/docker/docker-compose.dev.yml up -d
+name: sciem
+
+services:
+  app:
+    build:
+      context: ./php
+    image: sciem-php:dev
+    working_dir: /var/www/sciem/backend
+    command: php artisan serve --host=0.0.0.0 --port=8000
+    volumes:
+      # Repo completo: los tests leen docs/database/creation-script.sql.
+      - ../..:/var/www/sciem
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:15.0
+    environment:
+      POSTGRES_DB: sciem_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: sciem_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Solo se ejecutan la primera vez, con el volumen vacio, en orden alfabetico.
+      - ./postgres/init/01-create-test-database.sql:/docker-entrypoint-initdb.d/01-create-test-database.sql:ro
+      - ../../docs/database/creation-script.sql:/docker-entrypoint-initdb.d/02-creation-script.sql:ro
+    ports:
+      # 5432 lo ocupa el PostgreSQL de WSL; desde WSL este se usa en 5433.
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d sciem_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7.4.3
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  postgres_data:
