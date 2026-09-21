@@ -69,10 +69,24 @@ class User extends Model
                     ->withPivot('fecha_inicio', 'fecha_fin');
     }
 
-    /** El rol vigente es el único que todavía no fue cerrado. */
+    /**
+     * Rol vigente como relación: el único que todavía no fue cerrado.
+     *
+     * Se declara como relación para poder cargarlo con with() al listar cuentas.
+     */
+    public function activeRoles(): BelongsToMany
+    {
+        return $this->roles()->wherePivotNull('fecha_fin');
+    }
+
+    /** Si activeRoles ya viene cargada se reutiliza, sin volver a consultar. */
     public function rolActivo(): ?Role
     {
-        return $this->roles()->wherePivotNull('fecha_fin')->first();
+        if ($this->relationLoaded('activeRoles')) {
+            return $this->activeRoles->first();
+        }
+
+        return $this->activeRoles()->first();
     }
 
     public function scopeActivos(Builder $query): Builder
