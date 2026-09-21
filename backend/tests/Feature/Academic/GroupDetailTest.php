@@ -46,15 +46,32 @@ class GroupDetailTest extends TestCase
             ]);
     }
 
-    public function test_ubica_el_grupo_de_otro_docente_sin_marcarlo_como_propio(): void
+    public function test_rechaza_con_403_el_grupo_de_otro_docente(): void
+    {
+        $this->seedAcademicCatalog();
+        $this->enrollStudents($this->grupoAjenoId, 3);
+
+        $response = $this->getJson($this->groupUrl($this->grupoAjenoId))
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Solo el docente que dicta el grupo puede ver su detalle.')
+            ->assertDontSee('Luis Vargas');
+
+        $this->assertArrayNotHasKey('data', $response->json());
+    }
+
+    public function test_la_propiedad_se_resuelve_con_el_docente_de_configuracion(): void
     {
         $this->seedAcademicCatalog();
 
+        config()->set('sciem.docente_fijo_id', $this->otroDocenteId);
+
         $this->getJson($this->groupUrl($this->grupoAjenoId))
             ->assertOk()
-            ->assertJsonPath('data.grupo.es_mio', false)
-            ->assertJsonPath('data.grupo.cantidad_estudiantes', 0)
+            ->assertJsonPath('data.grupo.es_mio', true)
             ->assertJsonPath('data.grupo.docente.nombre_completo', 'Luis Vargas');
+
+        $this->getJson($this->groupUrl($this->grupoPropioId))
+            ->assertForbidden();
     }
 
     public function test_indica_cuando_el_grupo_no_es_del_periodo_activo(): void
@@ -72,6 +89,9 @@ class GroupDetailTest extends TestCase
     public function test_rechaza_el_grupo_cuyo_par_esta_inactivo(): void
     {
         $this->seedAcademicCatalog();
+
+        // El grupo lo dicta el otro docente: se consulta como él para llegar a la regla del par.
+        config()->set('sciem.docente_fijo_id', $this->otroDocenteId);
 
         $this->getJson($this->groupUrl($this->grupoParInactivoId))
             ->assertStatus(422)

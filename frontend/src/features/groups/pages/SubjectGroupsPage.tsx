@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Card } from '@/components/ui/card'
 import { GroupListItem } from '../components/GroupListItem'
 import { GroupsTable } from '../components/GroupsTable'
+import { SubjectFilterChip } from '../components/SubjectFilterChip'
 import { useSubjectGroups } from '../hooks/useSubjectGroups'
 
 /**
@@ -49,6 +50,8 @@ export function SubjectGroupsPage() {
           )
         }
       />
+
+      {subject && <SubjectFilterChip subjectName={subject.nombre} />}
 
       {/*
         El docente puede tener la materia asignada y aún no haber registrado grupos.
