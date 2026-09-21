@@ -2,38 +2,27 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Class ExamType
- * 
- * @property int $id_tipo_examen
- * @property string $nombre
- * @property string $categoria
- * 
- * @property Collection|Exam[] $exams
- * 
- * @package App\Models
+ * Catálogo de tipos de examen. Cada tipo pertenece a una categoría de public.categoria_examen.
  */
 class ExamType extends Model
 {
-	protected $table = 'tipo_examen';
-	protected $primaryKey = 'id_tipo_examen';
-	public $timestamps = false;
+    protected $table = 'tipo_examen';
 
-	protected $casts = [
-		'nombre'    => 'string',
-		'categoria' => 'string'
-	];
+    protected $primaryKey = 'id_tipo_examen';
 
-	protected $fillable = [
-		'nombre',
-		'categoria'
-	];
+    public $timestamps = false;
 
-	public function exams()
-	{
-		return $this->hasMany(Exam::class, 'id_tipo_examen');
-	}
+    protected $fillable = [
+        'nombre',
+        'categoria',
+    ];
+
+    public function exams(): HasMany
+    {
+        return $this->hasMany(Exam::class, 'id_tipo_examen', 'id_tipo_examen');
+    }
 }
