@@ -218,17 +218,23 @@ class AssignRoleTest extends TestCase
         ], 'id_tipo_examen');
 
         $upcomingExamId = DB::table('examen')->insertGetId([
-            'nombre_examen'  => 'Primer parcial',
-            'fecha'          => now()->addWeek()->toDateString(),
-            'hora_inicio'    => '08:00',
-            'id_tipo_examen' => $examTypeId,
+            'nombre_examen'      => 'Primer parcial',
+            'fecha'              => now()->addWeek()->toDateString(),
+            'hora_inicio'        => '08:00',
+            'id_tipo_examen'     => $examTypeId,
+            'id_carrera'         => $this->sistemasId,
+            'id_materia'         => $this->calculoId,
+            'id_usuario_docente' => $teacher->id_usuario,
         ], 'id_examen');
 
         $pastExamId = DB::table('examen')->insertGetId([
-            'nombre_examen'  => 'Diagnóstico',
-            'fecha'          => now()->subMonth()->toDateString(),
-            'hora_inicio'    => '08:00',
-            'id_tipo_examen' => $examTypeId,
+            'nombre_examen'      => 'Diagnóstico',
+            'fecha'              => now()->subMonth()->toDateString(),
+            'hora_inicio'        => '08:00',
+            'id_tipo_examen'     => $examTypeId,
+            'id_carrera'         => $this->sistemasId,
+            'id_materia'         => $this->calculoId,
+            'id_usuario_docente' => $teacher->id_usuario,
         ], 'id_examen');
 
         DB::table('grupo_examen')->insert([
