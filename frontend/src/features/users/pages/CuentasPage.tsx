@@ -1,58 +1,157 @@
-import React, { useState } from 'react';
-import { CheckCircle, X } from 'lucide-react';
-import { RegistrarCuentaModal } from '../components/RegistrarCuentaModal';
+import { useCallback, useMemo, useState } from 'react'
+import { Search, SearchX, Users } from 'lucide-react'
+import { AppShell } from '@/components/layout/AppShell'
+import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
+import { LoadingState } from '@/components/common/LoadingState'
+import { PageHeader } from '@/components/common/PageHeader'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AccountsTable } from '../components/AccountsTable'
+import { AsignarRolModal } from '../components/AsignarRolModal'
+import { RegistrarCuentaModal } from '../components/RegistrarCuentaModal'
+import { SuccessToast, type ToastMessage } from '../components/SuccessToast'
+import { useUserAccounts } from '../hooks/useUserAccounts'
+import { accountFullName, type Role, type UserAccount } from '../types/users.types'
 
-export const CuentasPage: React.FC = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [toastData, setToastData] = useState<any>(null);
+type AccountFilter = 'todas' | 'sin-rol'
 
-  const handleRegistroExitoso = (userData: any) => {
-    setToastData(userData);
-    setTimeout(() => setToastData(null), 5000);
-  };
+/** Lo que devuelve el registro de HU-001 al terminar: los datos que confirmó el SIS. */
+interface RegisteredPerson {
+  nombre: string
+  paterno: string
+}
+
+/**
+ * Cuentas con acceso a SCIEM y su rol vigente.
+ *
+ * Desde aquí se registran cuentas nuevas (HU-001) y se asigna el rol a las que
+ * aún no tienen uno (HU-004).
+ */
+export function CuentasPage() {
+  const { status, data, error, reload } = useUserAccounts()
+  const [filter, setFilter] = useState<AccountFilter>('todas')
+  const [search, setSearch] = useState('')
+  const [isRegistering, setIsRegistering] = useState(false)
+  const [accountToAssign, setAccountToAssign] = useState<UserAccount | null>(null)
+  const [toast, setToast] = useState<ToastMessage | null>(null)
+
+  const dismissToast = useCallback(() => setToast(null), [])
+
+  const accounts = useMemo(() => data?.accounts ?? [], [data])
+  const withoutRoleCount = accounts.filter((account) => !account.rol).length
+
+  const visibleAccounts = useMemo(() => {
+    const term = search.trim().toLowerCase()
+
+    return accounts.filter((account) => {
+      if (filter === 'sin-rol' && account.rol) return false
+      if (!term) return true
+
+      return [accountFullName(account), account.cod_sis, account.correo].some((value) =>
+        value.toLowerCase().includes(term)
+      )
+    })
+  }, [accounts, filter, search])
+
+  const handleRegistered = (person: RegisteredPerson) => {
+    setIsRegistering(false)
+    setToast({
+      title: 'Cuenta creada',
+      description: `${person.nombre} ${person.paterno} quedó sin rol. Asígnele uno para que pueda ingresar.`,
+    })
+    reload()
+  }
+
+  const handleAssigned = (role: Role) => {
+    const account = accountToAssign
+
+    setAccountToAssign(null)
+    setToast({
+      title: account?.rol ? 'Rol actualizado' : 'Rol asignado',
+      description: `${account ? account.nombre : 'La cuenta'} ahora tiene el rol ${role.nombre_rol}. Rige desde su siguiente acceso.`,
+    })
+    reload()
+  }
 
   return (
-    <div className="p-4 md:p-8 relative h-full">
-      
-      {/* TOAST DE ÉXITO */}
-      {toastData && (
-        <div className="absolute top-4 right-4 z-40 flex gap-3 items-start w-[380px] p-3.5 bg-white border border-[#DDDDDD] border-l-4 border-l-[#15803D] rounded-[10px] shadow-[0_12px_32px_rgba(5,56,62,0.16)] animate-in fade-in slide-in-from-top-4 duration-300">
-          <CheckCircle className="w-5 h-5 text-[#15803D] shrink-0 mt-0.5" />
-          <div className="grow flex flex-col">
-            <span className="font-semibold text-[14px] text-[#2C2C2C]">Cuenta creada</span>
-            <span className="text-[13px] text-[#6C757D] leading-[18px] mt-0.5">
-              {toastData.nombre} {toastData.paterno} quedó sin rol. Asígnele uno para que pueda ingresar.
-            </span>
-          </div>
-          <button onClick={() => setToastData(null)} className="text-[#8A969B] hover:text-[#4F5B62] shrink-0">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+    <AppShell mobileTitle="Cuentas" breadcrumbs={[{ label: 'Administración' }, { label: 'Cuentas' }]}>
+      <SuccessToast message={toast} onDismiss={dismissToast} />
 
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-[#2C2C2C]">Cuentas</h1>
-          <p className="text-[#6C757D] text-sm mt-1">Personas con acceso a SCIEM. El tipo institucional viene del SIS...</p>
-        </div>
-        
-        <button 
-          onClick={() => setIsModalOpen(true)} 
-          className="h-10 px-4 rounded-[10px] bg-[#005E68] text-white font-semibold flex items-center gap-2 hover:bg-[#004B53]"
-        >
-          Registrar cuenta
-        </button>
-      </div>
-
-      <div className="bg-white border border-[#DDDDDD] rounded-xl p-8 text-center text-[#6C757D]">
-        Aquí irá la tabla de cuentas (HU-002) más adelante.
-      </div>
-
-      <RegistrarCuentaModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onSuccess={handleRegistroExitoso}
+      <PageHeader
+        title="Cuentas"
+        subtitle="Personas con acceso a SCIEM. Una cuenta sin rol no puede usar las funciones del sistema."
+        actions={<Button onClick={() => setIsRegistering(true)}>Registrar cuenta</Button>}
       />
-    </div>
-  );
-};
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Tabs value={filter} onValueChange={(value) => setFilter(value as AccountFilter)}>
+          <TabsList>
+            <TabsTrigger value="todas">Todas ({accounts.length})</TabsTrigger>
+            <TabsTrigger value="sin-rol">Sin rol ({withoutRoleCount})</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <div className="relative sm:w-80">
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar por nombre, código SIS o correo"
+            aria-label="Buscar cuentas"
+            className="pl-8"
+          />
+        </div>
+      </div>
+
+      <Card className="overflow-hidden p-0">
+        {status === 'loading' && <LoadingState rows={5} label="Cargando cuentas" />}
+
+        {status === 'error' && error && <ErrorState error={error} onRetry={reload} />}
+
+        {status === 'success' && accounts.length === 0 && (
+          <EmptyState
+            icon={Users}
+            title="Aún no hay cuentas registradas"
+            description="Registre la primera cuenta para poder asignarle un rol."
+          />
+        )}
+
+        {status === 'success' && accounts.length > 0 && visibleAccounts.length === 0 && (
+          <EmptyState
+            icon={SearchX}
+            title="Ninguna cuenta coincide"
+            description="Pruebe con otro nombre, código SIS o correo, o cambie el filtro."
+          />
+        )}
+
+        {status === 'success' && visibleAccounts.length > 0 && (
+          <AccountsTable
+            accounts={visibleAccounts}
+            currentUserId={data?.currentUserId ?? null}
+            onAssignRole={setAccountToAssign}
+          />
+        )}
+      </Card>
+
+      <RegistrarCuentaModal
+        isOpen={isRegistering}
+        onClose={() => setIsRegistering(false)}
+        onSuccess={handleRegistered}
+      />
+
+      <AsignarRolModal
+        open={accountToAssign !== null}
+        account={accountToAssign}
+        onOpenChange={(open) => !open && setAccountToAssign(null)}
+        onAssigned={handleAssigned}
+      />
+    </AppShell>
+  )
+}

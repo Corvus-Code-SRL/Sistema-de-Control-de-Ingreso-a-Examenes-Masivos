@@ -38,6 +38,13 @@ export class ApiError extends Error {
 const NETWORK_ERROR = 'No se pudo conectar con el servidor. Revise su conexión.'
 const UNEXPECTED_ERROR = 'Ocurrió un error inesperado al consultar el servidor.'
 
+type Query = Record<string, string | number | undefined>
+
+interface RequestOptions {
+  signal?: AbortSignal
+  query?: Query
+}
+
 /**
  * Único punto de salida HTTP de la aplicación.
  *
@@ -45,16 +52,49 @@ const UNEXPECTED_ERROR = 'Ocurrió un error inesperado al consultar el servidor.
  */
 export async function apiClient<TResponse>(
   path: string,
-  options: { signal?: AbortSignal; query?: Record<string, string | number | undefined> } = {}
+  options: RequestOptions = {}
+): Promise<TResponse> {
+  return request<TResponse>('GET', path, options)
+}
+
+/** Envía `body` como JSON; los errores se traducen igual que en una consulta. */
+export async function apiPost<TResponse>(
+  path: string,
+  body: unknown,
+  options: RequestOptions = {}
+): Promise<TResponse> {
+  return request<TResponse>('POST', path, options, body)
+}
+
+export async function apiPut<TResponse>(
+  path: string,
+  body: unknown,
+  options: RequestOptions = {}
+): Promise<TResponse> {
+  return request<TResponse>('PUT', path, options, body)
+}
+
+async function request<TResponse>(
+  method: 'GET' | 'POST' | 'PUT',
+  path: string,
+  options: RequestOptions,
+  body?: unknown
 ): Promise<TResponse> {
   const url = buildUrl(path, options.query)
+
+  const headers: Record<string, string> = { Accept: 'application/json' }
+
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json'
+  }
 
   let response: Response
 
   try {
     response = await fetch(url, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
       signal: options.signal,
     })
   } catch (cause) {
@@ -73,7 +113,7 @@ export async function apiClient<TResponse>(
   return (await response.json()) as TResponse
 }
 
-function buildUrl(path: string, query?: Record<string, string | number | undefined>): string {
+function buildUrl(path: string, query?: Query): string {
   const url = new URL(`${env.apiUrl}${path}`)
 
   Object.entries(query ?? {}).forEach(([key, value]) => {

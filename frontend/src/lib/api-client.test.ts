@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { ApiError, apiClient } from '@/lib/api-client'
+import { describe, expect, it, vi } from 'vitest'
+import { ApiError, apiClient, apiPost, apiPut } from '@/lib/api-client'
 import { mockApiOnce, mockNetworkFailure } from '@/test/http'
 
 /** Ejecuta una petición que debe fallar y devuelve su ApiError ya tipado. */
@@ -15,6 +15,14 @@ async function captureApiError(request: Promise<unknown>): Promise<ApiError> {
   }
 
   throw new Error('Se esperaba que la petición fallara')
+}
+
+/** Argumentos con los que el cliente llamó a `fetch` en la última petición. */
+function lastFetchCall(): { url: string; init: RequestInit } {
+  const calls = vi.mocked(fetch).mock.calls
+  const [input, init] = calls[calls.length - 1] ?? []
+
+  return { url: String(input), init: init ?? {} }
 }
 
 describe('apiClient', () => {
@@ -72,5 +80,79 @@ describe('apiClient', () => {
 
     expect(error.status).toBe(500)
     expect(error.message).toMatch(/error inesperado/i)
+  })
+
+  it('una consulta no envía cuerpo ni Content-Type', async () => {
+    mockApiOnce({ body: { data: [] } })
+
+    await apiClient('/materias')
+
+    const { init } = lastFetchCall()
+    expect(init.method).toBe('GET')
+    expect(init.body).toBeUndefined()
+    expect(init.headers).not.toHaveProperty('Content-Type')
+  })
+})
+
+describe('apiPost', () => {
+  it('envía el cuerpo como JSON y devuelve la respuesta', async () => {
+    mockApiOnce({ body: { data: { id_rol: 2 }, mensaje: 'Rol asignado correctamente.' } })
+
+    await expect(apiPost('/usuarios/abc/rol', { id_rol: 2 })).resolves.toEqual({
+      data: { id_rol: 2 },
+      mensaje: 'Rol asignado correctamente.',
+    })
+
+    const { url, init } = lastFetchCall()
+    expect(url).toMatch(/\/usuarios\/abc\/rol$/)
+    expect(init.method).toBe('POST')
+    expect(init.body).toBe(JSON.stringify({ id_rol: 2 }))
+    expect(init.headers).toMatchObject({
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    })
+  })
+
+  it('traduce un 422 con los campos rechazados', async () => {
+    mockApiOnce({
+      status: 422,
+      body: { message: 'Debe seleccionar un rol.', errors: { id_rol: ['Debe seleccionar un rol.'] } },
+    })
+
+    const error = await captureApiError(apiPost('/usuarios/abc/rol', {}))
+
+    expect(error.isValidation).toBe(true)
+    expect(error.message).toBe('Debe seleccionar un rol.')
+    expect(error.errors.id_rol).toEqual(['Debe seleccionar un rol.'])
+  })
+
+  it('traduce un 403 conservando el mensaje del servidor', async () => {
+    mockApiOnce({ status: 403, body: { message: 'No puede modificar su propio rol.' } })
+
+    const error = await captureApiError(apiPost('/usuarios/abc/rol', { id_rol: 1 }))
+
+    expect(error.isForbidden).toBe(true)
+    expect(error.message).toBe('No puede modificar su propio rol.')
+  })
+})
+
+describe('apiPut', () => {
+  it('envía el cuerpo como JSON con el método PUT', async () => {
+    mockApiOnce({ body: { data: { ok: true } } })
+
+    await expect(apiPut('/recurso/1', { nombre: 'Nuevo' })).resolves.toEqual({ data: { ok: true } })
+
+    const { init } = lastFetchCall()
+    expect(init.method).toBe('PUT')
+    expect(init.body).toBe(JSON.stringify({ nombre: 'Nuevo' }))
+  })
+
+  it('informa de la caída de red', async () => {
+    mockNetworkFailure()
+
+    const error = await captureApiError(apiPut('/recurso/1', {}))
+
+    expect(error.status).toBe(0)
+    expect(error.message).toMatch(/no se pudo conectar/i)
   })
 })

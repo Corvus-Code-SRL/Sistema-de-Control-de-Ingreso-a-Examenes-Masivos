@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AuditLog extends Model
 {
@@ -25,7 +26,7 @@ class AuditLog extends Model
         'fecha_hora'    => 'datetime',
     ];
 
-    public function accion()
+    public function accion(): BelongsTo
     {
         return $this->belongsTo(Action::class, 'id_accion', 'id_accion');
     }
