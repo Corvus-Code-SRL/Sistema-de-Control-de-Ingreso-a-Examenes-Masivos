@@ -1,14 +1,23 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Exams\ExamController;
+use Illuminate\Support\Facades\Route;
 
 // Rutas del módulo: exams
 
-Route::prefix('exams')->group(function () {
-    // Crear examen
-    Route::post('/', [ExamController::class, 'crear']);
+// HU-24 — {exam} es el id_examen: cualquier otro valor responde 404 sin llegar a la base.
+Route::prefix('examenes')->name('examenes.')->group(function () {
+    Route::get('/formulario', [ExamController::class, 'formOptions'])
+         ->name('formulario');
 
-    // Obtener datos para formulario de examen
-    Route::get('/form-data', [ExamController::class, 'obtenerDatosFormulario']);
+    Route::post('/', [ExamController::class, 'store'])
+         ->name('store');
+
+    Route::put('/{exam}', [ExamController::class, 'update'])
+         ->whereNumber('exam')
+         ->name('update');
+
+    Route::post('/{exam}/cancelar', [ExamController::class, 'cancel'])
+         ->whereNumber('exam')
+         ->name('cancelar');
 });

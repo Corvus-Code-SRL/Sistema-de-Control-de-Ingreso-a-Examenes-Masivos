@@ -1,6 +1,9 @@
 <?php
+
 namespace App\Http\Resources\Exams;
+
 use Illuminate\Http\Resources\Json\JsonResource;
+
 class ClassroomResource extends JsonResource
 {
     public function toArray($request): array
