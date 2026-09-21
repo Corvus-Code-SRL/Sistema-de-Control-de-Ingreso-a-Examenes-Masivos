@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             ActionSeeder::class,
             AdministratorAccountSeeder::class,
+            ExamTypeSeeder::class,
         ]);
     }
 }

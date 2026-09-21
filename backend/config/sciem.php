@@ -41,4 +41,17 @@ return [
 
     'usuario_prueba' => env('SCIEM_USUARIO_PRUEBA', '00000000-0000-4000-8000-000000000001'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Zona horaria de los exámenes
+    |--------------------------------------------------------------------------
+    |
+    | examen.fecha y examen.hora_inicio guardan la hora local del campus, sin
+    | zona. La aplicación corre en UTC, así que "ahora" se calcula en esta zona
+    | para decidir si un examen se programa en el pasado.
+    |
+    */
+
+    'zona_horaria' => env('SCIEM_ZONA_HORARIA', 'America/La_Paz'),
+
 ];
