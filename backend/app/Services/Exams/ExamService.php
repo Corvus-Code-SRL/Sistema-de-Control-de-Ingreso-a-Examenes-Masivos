@@ -33,10 +33,16 @@ class ExamService
 
     private AuditLogService $auditLog;
 
-    public function __construct(SubjectCatalogService $subjectCatalog, AuditLogService $auditLog)
-    {
+    private ExamGroupService $groupService;
+
+    public function __construct(
+        SubjectCatalogService $subjectCatalog,
+        AuditLogService $auditLog,
+        ExamGroupService $groupService
+    ) {
         $this->subjectCatalog = $subjectCatalog;
         $this->auditLog = $auditLog;
+        $this->groupService = $groupService;
     }
 
     /**
@@ -58,6 +64,7 @@ class ExamService
             ->get();
 
         $groups = Group::query()
+            ->withActiveStudentCount()
             ->where('id_usuario_docente', $this->currentTeacherId())
             ->where('id_periodo', $this->subjectCatalog->activePeriodId())
             ->where('estado', RecordStatus::ACTIVE)
@@ -90,7 +97,7 @@ class ExamService
 
             $exam->classrooms()->attach($data['ambientes']);
 
-            return $exam;
+            return $this->groupService->assignGroups($exam, $data['grupos']);
         });
 
         return $this->loadDetail($exam);
@@ -351,7 +358,13 @@ class ExamService
 
     private function loadDetail(Exam $exam): Exam
     {
-        return $exam->fresh(['examType', 'subject', 'career', 'classrooms']);
+        return $exam->fresh([
+            'examType',
+            'subject',
+            'career',
+            'classrooms',
+            'groups' => fn ($query) => $query->withActiveStudentCount(),
+        ]);
     }
 
     private function notEditableMessage(string $status): string
