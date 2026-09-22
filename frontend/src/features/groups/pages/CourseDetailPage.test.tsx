@@ -39,14 +39,14 @@ describe('CourseDetailPage', () => {
     expect(screen.getAllByText('118')).toHaveLength(2)
   })
 
-  it('deja vacías las pestañas que pertenecen a otras historias', async () => {
+  it('muestra la carga de nómina y mantiene pendientes las otras pestañas', async () => {
     mockApiOnce({ body: groupDetailResponse(makeGroup(), materia) })
 
     renderPage()
     await waitForLoad()
 
     // La pestaña activa anuncia su contenido pendiente en lugar de mostrar datos a medias.
-    expect(screen.getByText(/nómina pendiente de implementar/i)).toBeInTheDocument()
+    expect(screen.getByText(/cargar nómina/i)).toBeInTheDocument()
   })
 
   it('niega el acceso a un curso de otro docente y no muestra su contenido', async () => {

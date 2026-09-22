@@ -1,5 +1,10 @@
 import type { Career, SubjectCareer } from '@/features/subjects'
 import type { Group, Period } from '@/features/groups'
+import type {
+  RosterConfirmationData,
+  RosterPreviewData,
+  RosterPreviewRow,
+} from '@/features/students'
 
 /**
  * Datos de prueba del catálogo académico.
@@ -119,4 +124,85 @@ export function groupDetailResponse(
       es_periodo_activo: esPeriodoActivo,
     },
   }
+}
+
+/**
+ * Datos de prueba de la carga de nómina.
+ *
+ * Reproduce lo que devuelven `/nomina/preview` y `/nomina/confirm`, incluida la
+ * particularidad de `filas_validas`, que también cuenta a quienes ya están
+ * inscritos en el grupo.
+ */
+
+export function makeRosterRow(overrides: Partial<RosterPreviewRow> = {}): RosterPreviewRow {
+  return {
+    numero_fila: 2,
+    codigo_sis: '20260001',
+    apellidos: 'PEREZ ROJAS',
+    nombres: 'ANA MARIA',
+    estado: 'new_student',
+    errores: [],
+    ...overrides,
+  }
+}
+
+/**
+ * Fila con un estado o un código que el frontend todavía no conoce.
+ *
+ * Los tipos no admiten esos valores, de ahí la conversión, pero la API sí podría
+ * enviarlos: la interfaz tiene que seguir dibujando la fila.
+ */
+export function makeUnsupportedRosterRow(
+  overrides: { estado?: string; errores?: string[] } = {}
+): RosterPreviewRow {
+  return { ...makeRosterRow(), ...overrides } as RosterPreviewRow
+}
+
+/** Respuesta cruda de `POST /grupos/{id}/nomina/preview`. */
+export function rosterPreviewResponse(
+  filas: RosterPreviewRow[],
+  token = 'a'.repeat(64)
+): { data: RosterPreviewData } {
+  const inconsistentes = filas.filter((fila) => fila.estado === 'inconsistent').length
+
+  return {
+    data: {
+      token,
+      total_filas: filas.length,
+      filas_validas: filas.length - inconsistentes,
+      filas_inconsistentes: inconsistentes,
+      filas,
+    },
+  }
+}
+
+/** Respuesta cruda de `POST /grupos/{id}/nomina/confirm`. */
+export function rosterConfirmationResponse(
+  overrides: Partial<RosterConfirmationData> = {}
+): { data: RosterConfirmationData } {
+  return {
+    data: {
+      total_filas: 3,
+      filas_inconsistentes: 1,
+      estudiantes_creados: 1,
+      estudiantes_inscritos: 2,
+      ya_inscritos: 0,
+      inscripciones_inactivas: 0,
+      ...overrides,
+    },
+  }
+}
+
+/**
+ * Archivo de nómina de prueba.
+ *
+ * El tamaño se declara en lugar de materializarse: una prueba del límite de
+ * 10 MB no puede reservar esa memoria.
+ */
+export function makeRosterFile(name = 'nomina.csv', size = 1024): File {
+  const file = new File(['Estudiante,Apellidos,Nombres'], name)
+
+  Object.defineProperty(file, 'size', { value: size })
+
+  return file
 }
