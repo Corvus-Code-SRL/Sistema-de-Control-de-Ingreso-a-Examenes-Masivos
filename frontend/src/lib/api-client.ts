@@ -57,7 +57,10 @@ export async function apiClient<TResponse>(
   return request<TResponse>('GET', path, options)
 }
 
-/** Envía `body` como JSON; los errores se traducen igual que en una consulta. */
+/**
+ * Envía `body` como JSON, o como multipart si es un `FormData` —el caso de la
+ * carga de nómina—; los errores se traducen igual que en una consulta.
+ */
 export async function apiPost<TResponse>(
   path: string,
   body: unknown,
@@ -81,10 +84,16 @@ async function request<TResponse>(
   body?: unknown
 ): Promise<TResponse> {
   const url = buildUrl(path, options.query)
+  const isFormData = body instanceof FormData
 
   const headers: Record<string, string> = { Accept: 'application/json' }
 
-  if (body !== undefined) {
+  /*
+   * Un multipart lo arma el navegador, que es quien conoce el `boundary` con el
+   * que separa las partes: fijar aquí el Content-Type dejaría el cuerpo ilegible
+   * para el servidor.
+   */
+  if (body !== undefined && !isFormData) {
     headers['Content-Type'] = 'application/json'
   }
 
@@ -94,7 +103,7 @@ async function request<TResponse>(
     response = await fetch(url, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: toRequestBody(body),
       signal: options.signal,
     })
   } catch (cause) {
@@ -111,6 +120,14 @@ async function request<TResponse>(
   }
 
   return (await response.json()) as TResponse
+}
+
+/** Un `FormData` viaja tal cual; cualquier otro cuerpo se serializa como JSON. */
+function toRequestBody(body: unknown): BodyInit | undefined {
+  if (body === undefined) return undefined
+  if (body instanceof FormData) return body
+
+  return JSON.stringify(body)
 }
 
 function buildUrl(path: string, query?: Query): string {
