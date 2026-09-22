@@ -29,7 +29,7 @@ export class ApiError extends Error {
     return this.status === 404
   }
 
-  /** Regla de negocio rechazada, como el par materia-carrera inactivo. */
+  /** Regla de negocio rechazada, como el par materia-carrera inactivo o una duplicidad. */
   get isValidation(): boolean {
     return this.status === 422
   }
@@ -38,9 +38,13 @@ export class ApiError extends Error {
 const NETWORK_ERROR = 'No se pudo conectar con el servidor. Revise su conexión.'
 const UNEXPECTED_ERROR = 'Ocurrió un error inesperado al consultar el servidor.'
 
+export type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 type Query = Record<string, string | number | undefined>
 
-interface RequestOptions {
+export interface ApiClientOptions {
+  method?: ApiMethod
+  /** Cuerpo de la petición; se serializa como JSON. Ignorado en GET. */
+  body?: unknown
   signal?: AbortSignal
   query?: Query
 }
@@ -52,40 +56,15 @@ interface RequestOptions {
  */
 export async function apiClient<TResponse>(
   path: string,
-  options: RequestOptions = {}
+  options: ApiClientOptions = {}
 ): Promise<TResponse> {
-  return request<TResponse>('GET', path, options)
-}
-
-/** Envía `body` como JSON; los errores se traducen igual que en una consulta. */
-export async function apiPost<TResponse>(
-  path: string,
-  body: unknown,
-  options: RequestOptions = {}
-): Promise<TResponse> {
-  return request<TResponse>('POST', path, options, body)
-}
-
-export async function apiPut<TResponse>(
-  path: string,
-  body: unknown,
-  options: RequestOptions = {}
-): Promise<TResponse> {
-  return request<TResponse>('PUT', path, options, body)
-}
-
-async function request<TResponse>(
-  method: 'GET' | 'POST' | 'PUT',
-  path: string,
-  options: RequestOptions,
-  body?: unknown
-): Promise<TResponse> {
+  const method = options.method ?? 'GET'
+  const hasBody = options.body !== undefined && method !== 'GET'
   const url = buildUrl(path, options.query)
 
-  const headers: Record<string, string> = { Accept: 'application/json' }
-
-  if (body !== undefined) {
-    headers['Content-Type'] = 'application/json'
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
   }
 
   let response: Response
@@ -94,7 +73,7 @@ async function request<TResponse>(
     response = await fetch(url, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: hasBody ? JSON.stringify(options.body) : undefined,
       signal: options.signal,
     })
   } catch (cause) {
@@ -110,7 +89,29 @@ async function request<TResponse>(
     throw await toApiError(response)
   }
 
+  // Una respuesta sin cuerpo (ej. 204) no tiene JSON que parsear.
+  if (response.status === 204) {
+    return undefined as TResponse
+  }
+
   return (await response.json()) as TResponse
+}
+
+/** Helpers directos para peticiones POST y PUT */
+export async function apiPost<TResponse>(
+  path: string,
+  body: unknown,
+  options: Omit<ApiClientOptions, 'method' | 'body'> = {}
+): Promise<TResponse> {
+  return apiClient<TResponse>(path, { ...options, method: 'POST', body })
+}
+
+export async function apiPut<TResponse>(
+  path: string,
+  body: unknown,
+  options: Omit<ApiClientOptions, 'method' | 'body'> = {}
+): Promise<TResponse> {
+  return apiClient<TResponse>(path, { ...options, method: 'PUT', body })
 }
 
 function buildUrl(path: string, query?: Query): string {

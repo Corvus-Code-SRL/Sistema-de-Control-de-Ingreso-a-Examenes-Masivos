@@ -95,3 +95,48 @@ export function groupLabel(group: Group): string {
 export function courseTitle(subject: SubjectCareer, group: Group): string {
   return `${subject.nombre} · ${groupLabel(group)}`
 }
+
+/**
+ * solo pide N° de grupo y
+ * Período académico; grupo.gestion (varchar) se deriva en el backend a partir
+ * de periodo.gestion (smallint) del período elegido.
+ */
+export interface CreateGroupPayload {
+  id_carrera: number
+  id_materia: number
+  num_grupo: string
+  /** Editable por el Docente; si se omite, el backend asigna el período activo (CA 11). */
+  id_periodo?: number
+}
+
+/**
+ * No incluye id_carrera, id_materia ni id_usuario_docente: son inmutables
+ * y el backend los ignora aunque se envíen. Tampoco "gestion", por el
+ * mismo motivo que CreateGroupPayload.
+ */
+export interface UpdateGroupPayload {
+  num_grupo: string
+  id_periodo?: number
+}
+
+/**
+ * Respuesta de crear/actualizar un grupo.
+ *
+ * No usa `ResourceResponse<TData, TMeta>` (de `types/api.types.ts`) a propósito:
+ * ese tipo exige `meta` siempre, y `ApiResponse::created()`/`success()` del
+ * backend no lo devuelve en estas operaciones — devuelve `{ data, message }`..
+ */
+export interface GroupMutationResponse {
+  data: {
+    grupo: Group
+    materia: SubjectCareer
+  }
+  message: string
+}
+
+/** Un período disponible para el selector (`GET /api/periodos`). */
+export interface PeriodOption {
+  id_periodo: number
+  nombre_periodo: string
+  gestion: number
+}
