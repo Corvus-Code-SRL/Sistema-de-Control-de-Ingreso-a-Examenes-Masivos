@@ -1,4 +1,4 @@
-import { CreateExamFormData, StepValidationResult } from '../types/exams.types';
+import { CreateExamFormData, Group, StepValidationResult } from '../types/exams.types';
 
 /** Menos de un día: el backend guarda la hora de fin como hora del día. */
 export const MAX_DURATION_MINUTES = 1439;
@@ -66,12 +66,26 @@ export function validateExamForm(
   };
 }
 
-export function validateGroupsStep(formData: CreateExamFormData): StepValidationResult {
+export function validateGroupsStep(
+  formData: CreateExamFormData,
+  availableGroups: Group[]
+): StepValidationResult {
   const errors: Record<string, string> = {};
   const warnings: Record<string, string> = {};
 
   if (!formData.grupos || formData.grupos.length === 0) {
     errors.grupos = 'Debe elegir al menos un grupo habilitado para vincular al examen.';
+  } else {
+    const selectedGroups = availableGroups.filter((group) =>
+      formData.grupos.includes(group.id_grupo)
+    );
+
+    if (
+      selectedGroups.length !== formData.grupos.length ||
+      selectedGroups.some((group) => !group.tiene_nomina)
+    ) {
+      errors.grupos = 'Todos los grupos seleccionados deben pertenecer al par y tener nómina activa.';
+    }
   }
 
   return {

@@ -1,5 +1,10 @@
 import { apiClient, apiPost } from '@/lib/api-client';
-import { Exam, ExamFormOptions, CreateExamPayload } from '../types/exams.types';
+import {
+  AssignGroupsPayload,
+  CreateExamPayload,
+  Exam,
+  ExamFormOptions,
+} from '../types/exams.types';
 
 interface DataResponse<T> {
   data: T;
@@ -14,6 +19,14 @@ export const examsService = {
 
   async createExam(payload: CreateExamPayload): Promise<Exam> {
     const response = await apiPost<DataResponse<Exam>>('/examenes', payload);
+    return response.data;
+  },
+
+  async assignGroups(examId: number, payload: AssignGroupsPayload): Promise<Exam> {
+    const response = await apiPost<DataResponse<Exam>>(
+      `/examenes/${examId}/grupos`,
+      payload
+    );
     return response.data;
   },
 };
