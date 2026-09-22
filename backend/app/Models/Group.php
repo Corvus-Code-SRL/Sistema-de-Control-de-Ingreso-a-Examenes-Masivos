@@ -3,34 +3,21 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Class Group
- * 
- * @property int $id_grupo
- * @property int $id_carrera
- * @property int $id_materia
- * @property string $num_grupo
- * @property string $gestion
- * @property string $estado
- * @property int|null $id_usuario_docente
- * @property int|null $id_periodo
+ * Grupo de una materia dentro de una carrera.
+ *
+ * Es la única vía por la que un docente queda vinculado a un par materia-carrera:
+ * no existe relación directa entre docente y materia.
  */
 class Group extends Model
 {
     protected $table = 'grupo';
-    protected $primaryKey = 'id_grupo';
-    public $timestamps = false;
 
-    protected $casts = [
-        'id_carrera'         => 'int',
-        'id_materia'         => 'int',
-        'num_grupo'          => 'string',
-        'gestion'            => 'string',
-        'estado'             => 'string',
-        'id_usuario_docente' => 'int',
-        'id_periodo'         => 'int',
-    ];
+    protected $primaryKey = 'id_grupo';
+
+    public $timestamps = false;
 
     protected $fillable = [
         'id_carrera',
@@ -42,28 +29,8 @@ class Group extends Model
         'id_periodo',
     ];
 
-    public function students()
+    public function period(): BelongsTo
     {
-        return $this->belongsToMany(Student::class, 'grupo_estudiante', 'id_grupo', 'id_estudiante');
-    }
-
-    public function exams()
-    {
-        return $this->belongsToMany(Exam::class, 'grupo_examen', 'id_grupo', 'id_examen');
-    }
-
-    public function subject()
-    {
-        return $this->belongsTo(Subject::class, 'id_materia');
-    }
-
-    public function tieneNomina(): bool
-    {
-        return $this->students()->count() > 0;
-    }
-
-    public function getCantidadEstudiantesAttribute(): int
-    {
-        return $this->students()->count();
+        return $this->belongsTo(Period::class, 'id_periodo', 'id_periodo');
     }
 }

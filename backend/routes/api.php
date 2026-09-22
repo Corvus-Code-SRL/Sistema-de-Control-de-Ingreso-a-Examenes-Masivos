@@ -18,7 +18,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
-// Importar todas las rutas del modulo Exams
-Route::prefix('exams')->group(base_path('routes/api/exams.php'));
-
-    
+// Cada módulo declara sus rutas en routes/api/<modulo>.php.
+foreach (glob(base_path('routes/api/*.php')) as $moduleRoutes) {
+    require $moduleRoutes;
+}

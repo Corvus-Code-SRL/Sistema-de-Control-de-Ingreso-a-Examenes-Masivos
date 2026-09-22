@@ -2,42 +2,33 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
- * Class Classroom
- * 
- * @property int $id_ambiente
- * @property string $nro_aula
- * @property int $capacidad
- * @property string|null $ubicacion
- * @property string $estado
- * 
- * @property Collection|Exam[] $exams
- *
- * @package App\Models
+ * Ambiente (aula) del catálogo general donde se rinden los exámenes.
  */
 class Classroom extends Model
 {
-	protected $table = 'ambiente';
-	protected $primaryKey = 'id_ambiente';
-	public $timestamps = false;
+    protected $table = 'ambiente';
 
-	protected $casts = [
-		'capacidad' => 'int',
-		'estado' => 'string'
-	];
+    protected $primaryKey = 'id_ambiente';
 
-	protected $fillable = [
-		'nro_aula',
-		'capacidad',
-		'ubicacion',
-		'estado'
-	];
+    public $timestamps = false;
 
-	public function exams()
-	{
-		return $this->belongsToMany(Exam::class, 'examen_ambiente', 'id_ambiente', 'id_examen');
-	}
+    protected $fillable = [
+        'nro_aula',
+        'capacidad',
+        'ubicacion',
+        'estado',
+    ];
+
+    protected $casts = [
+        'capacidad' => 'integer',
+    ];
+
+    public function exams(): BelongsToMany
+    {
+        return $this->belongsToMany(Exam::class, 'examen_ambiente', 'id_ambiente', 'id_examen');
+    }
 }

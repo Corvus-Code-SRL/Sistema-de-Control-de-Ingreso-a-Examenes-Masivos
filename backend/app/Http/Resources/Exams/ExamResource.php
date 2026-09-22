@@ -4,28 +4,26 @@ namespace App\Http\Resources\Exams;
 
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * Examen con su par materia-carrera, su estado y el docente que lo creó.
+ */
 class ExamResource extends JsonResource
 {
     public function toArray($request): array
     {
-        $firstGroup = $this->relationLoaded('groups') ? $this->groups->first() : null;
-        $materia = ($firstGroup && $firstGroup->relationLoaded('subject')) ? $firstGroup->subject : null;
-
         return [
-            'id_examen'      => $this->id_examen,
-            'nombre_examen'  => $this->nombre_examen,
-            'fecha'          => $this->fecha?->format('Y-m-d'),
-            'hora_inicio'    => $this->hora_inicio,
-            'hora_fin'       => $this->hora_fin,
-            'duracion'       => $this->duracion,
-            'normas'         => $this->normas,
-            'id_tipo_examen' => $this->id_tipo_examen,
-
-            'materia' => $materia ? [
-                'id_materia' => $materia->id_materia,
-                'nombre'     => $materia->nombre,
-                'codigo'     => $materia->codigo,
-            ] : null,
+            'id_examen'          => $this->id_examen,
+            'nombre_examen'      => $this->nombre_examen,
+            'fecha'              => $this->fecha ? $this->fecha->format('Y-m-d') : null,
+            'hora_inicio'        => $this->formatTime($this->hora_inicio),
+            'hora_fin'           => $this->formatTime($this->hora_fin),
+            'duracion'           => $this->duracion,
+            'normas'             => $this->normas,
+            'estado'             => $this->estado,
+            'id_tipo_examen'     => $this->id_tipo_examen,
+            'id_carrera'         => $this->id_carrera,
+            'id_materia'         => $this->id_materia,
+            'id_usuario_docente' => $this->id_usuario_docente,
 
             'tipo_examen' => $this->whenLoaded('examType', fn () => [
                 'id_tipo_examen' => $this->examType->id_tipo_examen,
@@ -33,24 +31,24 @@ class ExamResource extends JsonResource
                 'categoria'      => $this->examType->categoria,
             ]),
 
-            'ambientes' => $this->whenLoaded('classrooms', fn () =>
-                $this->classrooms->map(fn ($a) => [
-                    'id_ambiente' => $a->id_ambiente,
-                    'nro_aula'    => $a->nro_aula,
-                    'capacidad'   => $a->capacidad,
-                    'ubicacion'   => $a->ubicacion ?? null,
-                ])
-            ),
+            'materia' => $this->whenLoaded('subject', fn () => [
+                'id_materia' => $this->subject->id_materia,
+                'nombre'     => $this->subject->nombre,
+                'codigo'     => $this->subject->codigo,
+            ]),
 
-            'grupos' => $this->whenLoaded('groups', fn () =>
-                $this->groups->map(fn ($g) => [
-                    'id_grupo'  => $g->id_grupo,
-                    'num_grupo' => $g->num_grupo,
-                    'gestion'   => $g->gestion,
-                    'estado'    => $g->estado,
-                    'cantidad_estudiantes' => $g->cantidad_estudiantes ?? 0,
-                ])
-            ),
+            'carrera' => $this->whenLoaded('career', fn () => [
+                'id_carrera' => $this->career->id_carrera,
+                'nombre'     => $this->career->nombre,
+            ]),
+
+            'ambientes' => ClassroomResource::collection($this->whenLoaded('classrooms')),
         ];
+    }
+
+    /** PostgreSQL devuelve time como HH:MM:SS; el cliente trabaja con HH:MM. */
+    private function formatTime(?string $time): ?string
+    {
+        return $time === null ? null : substr($time, 0, 5);
     }
 }

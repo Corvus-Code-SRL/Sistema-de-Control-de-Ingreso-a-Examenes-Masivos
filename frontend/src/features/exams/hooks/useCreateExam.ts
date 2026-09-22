@@ -1,201 +1,85 @@
 import { useState, useCallback } from 'react';
+import { ApiError } from '@/lib/api-client';
 import { useExamFormOptions } from './useExamFormOptions';
 import { useExamFormState } from './useExamFormState';
-import { validateExamForm, validateGroupsStep, validateClassroomsStep } from '../utils/examValidators';
+import { validateExamForm } from '../utils/examValidators';
 import { examsService } from '../services/examsService';
-import { Group } from '../types/exams.types';
+import { CreateExamFormData, Exam } from '../types/exams.types';
 
-export function useCreateExam(onSuccess?: () => void) {
+/**
+ * Crea el examen en dos pasos cuando hace falta: si el backend advierte nombre
+ * duplicado o superposición de horario/ambiente (409), las advertencias se muestran
+ * y el docente decide si confirma el envío.
+ */
+export function useCreateExam(onSuccess?: (exam: Exam) => void) {
   const { options, loading: loadingOptions, error: optionsError } = useExamFormOptions();
-  const { formData, updateFormData } = useExamFormState();
-
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
-  const [subjectGroups, setSubjectGroups] = useState<Group[]>([]);
-  const [loadingGroups, setLoadingGroups] = useState<boolean>(false);
+  const { formData, updateFormData: setFields, resetFormData } = useExamFormState();
 
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [stepErrors, setStepErrors] = useState<Record<string, string>>({});
+  const [warnings, setWarnings] = useState<string[]>([]);
 
-  // Track which steps have been validated & completed
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
-  const [errorSteps, setErrorSteps] = useState<Set<number>>(new Set());
+  const validateForm = useCallback(() => {
+    return validateExamForm(formData);
+  }, [formData]);
 
-  // Helper to clear errors and mark step as completed
-  const markStepSuccess = useCallback((stepNum: number) => {
-    setStepErrors({});
-    setErrorSteps((prev) => {
-      const next = new Set(prev);
-      next.delete(stepNum);
-      return next;
-    });
-    setCompletedSteps((prev) => new Set([...prev, stepNum]));
-    setSubmitError(null);
-  }, []);
+  // Cualquier cambio invalida las advertencias: se calcularon para los datos anteriores.
+  const updateFormData = useCallback(
+    (fields: Partial<CreateExamFormData>) => {
+      setWarnings([]);
+      setFields(fields);
+    },
+    [setFields]
+  );
 
-  // Helper to mark step as having validation errors
-  const markStepError = useCallback((stepNum: number, errors: Record<string, string>) => {
-    setStepErrors(errors);
-    setErrorSteps((prev) => new Set([...prev, stepNum]));
-  }, []);
-
-  // Cargar grupos de la materia
-  const fetchGroupsForSubject = useCallback(async (subjectId: number) => {
-    try {
-      setLoadingGroups(true);
-      const groups = await examsService.getGroupsBySubject(subjectId);
-      setSubjectGroups(groups);
-
-      // Autoseleccionar todos los válidos por defecto
-      const validGroupIds = groups
-        .filter((g) => g.tiene_nomina || (g.cantidad_estudiantes ?? 0) > 0)
-        .map((g) => g.id_grupo);
-
-      updateFormData({ grupos: validGroupIds });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error al cargar grupos de la materia';
-      setSubmitError(msg);
-    } finally {
-      setLoadingGroups(false);
-    }
-  }, [updateFormData]);
-
-  // Paso 1 → Paso 2: Validar datos generales, cargar grupos
-  const goToStep2 = async () => {
-    const validation = validateExamForm(formData);
-    if (!validation.isValid) {
-      markStepError(1, validation.errors);
+  const submitExam = async (confirmWarnings = false) => {
+    const validation = validateForm();
+    if (!validation.isValid || !formData.materia) {
+      setSubmitError('Por favor complete todos los campos obligatorios del formulario.');
       return;
     }
 
-    markStepSuccess(1);
-
-    // Cargar grupos si aún no los tenemos o si la materia cambió
-    if (formData.id_materia) {
-      await fetchGroupsForSubject(formData.id_materia);
-    }
-
-    setCurrentStep(2);
-  };
-
-  // Paso 2 → Paso 3: Validar grupos
-  const goToStep3 = () => {
-    const validation = validateGroupsStep(formData, subjectGroups);
-    if (!validation.isValid) {
-      markStepError(2, validation.errors);
-      return;
-    }
-
-    markStepSuccess(2);
-    setCurrentStep(3);
-  };
-
-  // Navegar a un paso ya completado
-  const goToStep = (step: 1 | 2 | 3) => {
-    if (step < currentStep || completedSteps.has(step)) {
-      setCurrentStep(step);
-      setStepErrors({});
-      setSubmitError(null);
-    }
-  };
-
-  // Retroceder un paso
-  const goBack = () => {
-    if (currentStep === 2) {
-      setCurrentStep(1);
-    } else if (currentStep === 3) {
-      setCurrentStep(2);
-    }
-    setStepErrors({});
-    setSubmitError(null);
-  };
-
-  const toggleGroup = useCallback((groupId: number) => {
-    updateFormData({
-      grupos: formData.grupos.includes(groupId)
-        ? formData.grupos.filter((id) => id !== groupId)
-        : [...formData.grupos, groupId],
-    });
-  }, [formData.grupos, updateFormData]);
-
-  const toggleClassroom = useCallback((classroomId: number) => {
-    updateFormData({
-      ambientes: formData.ambientes.includes(classroomId)
-        ? formData.ambientes.filter((id) => id !== classroomId)
-        : [...formData.ambientes, classroomId],
-    });
-  }, [formData.ambientes, updateFormData]);
-
-  // Confirmar: validar ambientes + crear examen + asignar grupos
-  const confirmAndCreate = async () => {
-    const classroomValidation = validateClassroomsStep(formData);
-    if (!classroomValidation.isValid) {
-      markStepError(3, classroomValidation.errors);
-      return;
-    }
-
-    markStepSuccess(3);
     setSubmitting(true);
+    setSubmitError(null);
 
     try {
-      // 1. Crear examen
-      const createdExam = await examsService.createExam({
+      const exam = await examsService.createExam({
         nombre_examen: formData.nombre_examen,
-        id_materia: formData.id_materia!,
+        id_carrera: formData.materia.id_carrera,
+        id_materia: formData.materia.id_materia,
         categoria: formData.categoria,
         fecha: formData.fecha,
         hora_inicio: formData.hora_inicio,
         duracion: Number(formData.duracion),
         ambientes: formData.ambientes,
         normas: formData.normas || undefined,
+        confirmar_advertencias: confirmWarnings || undefined,
       });
 
-      // 2. Asignar grupos
-      await examsService.assignGroups(createdExam.id_examen, {
-        grupos: formData.grupos,
-      });
-
-      if (onSuccess) {
-        onSuccess();
-      }
+      setWarnings([]);
+      onSuccess?.(exam);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Ocurrió un error al registrar el examen';
-      setSubmitError(message);
+      if (err instanceof ApiError && err.status === 409) {
+        setWarnings(Object.values(err.errors).flat());
+      } else {
+        const message = err instanceof Error ? err.message : 'Ocurrió un error al registrar el examen';
+        setSubmitError(message);
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Obtener los grupos seleccionados como objetos
-  const selectedGroups = subjectGroups.filter((g) => formData.grupos.includes(g.id_grupo));
-
-  // Calcular total de estudiantes seleccionados
-  const totalStudents = selectedGroups.reduce(
-    (acc, g) => acc + (g.cantidad_estudiantes ?? g.inscritos_count ?? 0),
-    0,
-  );
-
   return {
-    currentStep,
     formData,
     options,
-    subjectGroups,
-    selectedGroups,
-    totalStudents,
-    loadingGroups,
     loading: loadingOptions,
     submitting,
     apiError: submitError || optionsError,
-    stepErrors,
-    completedSteps,
-    errorSteps,
+    warnings,
     updateFormData,
-    goToStep2,
-    goToStep3,
-    goToStep,
-    goBack,
-    toggleGroup,
-    toggleClassroom,
-    confirmAndCreate,
+    resetFormData,
+    validateForm,
+    submitExam,
   };
 }

@@ -1,23 +1,23 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Exams\ExamController;
-use App\Http\Controllers\Exams\ExamGroupController;
-use App\Http\Controllers\Exams\ExamFormController;
-use App\Http\Controllers\Exams\ExamSchedulerController;
+use Illuminate\Support\Facades\Route;
 
+// Rutas del módulo: exams
 
-// Crear examen
-Route::post('/new', [ExamController::class, 'create']);
+// HU-24 — {exam} es el id_examen: cualquier otro valor responde 404 sin llegar a la base.
+Route::prefix('examenes')->name('examenes.')->group(function () {
+    Route::get('/formulario', [ExamController::class, 'formOptions'])
+         ->name('formulario');
 
-// Obtener datos para formulario de examen
-Route::get('/form-data', [ExamFormController::class, 'getFormData']);
+    Route::post('/', [ExamController::class, 'store'])
+         ->name('store');
 
-// Obtener grupos por materia (HU-025 Criterio I1)
-Route::get('/materias/{subjectId}/grupos', [ExamGroupController::class, 'getGroupsBySubject']);
+    Route::put('/{exam}', [ExamController::class, 'update'])
+         ->whereNumber('exam')
+         ->name('update');
 
-// Asignar grupos a un examen (HU-025 Criterio I5)
-Route::post('/{id}/grupos', [ExamGroupController::class, 'assignGroups']);  
-
-// Obtener todos los exámenes programados
-Route::get('/', [ExamSchedulerController::class, 'getAll']);
+    Route::post('/{exam}/cancelar', [ExamController::class, 'cancel'])
+         ->whereNumber('exam')
+         ->name('cancelar');
+});
