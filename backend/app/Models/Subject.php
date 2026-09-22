@@ -17,8 +17,8 @@ class Subject extends Model
     public const ESTADO_ACTIVO   = 'ACTIVO';
     public const ESTADO_INACTIVO = 'INACTIVO';
 
-    /** Formato institucional: 2 a 4 letras mayúsculas, guion, 3 dígitos. Ej: "SIS-101". */
-    public const CODIGO_REGEX = '/^[A-Z]{2,4}-\d{3}$/';
+    /** Código institucional de materia: exactamente 7 dígitos. Ej: 2008057. */
+    public const CODIGO_REGEX = '/^[0-9]{7}$/';
 
     protected $table = 'materia';
     protected $primaryKey = 'id_materia';

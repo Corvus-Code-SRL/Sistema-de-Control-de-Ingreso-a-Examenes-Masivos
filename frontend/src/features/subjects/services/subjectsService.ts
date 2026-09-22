@@ -74,7 +74,7 @@ export async function registrarMateria(data: MateriaFormState) {
   if (!response.ok) {
     // Si Laravel devuelve error de validación (422), lo lanzamos para que la UI lo atrape
     const errorData = await response.json();
-    throw errorData; 
+    throw errorData;
   }
 
   return response.json();

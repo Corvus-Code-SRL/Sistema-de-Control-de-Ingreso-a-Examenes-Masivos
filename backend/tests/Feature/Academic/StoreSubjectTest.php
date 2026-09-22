@@ -39,7 +39,7 @@ class StoreSubjectTest extends TestCase
     {
         return array_merge([
             'nombre'      => 'Calculo I',
-            'codigo'      => 'SIS-101',
+            'codigo'      => '2008057',
             'descripcion' => 'Materia de primer semestre',
         ], $overrides);
     }
@@ -50,11 +50,11 @@ class StoreSubjectTest extends TestCase
         $this->actingAs($this->adminUser)
              ->postJson('/api/materias', $this->validData())
              ->assertStatus(201)
-             ->assertJsonPath('data.codigo', 'SIS-101')
+             ->assertJsonPath('data.codigo', '2008057')
              ->assertJsonPath('data.estado', 'ACTIVO')
              ->assertJsonPath('mensaje', 'Materia registrada correctamente.');
 
-        $this->assertDatabaseHas('materia', ['codigo' => 'SIS-101']);
+        $this->assertDatabaseHas('materia', ['codigo' => '2008057']);
     }
 
     /** @test */
@@ -88,7 +88,7 @@ class StoreSubjectTest extends TestCase
     public function rechaza_un_codigo_con_formato_invalido()
     {
         $this->actingAs($this->adminUser)
-             ->postJson('/api/materias', $this->validData(['codigo' => 'sis101']))
+             ->postJson('/api/materias', $this->validData(['codigo' => '200805']))
              ->assertStatus(422)
              ->assertJsonValidationErrors('codigo');
     }
@@ -98,7 +98,7 @@ class StoreSubjectTest extends TestCase
     {
         Subject::create([
             'nombre' => 'Otra materia',
-            'codigo' => 'SIS-101',
+            'codigo' => '2008057',
             'estado' => Subject::ESTADO_ACTIVO,
         ]);
 
@@ -113,7 +113,7 @@ class StoreSubjectTest extends TestCase
     {
         Subject::create([
             'nombre' => 'Materia dada de baja',
-            'codigo' => 'SIS-101',
+            'codigo' => '2008057',
             'estado' => Subject::ESTADO_INACTIVO,
         ]);
 
@@ -130,7 +130,7 @@ class StoreSubjectTest extends TestCase
              ->postJson('/api/materias', $this->validData())
              ->assertJsonPath('data.estado', 'ACTIVO');
 
-        $this->assertDatabaseHas('materia', ['codigo' => 'SIS-101', 'estado' => 'ACTIVO']);
+        $this->assertDatabaseHas('materia', ['codigo' => '2008057', 'estado' => 'ACTIVO']);
     }
 
     /** @test */
@@ -148,7 +148,7 @@ class StoreSubjectTest extends TestCase
              ->postJson('/api/materias', $this->validData())
              ->assertStatus(403);
 
-        $this->assertDatabaseMissing('materia', ['codigo' => 'SIS-101']);
+        $this->assertDatabaseMissing('materia', ['codigo' => '2008057']);
     }
 
     /** @test */
@@ -161,6 +161,6 @@ class StoreSubjectTest extends TestCase
 
         $this->assertNotNull($auditLog);
         $this->assertSame($this->adminUser->id_usuario, $auditLog->id_usuario);
-        $this->assertSame('SIS-101', $auditLog->nuevo_valor['codigo']);
+        $this->assertSame('2008057', $auditLog->nuevo_valor['codigo']);
     }
 }

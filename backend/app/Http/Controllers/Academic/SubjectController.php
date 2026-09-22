@@ -12,7 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 /**
- * Expone el catálogo institucional de materias como pares materia-carrera 
+ * Expone el catálogo institucional de materias como pares materia-carrera
  * y gestiona el registro de nuevas materias.
  */
 class SubjectController extends Controller

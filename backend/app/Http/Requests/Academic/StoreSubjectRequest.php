@@ -40,7 +40,7 @@ class StoreSubjectRequest extends FormRequest
     {
         return [
             'codigo.unique' => 'Ya existe una materia registrada con el código :input.',
-            'codigo.regex'  => 'El código debe seguir el formato institucional (ej: SIS-101).',
+            'codigo.regex'  => 'El código debe contener exactamente 7 dígitos (ej: 2008057).',
         ];
     }
 }

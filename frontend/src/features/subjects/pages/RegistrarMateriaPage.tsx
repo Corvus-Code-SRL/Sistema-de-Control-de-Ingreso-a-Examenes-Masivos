@@ -15,7 +15,7 @@ export const RegistrarMateriaPage: React.FC = () => {
 
   const [errors, setErrors] = useState<FormErrors>({});
   const [warnings, setWarnings] = useState<{ global?: string; nombre?: string }>({});
-  
+
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,10 +69,16 @@ export const RegistrarMateriaPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
-    
+
     // Validación Frontend básica
     const newErrors: FormErrors = {};
-    if (!formData.codigo.trim()) newErrors.codigo = 'Ingrese el código de la materia.';
+    const codigo = formData.codigo.trim();
+
+    if (!codigo) {
+      newErrors.codigo = 'Ingrese el código de la materia.';
+    } else if (!/^\d{7}$/.test(codigo)) {
+      newErrors.codigo = 'El código debe contener exactamente 7 dígitos.';
+    }
     if (!formData.nombre.trim()) newErrors.nombre = 'Ingrese el nombre de la materia.';
     if (formData.carreras.length === 0) newErrors.carreras = 'Agregue al menos una carrera.';
 
@@ -94,13 +100,13 @@ export const RegistrarMateriaPage: React.FC = () => {
     try {
       setIsSubmitting(true);
       await registrarMateria(formData);
-      
+
       // A4.7 - Mostrar Toast de Éxito
       setShowSuccessToast(true);
       setTimeout(() => {
         navigate('/materias');
       }, 3000);
-      
+
     } catch (error: any) {
       // Manejo de error 422 de Laravel
       if (error?.data?.errors || error?.errors) {
@@ -128,7 +134,7 @@ export const RegistrarMateriaPage: React.FC = () => {
       </header>
 
       <main className="flex-1 p-8 flex flex-col gap-6 max-w-[1168px] mx-auto w-full relative">
-        
+
         {/* Toast de Éxito (A4.7) */}
         {showSuccessToast && (
           <div className="fixed top-20 right-8 w-[420px] z-50 flex gap-3 p-4 bg-surface border-l-4 border-l-ok border border-border rounded-lg shadow-lg">
@@ -158,7 +164,7 @@ export const RegistrarMateriaPage: React.FC = () => {
 
         <div className="flex items-start gap-5">
           <form onSubmit={handleSubmit} className="flex-1 flex flex-col gap-5">
-            
+
             {/* Alerta Global de Error */}
             {errors.global && (
               <div className="flex gap-3 p-3 bg-danger-soft border border-danger/30 rounded-lg text-danger-fg text-[14px]">
@@ -190,12 +196,14 @@ export const RegistrarMateriaPage: React.FC = () => {
                       value={formData.codigo}
                       onChange={handleInputChange}
                       placeholder="Ej. 2008120"
+                      inputMode="numeric"
+                      maxLength={7}
                       className={`h-10 px-3 rounded-md border bg-surface text-foreground text-[14px] outline-none ${errors.codigo ? 'border-danger focus:ring-2 focus:ring-danger-soft' : 'border-border-strong focus:border-primary focus:ring-2 focus:ring-primary-soft'}`}
                     />
                     {errors.codigo ? (
                       <div className="flex gap-1.5 text-[13px] text-danger-fg font-medium"><span>{errors.codigo}</span></div>
                     ) : (
-                      <div className="text-[13px] text-muted">Disponible. Máximo 50 caracteres.</div>
+                      <div className="text-[13px] text-muted">Código institucional de 7 dígitos.</div>
                     )}
                   </div>
                   <div className="flex flex-col gap-1.5 min-w-0">
@@ -253,7 +261,7 @@ export const RegistrarMateriaPage: React.FC = () => {
                   </div>
                   <div className="flex flex-col gap-1.5 flex-1">
                     <label className="text-[14px] font-medium">Carrera</label>
-                    <select 
+                    <select
                       value={selectedCarreraId}
                       onChange={(e) => setSelectedCarreraId(Number(e.target.value))}
                       className="h-10 px-3 rounded-md border border-border-strong bg-surface text-foreground text-[14px] outline-none focus:border-primary focus:ring-2 focus:ring-primary-soft"

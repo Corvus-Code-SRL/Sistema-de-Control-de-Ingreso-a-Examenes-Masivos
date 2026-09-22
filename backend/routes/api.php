@@ -22,5 +22,3 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 foreach (glob(base_path('routes/api/*.php')) as $moduleRoutes) {
     require $moduleRoutes;
 }
-
-

@@ -26,4 +26,19 @@ class FakeSisGateway implements SisGateway
     {
         return in_array($codSis, $this->codigosValidos, true);
     }
+
+    /**
+     * Sin integración real, toda persona reconocida devuelve los mismos datos:
+     * son los que antes armaba el controller de verificación.
+     */
+    public function personData(string $codSis): array
+    {
+        return [
+            'nombre'   => 'Laura',
+            'paterno'  => 'Mendoza',
+            'materno'  => 'Rivas',
+            'tipo'     => 'Docente',
+            'facultad' => 'Facultad de Ciencias y Tecnología',
+        ];
+    }
 }

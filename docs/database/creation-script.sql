@@ -48,6 +48,16 @@ CREATE TYPE public.categoria_examen AS ENUM (
 	'ADMISION'
 );
 
+-- Ciclo de vida del examen (HU-24). Solo PROGRAMADO y CANCELADO se alcanzan hoy;
+-- EN_INGRESO, EN_CURSO y FINALIZADO los asignan las historias de control de ingreso.
+CREATE TYPE public.estado_examen AS ENUM (
+    'PROGRAMADO',
+    'EN_INGRESO',
+    'EN_CURSO',
+    'FINALIZADO',
+    'CANCELADO'
+);
+
 ---------------------------------------------------
 -- accion
 ---------------------------------------------------
@@ -432,6 +442,11 @@ CREATE TABLE public.examen (
     duracion        integer,
     normas          text,
     id_tipo_examen  integer NOT NULL,
+    id_carrera          integer,
+    id_materia          integer,
+    id_usuario_docente  uuid NOT NULL,
+    estado              public.estado_examen
+                        DEFAULT 'PROGRAMADO' NOT NULL,
 
     CONSTRAINT pk_examen
         PRIMARY KEY (id_examen),
@@ -440,11 +455,28 @@ CREATE TABLE public.examen (
         FOREIGN KEY (id_tipo_examen)
         REFERENCES public.tipo_examen(id_tipo_examen),
 
-    CONSTRAINT chk_examen_horas
-        CHECK (hora_fin IS NULL OR hora_fin > hora_inicio),
+    CONSTRAINT fk_examen_usuario_docente
+        FOREIGN KEY (id_usuario_docente)
+        REFERENCES public.usuario(id_usuario),
 
+    -- fk_examen_materia_carrera se declara después de crear materia_carrera.
+
+    -- El par materia-carrera va completo o no va: un examen de admisión no tiene materia.
+    CONSTRAINT chk_examen_materia_carrera
+        CHECK ((id_carrera IS NULL) = (id_materia IS NULL)),
+
+    -- hora_fin se deriva de la duración. Un examen que cruza la medianoche termina
+    -- con una hora menor a la de inicio, por eso no se exige hora_fin > hora_inicio.
+    CONSTRAINT chk_examen_hora_fin
+        CHECK (
+            hora_fin IS NULL
+            OR duracion IS NULL
+            OR hora_fin = hora_inicio + make_interval(mins => duracion)
+        ),
+
+    -- Menos de un día: la hora de fin no puede dar la vuelta completa al reloj.
     CONSTRAINT chk_examen_duracion
-        CHECK (duracion IS NULL OR duracion > 0)
+        CHECK (duracion IS NULL OR (duracion > 0 AND duracion < 1440))
 );
 
 ---------------------------------------------------
@@ -595,6 +627,13 @@ CREATE TABLE public.materia_carrera (
         FOREIGN KEY (id_materia)
         REFERENCES public.materia(id_materia)
 );
+
+-- examen se crea antes que materia_carrera: su clave compuesta hacia el par se agrega aquí,
+-- igual que la de grupo.
+ALTER TABLE public.examen
+    ADD CONSTRAINT fk_examen_materia_carrera
+        FOREIGN KEY (id_carrera, id_materia)
+        REFERENCES public.materia_carrera(id_carrera, id_materia);
 
 ---------------------------------------------------
 -- permiso_rol
@@ -1098,6 +1137,15 @@ CREATE INDEX idx_examen_fecha
 
 CREATE INDEX idx_examen_fecha_hora
     ON public.examen(fecha, hora_inicio);
+
+CREATE INDEX idx_examen_materia_carrera
+    ON public.examen(id_carrera, id_materia);
+
+CREATE INDEX idx_examen_usuario_docente
+    ON public.examen(id_usuario_docente, fecha);
+
+CREATE INDEX idx_examen_estado
+    ON public.examen(estado);
 
 ---------------------------------------------------
 -- EXAMEN ADMISION
