@@ -46,14 +46,27 @@ class ExamGroupService
             $this->assertStudentsAreNotRepeated($enrollments);
 
             /*
-             * examen_estudiante referencia grupo_examen. Primero se retira la nómina
-             * anterior y después se sincronizan los grupos para respetar esa FK.
+             * Cada docente reemplaza solo los grupos que él mismo había vinculado, nunca
+             * el examen entero: si en el futuro varios docentes participan del mismo
+             * examen (módulo assistants, aún sin construir), esto evita que uno pise la
+             * lista del otro. Hoy assertExamCanBeConfigured ya limita quién puede llamar
+             * este método al docente dueño del examen.
              */
+            $teacherId = $this->subjectCatalog->teacherId();
+
+            $previousOwnGroupIds = $exam->groups()
+                ->where('id_usuario_docente', $teacherId)
+                ->pluck('grupo.id_grupo')
+                ->all();
+
+            // examen_estudiante referencia grupo_examen: se retira antes de reasignar.
             DB::table('examen_estudiante')
                 ->where('id_examen', $exam->id_examen)
+                ->whereIn('id_grupo', $previousOwnGroupIds)
                 ->delete();
 
-            $exam->groups()->sync($groupIds);
+            $exam->groups()->detach($previousOwnGroupIds);
+            $exam->groups()->attach($groupIds);
 
             DB::table('examen_estudiante')->insert(
                 $enrollments->map(fn ($enrollment) => [

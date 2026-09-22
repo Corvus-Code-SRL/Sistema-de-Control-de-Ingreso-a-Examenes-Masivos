@@ -133,6 +133,89 @@ class AssignGroupsTest extends TestCase
         $this->assertGroupIsRejected($this->groupWithoutRosterId);
     }
 
+    public function test_rechaza_grupo_de_la_misma_materia_en_otra_carrera(): void
+    {
+        // Calculo II también se dicta en Informatica: mismo id_materia, otro id_carrera.
+        $group = Group::create([
+            'id_carrera' => $this->informaticaId,
+            'id_materia' => $this->calculoId,
+            'num_grupo' => '9',
+            'gestion' => '2026',
+            'estado' => RecordStatus::ACTIVE,
+            'id_usuario_docente' => $this->docenteId,
+            'id_periodo' => $this->periodoActivoId,
+        ]);
+        $this->enrollStudents($group->id_grupo, 1);
+
+        $this->assertGroupIsRejected($group->id_grupo);
+    }
+
+    public function test_grupos_de_dos_docentes_en_el_mismo_examen_no_se_fusionan(): void
+    {
+        // Simula un examen con grupos ya vinculados por otro docente (escenario que hoy
+        // no se puede alcanzar por la API, pero que el servicio no debe corromper si el
+        // módulo assistants llega a habilitarlo).
+        $exam = $this->createExam();
+        $this->enrollStudents($this->grupoAjenoId, 1);
+
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoAjenoId,
+        ]);
+        DB::table('examen_estudiante')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_estudiante' => DB::table('grupo_estudiante')
+                ->where('id_grupo', $this->grupoAjenoId)
+                ->value('id_estudiante'),
+            'id_grupo' => $this->grupoAjenoId,
+            'estado_habilitacion' => 'HABILITADO',
+            'estado_ingreso' => 'NO_INGRESO',
+        ]);
+
+        $this->postJson("/api/examenes/{$exam->id_examen}/grupos", [
+            'grupos' => [$this->grupoPropioId],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('grupo_examen', [
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoAjenoId,
+        ]);
+        $this->assertDatabaseHas('grupo_examen', [
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
+        $this->assertDatabaseHas('examen_estudiante', [
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoAjenoId,
+        ]);
+    }
+
+    public function test_agrega_y_quita_grupos_propios_mientras_esta_programado(): void
+    {
+        $segundoGrupoPropioId = (int) Group::query()
+            ->where('id_carrera', $this->sistemasId)
+            ->where('id_materia', $this->calculoId)
+            ->where('num_grupo', '2')
+            ->value('id_grupo');
+        $this->enrollStudents($segundoGrupoPropioId, 1);
+
+        $exam = $this->createExam();
+
+        $this->postJson("/api/examenes/{$exam->id_examen}/grupos", [
+            'grupos' => [$this->grupoPropioId, $segundoGrupoPropioId],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('grupo_examen', ['id_examen' => $exam->id_examen, 'id_grupo' => $this->grupoPropioId]);
+        $this->assertDatabaseHas('grupo_examen', ['id_examen' => $exam->id_examen, 'id_grupo' => $segundoGrupoPropioId]);
+
+        $this->postJson("/api/examenes/{$exam->id_examen}/grupos", [
+            'grupos' => [$this->grupoPropioId],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('grupo_examen', ['id_examen' => $exam->id_examen, 'id_grupo' => $this->grupoPropioId]);
+        $this->assertDatabaseMissing('grupo_examen', ['id_examen' => $exam->id_examen, 'id_grupo' => $segundoGrupoPropioId]);
+    }
+
     public function test_rechaza_un_estudiante_repetido_en_dos_grupos_seleccionados(): void
     {
         $otherGroup = Group::create([
@@ -152,6 +235,7 @@ class AssignGroupsTest extends TestCase
         DB::table('grupo_estudiante')->insert([
             'id_grupo' => $otherGroup->id_grupo,
             'id_estudiante' => $studentId,
+            'fecha_inscripcion' => '2026-02-15',
             'estado' => RecordStatus::ACTIVE,
         ]);
 
