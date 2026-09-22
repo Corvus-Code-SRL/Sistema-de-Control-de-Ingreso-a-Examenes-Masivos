@@ -15,10 +15,13 @@ RUN printf '%s\n' \
 #   pdo_pgsql -> conexion a PostgreSQL
 #   bcmath    -> requisito del README
 #   zip       -> descompresion de paquetes de Composer y librerias de hojas de calculo
+#   gd        -> lo exige phpoffice/phpspreadsheet, con el que HU-021 lee las nominas XLSX.
+#                libpng-dev es la unica libreria de sistema que necesita: sin opciones de
+#                configure, gd se compila con soporte PNG y nada mas.
 #   redis     -> cliente phpredis (REDIS_CLIENT por defecto en config/database.php)
 RUN apt-get -o Acquire::Check-Valid-Until=false update \
-    && apt-get install -y --no-install-recommends libpq-dev libzip-dev unzip git \
-    && docker-php-ext-install pdo_pgsql bcmath zip \
+    && apt-get install -y --no-install-recommends libpq-dev libzip-dev libpng-dev unzip git \
+    && docker-php-ext-install pdo_pgsql bcmath zip gd \
     && pecl install redis-6.0.2 \
     && docker-php-ext-enable redis \
     && rm -rf /var/lib/apt/lists/* /tmp/pear
@@ -26,6 +29,9 @@ RUN apt-get -o Acquire::Check-Valid-Until=false update \
 # No existe la imagen composer:2.9.6: se parte de 2.9 y se fija la version exacta.
 COPY --from=composer:2.9 /usr/bin/composer /usr/bin/composer
 RUN composer self-update 2.9.6
+
+# Limites de subida de la aplicacion; el motivo esta en el propio archivo.
+COPY conf.d/sciem-uploads.ini /usr/local/etc/php/conf.d/
 
 # Usuario con el mismo UID/GID que el desarrollador en WSL, para que los archivos
 # generados (vendor/, storage/logs) no queden a nombre de root.
