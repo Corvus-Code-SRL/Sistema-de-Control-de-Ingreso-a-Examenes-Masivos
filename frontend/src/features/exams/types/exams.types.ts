@@ -102,6 +102,22 @@ export interface CreateExamDto {
 
 export type CreateExamPayload = CreateExamDto;
 
+/** La info general se edita sin tocar los grupos: eso pasa por assignGroups. */
+export interface UpdateExamDto {
+  nombre_examen: string;
+  id_carrera: number;
+  id_materia: number;
+  categoria: ExamCategory;
+  fecha: string;
+  hora_inicio: string;
+  duracion: number;
+  ambientes: number[];
+  normas?: string;
+  confirmar_advertencias?: boolean;
+}
+
+export type UpdateExamPayload = UpdateExamDto;
+
 export interface AssignGroupsPayload {
   grupos: number[];
 }
