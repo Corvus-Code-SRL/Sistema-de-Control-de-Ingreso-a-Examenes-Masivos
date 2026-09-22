@@ -44,7 +44,15 @@ class SubjectController extends Controller
             ->additional($additional);
     }
 
-    // Tu nuevo método de la HU-006 para registrar la materia
+    public function adminIndex(): AnonymousResourceCollection
+    {
+        $this->authorize('viewAny', Subject::class);
+
+        return SubjectResource::collection(
+            $this->subjectService->listForAdministration()
+        );
+    }
+
     public function store(StoreSubjectRequest $request): JsonResponse
     {
         $subject = $this->subjectService->create($request->validated());

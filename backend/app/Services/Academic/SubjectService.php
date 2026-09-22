@@ -5,6 +5,7 @@ namespace App\Services\Academic;
 use App\Models\Subject;
 use App\Services\Security\AuditLogService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Collection;
 
 class SubjectService
 {
@@ -13,6 +14,13 @@ class SubjectService
     public function __construct(AuditLogService $auditService)
     {
         $this->auditService = $auditService;
+    }
+
+    public function listForAdministration(): Collection
+    {
+        return Subject::query()
+            ->orderBy('nombre')
+            ->get();
     }
 
     public function create(array $data): Subject
