@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { getSubjectCatalog } from './subjectsService'
+import {
+  actualizarMateria,
+  getAdminSubjects,
+  getSubjectCatalog,
+} from './subjectsService'
 import { makeSubject, subjectCatalogResponse } from '@/test/fixtures'
 import { mockApiOnce } from '@/test/http'
 
@@ -66,5 +70,104 @@ describe('getSubjectCatalog', () => {
     expect(page.items).toHaveLength(8)
     expect(page.total).toBe(64)
     expect(page.totalPages).toBe(8)
+  })
+})
+
+describe('getAdminSubjects', () => {
+  it('conserva una sola entrada por materia aunque aparezca en varias carreras', async () => {
+    mockApiOnce({
+      body: subjectCatalogResponse([
+        makeSubject({
+          id_materia: 10,
+          id_carrera: 1,
+          nombre: 'Bases de Datos I',
+          codigo: '2008057',
+        }),
+        makeSubject({
+          id_materia: 10,
+          id_carrera: 2,
+          nombre: 'Bases de Datos I',
+          codigo: '2008057',
+        }),
+        makeSubject({
+          id_materia: 20,
+          id_carrera: 1,
+          nombre: 'Calculo II',
+          codigo: '2008058',
+        }),
+      ]),
+    })
+
+    const subjects = await getAdminSubjects()
+
+    expect(subjects).toEqual([
+      {
+        id_materia: 10,
+        nombre: 'Bases de Datos I',
+        codigo: '2008057',
+      },
+      {
+        id_materia: 20,
+        nombre: 'Calculo II',
+        codigo: '2008058',
+      },
+    ])
+  })
+})
+
+describe('actualizarMateria', () => {
+  it('envia nombre y codigo por PUT a la materia indicada', async () => {
+    mockApiOnce({
+      body: {
+        data: {
+          id_materia: 10,
+          nombre: 'Bases de Datos II',
+          codigo: '2008058',
+          descripcion: null,
+          estado: 'ACTIVO',
+        },
+        mensaje: 'Materia actualizada correctamente.',
+      },
+    })
+
+    await actualizarMateria(10, {
+      nombre: 'Bases de Datos II',
+      codigo: '2008058',
+    })
+
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+
+    expect(String(url)).toContain('/materias/10')
+    expect(init.method).toBe('PUT')
+    expect(init.body).toBe(
+      JSON.stringify({
+        nombre: 'Bases de Datos II',
+        codigo: '2008058',
+      })
+    )
+  })
+
+  it('conserva los errores por campo cuando el backend responde 422', async () => {
+    mockApiOnce({
+      status: 422,
+      body: {
+        message: 'The given data was invalid.',
+        errors: {
+          codigo: ['Ya existe una materia registrada con el código 2008058.'],
+        },
+      },
+    })
+
+    await expect(
+      actualizarMateria(10, {
+        nombre: 'Bases de Datos II',
+        codigo: '2008058',
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      errors: {
+        codigo: ['Ya existe una materia registrada con el código 2008058.'],
+      },
+    })
   })
 })

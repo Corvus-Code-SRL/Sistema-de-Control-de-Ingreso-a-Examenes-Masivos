@@ -1,6 +1,13 @@
-import { apiClient } from '@/lib/api-client'
+import { apiClient, apiPut } from '@/lib/api-client'
 import type { PageRequest } from '@/types/api.types'
-import type { SubjectCatalogPage, SubjectCatalogResponse, MateriaFormState } from '../types/subject.types'
+import type {
+  AdminSubjectSummary,
+  MateriaFormState,
+  SubjectCatalogPage,
+  SubjectCatalogResponse,
+  UpdateSubjectPayload,
+  UpdateSubjectResponse,
+} from '../types/subject.types'
 
 export const DEFAULT_PER_PAGE = 8
 
@@ -53,6 +60,36 @@ function toPage(
     mensaje: response.mensaje ?? null,
   }
 }
+
+/**
+ * Catálogo de materias para el área administrativa.
+ *
+ * `GET /materias` devuelve pares materia-carrera, por lo que una misma materia
+ * puede aparecer varias veces. La administración trabaja con la materia
+ * institucional, así que aquí se conserva una sola entrada por `id_materia`.
+ */
+export async function getAdminSubjects(
+  signal?: AbortSignal
+): Promise<AdminSubjectSummary[]> {
+  const response = await apiClient<SubjectCatalogResponse>('/materias', {
+    signal,
+  })
+
+  const subjects = new Map<number, AdminSubjectSummary>()
+
+  for (const pair of response.data) {
+    if (!subjects.has(pair.id_materia)) {
+      subjects.set(pair.id_materia, {
+        id_materia: pair.id_materia,
+        nombre: pair.nombre,
+        codigo: pair.codigo,
+      })
+    }
+  }
+
+  return Array.from(subjects.values())
+}
+
 /* ==========================================================================
     HU-006 (Registrar Materia)
    ========================================================================== */
@@ -78,4 +115,21 @@ export async function registrarMateria(data: MateriaFormState) {
   }
 
   return response.json();
+}
+
+/* ==========================================================================
+   HU-007 (Editar Materia)
+   ========================================================================== */
+
+/**
+ * Actualiza únicamente el nombre y código de una materia existente.
+ */
+export async function actualizarMateria(
+  idMateria: number,
+  data: UpdateSubjectPayload
+): Promise<UpdateSubjectResponse> {
+  return apiPut<UpdateSubjectResponse>(
+    `/materias/${idMateria}`,
+    data
+  )
 }

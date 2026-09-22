@@ -78,3 +78,35 @@ export interface FormErrors {
   nombre?: string;
   carreras?: string;
 }
+
+// HU-007 (Editar Materia)
+
+export interface AdminSubjectSummary {
+  id_materia: number
+  nombre: string
+  codigo: string
+}
+
+export interface UpdateSubjectPayload {
+  nombre: string
+  codigo: string
+}
+
+export interface SubjectData {
+  id_materia: number
+  nombre: string
+  codigo: string
+  descripcion: string | null
+  estado: string
+}
+
+export interface UpdateSubjectResponse {
+  data: SubjectData
+  mensaje: string
+}
+
+export interface UpdateSubjectFormErrors {
+  global?: string
+  nombre?: string
+  codigo?: string
+}
