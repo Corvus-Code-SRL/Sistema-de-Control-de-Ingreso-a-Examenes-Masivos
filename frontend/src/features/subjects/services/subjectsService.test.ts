@@ -74,31 +74,29 @@ describe('getSubjectCatalog', () => {
 })
 
 describe('getAdminSubjects', () => {
-  it('conserva una sola entrada por materia aunque aparezca en varias carreras', async () => {
+  it('consulta el catálogo administrativo y devuelve las materias', async () => {
     mockApiOnce({
-      body: subjectCatalogResponse([
-        makeSubject({
-          id_materia: 10,
-          id_carrera: 1,
-          nombre: 'Bases de Datos I',
-          codigo: '2008057',
-        }),
-        makeSubject({
-          id_materia: 10,
-          id_carrera: 2,
-          nombre: 'Bases de Datos I',
-          codigo: '2008057',
-        }),
-        makeSubject({
-          id_materia: 20,
-          id_carrera: 1,
-          nombre: 'Calculo II',
-          codigo: '2008058',
-        }),
-      ]),
+      body: {
+        data: [
+          {
+            id_materia: 10,
+            nombre: 'Bases de Datos I',
+            codigo: '2008057',
+          },
+          {
+            id_materia: 20,
+            nombre: 'Calculo II',
+            codigo: '2008058',
+          },
+        ],
+      },
     })
 
     const subjects = await getAdminSubjects()
+
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+
+    expect(String(url)).toContain('/materias/administracion')
 
     expect(subjects).toEqual([
       {

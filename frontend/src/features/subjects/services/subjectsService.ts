@@ -62,32 +62,20 @@ function toPage(
 }
 
 /**
- * Catálogo de materias para el área administrativa.
+ * Catálogo institucional de materias para Administración.
  *
- * `GET /materias` devuelve pares materia-carrera, por lo que una misma materia
- * puede aparecer varias veces. La administración trabaja con la materia
- * institucional, así que aquí se conserva una sola entrada por `id_materia`.
+ * El backend consulta directamente `materia`, por lo que cada materia aparece
+ * una sola vez aunque todavía no tenga una carrera asociada.
  */
 export async function getAdminSubjects(
   signal?: AbortSignal
 ): Promise<AdminSubjectSummary[]> {
-  const response = await apiClient<SubjectCatalogResponse>('/materias', {
-    signal,
-  })
+  const response = await apiClient<{ data: AdminSubjectSummary[] }>(
+    '/materias/administracion',
+    { signal }
+  )
 
-  const subjects = new Map<number, AdminSubjectSummary>()
-
-  for (const pair of response.data) {
-    if (!subjects.has(pair.id_materia)) {
-      subjects.set(pair.id_materia, {
-        id_materia: pair.id_materia,
-        nombre: pair.nombre,
-        codigo: pair.codigo,
-      })
-    }
-  }
-
-  return Array.from(subjects.values())
+  return response.data
 }
 
 /* ==========================================================================
