@@ -248,10 +248,21 @@ Todo el equipo trabaja con los mismos registros: cada valor está escrito a mano
 
     ```bash
     cd backend
+    php artisan config:clear
     php artisan db:seed --class="Database\Seeders\TestData\TestDataSeeder"
     ```
 
-El seeder no está registrado en `DatabaseSeeder`, así que `php artisan db:seed` a secas no lo carga. Se niega a correr con cualquier `APP_ENV` que no sea `local` o `development`, y la suite de pruebas nunca lo usa: construye su propio esquema en `sciem_test`. También ejecuta `RoleSeeder`, `ActionSeeder` y `ExamTypeSeeder`, que son idempotentes.
+El seeder no está registrado en `DatabaseSeeder`, así que `php artisan db:seed` a secas no lo carga. Se niega a correr con cualquier `APP_ENV` que no sea `local` o `development` y rechaza expresamente la base `sciem_test`, incluso en entorno local. La suite construye su propio esquema y nunca usa estos datos. También ejecuta `RoleSeeder`, `ActionSeeder` y `ExamTypeSeeder`, que son idempotentes.
+
+### Comprobar qué datos ve el frontend
+
+Cambiar `.env.example` no modifica un `.env` existente. La API debe usar el docente `…0011`, el periodo `9303` y la misma base donde se ejecutó el seeder. Después de modificar su `.env`, limpiar la configuración y reiniciar el servidor PHP. Si PHP corre en Docker, ejecutar estos pasos **en el contenedor que atiende el puerto 8000**; un contenedor sin el repositorio montado conserva su propia copia del código y de `.env`.
+
+Para conservar una base antigua, crear otra base local vacía (por ejemplo `sciem_demo`), cargar en ella `docs/database/creation-script.sql` y seleccionar `DB_DATABASE=sciem_demo` en la API antes de sembrar. No ejecutar el script de creación sobre tablas existentes. El esquema de exámenes debe incluir HU-024; el seeder lo comprueba antes de escribir.
+
+La verificación de la carga debe mostrar 8 materias, 15 pares materia-carrera, 11 grupos, 24 estudiantes y 8 exámenes en una base nueva. `GET /api/materias` debe devolver los pares y `GET /api/carreras/9101/materias/9201/grupos` los grupos propios y ajenos de Cálculo I en Sistemas.
+
+**Limitación actual de la aplicación:** `ExamsPage.tsx` inicializa su lista con `[]` y no consulta el backend; tampoco existe `GET /api/examenes`. Por eso «Exámenes programados» seguirá vacío aun con datos cargados. El formulario de creación sí consulta `/api/examenes/formulario`, y los exámenes sembrados permiten probar las advertencias de superposición y las operaciones de edición/cancelación por API. Conectar el listado requiere implementar esa funcionalidad.
 
 `UserSeeder` escribe en el mismo uuid del Administrador de prueba. Si después se corre `php artisan db:seed`, el nombre y el código SIS de esa cuenta vuelven a los de `UserSeeder`; basta con volver a cargar los datos de prueba.
 
@@ -295,8 +306,13 @@ Los códigos SIS siguen el formato de cada tipo de cuenta: el Administrador es a
 | Código SIS no reconocido | `999999999` | HU-001 |
 | Ambiente fuera de servicio | Aula `612` (INACTIVO) | HU-024 |
 | Tipos de examen Parcial y Final | `tipo_examen` 9701 y 9702 (categoría REGULAR) | HU-024 |
+| Exámenes propios y ajenos en el mismo par | 9801 (Marcelo) y 9803 (Rosario), Cálculo I/Sistemas, 15-10-2026 a las 08:00 | HU-024 |
+| Misma materia en otra facultad | 9802, Final Cálculo ECO, 20-11-2026 a las 10:00 | HU-024 |
+| Examen cancelado, sin reserva efectiva de horario | 9804, Base de Datos I/Sistemas, 16-10-2026 a las 14:00 | HU-024 |
+| Estados que bloquean edición y cancelación | 9805 EN_INGRESO, 9806 EN_CURSO, 9807 FINALIZADO | HU-024 |
+| Examen que cruza medianoche | 9808, Programación/Sistemas, 17-10-2026 de 23:00 a 01:00 (120 minutos) | HU-024 |
 
-Periodos: `2-2025` (9301), `1-2026` (9302) y `2-2026` (9303, el activo). Hay 24 estudiantes, repartidos entre 2 y 6 por grupo. Los exámenes de prueba quedan pendientes hasta que HU-024 cierre el esquema de `examen`.
+Periodos: `2-2025` (9301), `1-2026` (9302) y `2-2026` (9303, el activo). Hay 24 estudiantes, repartidos entre 2 y 6 por grupo. Los ocho exámenes (9801–9808) tienen un ambiente y un grupo del mismo par cada uno. Sus fechas y estados son fijos: no avanzan con el reloj. Cuando esas fechas queden en el pasado, el formulario de HU-024 rechazará reutilizarlas para crear o editar; actualizar el conjunto compartido de forma coordinada si se necesita otro calendario.
 
 ### Cómo retirarlos
 

@@ -8,6 +8,7 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 
 /**
@@ -32,6 +33,27 @@ class TestDataSeeder extends Seeder
                 'Los datos de prueba solo se cargan con APP_ENV local o development; el entorno actual es «%s».',
                 app()->environment()
             ));
+        }
+
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            throw new RuntimeException(
+                'Los datos compartidos requieren PostgreSQL y el esquema de creation-script.sql.'
+            );
+        }
+
+        $database = DB::selectOne('select current_database() as name')->name;
+
+        if (strtolower($database) === 'sciem_test') {
+            throw new RuntimeException(
+                'No se permite cargar datos compartidos en sciem_test, incluso con APP_ENV=local.'
+            );
+        }
+
+        if (! Schema::hasColumns('examen', ['id_carrera', 'id_materia', 'id_usuario_docente', 'estado'])) {
+            throw new RuntimeException(
+                'Falta el esquema de HU-024: use creation-script.sql en una base nueva '
+                . 'o revise docs/database/alter-hu-24-examen.sql para actualizar una existente.'
+            );
         }
 
         try {
@@ -66,11 +88,7 @@ class TestDataSeeder extends Seeder
                 CatalogTestDataSeeder::class,
                 AccountTestDataSeeder::class,
                 GroupTestDataSeeder::class,
-                /*
-                 * PENDIENTE — exámenes de prueba. Se agregan cuando HU-024 cierre el esquema
-                 * de examen (par materia-carrera, id_usuario_docente, enum estado_examen).
-                 * Ids reservados: examen 9801–9899; tipo_examen ya tiene Parcial (9701) y Final (9702).
-                 */
+                ExamTestDataSeeder::class,
             ]);
         });
     }
