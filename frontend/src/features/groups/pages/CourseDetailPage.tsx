@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { SearchX, Pencil } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
+
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -17,20 +18,27 @@ import { useGroupDetail } from '../hooks/useGroupDetail'
 import { courseTitle } from '../types/group.types'
 
 /**
- * Detalle de un curso (artboards 2.3, 2.4 y 2.11).
- *
- * De esta historia son la cabecera, el armazón de pestañas y el control de
- * acceso. El contenido de cada pestaña llega con sus propias historias.
+ * Detalle de un curso con navegación de pestañas y contenido de nómina.
  */
 export function CourseDetailPage() {
   const params = useParams()
   const groupId = Number(params.idGrupo)
 
-  const { detail, isLoading, isForbidden, isNotFound, error, reload } = useGroupDetail(groupId)
-  const [isEditOpen, setIsEditOpen] = useState(false)
+  const {
+    detail,
+    isLoading,
+    isForbidden,
+    isNotFound,
+    error,
+    reload,
+  } = useGroupDetail(groupId)
 
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  
   const title =
-    detail && !isForbidden ? courseTitle(detail.subject, detail.group) : 'Detalle del curso'
+    detail && !isForbidden
+      ? courseTitle(detail.subject, detail.group)
+      : 'Detalle del curso'
 
   const subjectCareerLabel = detail
     ? `${detail.subject.nombre} · ${detail.subject.carrera.nombre}`
@@ -38,9 +46,20 @@ export function CourseDetailPage() {
 
   return (
     <AppShell
-      mobileTitle={detail && !isForbidden ? `Grupo ${detail.group.num_grupo}` : 'Curso'}
-      mobileSubtitle={detail && !isForbidden ? detail.subject.nombre : undefined}
-      breadcrumbs={[{ label: 'Mis cursos', to: '/mis-cursos' }, { label: title }]}
+      mobileTitle={
+        detail && !isForbidden
+          ? `Grupo ${detail.group.num_grupo}`
+          : 'Curso'
+      }
+      mobileSubtitle={
+        detail && !isForbidden
+          ? detail.subject.nombre
+          : undefined
+      }
+      breadcrumbs={[
+        { label: 'Mis cursos', to: '/mis-cursos' },
+        { label: title },
+      ]}
     >
       <PageHeader
         title={title}
@@ -49,13 +68,13 @@ export function CourseDetailPage() {
         subtitle={
           detail &&
           !isForbidden && (
-            <span className="flex flex-wrap items-center gap-1.5">
-              <span className="font-mono">{detail.subject.codigo}</span>
-              <span aria-hidden="true">·</span>
-              <span>{detail.subject.carrera.nombre}</span>
-              <span aria-hidden="true">·</span>
-              <span>{detail.group.periodo.nombre_periodo}</span>
-            </span>
+            <>
+              {detail.subject.codigo}
+              {' · '}
+              {detail.subject.carrera.nombre}
+              {' · '}
+              {detail.group.periodo.nombre_periodo}
+            </>
           )
         }
         actions={
@@ -87,8 +106,14 @@ export function CourseDetailPage() {
             title="El curso no existe"
             description="El grupo que intenta abrir no está registrado o fue dado de baja."
             action={
-              <Button variant="outline" size="sm" asChild>
-                <Link to="/mis-cursos">Ir a mis cursos</Link>
+              <Button
+                variant="outline"
+                size="sm"
+                asChild
+              >
+                <Link to="/mis-cursos">
+                  Ir a mis cursos
+                </Link>
               </Button>
             }
           />
@@ -97,7 +122,10 @@ export function CourseDetailPage() {
 
       {!isLoading && !isNotFound && error && (
         <Card className="p-0">
-          <ErrorState error={error} onRetry={reload} />
+          <ErrorState
+            error={error}
+            onRetry={reload}
+          />
         </Card>
       )}
 
@@ -110,7 +138,13 @@ export function CourseDetailPage() {
       {!isLoading && !error && !isForbidden && detail && (
         <>
           <CourseHeader detail={detail} />
-          <CourseTabsShell group={detail.group} />
+
+          <CourseTabsShell
+            group={detail.group}
+            subjectName={detail.subject.nombre}
+            meta={detail.meta}
+            onReload={reload}
+          />
         </>
       )}
 

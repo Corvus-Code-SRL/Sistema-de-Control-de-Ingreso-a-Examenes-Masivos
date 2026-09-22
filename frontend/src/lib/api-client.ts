@@ -43,7 +43,10 @@ type Query = Record<string, string | number | undefined>
 
 export interface ApiClientOptions {
   method?: ApiMethod
-  /** Cuerpo de la petición; se serializa como JSON. Ignorado en GET. */
+  /**
+   * Cuerpo de la petición. Se serializa como JSON, salvo que sea un `FormData`
+   * —el caso de la carga de nómina—, que se envía tal cual. Ignorado en GET.
+   */
   body?: unknown
   signal?: AbortSignal
   query?: Query
@@ -61,10 +64,17 @@ export async function apiClient<TResponse>(
   const method = options.method ?? 'GET'
   const hasBody = options.body !== undefined && method !== 'GET'
   const url = buildUrl(path, options.query)
+  const isFormData = options.body instanceof FormData
 
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+  const headers: Record<string, string> = { Accept: 'application/json' }
+
+  /*
+   * Un multipart lo arma el navegador, que es quien conoce el `boundary` con el
+   * que separa las partes: fijar aquí el Content-Type dejaría el cuerpo ilegible
+   * para el servidor.
+   */
+  if (hasBody && !isFormData) {
+    headers['Content-Type'] = 'application/json'
   }
 
   let response: Response
@@ -73,7 +83,7 @@ export async function apiClient<TResponse>(
     response = await fetch(url, {
       method,
       headers,
-      body: hasBody ? JSON.stringify(options.body) : undefined,
+      body: toRequestBody(options.body),
       signal: options.signal,
     })
   } catch (cause) {
@@ -97,7 +107,7 @@ export async function apiClient<TResponse>(
   return (await response.json()) as TResponse
 }
 
-/** Helpers directos para peticiones POST y PUT */
+/** Helpers directos para peticiones POST y PUT. */
 export async function apiPost<TResponse>(
   path: string,
   body: unknown,
@@ -112,6 +122,14 @@ export async function apiPut<TResponse>(
   options: Omit<ApiClientOptions, 'method' | 'body'> = {}
 ): Promise<TResponse> {
   return apiClient<TResponse>(path, { ...options, method: 'PUT', body })
+}
+
+/** Un `FormData` viaja tal cual; cualquier otro cuerpo se serializa como JSON. */
+function toRequestBody(body: unknown): BodyInit | undefined {
+  if (body === undefined) return undefined
+  if (body instanceof FormData) return body
+
+  return JSON.stringify(body)
 }
 
 function buildUrl(path: string, query?: Query): string {

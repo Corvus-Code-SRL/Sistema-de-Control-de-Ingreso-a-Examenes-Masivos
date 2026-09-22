@@ -1,0 +1,168 @@
+import {
+  FIRST_NAMES_MAX_LENGTH,
+  INCORPORABLE_STATES,
+  LAST_NAMES_MAX_LENGTH,
+  SIS_CODE_MAX_LENGTH,
+  type RosterIssue,
+  type RosterPreviewData,
+  type RosterPreviewRow,
+  type RosterRowError,
+  type RosterRowState,
+} from '../types/roster.types'
+
+/**
+ * Lectura de las filas de una previsualización, sin React.
+ *
+ * Aquí se decide qué ve el docente de cada fila —estado, observaciones y
+ * conteos— para que la tabla, las tarjetas de móvil y el paso de confirmación
+ * cuenten siempre lo mismo.
+ */
+
+export type RosterStateTone = 'ok' | 'neutral' | 'warn' | 'danger'
+
+export interface RosterStateText {
+  label: string
+  tone: RosterStateTone
+}
+
+export interface RosterRowCounts {
+  /** Filas leídas del archivo, según el propio backend. */
+  leidas: number
+  /** Filas que el confirm incorporará al grupo. */
+  incorporables: number
+  /** De las incorporables, las que además crean al estudiante en SCIEM. */
+  nuevos: number
+  yaEnElGrupo: number
+  yaInscritos: number
+  inscripcionesInactivas: number
+  inconsistentes: number
+}
+
+const STATE_TEXT: Record<RosterRowState, RosterStateText> = {
+  new_student: { label: 'Nuevo en SCIEM', tone: 'ok' },
+  existing_student: { label: 'Se inscribirá', tone: 'ok' },
+  already_enrolled: { label: 'Ya en el grupo', tone: 'neutral' },
+  inactive_enrollment: { label: 'Inscripción inactiva', tone: 'warn' },
+  inconsistent: { label: 'Inconsistente', tone: 'danger' },
+}
+
+const ERROR_ISSUE: Record<RosterRowError, RosterIssue> = {
+  missing_sis_code: { category: 'Incompleto', message: 'Falta el código SIS' },
+  missing_last_names: { category: 'Incompleto', message: 'Faltan los apellidos' },
+  missing_first_names: { category: 'Incompleto', message: 'Faltan los nombres' },
+  sis_code_too_long: {
+    category: 'Formato',
+    message: `El código SIS supera los ${SIS_CODE_MAX_LENGTH} caracteres`,
+  },
+  last_names_too_long: {
+    category: 'Formato',
+    message: `Los apellidos superan los ${LAST_NAMES_MAX_LENGTH} caracteres`,
+  },
+  first_names_too_long: {
+    category: 'Formato',
+    message: `Los nombres superan los ${FIRST_NAMES_MAX_LENGTH} caracteres`,
+  },
+  duplicate_sis_code_in_file: { category: 'Duplicado', message: 'Código SIS repetido en el archivo' },
+}
+
+/*
+ * Los datos llegan de la red sin validar, así que las búsquedas se hacen sobre
+ * una vista indexada por cadena: si el backend añade un estado o un código, la
+ * fila se dibuja con un texto de respaldo en lugar de romper la vista.
+ */
+const STATE_TEXT_BY_KEY: Record<string, RosterStateText | undefined> = STATE_TEXT
+const ERROR_ISSUE_BY_KEY: Record<string, RosterIssue | undefined> = ERROR_ISSUE
+
+const UNKNOWN_STATE: RosterStateText = { label: 'Estado no reconocido', tone: 'neutral' }
+
+export function rowStateText(estado: RosterRowState): RosterStateText {
+  return STATE_TEXT_BY_KEY[estado] ?? UNKNOWN_STATE
+}
+
+export function isIncorporable(estado: RosterRowState): boolean {
+  return INCORPORABLE_STATES.includes(estado)
+}
+
+/** «3» · «3 y 5» · «3, 5 y 7». */
+export function formatRowList(rowNumbers: readonly number[]): string {
+  if (rowNumbers.length <= 1) return String(rowNumbers[0] ?? '')
+
+  const head = rowNumbers.slice(0, -1).join(', ')
+
+  return `${head} y ${rowNumbers[rowNumbers.length - 1]}`
+}
+
+/**
+ * Filas en las que aparece cada código SIS.
+ *
+ * Se construye con todas las filas de la previsualización, no con las visibles:
+ * filtrar o paginar no puede cambiar en qué filas está repetido un código.
+ */
+export function duplicateRowsBySis(rows: readonly RosterPreviewRow[]): Map<string, number[]> {
+  const byCode = new Map<string, number[]>()
+
+  rows.forEach((row) => {
+    if (row.codigo_sis === null) return
+
+    const seen = byCode.get(row.codigo_sis) ?? []
+    seen.push(row.numero_fila)
+    byCode.set(row.codigo_sis, seen)
+  })
+
+  return byCode
+}
+
+/**
+ * Observaciones de una fila, una por inconsistencia.
+ *
+ * El backend marca `duplicate_sis_code_in_file` en todas las apariciones del
+ * código, así que el mensaje nombra el conjunto completo una sola vez.
+ */
+export function rowIssues(
+  row: RosterPreviewRow,
+  duplicateRows: readonly number[] = []
+): RosterIssue[] {
+  return row.errores.map((code) => {
+    if (code === 'duplicate_sis_code_in_file' && duplicateRows.length > 0) {
+      return { category: 'Duplicado', message: duplicateMessage(duplicateRows) }
+    }
+
+    return ERROR_ISSUE_BY_KEY[code] ?? unknownIssue(code)
+  })
+}
+
+export function countRosterRows(preview: RosterPreviewData): RosterRowCounts {
+  const counts = {
+    incorporables: 0,
+    nuevos: 0,
+    yaInscritos: 0,
+    inscripcionesInactivas: 0,
+    inconsistentes: 0,
+  }
+
+  preview.filas.forEach((row) => {
+    if (isIncorporable(row.estado)) counts.incorporables += 1
+    if (row.estado === 'new_student') counts.nuevos += 1
+    if (row.estado === 'already_enrolled') counts.yaInscritos += 1
+    if (row.estado === 'inactive_enrollment') counts.inscripcionesInactivas += 1
+    if (row.estado === 'inconsistent') counts.inconsistentes += 1
+  })
+
+  return {
+    leidas: preview.total_filas,
+    yaEnElGrupo: counts.yaInscritos + counts.inscripcionesInactivas,
+    ...counts,
+  }
+}
+
+function duplicateMessage(duplicateRows: readonly number[]): string {
+  const list = formatRowList(duplicateRows)
+
+  return duplicateRows.length === 1
+    ? `Código SIS repetido en la fila ${list}`
+    : `Código SIS repetido en las filas ${list}`
+}
+
+function unknownIssue(code: string): RosterIssue {
+  return { category: 'Otro', message: `Inconsistencia informada por el servidor (${code})` }
+}

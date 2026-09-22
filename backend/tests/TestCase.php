@@ -41,6 +41,12 @@ abstract class TestCase extends BaseTestCase
 
         $connection = $app->make('db')->connection();
 
+        if ($connection->getDatabaseName() !== 'sciem_test') {
+            throw new RuntimeException(
+                'Las pruebas solo pueden reiniciar la base de datos sciem_test.'
+            );
+        }
+
         $connection->unprepared('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
         $connection->unprepared(file_get_contents($script));
     }

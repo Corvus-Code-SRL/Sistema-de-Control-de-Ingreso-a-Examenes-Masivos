@@ -136,6 +136,55 @@ describe('apiPost', () => {
   })
 })
 
+describe('apiPost con FormData', () => {
+  function rosterFormData(): FormData {
+    const formData = new FormData()
+    formData.append('archivo', new File(['Estudiante,Apellidos,Nombres'], 'nomina.csv'))
+
+    return formData
+  }
+
+  it('envía el FormData tal cual, sin serializarlo', async () => {
+    mockApiOnce({ body: { data: { token: 'abc' } } })
+
+    const formData = rosterFormData()
+
+    await expect(apiPost('/grupos/100/nomina/preview', formData)).resolves.toEqual({
+      data: { token: 'abc' },
+    })
+
+    const { init } = lastFetchCall()
+    expect(init.method).toBe('POST')
+    expect(init.body).toBe(formData)
+  })
+
+  it('deja que el navegador fije el Content-Type del multipart', async () => {
+    mockApiOnce({ body: { data: {} } })
+
+    await apiPost('/grupos/100/nomina/preview', rosterFormData())
+
+    const { init } = lastFetchCall()
+    // Sin este vacío el navegador no puede añadir el boundary de las partes.
+    expect(init.headers).not.toHaveProperty('Content-Type')
+    expect(init.headers).toMatchObject({ Accept: 'application/json' })
+  })
+
+  it('traduce un 422 con los campos rechazados del archivo', async () => {
+    mockApiOnce({
+      status: 422,
+      body: {
+        message: 'The given data was invalid.',
+        errors: { archivo: ['El archivo debe tener formato CSV o XLSX.'] },
+      },
+    })
+
+    const error = await captureApiError(apiPost('/grupos/100/nomina/preview', rosterFormData()))
+
+    expect(error.isValidation).toBe(true)
+    expect(error.errors.archivo).toEqual(['El archivo debe tener formato CSV o XLSX.'])
+  })
+})
+
 describe('apiPut', () => {
   it('envía el cuerpo como JSON con el método PUT', async () => {
     mockApiOnce({ body: { data: { ok: true } } })

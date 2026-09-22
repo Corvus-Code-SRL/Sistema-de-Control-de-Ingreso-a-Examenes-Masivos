@@ -33,22 +33,19 @@ export function useAsyncResource<TData>(
     const controller = new AbortController()
     let active = true
 
-    setStatus('loading')
     setError(null)
+    setStatus((prev) => (prev === 'success' ? prev : 'loading'))
 
     fetcher(controller.signal)
       .then((result) => {
         if (!active) return
-
         setData(result)
         setStatus('success')
       })
       .catch((cause: unknown) => {
-        // El aborto lo provoca la limpieza del efecto, no es un fallo que mostrar.
         if (!active || (cause instanceof DOMException && cause.name === 'AbortError')) {
           return
         }
-
         setError(cause instanceof ApiError ? cause : new ApiError(0, (cause as Error).message))
         setStatus('error')
       })
