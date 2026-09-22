@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateExam } from '../hooks/useCreateExam';
 import { ExamForm } from './ExamForm';
+import { AssignGroupsForm } from './AssignGroupsForm';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, CheckCircle2, Loader2, Save } from 'lucide-react';
 import { Exam } from '../types/exams.types';
@@ -13,6 +14,7 @@ export const CreateExamContainer: React.FC = () => {
   const {
     formData,
     options,
+    subjectGroups,
     loading,
     submitting,
     apiError,
@@ -20,10 +22,16 @@ export const CreateExamContainer: React.FC = () => {
     updateFormData,
     resetFormData,
     validateForm,
+    toggleGroup,
     submitExam,
   } = useCreateExam(setCreatedExam);
 
   const validation = validateForm();
+  const selectedSubject = options.materias.find(
+    (subject) =>
+      subject.id_carrera === formData.materia?.id_carrera &&
+      subject.id_materia === formData.materia?.id_materia
+  );
 
   if (loading) {
     return (
@@ -40,8 +48,9 @@ export const CreateExamContainer: React.FC = () => {
         <CheckCircle2 className="h-10 w-10 text-[#15803D] mx-auto" />
         <h1 className="text-lg font-bold text-[#2C2C2C]">Examen creado</h1>
         <p className="text-xs text-[#6C757D]">
-          «{createdExam.nombre_examen}» quedó registrado en estado <strong>Programado</strong> para el{' '}
-          {createdExam.fecha} de {createdExam.hora_inicio} a {createdExam.hora_fin}.
+          «{createdExam.nombre_examen}» quedó registrado con sus grupos en estado{' '}
+          <strong>Programado</strong> para el {createdExam.fecha} de{' '}
+          {createdExam.hora_inicio} a {createdExam.hora_fin}.
         </p>
         <Button
           type="button"
@@ -89,6 +98,14 @@ export const CreateExamContainer: React.FC = () => {
           errors={validation.errors}
           warnings={validation.warnings}
           updateFormData={updateFormData}
+        />
+
+        <AssignGroupsForm
+          selectedSubject={selectedSubject}
+          availableGroups={subjectGroups}
+          selectedGroupIds={formData.grupos}
+          errors={validation.errors}
+          onToggleGroup={toggleGroup}
         />
 
         {warnings.length > 0 && (

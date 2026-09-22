@@ -43,6 +43,7 @@ class ExamResource extends JsonResource
             ]),
 
             'ambientes' => ClassroomResource::collection($this->whenLoaded('classrooms')),
+            'grupos' => GroupResource::collection($this->whenLoaded('groups')),
         ];
     }
 

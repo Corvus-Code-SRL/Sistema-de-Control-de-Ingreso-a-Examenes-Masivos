@@ -40,5 +40,9 @@ class ExamFormOptionsTest extends TestCase
         $this->assertCount(2, $data['grupos']);
         $this->assertNotContains($this->grupoAjenoId, array_column($data['grupos'], 'id_grupo'));
         $this->assertNotContains($this->grupoPeriodoAnteriorId, array_column($data['grupos'], 'id_grupo'));
+
+        $ownGroup = collect($data['grupos'])->firstWhere('id_grupo', $this->grupoPropioId);
+        $this->assertSame(2, $ownGroup['cantidad_estudiantes']);
+        $this->assertTrue($ownGroup['tiene_nomina']);
     }
 }

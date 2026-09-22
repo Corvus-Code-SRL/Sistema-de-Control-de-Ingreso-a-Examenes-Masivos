@@ -14,6 +14,7 @@ use App\Services\Security\AuditLogService;
 use App\Support\RecordStatus;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -33,10 +34,16 @@ class ExamService
 
     private AuditLogService $auditLog;
 
-    public function __construct(SubjectCatalogService $subjectCatalog, AuditLogService $auditLog)
-    {
+    private ExamGroupService $groupService;
+
+    public function __construct(
+        SubjectCatalogService $subjectCatalog,
+        AuditLogService $auditLog,
+        ExamGroupService $groupService
+    ) {
         $this->subjectCatalog = $subjectCatalog;
         $this->auditLog = $auditLog;
+        $this->groupService = $groupService;
     }
 
     /**
@@ -58,6 +65,7 @@ class ExamService
             ->get();
 
         $groups = Group::query()
+            ->withActiveStudentCount()
             ->where('id_usuario_docente', $this->currentTeacherId())
             ->where('id_periodo', $this->subjectCatalog->activePeriodId())
             ->where('estado', RecordStatus::ACTIVE)
@@ -71,6 +79,27 @@ class ExamService
             'classrooms' => $classrooms,
             'groups'     => $groups,
         ];
+    }
+
+    /**
+     * Exámenes del docente actual, del más próximo al más lejano (vista Programados).
+     */
+    public function listForCurrentTeacher(): Collection
+    {
+        return Exam::query()
+            ->with(['examType', 'subject', 'career'])
+            ->where('id_usuario_docente', $this->currentTeacherId())
+            ->orderBy('fecha')
+            ->orderBy('hora_inicio')
+            ->get();
+    }
+
+    /** Detalle de un examen propio, para editarlo o gestionar sus grupos. */
+    public function find(Exam $exam): Exam
+    {
+        $this->assertOwnedBy($exam, $this->currentTeacherId());
+
+        return $this->loadDetail($exam);
     }
 
     public function create(array $data): Exam
@@ -90,7 +119,7 @@ class ExamService
 
             $exam->classrooms()->attach($data['ambientes']);
 
-            return $exam;
+            return $this->groupService->assignGroups($exam, $data['grupos']);
         });
 
         return $this->loadDetail($exam);
@@ -351,7 +380,13 @@ class ExamService
 
     private function loadDetail(Exam $exam): Exam
     {
-        return $exam->fresh(['examType', 'subject', 'career', 'classrooms']);
+        return $exam->fresh([
+            'examType',
+            'subject',
+            'career',
+            'classrooms',
+            'groups' => fn ($query) => $query->withActiveStudentCount(),
+        ]);
     }
 
     private function notEditableMessage(string $status): string

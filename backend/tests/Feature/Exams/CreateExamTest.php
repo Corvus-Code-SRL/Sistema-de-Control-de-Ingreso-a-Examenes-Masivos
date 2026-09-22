@@ -102,6 +102,7 @@ class CreateExamTest extends TestCase
                 'hora_inicio',
                 'duracion',
                 'ambientes',
+                'grupos',
             ]);
 
         $this->assertSame(0, Exam::count());

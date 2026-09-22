@@ -38,6 +38,22 @@ class ExamController extends Controller
         ]);
     }
 
+    /** GET /api/examenes — vista Programados: los exámenes del docente actual. */
+    public function index(): JsonResponse
+    {
+        $exams = $this->examService->listForCurrentTeacher();
+
+        return ApiResponse::success(ExamResource::collection($exams));
+    }
+
+    /** GET /api/examenes/{exam} */
+    public function show(Exam $exam): JsonResponse
+    {
+        $exam = $this->examService->find($exam);
+
+        return ApiResponse::success(new ExamResource($exam));
+    }
+
     /** POST /api/examenes */
     public function store(CreateExamRequest $request): JsonResponse
     {

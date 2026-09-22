@@ -8,13 +8,13 @@ use App\Models\Period;
 use App\Models\Subject;
 use App\Models\SubjectCareer;
 use App\Support\RecordStatus;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class GroupControllerTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     private function activePair(): SubjectCareer
     {
