@@ -11,3 +11,4 @@ export type {
   SubjectCatalogPage,
   SubjectCatalogResponse,
 } from './types/subject.types'
+export { EditarMateriaPage } from './pages/EditarMateriaPage'

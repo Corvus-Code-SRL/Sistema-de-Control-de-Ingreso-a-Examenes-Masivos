@@ -2,7 +2,11 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useCurrentUser } from '@/features/auth'
 import { CreateExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
 import { CourseDetailPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
-import { AdminSubjectsPage, SubjectsPage } from '@/features/subjects'
+import {
+  AdminSubjectsPage,
+  EditarMateriaPage,
+  SubjectsPage,
+} from '@/features/subjects'
 import { CuentaDetallePage, CuentasPage } from '@/features/users'
 
 /**
@@ -42,7 +46,13 @@ function AdministradorRoutes() {
       <Route path="/" element={<Navigate to="/cuentas" replace />} />
       <Route path="/cuentas" element={<CuentasPage />} />
       <Route path="/cuentas/:idUsuario" element={<CuentaDetallePage />} />
+
       <Route path="/materias" element={<AdminSubjectsPage />} />
+      <Route
+        path="/materias/:idMateria/editar"
+        element={<EditarMateriaPage />}
+      />
+
       <Route path="*" element={<Navigate to="/cuentas" replace />} />
     </Routes>
   )
