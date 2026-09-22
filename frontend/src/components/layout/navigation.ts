@@ -71,9 +71,8 @@ const navegacionDocente: NavGroup[] = [
 /**
  * Navegación lateral del administrador.
  *
- * De momento solo Cuentas tiene pantalla (HU-01). Materias, facultades y
- * carreras son el catálogo institucional que administran HU-06 y HU-07, aún sin
- * construir, así que se listan deshabilitadas igual que las del docente.
+ * Cuentas y Materias tienen pantallas disponibles. Facultades, carreras y
+ * bitácora permanecen deshabilitadas hasta sus respectivas historias.
  */
 const navegacionAdministrador: NavGroup[] = [
   { items: [{ label: 'Inicio', icon: Home }] },
@@ -81,7 +80,7 @@ const navegacionAdministrador: NavGroup[] = [
     label: 'Administración',
     items: [
       { label: 'Cuentas', icon: Users, to: '/cuentas' },
-      { label: 'Materias', icon: BookOpen },
+      { label: 'Materias', icon: BookOpen, to: '/materias' },
       { label: 'Facultades', icon: Building2 },
       { label: 'Carreras', icon: GraduationCap },
       { label: 'Bitácora', icon: ScrollText },

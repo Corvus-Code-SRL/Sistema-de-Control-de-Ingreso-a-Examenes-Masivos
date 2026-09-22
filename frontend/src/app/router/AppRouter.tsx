@@ -2,7 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useCurrentUser } from '@/features/auth'
 import { CreateExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
 import { CourseDetailPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
-import { SubjectsPage } from '@/features/subjects'
+import { AdminSubjectsPage, SubjectsPage } from '@/features/subjects'
 import { CuentaDetallePage, CuentasPage } from '@/features/users'
 
 /**
@@ -33,8 +33,8 @@ function DocenteRoutes() {
 /**
  * Rutas de la administración del catálogo institucional.
  *
- * Solo Cuentas existe (HU-01). Materias, facultades y carreras llegan con
- * HU-06 y HU-07, y hasta entonces su enlace se dibuja deshabilitado.
+ * Cuentas y Materias tienen pantallas disponibles. Facultades y carreras
+ * permanecen pendientes de sus respectivas historias de usuario.
  */
 function AdministradorRoutes() {
   return (
@@ -42,6 +42,7 @@ function AdministradorRoutes() {
       <Route path="/" element={<Navigate to="/cuentas" replace />} />
       <Route path="/cuentas" element={<CuentasPage />} />
       <Route path="/cuentas/:idUsuario" element={<CuentaDetallePage />} />
+      <Route path="/materias" element={<AdminSubjectsPage />} />
       <Route path="*" element={<Navigate to="/cuentas" replace />} />
     </Routes>
   )
