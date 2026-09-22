@@ -131,7 +131,7 @@ export interface GroupMutationResponse {
     grupo: Group
     materia: SubjectCareer
   }
-  message: string
+  mensaje?: string | null
 }
 
 /** Un período disponible para el selector (`GET /api/periodos`). */

@@ -11,6 +11,7 @@ use App\Support\RecordStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use Illuminate\Support\Facades\DB;
 
 class GroupControllerTest extends TestCase
 {
@@ -44,6 +45,17 @@ class GroupControllerTest extends TestCase
         $pair = $this->activePair();
         $period = $this->activePeriod(2026);
 
+        // El docente ya dicta un grupo en este par: CA7 le permite registrar más.
+        Group::create([
+            'id_carrera' => $pair->id_carrera,
+            'id_materia' => $pair->id_materia,
+            'num_grupo' => 'Z',   // número distinto al que se va a registrar
+            'gestion' => (string) $period->gestion,
+            'estado' => RecordStatus::ACTIVE,
+            'id_usuario_docente' => config('sciem.docente_fijo_id'),
+            'id_periodo' => $period->id_periodo,
+        ]);
+
         $response = $this->postJson('/api/grupos', [
             'id_carrera' => $pair->id_carrera,
             'id_materia' => $pair->id_materia,
@@ -57,11 +69,10 @@ class GroupControllerTest extends TestCase
             'id_carrera' => $pair->id_carrera,
             'id_materia' => $pair->id_materia,
             'num_grupo' => 'A',
-            'gestion' => '2026', // derivada de periodo.gestion, no enviada por el cliente
+            'gestion' => '2026',
             'id_periodo' => $period->id_periodo,
         ]);
     }
-
     public function test_rechaza_un_grupo_duplicado_en_el_mismo_par_gestion_y_periodo(): void
     {
         $pair = $this->activePair();
@@ -152,6 +163,15 @@ class GroupControllerTest extends TestCase
 
     public function test_asigna_el_periodo_activo_por_defecto(): void
     {
+        Group::create([
+            'id_carrera' => $pair->id_carrera,
+            'id_materia' => $pair->id_materia,
+            'num_grupo' => 'Z',
+            'gestion' => (string) $period->gestion,
+            'estado' => RecordStatus::ACTIVE,
+            'id_usuario_docente' => config('sciem.docente_fijo_id'),
+            'id_periodo' => $period->id_periodo,
+        ]); 
         $pair = $this->activePair();
         $period = $this->activePeriod(2026);
 
@@ -287,6 +307,58 @@ class GroupControllerTest extends TestCase
             'id_grupo' => $group->id_grupo,
             'id_periodo' => $period2027->id_periodo,
             'gestion' => '2027',
+        ]);
+    }
+
+    public function test_actualizar_un_grupo_no_afecta_a_otros_grupos_ni_estudiantes(): void
+    {
+        $pair = $this->activePair();
+        $period = $this->activePeriod(2026);
+
+        $groupA = Group::create([
+            'id_carrera' => $pair->id_carrera,
+            'id_materia' => $pair->id_materia,
+            'num_grupo' => 'A',
+            'gestion' => (string) $period->gestion,
+            'estado' => RecordStatus::ACTIVE,
+            'id_usuario_docente' => config('sciem.docente_fijo_id'),
+            'id_periodo' => $period->id_periodo,
+        ]);
+
+        $groupB = Group::create([
+            'id_carrera' => $pair->id_carrera,
+            'id_materia' => $pair->id_materia,
+            'num_grupo' => 'B',
+            'gestion' => (string) $period->gestion,
+            'estado' => RecordStatus::ACTIVE,
+            'id_usuario_docente' => config('sciem.docente_fijo_id'),
+            'id_periodo' => $period->id_periodo,
+        ]);
+
+        // Estudiante inscrito en groupA.
+        $estudiante = \App\Models\Estudiante::factory()->create(['estado' => RecordStatus::ACTIVE]);
+        DB::table('grupo_estudiante')->insert([
+            'id_grupo' => $groupA->id_grupo,
+            'id_estudiante' => $estudiante->id_estudiante,
+            'fecha_inscripcion' => now()->toDateString(),
+            'estado' => RecordStatus::ACTIVE,
+        ]);
+
+        $this->putJson("/api/grupos/{$groupA->id_grupo}", [
+            'num_grupo' => 'A2',
+        ])->assertStatus(200);
+
+        // groupB intacto.
+        $this->assertDatabaseHas('grupo', [
+            'id_grupo' => $groupB->id_grupo,
+            'num_grupo' => 'B',
+        ]);
+
+        // La inscripción sigue.
+        $this->assertDatabaseHas('grupo_estudiante', [
+            'id_grupo' => $groupA->id_grupo,
+            'id_estudiante' => $estudiante->id_estudiante,
+            'estado' => RecordStatus::ACTIVE,
         ]);
     }
 }

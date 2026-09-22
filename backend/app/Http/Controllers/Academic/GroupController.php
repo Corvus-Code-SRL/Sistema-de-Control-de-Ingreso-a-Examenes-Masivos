@@ -53,6 +53,9 @@ class GroupController extends Controller
      */
     public function update(UpdateGroupRequest $request, int $id_grupo): JsonResponse
     {
+        $group = $this->groupService->findGroup($id_grupo);
+        $this->authorize('update', $group);
+
         $result = $this->groupService->updateGroup($id_grupo, $request->validated());
 
         return ApiResponse::success(

@@ -70,8 +70,12 @@ class GroupService
      * Arma el detalle de un grupo ya autorizado, con su par materia-carrera y periodo:
      * es la unidad sobre la que después se prepara la información de estudiantes.
      */
-    public function showGroup(Group $group): array
+    public function showGroup(Group|int $group): array
     {
+        if (is_int($group)) {
+            $group = $this->findGroup($group);
+        }
+
         $pair = $this->subjectCatalog->findSelectablePair(
             (int) $group->id_carrera,
             (int) $group->id_materia
@@ -105,6 +109,11 @@ class GroupService
         $pair = $this->subjectCatalog->findSelectablePair(
             (int) $data['id_carrera'],
             (int) $data['id_materia']
+        );
+
+        $this->assertTeacherHasAccessToPair(
+            (int) $pair->id_carrera,
+            (int) $pair->id_materia
         );
 
         $periodId = (int) ($data['id_periodo'] ?? $this->subjectCatalog->activePeriodId());
@@ -148,27 +157,27 @@ class GroupService
      */
     public function updateGroup(int $groupId, array $data): array
     {
-        $group = Group::query()->find($groupId);
+        $group = DB::transaction(function () use ($groupId, $data) {
+            $group = Group::query()->lockForUpdate()->find($groupId);
 
-        if ($group === null) {
-            throw new ModelNotFoundException('No existe el grupo indicado.');
-        }
+            if ($group === null) {
+                throw new ModelNotFoundException('No existe el grupo indicado.');
+            }
 
-        $this->assertGroupBelongsToTeacher($group);
+            $this->assertGroupBelongsToTeacher($group);
 
-        $periodId = (int) ($data['id_periodo'] ?? $group->id_periodo);
-        $period = $this->findPeriodOrFail($periodId);
+            $periodId = (int) ($data['id_periodo'] ?? $group->id_periodo);
+            $period = $this->findPeriodOrFail($periodId);
 
-        $this->assertNoDuplicateGroup(
-            (int) $group->id_carrera,
-            (int) $group->id_materia,
-            $data['num_grupo'],
-            $this->groupManagementFor($period),
-            $periodId,
-            (int) $group->id_grupo
-        );
+            $this->assertNoDuplicateGroup(
+                (int) $group->id_carrera,
+                (int) $group->id_materia,
+                $data['num_grupo'],
+                $this->groupManagementFor($period),
+                $periodId,
+                (int) $group->id_grupo
+            );
 
-        DB::transaction(function () use ($group, $data, $period) {
             try {
                 $group->fill([
                     'num_grupo' => $data['num_grupo'],
@@ -181,11 +190,12 @@ class GroupService
                     ? $this->duplicateGroupException()
                     : $exception;
             }
+
+            return $group;
         });
 
-        return $this->showGroup((int) $group->id_grupo);
+        return $this->showGroup($group);
     }
-
     /**
      * El mockup de "Nuevo grupo" (02-materias.html) solo pide N° de grupo y
      * Período académico: no hay un input de "Gestión" independiente. grupo.gestion
@@ -303,6 +313,26 @@ class GroupService
     {
         if ((string) $group->id_usuario_docente !== $this->subjectCatalog->teacherId()) {
             throw new AuthorizationException('No tiene permiso sobre este grupo.');
+        }
+    }
+
+    private function assertTeacherHasAccessToPair(int $careerId, int $subjectId): void
+    {
+        $teacherId = $this->subjectCatalog->teacherId();
+
+        $hasAccess = Group::query()
+            ->where('id_carrera', $careerId)
+            ->where('id_materia', $subjectId)
+            ->where('id_usuario_docente', $teacherId)
+            ->exists();
+
+        if (!$hasAccess) {
+            throw ValidationException::withMessages([
+                'id_materia' => [
+                    'No tiene permiso para registrar grupos en esta materia. '
+                    . 'Solo puede hacerlo en materias donde ya dicta al menos un grupo.',
+                ],
+            ]);
         }
     }
 }

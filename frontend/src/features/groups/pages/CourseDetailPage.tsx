@@ -15,6 +15,7 @@ import { CourseTabsShell } from '../components/CourseTabsShell'
 import { ActualizarGrupoForm } from '../components/GroupUpdateForm'
 import { useGroupDetail } from '../hooks/useGroupDetail'
 import { courseTitle } from '../types/group.types'
+import { Toast } from '@/components/ui/toast' 
 
 /**
  * Detalle de un curso (artboards 2.3, 2.4 y 2.11).
@@ -28,6 +29,12 @@ export function CourseDetailPage() {
 
   const { detail, isLoading, isForbidden, isNotFound, error, reload } = useGroupDetail(groupId)
   const [isEditOpen, setIsEditOpen] = useState(false)
+
+  const [toast, setToast] = useState<{ show: boolean; title: string; description: string }>({
+    show: false,
+    title: '',
+    description: '',
+  })
 
   const title =
     detail && !isForbidden ? courseTitle(detail.subject, detail.group) : 'Detalle del curso'
@@ -73,6 +80,14 @@ export function CourseDetailPage() {
           )
         }
       />
+
+      {toast.show && (
+        <Toast
+          title={toast.title}
+          description={toast.description}
+          onClose={() => setToast((prev) => ({ ...prev, show: false }))}
+        />
+      )}
 
       {isLoading && (
         <Card className="p-0">
@@ -126,6 +141,11 @@ export function CourseDetailPage() {
               onUpdated={() => {
                 setIsEditOpen(false)
                 reload()
+                setToast({
+                  show: true,
+                  title: 'Grupo actualizado',
+                  description: 'Los cambios se guardaron correctamente.',
+                })
               }}
             />
           )}

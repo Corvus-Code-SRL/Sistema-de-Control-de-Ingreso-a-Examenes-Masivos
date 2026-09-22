@@ -33,4 +33,9 @@ class GroupPolicy
 
         return Response::deny('Solo el docente que dicta el grupo puede ver su detalle.');
     }
+
+    public function update(?User $user, Group $group): Response
+    {
+        return $this->view($user, $group);
+    }
 }

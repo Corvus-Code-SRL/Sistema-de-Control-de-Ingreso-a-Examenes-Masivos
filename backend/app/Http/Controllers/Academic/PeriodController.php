@@ -29,6 +29,12 @@ class PeriodController extends Controller
 
         $activePeriodId = $this->subjectCatalog->activePeriodId();
 
+        try {
+            $activePeriodId = $this->subjectCatalog->activePeriodId();
+        } catch (\RuntimeException) {
+            $activePeriodId = null;
+        }
+
         return response()->json([
             'data' => $periods->map(fn (Period $period) => [
                 'id_periodo' => (int) $period->id_periodo,
@@ -36,7 +42,7 @@ class PeriodController extends Controller
                 'gestion' => (int) $period->gestion,
             ]),
             'meta' => [
-                'id_periodo_activo' => $activePeriodId > 0 ? $activePeriodId : null,
+                'id_periodo_activo' => $activePeriodId,
             ],
         ]);
     }

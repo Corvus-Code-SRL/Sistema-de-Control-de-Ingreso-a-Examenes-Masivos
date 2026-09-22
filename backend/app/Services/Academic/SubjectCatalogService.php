@@ -51,7 +51,15 @@ class SubjectCatalogService
 
     public function activePeriodId(): int
     {
-        return (int) config('sciem.periodo_activo_id');
+        $id = (int) config('sciem.periodo_activo_id');
+
+        if ($id <= 0) {
+            throw new \RuntimeException(
+                'No hay período académico activo configurado (sciem.periodo_activo_id).'
+            );
+        }
+
+        return $id;
     }
 
     public function teacherId(): string

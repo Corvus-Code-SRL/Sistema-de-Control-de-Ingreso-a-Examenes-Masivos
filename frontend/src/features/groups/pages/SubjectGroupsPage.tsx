@@ -16,6 +16,7 @@ import { RegistrarGrupoForm } from '../components/GroupRegisterForm'
 import { SubjectFilterChip } from '../components/SubjectFilterChip'
 import { useSubjectGroups } from '../hooks/useSubjectGroups'
 import { Toast } from '@/components/ui/toast'
+import type { GroupMutationResponse } from '../types/group.types'
 
 /**
  * Grupos de un par materia-carrera (artboards 1.4 y 1.5).
@@ -52,14 +53,14 @@ export function SubjectGroupsPage() {
   const title = subject?.nombre ?? 'Grupos de la materia'
   const subjectCareerLabel = subject ? `${subject.nombre} · ${subject.carrera.nombre}` : ''
 
-  const handleGroupRegistered = (registeredGroup: any) => {
+  const handleGroupRegistered = (result: GroupMutationResponse['data']) => {
     setIsCreateOpen(false)
     reload()
 
     setToastNotification({
       show: true,
-      title: `Grupo ${registeredGroup?.num_grupo ?? ''} registrado`,
-      description: '61 estudiantes asociados. 3 filas quedaron fuera por inconsistencias.',
+      title: `Grupo ${result.grupo.num_grupo} registrado`,
+      description: 'El grupo se registró correctamente en el período seleccionado.',
     })
   }
 
@@ -168,7 +169,7 @@ export function SubjectGroupsPage() {
             careerId={careerId}
             subjectId={subjectId}
             subjectName={subject?.nombre ?? ''}
-            teacherName="P. Careaga"
+            teacherName={groups[0]?.docente.nombre_completo ?? 'Docente'}
             subjectCareerLabel={subjectCareerLabel}
             onCancel={() => setIsCreateOpen(false)}
             onRegistered={handleGroupRegistered}
