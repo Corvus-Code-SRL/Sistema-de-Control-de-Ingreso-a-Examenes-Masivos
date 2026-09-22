@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Academic;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Academic\StoreSubjectRequest;
+use App\Http\Requests\Academic\UpdateSubjectRequest;
 use App\Http\Resources\Academic\SubjectCareerResource;
 use App\Http\Resources\Academic\SubjectResource;
+use App\Models\Subject;
 use App\Services\Academic\SubjectCatalogService;
 use App\Services\Academic\SubjectService;
 use Illuminate\Http\JsonResponse;
@@ -51,5 +53,18 @@ class SubjectController extends Controller
             'data'    => new SubjectResource($subject),
             'mensaje' => 'Materia registrada correctamente.'
         ], 201);
+    }
+
+    public function update(UpdateSubjectRequest $request, Subject $subject): JsonResponse
+    {
+        $subject = $this->subjectService->update(
+            $subject,
+            $request->validated()
+        );
+
+        return response()->json([
+            'data'    => new SubjectResource($subject),
+            'mensaje' => 'Materia actualizada correctamente.',
+        ]);
     }
 }

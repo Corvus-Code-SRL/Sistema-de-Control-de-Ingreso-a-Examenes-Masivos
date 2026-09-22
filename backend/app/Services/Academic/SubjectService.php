@@ -36,4 +36,36 @@ class SubjectService
             return $subject;
         });
     }
+
+    public function update(Subject $subject, array $data): Subject
+    {
+        return DB::transaction(function () use ($subject, $data) {
+            $before = [];
+            $after = [];
+
+            foreach (['nombre', 'codigo'] as $field) {
+                if ((string) $subject->{$field} !== (string) $data[$field]) {
+                    $before[$field] = $subject->{$field};
+                    $after[$field] = $data[$field];
+                }
+            }
+
+            if ($after === []) {
+                return $subject;
+            }
+
+            $subject->fill($after);
+            $subject->save();
+
+            $this->auditService->registrar(
+                'MODIFICAR',
+                'materia',
+                $before,
+                $after,
+                auth()->id()
+            );
+
+            return $subject->fresh();
+        });
+    }
 }
