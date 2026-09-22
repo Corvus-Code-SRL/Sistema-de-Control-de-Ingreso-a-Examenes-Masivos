@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Exams\ExamController;
+use App\Http\Controllers\Exams\ExamGroupController;
 use Illuminate\Support\Facades\Route;
 
 // Rutas del módulo: exams
@@ -20,4 +21,8 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
     Route::post('/{exam}/cancelar', [ExamController::class, 'cancel'])
          ->whereNumber('exam')
          ->name('cancelar');
+
+    Route::post('/{exam}/grupos', [ExamGroupController::class, 'store'])
+         ->whereNumber('exam')
+         ->name('grupos.store');
 });
