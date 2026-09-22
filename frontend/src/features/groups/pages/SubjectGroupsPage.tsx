@@ -13,6 +13,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { GroupListItem } from '../components/GroupListItem'
 import { GroupsTable } from '../components/GroupsTable'
 import { RegistrarGrupoForm } from '../components/GroupRegisterForm'
+import { SubjectFilterChip } from '../components/SubjectFilterChip'
 import { useSubjectGroups } from '../hooks/useSubjectGroups'
 import { Toast } from '@/components/ui/toast'
 
@@ -99,6 +100,8 @@ export function SubjectGroupsPage() {
           )
         }
       />
+
+      {subject && <SubjectFilterChip subjectName={subject.nombre} />}
 
       {/*
         El docente puede tener la materia asignada y aún no haber registrado grupos.

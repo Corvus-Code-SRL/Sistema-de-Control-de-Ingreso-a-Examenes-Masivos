@@ -34,6 +34,24 @@ class SubjectGroupsTest extends TestCase
         $this->assertFalse($propios['3']);
     }
 
+    /**
+     * La Policy del detalle no debe filtrarse al listado: el par se muestra completo.
+     */
+    public function test_el_listado_sigue_incluyendo_los_grupos_de_otros_docentes(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $response = $this->getJson($this->groupsUrl($this->sistemasId, $this->calculoId));
+
+        $response->assertOk();
+
+        $ajeno = collect($response->json('data.grupos'))->firstWhere('id_grupo', $this->grupoAjenoId);
+
+        $this->assertNotNull($ajeno);
+        $this->assertFalse($ajeno['es_mio']);
+        $this->assertSame('Luis Vargas', $ajeno['docente']['nombre_completo']);
+    }
+
     public function test_resuelve_por_par_y_no_por_materia_sola(): void
     {
         $this->seedAcademicCatalog();

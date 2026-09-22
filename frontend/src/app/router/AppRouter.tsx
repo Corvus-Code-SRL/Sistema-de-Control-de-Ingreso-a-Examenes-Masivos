@@ -1,8 +1,9 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useCurrentUser } from '@/features/auth'
+import { CreateExamPage } from '@/features/exams'
 import { CourseDetailPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
 import { SubjectsPage } from '@/features/subjects'
-import { CuentasPage } from '@/features/users'
+import { CuentaDetallePage, CuentasPage } from '@/features/users'
 
 /**
  * Rutas de la gestión académica del docente.
@@ -21,6 +22,7 @@ function DocenteRoutes() {
       />
       <Route path="/mis-cursos" element={<MyCoursesPage />} />
       <Route path="/cursos/:idGrupo" element={<CourseDetailPage />} />
+      <Route path="/examenes/nuevo" element={<CreateExamPage />} />
       <Route path="*" element={<Navigate to="/materias" replace />} />
     </Routes>
   )
@@ -37,6 +39,7 @@ function AdministradorRoutes() {
     <Routes>
       <Route path="/" element={<Navigate to="/cuentas" replace />} />
       <Route path="/cuentas" element={<CuentasPage />} />
+      <Route path="/cuentas/:idUsuario" element={<CuentaDetallePage />} />
       <Route path="*" element={<Navigate to="/cuentas" replace />} />
     </Routes>
   )

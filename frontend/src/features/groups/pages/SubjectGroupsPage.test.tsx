@@ -1,4 +1,6 @@
-import { screen, waitForElementToBeRemoved } from '@testing-library/react'
+import { render, screen, waitForElementToBeRemoved } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { SubjectGroupsPage } from './SubjectGroupsPage'
 import {
@@ -88,6 +90,30 @@ describe('SubjectGroupsPage', () => {
     await waitForLoad()
 
     expect(screen.getAllByText('Sin nómina').length).toBeGreaterThan(0)
+  })
+
+  it('quita el filtro de materia y vuelve a la selección de materias', async () => {
+    mockApiOnce({ body: subjectGroupsResponse(materia, [makeGroup()]) })
+
+    render(
+      <MemoryRouter initialEntries={[ROUTE]}>
+        <Routes>
+          <Route path={PATH} element={<SubjectGroupsPage />} />
+          <Route path="/materias" element={<p>Selección de materias</p>} />
+        </Routes>
+      </MemoryRouter>
+    )
+    await waitForLoad()
+
+    expect(screen.getByText(/materia: bases de datos i/i)).toBeInTheDocument()
+
+    const removeFilter = screen.getByRole('link', { name: /quitar el filtro de materia/i })
+    // El chip no depende de un punto de quiebre: está en escritorio y en móvil.
+    expect(removeFilter.closest('.hidden')).toBeNull()
+
+    await userEvent.click(removeFilter)
+
+    expect(screen.getByText('Selección de materias')).toBeInTheDocument()
   })
 
   it('muestra el mensaje del servidor cuando el par está inactivo', async () => {

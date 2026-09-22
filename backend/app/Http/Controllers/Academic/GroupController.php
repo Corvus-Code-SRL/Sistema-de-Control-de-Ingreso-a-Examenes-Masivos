@@ -13,7 +13,7 @@ use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
 /**
- * Expone un grupo académico de forma independiente, junto con el par al que pertenece.
+ * Expone un grupo académico al docente que lo dicta, junto con el par al que pertenece.
  */
 class GroupController extends Controller
 {
@@ -26,7 +26,11 @@ class GroupController extends Controller
 
     public function show(ShowGroupRequest $request): JsonResponse
     {
-        $result = $this->groupService->showGroup((int) $request->validated()['id_grupo']);
+        $group = $this->groupService->findGroup((int) $request->validated()['id_grupo']);
+
+        $this->authorize('view', $group);
+
+        $result = $this->groupService->showGroup($group);
 
         return $this->groupResponse($result);
     }

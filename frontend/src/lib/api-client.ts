@@ -39,42 +39,40 @@ const NETWORK_ERROR = 'No se pudo conectar con el servidor. Revise su conexión.
 const UNEXPECTED_ERROR = 'Ocurrió un error inesperado al consultar el servidor.'
 
 export type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+type Query = Record<string, string | number | undefined>
 
 export interface ApiClientOptions {
   method?: ApiMethod
   /** Cuerpo de la petición; se serializa como JSON. Ignorado en GET. */
   body?: unknown
   signal?: AbortSignal
-  query?: Record<string, string | number | undefined>
+  query?: Query
 }
 
 /**
  * Único punto de salida HTTP de la aplicación.
  *
  * Toda llamada a la API pasa por aquí: ningún feature usa `fetch` directamente.
- *
- * Se agregó `method` y `body` para las primeras operaciones de escritura (registrar/actualizar grupo);
- * el manejo de errores no cambió. No incluye envío de cookie/CSRF ni cabecera de
- * autorización porque, según sciem.php, la autenticación real todavía no está
- * implementada — revisar esto cuando exista esa historia.
  */
 export async function apiClient<TResponse>(
   path: string,
   options: ApiClientOptions = {}
 ): Promise<TResponse> {
-  const url = buildUrl(path, options.query)
   const method = options.method ?? 'GET'
   const hasBody = options.body !== undefined && method !== 'GET'
+  const url = buildUrl(path, options.query)
+
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+  }
 
   let response: Response
 
   try {
     response = await fetch(url, {
       method,
-      headers: {
-        Accept: 'application/json',
-        ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
-      },
+      headers,
       body: hasBody ? JSON.stringify(options.body) : undefined,
       signal: options.signal,
     })
@@ -99,7 +97,24 @@ export async function apiClient<TResponse>(
   return (await response.json()) as TResponse
 }
 
-function buildUrl(path: string, query?: Record<string, string | number | undefined>): string {
+/** Helpers directos para peticiones POST y PUT */
+export async function apiPost<TResponse>(
+  path: string,
+  body: unknown,
+  options: Omit<ApiClientOptions, 'method' | 'body'> = {}
+): Promise<TResponse> {
+  return apiClient<TResponse>(path, { ...options, method: 'POST', body })
+}
+
+export async function apiPut<TResponse>(
+  path: string,
+  body: unknown,
+  options: Omit<ApiClientOptions, 'method' | 'body'> = {}
+): Promise<TResponse> {
+  return apiClient<TResponse>(path, { ...options, method: 'PUT', body })
+}
+
+function buildUrl(path: string, query?: Query): string {
   const url = new URL(`${env.apiUrl}${path}`)
 
   Object.entries(query ?? {}).forEach(([key, value]) => {

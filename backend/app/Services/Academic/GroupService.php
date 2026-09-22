@@ -53,11 +53,7 @@ class GroupService
         ];
     }
 
-    /**
-     * Ubica un grupo por sí solo, con su par materia-carrera y periodo: es la unidad
-     * sobre la que después se prepara la información de estudiantes.
-     */
-    public function showGroup(int $groupId): array
+    public function findGroup(int $groupId): Group
     {
         $group = $this->baseGroupQuery()
             ->where('grupo.id_grupo', $groupId)
@@ -67,6 +63,15 @@ class GroupService
             throw new ModelNotFoundException('No existe el grupo indicado.');
         }
 
+        return $group;
+    }
+
+    /**
+     * Arma el detalle de un grupo ya autorizado, con su par materia-carrera y periodo:
+     * es la unidad sobre la que después se prepara la información de estudiantes.
+     */
+    public function showGroup(Group $group): array
+    {
         $pair = $this->subjectCatalog->findSelectablePair(
             (int) $group->id_carrera,
             (int) $group->id_materia

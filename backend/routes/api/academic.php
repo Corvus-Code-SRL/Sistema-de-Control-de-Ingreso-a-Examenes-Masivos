@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Route;
 Route::get('materias', [SubjectController::class, 'index']);
 
 Route::get('periodos', [PeriodController::class, 'index']);
+// Nuestra nueva ruta de la HU-006 protegida para que solo Administradores autenticados puedan crear
+Route::post('materias', [SubjectController::class, 'store'])->middleware('auth:sanctum');
 
 Route::get(
     'carreras/{id_carrera}/materias/{id_materia}/grupos',
