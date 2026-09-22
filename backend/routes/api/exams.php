@@ -11,8 +11,15 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
     Route::get('/formulario', [ExamController::class, 'formOptions'])
          ->name('formulario');
 
+    Route::get('/', [ExamController::class, 'index'])
+         ->name('index');
+
     Route::post('/', [ExamController::class, 'store'])
          ->name('store');
+
+    Route::get('/{exam}', [ExamController::class, 'show'])
+         ->whereNumber('exam')
+         ->name('show');
 
     Route::put('/{exam}', [ExamController::class, 'update'])
          ->whereNumber('exam')

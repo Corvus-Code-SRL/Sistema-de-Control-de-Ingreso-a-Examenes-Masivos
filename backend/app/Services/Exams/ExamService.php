@@ -14,6 +14,7 @@ use App\Services\Security\AuditLogService;
 use App\Support\RecordStatus;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -78,6 +79,27 @@ class ExamService
             'classrooms' => $classrooms,
             'groups'     => $groups,
         ];
+    }
+
+    /**
+     * Exámenes del docente actual, del más próximo al más lejano (vista Programados).
+     */
+    public function listForCurrentTeacher(): Collection
+    {
+        return Exam::query()
+            ->with(['examType', 'subject', 'career'])
+            ->where('id_usuario_docente', $this->currentTeacherId())
+            ->orderBy('fecha')
+            ->orderBy('hora_inicio')
+            ->get();
+    }
+
+    /** Detalle de un examen propio, para editarlo o gestionar sus grupos. */
+    public function find(Exam $exam): Exam
+    {
+        $this->assertOwnedBy($exam, $this->currentTeacherId());
+
+        return $this->loadDetail($exam);
     }
 
     public function create(array $data): Exam
