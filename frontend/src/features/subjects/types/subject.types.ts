@@ -56,3 +56,25 @@ export interface SubjectCatalogPage extends Page<SubjectCareer> {
 export function subjectCareerKey(pair: Pick<SubjectCareer, 'id_carrera' | 'id_materia'>): string {
   return `${pair.id_carrera}-${pair.id_materia}`
 }
+
+//HU-006 (Registrar Materia)
+export interface CarreraSeleccionada {
+  id_carrera: number;
+  nombre: string;
+  nivel_semestre: string;
+  obligatoria: boolean;
+}
+
+export interface MateriaFormState {
+  codigo: string;
+  nombre: string;
+  descripcion: string;
+  carreras: CarreraSeleccionada[];
+}
+
+export interface FormErrors {
+  global?: string;
+  codigo?: string;
+  nombre?: string;
+  carreras?: string;
+}

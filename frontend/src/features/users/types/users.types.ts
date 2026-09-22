@@ -76,6 +76,24 @@ export interface UserAccountWithContext {
   currentUserId: string | null
 }
 
+/** Persona tal como la devuelve la verificación en el SIS, antes de tener cuenta. */
+export interface SisPerson {
+  nombre: string
+  paterno: string
+  materno: string | null
+  tipo: string
+  facultad: string
+}
+
+/** Cuerpo de `POST /usuarios`: exactamente los campos que declara StoreUserRequest. */
+export interface NewUserAccount {
+  cod_sis: string
+  nombre: string
+  apellido_paterno: string
+  apellido_materno: string | null
+  correo: string
+}
+
 /** Nombre del rol Docente en el catálogo; su cambio exige revisar asignaciones. */
 export const TEACHER_ROLE = 'Docente'
 

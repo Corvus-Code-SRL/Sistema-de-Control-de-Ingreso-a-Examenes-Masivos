@@ -2,6 +2,7 @@ import type {
   ActiveAssignments,
   Role,
   RoleHistoryEntry,
+  SisPerson,
   UserAccount,
   UserAccountDetail,
 } from '@/features/users'
@@ -89,7 +90,17 @@ export function assignmentsResponse(overrides: Partial<ActiveAssignments> = {}) 
   }
 }
 
+/** Persona que devuelve la verificación en el SIS (la misma que simula el backend). */
+export const sisPerson: SisPerson = {
+  nombre: 'Laura',
+  paterno: 'Mendoza',
+  materno: 'Rivas',
+  tipo: 'Docente',
+  facultad: 'Facultad de Ciencias y Tecnología',
+}
+
 export const userMatchers = {
+  sisVerification: (url: string) => url.includes('/sis/verificar/'),
   roles: (url: string) => url.endsWith('/roles'),
   accounts: (url: string) => url.endsWith('/usuarios'),
   account: (url: string) => /\/usuarios\/[0-9a-f-]{36}$/.test(url),

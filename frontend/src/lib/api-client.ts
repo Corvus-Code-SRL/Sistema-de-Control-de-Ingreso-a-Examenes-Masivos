@@ -29,7 +29,7 @@ export class ApiError extends Error {
     return this.status === 404
   }
 
-  /** Regla de negocio rechazada, como el par materia-carrera inactivo. */
+  /** Regla de negocio rechazada, como el par materia-carrera inactivo o una duplicidad. */
   get isValidation(): boolean {
     return this.status === 422
   }
@@ -38,9 +38,16 @@ export class ApiError extends Error {
 const NETWORK_ERROR = 'No se pudo conectar con el servidor. Revise su conexión.'
 const UNEXPECTED_ERROR = 'Ocurrió un error inesperado al consultar el servidor.'
 
+export type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 type Query = Record<string, string | number | undefined>
 
-interface RequestOptions {
+export interface ApiClientOptions {
+  method?: ApiMethod
+  /**
+   * Cuerpo de la petición. Se serializa como JSON, salvo que sea un `FormData`
+   * —el caso de la carga de nómina—, que se envía tal cual. Ignorado en GET.
+   */
+  body?: unknown
   signal?: AbortSignal
   query?: Query
 }
@@ -52,39 +59,12 @@ interface RequestOptions {
  */
 export async function apiClient<TResponse>(
   path: string,
-  options: RequestOptions = {}
+  options: ApiClientOptions = {}
 ): Promise<TResponse> {
-  return request<TResponse>('GET', path, options)
-}
-
-/**
- * Envía `body` como JSON, o como multipart si es un `FormData` —el caso de la
- * carga de nómina—; los errores se traducen igual que en una consulta.
- */
-export async function apiPost<TResponse>(
-  path: string,
-  body: unknown,
-  options: RequestOptions = {}
-): Promise<TResponse> {
-  return request<TResponse>('POST', path, options, body)
-}
-
-export async function apiPut<TResponse>(
-  path: string,
-  body: unknown,
-  options: RequestOptions = {}
-): Promise<TResponse> {
-  return request<TResponse>('PUT', path, options, body)
-}
-
-async function request<TResponse>(
-  method: 'GET' | 'POST' | 'PUT',
-  path: string,
-  options: RequestOptions,
-  body?: unknown
-): Promise<TResponse> {
+  const method = options.method ?? 'GET'
+  const hasBody = options.body !== undefined && method !== 'GET'
   const url = buildUrl(path, options.query)
-  const isFormData = body instanceof FormData
+  const isFormData = options.body instanceof FormData
 
   const headers: Record<string, string> = { Accept: 'application/json' }
 
@@ -93,7 +73,7 @@ async function request<TResponse>(
    * que separa las partes: fijar aquí el Content-Type dejaría el cuerpo ilegible
    * para el servidor.
    */
-  if (body !== undefined && !isFormData) {
+  if (hasBody && !isFormData) {
     headers['Content-Type'] = 'application/json'
   }
 
@@ -103,7 +83,7 @@ async function request<TResponse>(
     response = await fetch(url, {
       method,
       headers,
-      body: toRequestBody(body),
+      body: toRequestBody(options.body),
       signal: options.signal,
     })
   } catch (cause) {
@@ -119,7 +99,29 @@ async function request<TResponse>(
     throw await toApiError(response)
   }
 
+  // Una respuesta sin cuerpo (ej. 204) no tiene JSON que parsear.
+  if (response.status === 204) {
+    return undefined as TResponse
+  }
+
   return (await response.json()) as TResponse
+}
+
+/** Helpers directos para peticiones POST y PUT. */
+export async function apiPost<TResponse>(
+  path: string,
+  body: unknown,
+  options: Omit<ApiClientOptions, 'method' | 'body'> = {}
+): Promise<TResponse> {
+  return apiClient<TResponse>(path, { ...options, method: 'POST', body })
+}
+
+export async function apiPut<TResponse>(
+  path: string,
+  body: unknown,
+  options: Omit<ApiClientOptions, 'method' | 'body'> = {}
+): Promise<TResponse> {
+  return apiClient<TResponse>(path, { ...options, method: 'PUT', body })
 }
 
 /** Un `FormData` viaja tal cual; cualquier otro cuerpo se serializa como JSON. */

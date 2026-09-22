@@ -1,7 +1,10 @@
 import { apiClient, apiPost } from '@/lib/api-client'
 import type {
   ActiveAssignments,
+  NewUserAccount,
   Role,
+  SisPerson,
+  UserAccount,
   UserAccountDetailResponse,
   UserAccounts,
   UserAccountsResponse,
@@ -44,6 +47,25 @@ export async function getActiveAssignments(
     `/usuarios/${userId}/asignaciones`,
     { signal }
   )
+
+  return response.data
+}
+
+/**
+ * Verifica un código SIS antes de registrarlo. Los rechazos llegan como ApiError:
+ * 503 si el SIS no responde y 422 con `errors.cod_sis` si es duplicado o desconocido.
+ */
+export async function verifySisCode(codSis: string, signal?: AbortSignal): Promise<SisPerson> {
+  const response = await apiClient<{ data: SisPerson }>(
+    `/sis/verificar/${encodeURIComponent(codSis)}`,
+    { signal }
+  )
+
+  return response.data
+}
+
+export async function registerUser(account: NewUserAccount): Promise<UserAccount> {
+  const response = await apiPost<{ data: UserAccount }>('/usuarios', account)
 
   return response.data
 }

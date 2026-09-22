@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { CreateExamFormData } from '../types/exams.types'
-import { localToday, validateExamForm } from './examValidators'
+import type { CreateExamFormData, Group } from '../types/exams.types'
+import { localToday, validateExamForm, validateGroupsStep } from './examValidators'
 
 // 10:00 hora local del navegador.
 const now = new Date(2026, 8, 21, 10, 0)
@@ -51,5 +51,37 @@ describe('validateExamForm', () => {
 describe('localToday', () => {
   it('usa la fecha local, no la UTC', () => {
     expect(localToday(new Date(2026, 8, 21, 23, 30))).toBe('2026-09-21')
+  })
+})
+
+const availableGroup: Group = {
+  id_grupo: 10,
+  id_carrera: 1,
+  id_materia: 2,
+  num_grupo: '1',
+  gestion: '2026',
+  estado: 'ACTIVO',
+  cantidad_estudiantes: 30,
+  tiene_nomina: true,
+}
+
+describe('validateGroupsStep', () => {
+  it('acepta un grupo disponible con nómina', () => {
+    const result = validateGroupsStep(form({ grupos: [availableGroup.id_grupo] }), [
+      availableGroup,
+    ])
+
+    expect(result.isValid).toBe(true)
+  })
+
+  it('rechaza grupos vacíos, ajenos al par o sin nómina', () => {
+    expect(validateGroupsStep(form({ grupos: [] }), [availableGroup]).isValid).toBe(false)
+    expect(validateGroupsStep(form({ grupos: [999] }), [availableGroup]).isValid).toBe(false)
+    expect(
+      validateGroupsStep(
+        form({ grupos: [availableGroup.id_grupo] }),
+        [{ ...availableGroup, tiene_nomina: false, cantidad_estudiantes: 0 }]
+      ).isValid
+    ).toBe(false)
   })
 })

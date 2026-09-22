@@ -9,6 +9,7 @@ export type {
   ActiveAssignments,
   Role,
   RoleHistoryEntry,
+  SisPerson,
   UserAccount,
   UserAccountDetail,
 } from './types/users.types'

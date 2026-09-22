@@ -1,233 +1,130 @@
-import React, { useState } from 'react';
+import { CalendarPlus, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { AppShell } from '@/components/layout/AppShell';
+import { EmptyState } from '@/components/common/EmptyState';
+import { ErrorState } from '@/components/common/ErrorState';
+import { LoadingState } from '@/components/common/LoadingState';
+import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import {
-  Plus,
-  Calendar,
-  Search,
-  MoreVertical,
-  CalendarPlus,
-  AlertCircle
-} from 'lucide-react';
-import { ExamStatus } from '../types/exams.types';
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { useExams } from '../hooks/useExams';
+import { ExamStatusBadge } from '../components/ExamStatusBadge';
+import { Exam } from '../types/exams.types';
 
-interface ExamItem {
-  id: number;
-  nombre: string;
-  materia: string;
-  grupo: string;
-  fecha: string;
-  horario: string;
-  duracion: string;
-  aula: string;
-  postulantes: number;
-  auxiliares: { initials: string; active?: boolean }[];
-  auxiliaresText: string;
-  estado: ExamStatus;
+function totalStudents(exam: Exam): number {
+  return (exam.grupos ?? []).reduce((total, group) => total + group.cantidad_estudiantes, 0);
 }
 
-export const ExamsPage: React.FC = () => {
+/**
+ * Exámenes del docente actual, ordenados por fecha (HU-24 criterios 10-12).
+ *
+ * Es el punto de entrada para reabrir un examen PROGRAMADO y editarlo o
+ * gestionar sus grupos (HU-25 criterio 7).
+ */
+export function ExamsPage() {
   const navigate = useNavigate();
-  const [exams] = useState<ExamItem[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const statusBadges: Record<ExamStatus, { label: string; className: string }> = {
-    PROGRAMADO: { label: 'PROGRAMADO', className: 'bg-[#DFF1E7] text-[#15803D]' },
-    EN_INGRESO: { label: 'EN INGRESO', className: 'bg-[#D8ECEE] text-[#005E68]' },
-    EN_CURSO: { label: 'EN CURSO', className: 'bg-[#D8ECEE] text-[#005E68]' },
-    FINALIZADO: { label: 'FINALIZADO', className: 'bg-[#EEEEEE] text-[#4A4A4A]' },
-    CANCELADO: { label: 'CANCELADO', className: 'bg-[#FDE2E2] text-[#B42318]' },
-  };
-
-  const renderStatusBadge = (estado: ExamStatus) => (
-    <span className={`px-3 py-1 rounded-full text-[11px] font-bold ${statusBadges[estado].className}`}>
-      {statusBadges[estado].label}
-    </span>
-  );
-
-  const filteredExams = exams.filter((exam) => {
-    if (!searchTerm.trim()) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      exam.nombre.toLowerCase().includes(term) ||
-      exam.materia.toLowerCase().includes(term) ||
-      exam.aula.toLowerCase().includes(term)
-    );
-  });
+  const { exams, isLoading, isEmpty, error, reload } = useExams();
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#2C2C2C]">Exámenes programados</h1>
-          <p className="text-sm text-[#6C757D] mt-0.5">
-            Planifica y supervisa las fechas de ingreso masivo a evaluaciones
-          </p>
-        </div>
-        <Button
-          onClick={() => navigate('/examenes/nuevo')}
-          className="bg-[#005E68] hover:bg-[#00555E] text-white font-semibold text-xs px-4 py-2.5 rounded-lg gap-2 shadow-xs"
-        >
-          <Plus className="h-4 w-4" /> Nuevo examen
-        </Button>
-      </div>
-
-      {exams.length === 0 ? (
-        <div className="bg-white rounded-xl border border-[#DDDDDD] p-16 text-center shadow-xs space-y-5 max-w-3xl mx-auto my-6">
-          <div className="h-16 w-16 bg-[#D8ECEE] rounded-2xl flex items-center justify-center mx-auto text-[#005E68]">
-            <CalendarPlus className="h-8 w-8" />
-          </div>
-
-          <div className="space-y-2 max-w-lg mx-auto">
-            <h2 className="text-lg font-bold text-[#2C2C2C]">No tienes exámenes programados</h2>
-            <p className="text-xs text-[#6C757D] leading-relaxed">
-              Comienza planificando una fecha de evaluación para tu asignatura. Podrás habilitar el control de ingreso por QR/Cédula, asignar aulas con aforo controlado y sincronizar auxiliares de apoyo.
-            </p>
-          </div>
-
-          <Button
-            onClick={() => navigate('/examenes/nuevo')}
-            className="bg-[#005E68] hover:bg-[#00555E] text-white font-semibold text-xs px-5 py-2.5 rounded-lg gap-2 mt-2"
-          >
-            <Plus className="h-4 w-4" /> Programar mi primer examen
+    <AppShell
+      mobileTitle="Programados"
+      breadcrumbs={[{ label: 'Exámenes' }, { label: 'Programados' }]}
+    >
+      <PageHeader
+        title="Exámenes programados"
+        subtitle="Sus exámenes del período vigente, del más próximo al más lejano."
+        actions={
+          <Button onClick={() => navigate('/examenes/nuevo')}>
+            <Plus className="size-4" aria-hidden="true" />
+            Nuevo examen
           </Button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-[#DDDDDD] p-3 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-            <div className="flex items-center gap-3 flex-1 min-w-[280px]">
-              <div className="relative flex-1">
-                <Search className="h-4 w-4 text-[#6C757D] absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Buscar por materia, examen o aula..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 bg-[#F9FBFB] border border-[#DDDDDD] rounded-lg text-xs outline-none focus:border-[#005E68] focus:bg-white transition-colors"
-                />
-              </div>
+        }
+      />
 
-              <select className="bg-[#F9FBFB] border border-[#DDDDDD] rounded-lg text-xs px-3 py-1.5 text-[#2C2C2C] outline-none font-medium">
-                <option>Todas las Materias</option>
-              </select>
+      <Card className="overflow-hidden p-0">
+        {isLoading && <LoadingState rows={4} label="Cargando sus exámenes" />}
 
-              <select className="bg-[#F9FBFB] border border-[#DDDDDD] rounded-lg text-xs px-3 py-1.5 text-[#2C2C2C] outline-none font-medium">
-                <option>Todos los Estados</option>
-              </select>
-            </div>
+        {!isLoading && error && <ErrorState error={error} onRetry={reload} />}
 
-            <span className="text-xs text-[#6C757D] font-medium pr-2">
-              {filteredExams.length} exámenes encontrados
-            </span>
-          </div>
+        {!isLoading && !error && isEmpty && (
+          <EmptyState
+            icon={CalendarPlus}
+            title="No tiene exámenes programados"
+            description="Programe una fecha de evaluación para su asignatura: podrá vincular sus grupos, asignar ambientes y luego habilitar el control de ingreso."
+            action={
+              <Button onClick={() => navigate('/examenes/nuevo')}>
+                <Plus className="size-4" aria-hidden="true" />
+                Programar mi primer examen
+              </Button>
+            }
+          />
+        )}
 
-          <div className="bg-white rounded-xl border border-[#DDDDDD] overflow-hidden shadow-xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-[#DDDDDD] bg-[#FAFCFC] text-[#6C757D] font-bold uppercase tracking-wider text-[11px]">
-                    <th className="py-3 px-5">EXAMEN / ASIGNATURA</th>
-                    <th className="py-3 px-5">FECHA Y HORARIO</th>
-                    <th className="py-3 px-5">AULAS Y CUPO</th>
-                    <th className="py-3 px-5">AUXILIARES</th>
-                    <th className="py-3 px-5">ESTADO</th>
-                    <th className="py-3 px-5 text-right">ACCIONES</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#DDDDDD]">
-                  {filteredExams.map((exam) => (
-                    <tr key={exam.id} className="hover:bg-[#F9FBFB] transition-colors">
-                      <td className="py-4 px-5">
-                        <p className="font-bold text-xs text-[#2C2C2C]">{exam.nombre}</p>
-                        <p className="text-[11px] text-[#005E68] font-semibold mt-0.5">
-                          {exam.materia} • {exam.grupo}
-                        </p>
-                      </td>
+        {!isLoading && !error && !isEmpty && (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="sciem-overline text-muted-foreground">Examen / materia</TableHead>
+                <TableHead className="sciem-overline text-muted-foreground">Fecha y horario</TableHead>
+                <TableHead className="sciem-overline text-muted-foreground">Ambientes</TableHead>
+                <TableHead className="sciem-overline text-right text-muted-foreground">Estudiantes</TableHead>
+                <TableHead className="sciem-overline text-muted-foreground">Estado</TableHead>
+                <TableHead className="text-right">
+                  <span className="sr-only">Acciones</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {exams.map((exam) => (
+                <TableRow key={exam.id_examen}>
+                  <TableCell>
+                    <p className="font-medium">{exam.nombre_examen}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {exam.materia?.nombre} · {exam.carrera?.nombre}
+                    </p>
+                  </TableCell>
 
-                      <td className="py-4 px-5">
-                        <p className="font-semibold text-xs text-[#2C2C2C] flex items-center gap-1.5">
-                          <Calendar className="h-3.5 w-3.5 text-[#6C757D]" />
-                          {exam.fecha}
-                        </p>
-                        <p className="text-[11px] text-[#6C757D] mt-0.5">
-                          {exam.horario} ({exam.duracion})
-                        </p>
-                      </td>
+                  <TableCell>
+                    <p className="sciem-tnum">{exam.fecha}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {exam.hora_inicio}–{exam.hora_fin} ({exam.duracion} min)
+                    </p>
+                  </TableCell>
 
-                      <td className="py-4 px-5">
-                        <span className="inline-block bg-[#EBF4F5] text-[#005E68] font-semibold px-2.5 py-0.5 rounded-md text-[11px] border border-[#D0E6E8]">
-                          🏛 {exam.aula}
-                        </span>
-                        <p className="text-[11px] text-[#6C757D] mt-1">
-                          {exam.postulantes} postulantes
-                        </p>
-                      </td>
+                  <TableCell>
+                    {(exam.ambientes ?? []).map((room) => room.nro_aula).join(', ') || '—'}
+                  </TableCell>
 
-                      <td className="py-4 px-5">
-                        {exam.auxiliares.length > 0 ? (
-                          <div className="flex items-center gap-2">
-                            <div className="flex -space-x-1.5 overflow-hidden">
-                              {exam.auxiliares.map((auxiliary, index) => (
-                                <div
-                                  key={index}
-                                  className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-[#D8ECEE] text-[#005E68] font-bold text-[10px] flex items-center justify-center"
-                                >
-                                  {auxiliary.initials}
-                                </div>
-                              ))}
-                            </div>
-                            <span className="text-[11px] text-[#6C757D] font-medium">
-                              {exam.auxiliaresText}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-[11px] text-[#9A6F00] font-semibold flex items-center gap-1">
-                            <AlertCircle className="h-3.5 w-3.5" />
-                            {exam.auxiliaresText}
-                          </span>
-                        )}
-                      </td>
+                  <TableCell className="text-right">
+                    <p className="sciem-tnum font-medium">{totalStudents(exam)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(exam.grupos ?? []).length} grupo(s)
+                    </p>
+                  </TableCell>
 
-                      <td className="py-4 px-5">
-                        {renderStatusBadge(exam.estado)}
-                      </td>
+                  <TableCell>
+                    <ExamStatusBadge status={exam.estado} />
+                  </TableCell>
 
-                      <td className="py-4 px-5 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => navigate('/examenes/nuevo')}
-                            className="px-3 py-1 bg-[#F3F8F8] border border-[#DDDDDD] hover:bg-white text-[#2C2C2C] font-semibold text-xs rounded-md transition-colors"
-                          >
-                            Configurar
-                          </button>
-                          <button className="p-1 text-[#6C757D] hover:text-[#2C2C2C] rounded-md hover:bg-gray-100">
-                            <MoreVertical className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="px-5 py-3 border-t border-[#DDDDDD] bg-[#FAFCFC] flex items-center justify-between text-xs text-[#6C757D]">
-              <span>Página 1 de 1</span>
-              <div className="flex items-center gap-2">
-                <button disabled className="px-3 py-1 border border-[#DDDDDD] rounded-md bg-white opacity-50 cursor-not-allowed font-medium">
-                  Anterior
-                </button>
-                <button className="px-3 py-1 bg-[#005E68] text-white rounded-md font-bold">
-                  1
-                </button>
-                <button disabled className="px-3 py-1 border border-[#DDDDDD] rounded-md bg-white opacity-50 cursor-not-allowed font-medium">
-                  Siguiente
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+                  <TableCell className="text-right">
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/examenes/${exam.id_examen}`)}>
+                      {exam.estado === 'PROGRAMADO' ? 'Configurar' : 'Ver detalle'}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
+    </AppShell>
   );
-};
+}

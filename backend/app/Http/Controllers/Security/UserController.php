@@ -2,13 +2,9 @@
 
 namespace App\Http\Controllers\Security;
 
-use App\Exceptions\Security\SisNoDisponibleException;
-use App\Exceptions\Security\SisNoValidoException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Security\StoreUserRequest;
 use App\Http\Resources\Security\UserResource;
-use App\Models\User;
-use App\Services\Security\Contracts\SisGateway;
 use App\Services\Security\UserService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -35,36 +31,8 @@ class UserController extends Controller
     }
 
     /** GET /api/sis/verificar/{cod_sis} */
-    public function verificarSis(string $codSis, SisGateway $sis): JsonResponse
+    public function verificarSis(string $codSis): JsonResponse
     {
-        // 1. Validar SIS caído
-        if (! $sis->estaDisponible()) {
-            throw new SisNoDisponibleException();
-        }
-
-        // 2. Validar cuenta duplicada (Busca en tu base de datos)
-        $existente = User::where('cod_sis', $codSis)->first();
-        if ($existente) {
-            return response()->json([
-                'message' => 'Los datos proporcionados no son válidos.',
-                'errors'  => ['cod_sis' => ["Ya existe una cuenta con este código SIS: {$existente->nombre_completo}."]],
-            ], 422);
-        }
-
-        // 3. Validar si no existe en la UMSS
-        if (! $sis->existePersona($codSis)) {
-            throw new SisNoValidoException();
-        }
-
-        // 4. Éxito
-        return response()->json([
-            'data' => [
-                'nombre'   => 'Laura',
-                'paterno'  => 'Mendoza',
-                'materno'  => 'Rivas',
-                'tipo'     => 'Docente',
-                'facultad' => 'Facultad de Ciencias y Tecnología'
-            ]
-        ]);
+        return ApiResponse::success($this->service->verifySisCode($codSis));
     }
 }

@@ -1,4 +1,5 @@
-import { Info, Layers } from 'lucide-react'
+import { useState } from 'react'
+import { Layers, Plus } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -6,16 +7,24 @@ import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { GroupListItem } from '../components/GroupListItem'
 import { GroupsTable } from '../components/GroupsTable'
+import { RegistrarGrupoForm } from '../components/GroupRegisterForm'
+import { SubjectFilterChip } from '../components/SubjectFilterChip'
 import { useSubjectGroups } from '../hooks/useSubjectGroups'
+import { Toast } from '@/components/ui/toast'
 
 /**
  * Grupos de un par materia-carrera (artboards 1.4 y 1.5).
  *
  * Lista todos los grupos del par, propios y ajenos, porque el docente necesita
  * ver la materia completa aunque solo pueda abrir los suyos.
+ *
+ * "Nuevo grupo" en el header abre el formulario correspondiente en un Dialog;
+ * al confirmar, se recarga el listado con el `reload()` que expone el hook.
  */
 export function SubjectGroupsPage() {
   const params = useParams()
@@ -27,7 +36,32 @@ export function SubjectGroupsPage() {
     subjectId
   )
 
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+
+  // Estado para la notificación Toast de éxito
+  const [toastNotification, setToastNotification] = useState<{
+    show: boolean
+    title: string
+    description: string
+  }>({
+    show: false,
+    title: '',
+    description: '',
+  })
+
   const title = subject?.nombre ?? 'Grupos de la materia'
+  const subjectCareerLabel = subject ? `${subject.nombre} · ${subject.carrera.nombre}` : ''
+
+  const handleGroupRegistered = (registeredGroup: any) => {
+    setIsCreateOpen(false)
+    reload()
+
+    setToastNotification({
+      show: true,
+      title: `Grupo ${registeredGroup?.num_grupo ?? ''} registrado`,
+      description: '61 estudiantes asociados. 3 filas quedaron fuera por inconsistencias.',
+    })
+  }
 
   return (
     <AppShell
@@ -35,6 +69,15 @@ export function SubjectGroupsPage() {
       mobileSubtitle={subject?.carrera.nombre}
       breadcrumbs={[{ label: 'Materias', to: '/materias' }, { label: title }]}
     >
+      {/* Toast emergente de éxito */}
+      {toastNotification.show && (
+        <Toast
+          title={toastNotification.title}
+          description={toastNotification.description}
+          onClose={() => setToastNotification((prev) => ({ ...prev, show: false }))}
+        />
+      )}
+
       <PageHeader
         title={title}
         backTo="/materias"
@@ -48,18 +91,32 @@ export function SubjectGroupsPage() {
             </span>
           )
         }
+        actions={
+          subject && (
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <Plus className="size-4" aria-hidden="true" />
+              Añadir grupo
+            </Button>
+          )
+        }
       />
+
+      {subject && <SubjectFilterChip subjectName={subject.nombre} />}
 
       {/*
         El docente puede tener la materia asignada y aún no haber registrado grupos.
         Es un aviso informativo, no un bloqueo: el listado del par sigue visible.
       */}
       {!isLoading && !error && !isEmpty && hasNoOwnGroups && (
-        <Alert>
-          <Info className="size-4" aria-hidden="true" />
+        <Alert variant="info" className="mb-4">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 16v-4"></path>
+            <path d="M12 8h.01"></path>
+          </svg>
           <AlertTitle>Usted no tiene grupos en esta materia</AlertTitle>
           <AlertDescription>
-            Los grupos que se listan abajo pertenecen a otros docentes y son de solo lectura.
+            La materia figura entre sus asignaciones, pero todavía no registró grupos. Puede seguir consultando el catálogo o registrar el primer grupo.
           </AlertDescription>
         </Alert>
       )}
@@ -78,6 +135,14 @@ export function SubjectGroupsPage() {
                 ? `${subject.nombre} no tiene grupos registrados en ${subject.carrera.nombre} para el período vigente.`
                 : 'Esta materia no tiene grupos registrados para el período vigente.'
             }
+            action={
+              subject && (
+                <Button onClick={() => setIsCreateOpen(true)}>
+                  <Plus className="size-4" aria-hidden="true" />
+                  Registrar el primer grupo
+                </Button>
+              )
+            }
           />
         )}
 
@@ -95,6 +160,21 @@ export function SubjectGroupsPage() {
           </>
         )}
       </Card>
+
+      {/* HU-18 */}
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="sm:max-w-[640px] p-0 overflow-hidden">
+          <RegistrarGrupoForm
+            careerId={careerId}
+            subjectId={subjectId}
+            subjectName={subject?.nombre ?? ''}
+            teacherName="P. Careaga"
+            subjectCareerLabel={subjectCareerLabel}
+            onCancel={() => setIsCreateOpen(false)}
+            onRegistered={handleGroupRegistered}
+          />
+        </DialogContent>
+      </Dialog>
     </AppShell>
   )
 }
