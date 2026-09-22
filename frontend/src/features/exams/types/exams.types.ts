@@ -21,17 +21,18 @@ export interface Classroom {
   id_ambiente: number;
   nro_aula: string;
   capacidad: number;
+  ubicacion?: string;
 }
 
 export interface Group {
   id_grupo: number;
-  num_grupo: number;
+  num_grupo: string;
   gestion: string;
   estado: string;
-  id_carrera?: number;
-  id_materia?: number;
-  tiene_nomina?: boolean;
-  inscritos_count?: number;
+  id_carrera: number;
+  id_materia: number;
+  cantidad_estudiantes: number;
+  tiene_nomina: boolean;
 }
 
 export interface ExamType {
@@ -57,6 +58,7 @@ export interface Exam {
   materia?: { id_materia: number; nombre: string; codigo: string };
   carrera?: { id_carrera: number; nombre: string };
   ambientes?: Classroom[];
+  grupos?: Group[];
 }
 
 export interface ExamFormOptions {
@@ -92,12 +94,33 @@ export interface CreateExamDto {
   hora_inicio: string;
   duracion: number;
   ambientes: number[];
+  grupos: number[];
   normas?: string;
   /** Reenvío tras revisar nombre duplicado o superposición de horario/ambiente. */
   confirmar_advertencias?: boolean;
 }
 
 export type CreateExamPayload = CreateExamDto;
+
+/** La info general se edita sin tocar los grupos: eso pasa por assignGroups. */
+export interface UpdateExamDto {
+  nombre_examen: string;
+  id_carrera: number;
+  id_materia: number;
+  categoria: ExamCategory;
+  fecha: string;
+  hora_inicio: string;
+  duracion: number;
+  ambientes: number[];
+  normas?: string;
+  confirmar_advertencias?: boolean;
+}
+
+export type UpdateExamPayload = UpdateExamDto;
+
+export interface AssignGroupsPayload {
+  grupos: number[];
+}
 
 export interface StepValidationResult {
   isValid: boolean;

@@ -1,3 +1,4 @@
+import { Pencil } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -6,6 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { GroupDetailAction } from './GroupDetailAction'
 import { GroupOwnerCell } from './GroupOwnerCell'
@@ -14,10 +16,11 @@ import { groupLabel, type Group } from '../types/group.types'
 
 interface GroupsTableProps {
   groups: Group[]
+  onEdit?: (group: Group) => void
 }
 
 /** Grupos del par en tabla, para escritorio. */
-export function GroupsTable({ groups }: GroupsTableProps) {
+export function GroupsTable({ groups, onEdit }: GroupsTableProps) {
   return (
     <Table>
       <TableHeader>
@@ -50,7 +53,20 @@ export function GroupsTable({ groups }: GroupsTableProps) {
             </TableCell>
 
             <TableCell className="text-right">
-              <GroupDetailAction group={group} />
+              <div className="flex items-center justify-end gap-1">
+                {/* Un grupo ajeno no se edita desde aquí. */}
+                {group.es_mio && onEdit && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Editar grupo ${groupLabel(group)}`}
+                    onClick={() => onEdit(group)}
+                  >
+                    <Pencil className="size-4" aria-hidden="true" />
+                  </Button>
+                )}
+                <GroupDetailAction group={group} />
+              </div>
             </TableCell>
           </TableRow>
         ))}

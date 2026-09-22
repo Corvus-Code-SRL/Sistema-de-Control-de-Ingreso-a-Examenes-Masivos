@@ -1,3 +1,5 @@
+import { Pencil } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { GroupDetailAction } from './GroupDetailAction'
 import { EnrolledCount, RosterStatusBadge } from './RosterStatusBadge'
@@ -5,10 +7,11 @@ import { groupLabel, type Group } from '../types/group.types'
 
 interface GroupListItemProps {
   group: Group
+  onEdit?: (group: Group) => void
 }
 
 /** Grupo del par en móvil. */
-export function GroupListItem({ group }: GroupListItemProps) {
+export function GroupListItem({ group, onEdit }: GroupListItemProps) {
   return (
     <li
       className={cn(
@@ -29,7 +32,17 @@ export function GroupListItem({ group }: GroupListItemProps) {
         <RosterStatusBadge group={group} />
       </div>
 
-      <div className="shrink-0">
+      <div className="flex shrink-0 items-center gap-1">
+        {group.es_mio && onEdit && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Editar grupo ${groupLabel(group)}`}
+            onClick={() => onEdit(group)}
+          >
+            <Pencil className="size-4" aria-hidden="true" />
+          </Button>
+        )}
         <GroupDetailAction group={group} compact />
       </div>
     </li>

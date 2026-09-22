@@ -7,13 +7,13 @@ use App\Models\User;
 use App\Services\Security\Contracts\SisGateway;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\UserSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Mockery;
 use Tests\TestCase;
 
 class StoreUserTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     private array $datosValidos = [
         'cod_sis'          => '202312345',

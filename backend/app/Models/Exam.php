@@ -73,4 +73,9 @@ class Exam extends Model
     {
         return $this->belongsToMany(Classroom::class, 'examen_ambiente', 'id_examen', 'id_ambiente');
     }
+
+    public function groups(): BelongsToMany
+    {
+        return $this->belongsToMany(Group::class, 'grupo_examen', 'id_examen', 'id_grupo');
+    }
 }

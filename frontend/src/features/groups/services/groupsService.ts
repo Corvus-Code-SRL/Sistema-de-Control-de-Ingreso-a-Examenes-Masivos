@@ -1,9 +1,12 @@
 import { apiClient } from '@/lib/api-client'
 import type {
+  CreateGroupPayload,
   GroupDetail,
   GroupDetailResponse,
+  GroupMutationResponse,
   SubjectGroups,
   SubjectGroupsResponse,
+  UpdateGroupPayload,
 } from '../types/group.types'
 
 /**
@@ -38,4 +41,42 @@ export async function getGroup(groupId: number, signal?: AbortSignal): Promise<G
     subject: response.data.materia,
     meta: response.meta,
   }
+}
+
+/**
+ * Los errores de duplicidad (CA 8) y de materia inactiva/ajena (CA 7) llegan
+ * como ApiError 422/404 respectivamente; el llamador los distingue con
+ * `error.isValidation` / `error.isNotFound`.
+ */
+export async function createGroup(
+  payload: CreateGroupPayload,
+  signal?: AbortSignal
+): Promise<GroupMutationResponse['data']> {
+  const response = await apiClient<GroupMutationResponse>('/grupos', {
+    method: 'POST',
+    body: payload,
+    signal,
+  })
+
+  return response.data
+}
+
+/**
+ * Actualiza los datos habilitados de un grupo existente.
+ *
+ * `payload` nunca incluye id_carrera/id_materia/id_usuario_docente: son
+ * inmutables y el backend los ignora aunque se envíen.
+ */
+export async function updateGroup(
+  groupId: number,
+  payload: UpdateGroupPayload,
+  signal?: AbortSignal
+): Promise<GroupMutationResponse['data']> {
+  const response = await apiClient<GroupMutationResponse>(`/grupos/${groupId}`, {
+    method: 'PUT',
+    body: payload,
+    signal,
+  })
+
+  return response.data
 }

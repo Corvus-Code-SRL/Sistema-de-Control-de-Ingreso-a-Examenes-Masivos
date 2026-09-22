@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ExamFormOptions, Group } from '../types/exams.types';
+import { ExamFormOptions } from '../types/exams.types';
 import { examsService } from '../services/examsService';
 
 export function useExamFormOptions() {
@@ -38,15 +38,9 @@ export function useExamFormOptions() {
     };
   }, []);
 
-  const getGroupsBySubject = (subjectId: number | null): Group[] => {
-    if (!subjectId) return [];
-    return options.grupos.filter((g) => !g.id_materia || g.id_materia === subjectId);
-  };
-
   return {
     options,
     loading,
     error,
-    getGroupsBySubject,
   };
 }
