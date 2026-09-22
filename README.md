@@ -14,6 +14,7 @@ Proyecto desarrollado por **Corvus Code S.R.L.** para la Convocatoria Pública *
 - [Estructura del repositorio](#estructura-del-repositorio)
 - [Requisitos previos](#requisitos-previos)
 - [Instalación y ejecución](#instalación-y-ejecución)
+- [Datos de prueba compartidos](#datos-de-prueba-compartidos)
 - [Pruebas](#pruebas)
 - [Convenciones](#convenciones)
 - [Flujo de trabajo](#flujo-de-trabajo)
@@ -223,6 +224,83 @@ En desarrollo, Vite redirige las peticiones de `/api` al backend (`http://localh
 Para desarrollar sin instalar PHP, PostgreSQL ni Redis en el sistema, el backend puede ejecutarse con Docker Compose. La guía está en [`deployment/docker/README.md`](deployment/docker/README.md).
 
 El despliegue con un solo contenedor Apache (frontend compilado + API en el mismo origen) sigue pendiente: el `docker-compose.yml` de despliegue, el `Dockerfile` de Apache y `sciem.conf` todavía no existen.
+
+---
+
+## Datos de prueba compartidos
+
+> **Datos temporales, solo para desarrollo.** Son inventados: no corresponden a personas reales y el dominio de correo `sciem.test` no existe. Se eliminarán cuando haya datos reales. No los cargue en producción ni en una base compartida.
+
+Todo el equipo trabaja con los mismos registros: cada valor está escrito a mano en `backend/database/seeders/TestData/` (sin Faker), incluidos los ids y los uuid. Cargarlos dos veces no duplica nada: cada tabla se escribe con *upsert* por clave primaria y el historial de roles de las cuentas de prueba se restablece a su estado original.
+
+### Cómo cargarlos
+
+1. Partir de una base creada con `docs/database/creation-script.sql`. Si la base local ya tiene datos armados a mano con los mismos códigos (por ejemplo la carrera `SIS` o el periodo `2-2026` con otro id), el seeder se detiene sin escribir nada y lo explica.
+2. En `backend/.env`, `APP_ENV=local` (o `development`) y estos tres valores, que ya trae `.env.example`:
+
+    ```dotenv
+    SCIEM_DOCENTE_FIJO_ID=00000000-0000-4000-8000-000000000011
+    SCIEM_PERIODO_ACTIVO_ID=9303
+    SCIEM_USUARIO_PRUEBA=00000000-0000-4000-8000-000000000001
+    ```
+
+3. Ejecutar:
+
+    ```bash
+    cd backend
+    php artisan db:seed --class="Database\Seeders\TestData\TestDataSeeder"
+    ```
+
+El seeder no está registrado en `DatabaseSeeder`, así que `php artisan db:seed` a secas no lo carga. Se niega a correr con cualquier `APP_ENV` que no sea `local` o `development`, y la suite de pruebas nunca lo usa: construye su propio esquema en `sciem_test`. También ejecuta `RoleSeeder`, `ActionSeeder` y `ExamTypeSeeder`, que son idempotentes.
+
+`UserSeeder` escribe en el mismo uuid del Administrador de prueba. Si después se corre `php artisan db:seed`, el nombre y el código SIS de esa cuenta vuelven a los de `UserSeeder`; basta con volver a cargar los datos de prueba.
+
+### Cuentas
+
+Todas tienen la contraseña `password` (hash bcrypt fijo). Todavía no hay inicio de sesión: la aplicación actúa como el Docente fijo y el Administrador de prueba que indica `.env`.
+
+| Cuenta | uuid (`usuario.id_usuario`) | cod_sis | Correo | Rol vigente |
+| --- | --- | --- | --- | --- |
+| Valeria Montaño Ríos | `00000000-0000-4000-8000-000000000001` | `ADM0001` | valeria.montano@sciem.test | Administrador (`SCIEM_USUARIO_PRUEBA`) |
+| Marcelo Quiroga Andrade | `00000000-0000-4000-8000-000000000011` | `10452` | marcelo.quiroga@sciem.test | Docente (`SCIEM_DOCENTE_FIJO_ID`); antes Auxiliar |
+| Rosario Salazar Vidal | `00000000-0000-4000-8000-000000000012` | `10487` | rosario.salazar@sciem.test | Docente |
+| Gustavo Rocha | `00000000-0000-4000-8000-000000000013` | `10533` | gustavo.rocha@sciem.test | Docente (sin apellido materno) |
+| Daniela Ferrufino Soliz | `00000000-0000-4000-8000-000000000021` | `201800451` | daniela.ferrufino@sciem.test | Auxiliar |
+| Iván Choque Mamani | `00000000-0000-4000-8000-000000000022` | `201900782` | ivan.choque@sciem.test | Auxiliar |
+| Lucía Terrazas Paz | `00000000-0000-4000-8000-000000000031` | `202000315` | lucia.terrazas@sciem.test | ninguno |
+| Óscar Villarroel Gutiérrez | `00000000-0000-4000-8000-000000000041` | `10398` | oscar.villarroel@sciem.test | ninguno; cuenta INACTIVA con rol Docente cerrado |
+
+Los códigos SIS siguen el formato de cada tipo de cuenta: el Administrador es alfanumérico, los docentes tienen 5 dígitos, y los auxiliares y estudiantes, 9.
+
+### Casos borde
+
+| Caso | Registro de prueba | Historia |
+| --- | --- | --- |
+| Materia compartida por carreras de facultades distintas | Cálculo I en Sistemas, Informática (FCYT) y Economía (FCE) | HU-016, HU-017 |
+| Materia INACTIVA con par activo | Taller de Sistemas Operativos en Sistemas | HU-016 |
+| Par INACTIVO con materia activa | Base de Datos I en Informática; su grupo 1 (9409) responde 422 en el detalle | HU-016, HU-017 |
+| Par sin grupos del docente fijo | Contabilidad General en Administración (solo Rosario Salazar) | HU-016 |
+| Par sin ningún grupo | Microeconomía en Economía | HU-017 |
+| Mismo número de grupo, misma materia, otra carrera | Grupo 1 de Cálculo I en Sistemas (9401) y en Economía (9403) | HU-017 |
+| Grupos de otro docente en el mismo par | Cálculo I en Sistemas: grupo 1 del docente fijo y grupo 2 de Rosario Salazar (9402), abierto en el listado y con 403 en el detalle | HU-017 |
+| Grupo sin nómina | Base de Datos I en Sistemas, grupo 1 (9404) | HU-017 |
+| Inscripción retirada, que no cuenta como inscrito | Gabriela Guzmán en el grupo 9401 (INACTIVO) | HU-017 |
+| Grupo de un periodo anterior | Cálculo I en Sistemas, grupo 1 del periodo 1-2026 (9410) | HU-017 |
+| Cuenta sin rol | Lucía Terrazas | HU-004 |
+| Cuenta deshabilitada | Óscar Villarroel | HU-004 |
+| Historial de roles de dos tramos | Marcelo Quiroga: Auxiliar → Docente | HU-004 |
+| Docente con asignaciones activas | Marcelo Quiroga, Rosario Salazar, Gustavo Rocha | HU-004 |
+| Código SIS con cuenta existente | Cualquier cod_sis de la tabla de cuentas, por ejemplo `10452` | HU-001 |
+| Código SIS libre y reconocido por el SIS simulado | `202312345`, `202312346`, `202312347`, `201900001` | HU-001 |
+| Código SIS no reconocido | `999999999` | HU-001 |
+| Ambiente fuera de servicio | Aula `612` (INACTIVO) | HU-024 |
+| Tipos de examen Parcial y Final | `tipo_examen` 9701 y 9702 (categoría REGULAR) | HU-024 |
+
+Periodos: `2-2025` (9301), `1-2026` (9302) y `2-2026` (9303, el activo). Hay 24 estudiantes, repartidos entre 2 y 6 por grupo. Los exámenes de prueba quedan pendientes hasta que HU-024 cierre el esquema de `examen`.
+
+### Cómo retirarlos
+
+Todos los ids numéricos de prueba están en el rango 9000–9999 y todos los uuid empiezan con `00000000-0000-4000-8000-`. Para retirar los datos, recrear la base desde el script de creación y borrar `backend/database/seeders/TestData/`, esta sección y los tres valores de `.env.example`.
 
 ---
 
