@@ -1,10 +1,17 @@
+import { BrowserRouter } from 'react-router-dom'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { CurrentUserProvider } from '@/features/auth'
+import { AppRouter } from './router/AppRouter'
+
 function App() {
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <h1 className="text-3xl font-bold">
-        SCIEM
-      </h1>
-    </main>
+    <BrowserRouter>
+      <CurrentUserProvider>
+        <TooltipProvider>
+          <AppRouter />
+        </TooltipProvider>
+      </CurrentUserProvider>
+    </BrowserRouter>
   )
 }
 
