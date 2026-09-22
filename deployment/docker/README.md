@@ -15,8 +15,13 @@ por separado.
 | `postgres` | `postgres:15.0`        | 15.0    | Interno `postgres:5432` · Host `localhost:5433` |
 | `redis`    | `redis:7.4.3`          | 7.4.3   | Solo interno: `redis:6379`                |
 
-- Extensiones PHP instaladas: `pdo_pgsql`, `bcmath`, `redis`, `zip` (el resto de las exigidas
-  por el README vienen incluidas en la imagen oficial).
+- Extensiones PHP instaladas: `pdo_pgsql`, `bcmath`, `redis`, `zip`, `gd` (el resto de las
+  exigidas por el README vienen incluidas en la imagen oficial). `gd` la exige
+  `phpoffice/phpspreadsheet`, con el que HU-021 lee las nóminas en XLSX.
+- Límites de subida: `upload_max_filesize = 12M` y `post_max_size = 16M`, definidos en
+  `php/conf.d/sciem-uploads.ini`. Los valores por defecto de PHP (2M y 8M) se quedan por
+  debajo de los 10 MB que admite la nómina de HU-021, y un archivo descartado por PHP
+  nunca llega al validador de Laravel.
 - PostgreSQL se publica en **5433** para no chocar con una instalación local en 5432.
 - Los datos de PostgreSQL se guardan en el volumen `sciem_postgres_data`.
 

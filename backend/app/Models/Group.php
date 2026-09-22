@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Support\RecordStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * Grupo de una materia dentro de una carrera.
@@ -32,5 +35,30 @@ class Group extends Model
     public function period(): BelongsTo
     {
         return $this->belongsTo(Period::class, 'id_periodo', 'id_periodo');
+    }
+    public function students(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Student::class,
+            'grupo_estudiante',
+            'id_grupo',
+            'id_estudiante',
+        )->withPivot([
+            'fecha_inscripcion',
+            'estado',
+        ]);
+    }
+
+    /** Incluye el tamaño de la nómina activa sin lanzar una consulta por grupo. */
+    public function scopeWithActiveStudentCount(Builder $query): Builder
+    {
+        return $query
+            ->select('grupo.*')
+            ->selectSub(function ($subquery) {
+                $subquery->from('grupo_estudiante')
+                    ->selectRaw('count(*)')
+                    ->whereColumn('grupo_estudiante.id_grupo', 'grupo.id_grupo')
+                    ->where('grupo_estudiante.estado', RecordStatus::ACTIVE);
+            }, 'cantidad_estudiantes');
     }
 }

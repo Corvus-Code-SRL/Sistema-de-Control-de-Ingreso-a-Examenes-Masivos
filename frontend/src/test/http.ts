@@ -56,6 +56,8 @@ export const matchers = {
   catalog: (url: string) => url.includes('/materias') && !url.includes('/carreras/'),
   groupsOfPair: (url: string) => /\/carreras\/\d+\/materias\/\d+\/grupos/.test(url),
   groupDetail: (url: string) => /\/grupos\/\d+$/.test(url),
+  rosterPreview: (url: string) => /\/grupos\/\d+\/nomina\/preview$/.test(url),
+  rosterConfirm: (url: string) => /\/grupos\/\d+\/nomina\/confirm$/.test(url),
 }
 
 function jsonResponse({ status = 200, body = {}, invalidJson = false }: StubbedResponse): Response {

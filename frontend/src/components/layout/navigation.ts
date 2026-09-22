@@ -34,9 +34,9 @@ export interface NavGroup {
 /**
  * Navegación lateral del docente.
  *
- * Materias, Mis cursos y Nuevo examen (HU-24) existen. El resto se lista para
- * dar la forma completa del producto, pero sin destino: un enlace que no lleva
- * a ninguna parte confunde más que uno visiblemente pendiente.
+ * Materias, Mis cursos, Nuevo examen y Programados (HU-24/HU-25) existen. El
+ * resto se lista para dar la forma completa del producto, pero sin destino: un
+ * enlace que no lleva a ninguna parte confunde más que uno visiblemente pendiente.
  */
 const navegacionDocente: NavGroup[] = [
   { items: [{ label: 'Inicio', icon: Home }] },
@@ -52,7 +52,7 @@ const navegacionDocente: NavGroup[] = [
     label: 'Exámenes',
     items: [
       { label: 'Nuevo examen', icon: SquarePen, to: '/examenes/nuevo' },
-      { label: 'Programados', icon: CalendarClock },
+      { label: 'Programados', icon: CalendarClock, to: '/examenes/programados' },
       { label: 'Control de ingreso', icon: DoorOpen },
       { label: 'En curso', icon: PlaySquare },
       { label: 'Incidencias', icon: AlertTriangle, badge: 3 },
@@ -71,9 +71,8 @@ const navegacionDocente: NavGroup[] = [
 /**
  * Navegación lateral del administrador.
  *
- * De momento solo Cuentas tiene pantalla (HU-01). Materias, facultades y
- * carreras son el catálogo institucional que administran HU-06 y HU-07, aún sin
- * construir, así que se listan deshabilitadas igual que las del docente.
+ * Cuentas y Materias tienen pantallas disponibles. Facultades, carreras y
+ * bitácora permanecen deshabilitadas hasta sus respectivas historias.
  */
 const navegacionAdministrador: NavGroup[] = [
   { items: [{ label: 'Inicio', icon: Home }] },
@@ -81,7 +80,7 @@ const navegacionAdministrador: NavGroup[] = [
     label: 'Administración',
     items: [
       { label: 'Cuentas', icon: Users, to: '/cuentas' },
-      { label: 'Materias', icon: BookOpen },
+      { label: 'Materias', icon: BookOpen, to: '/materias' },
       { label: 'Facultades', icon: Building2 },
       { label: 'Carreras', icon: GraduationCap },
       { label: 'Bitácora', icon: ScrollText },
