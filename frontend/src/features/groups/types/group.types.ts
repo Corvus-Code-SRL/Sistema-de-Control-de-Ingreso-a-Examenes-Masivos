@@ -107,6 +107,8 @@ export interface CreateGroupPayload {
   num_grupo: string
   /** Editable por el Docente; si se omite, el backend asigna el período activo (CA 11). */
   id_periodo?: number
+  /** Token del preview de nómina standalone; si se envía, el backend asocia los estudiantes. */
+  token?: string
 }
 
 /**

@@ -72,6 +72,48 @@ class StudentRosterPreviewService
     }
 
     /**
+     * Preview sin grupo: el grupo todavía no existe (se creará al confirmar).
+     *
+     * Solo clasifica como NEW_STUDENT o EXISTING_STUDENT. Los estados
+     * ALREADY_ENROLLED e INACTIVE_ENROLLMENT se resuelven al confirmar,
+     * cuando ya hay un id_grupo contra el que comparar.
+     */
+    public function generateStandalone(
+        string $path,
+        string $extension
+    ): StudentRosterPreviewResult {
+        $reader = $this->readerResolver->resolve($extension);
+
+        $analysis = $this->analyzer->analyze(
+            $reader->read($path)
+        );
+
+        if ($analysis->totalRows() === 0) {
+            throw new StudentRosterFileException(
+                'La nómina no contiene estudiantes.'
+            );
+        }
+
+        $matches = $this->databaseMatcher->classifyWithoutGroup(
+            $analysis
+        );
+
+        $token = $this->previewStore->store(
+            null,   // ← sin grupo
+            (string) config('sciem.docente_fijo_id'),
+            $analysis
+        );
+
+        return new StudentRosterPreviewResult(
+            $token,
+            $analysis->totalRows(),
+            $analysis->validRows(),
+            $analysis->inconsistentRows(),
+            $this->buildRows($analysis, $matches)
+        );
+    }
+
+    /**
      * @param array<int, StudentRosterDatabaseMatch> $matches
      *
      * @return array<int, array{

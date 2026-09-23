@@ -5,6 +5,7 @@ namespace App\Services\Academic;
 use App\Models\Group;
 use App\Models\Period;
 use App\Support\RecordStatus;
+use App\Services\Academic\Importers\StudentRosterConfirmationService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -23,10 +24,12 @@ use Illuminate\Validation\ValidationException;
 class GroupService
 {
     private SubjectCatalogService $subjectCatalog;
+    private StudentRosterConfirmationService $rosterConfirmationService;
 
-    public function __construct(SubjectCatalogService $subjectCatalog)
+    public function __construct(SubjectCatalogService $subjectCatalog, StudentRosterConfirmationService $rosterConfirmationService)
     {
         $this->subjectCatalog = $subjectCatalog;
+        $this->rosterConfirmationService = $rosterConfirmationService;
     }
 
     public function listGroupsForPair(int $careerId, int $subjectId): array
@@ -129,7 +132,7 @@ class GroupService
 
         $group = DB::transaction(function () use ($pair, $data, $period) {
             try {
-                return Group::create([
+                $group = Group::create([
                     'id_carrera' => $pair->id_carrera,
                     'id_materia' => $pair->id_materia,
                     'num_grupo' => $data['num_grupo'],
@@ -146,6 +149,16 @@ class GroupService
                     ? $this->duplicateGroupException()
                     : $exception;
             }
+
+            // Si hay token de nómina, aplicarla al grupo recién creado.
+            if (!empty($data['token'])) {
+                $this->rosterConfirmationService->confirmForNewGroup(
+                    (int) $group->id_grupo,
+                    $data['token']
+                );
+            }
+
+            return $group;
         });
 
         return $this->showGroup((int) $group->id_grupo);

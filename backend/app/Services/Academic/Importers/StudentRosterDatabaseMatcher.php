@@ -107,6 +107,73 @@ class StudentRosterDatabaseMatcher
     }
 
     /**
+     * Clasifica sin grupo: solo distingue NEW_STUDENT de EXISTING_STUDENT.
+     *
+     * No hay id_grupo, así que no se puede saber si un estudiante ya estaba
+     * inscrito (ALREADY_ENROLLED) o si su inscripción está inactiva
+     * (INACTIVE_ENROLLMENT). Eso se resuelve al confirmar, cuando el grupo
+     * ya existe.
+     *
+     * @return array<int, StudentRosterDatabaseMatch>
+    */
+    public function classifyWithoutGroup(
+        StudentRosterAnalysisResult $analysis
+    ): array {
+        $validRows = $this->validRows($analysis);
+
+        if ($validRows === []) {
+            return [];
+        }
+
+        $sisCodes = $this->sisCodes($validRows);
+
+        $students = Student::query()
+            ->whereIn('cod_sis', $sisCodes)
+            ->get([
+                'id_estudiante',
+                'cod_sis',
+            ]);
+
+        $studentsBySis = [];
+
+        foreach ($students as $student) {
+            $studentsBySis[
+                'sis:' . $student->cod_sis
+            ] = $student;
+        }
+
+        $matches = [];
+
+        foreach ($validRows as $rowAnalysis) {
+            $sisCode = $rowAnalysis->row()->sisCode();
+
+            if ($sisCode === null) {
+                continue;
+            }
+
+            $student = $studentsBySis['sis:' . $sisCode] ?? null;
+
+            if ($student === null) {
+                $matches[] = new StudentRosterDatabaseMatch(
+                    $rowAnalysis,
+                    null,
+                    StudentRosterDatabaseMatch::NEW_STUDENT
+                );
+
+                continue;
+            }
+
+            $matches[] = new StudentRosterDatabaseMatch(
+                $rowAnalysis,
+                (int) $student->id_estudiante,
+                StudentRosterDatabaseMatch::EXISTING_STUDENT
+            );
+        }
+
+        return $matches;
+    }
+
+    /**
      * @return array<int, StudentRosterRowAnalysis>
      */
     private function validRows(

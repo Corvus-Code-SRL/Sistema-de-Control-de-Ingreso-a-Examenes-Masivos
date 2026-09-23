@@ -61,3 +61,20 @@ export async function confirmStudentRoster(
 ): Promise<RosterConfirmationResponse> {
   return apiPost<RosterConfirmationResponse>(`/grupos/${groupId}/nomina/confirm`, { token }, { signal })
 }
+
+/**
+ * Preview sin grupo: el grupo todavía no existe.
+ *
+ * Se usa desde el modal "Nuevo grupo" para mostrar la previsualización
+ * antes de crear el grupo. El token resultante se envía luego a
+ * `createGroup` para asociar los estudiantes al grupo recién creado.
+ */
+export async function previewStandaloneRoster(
+  file: File,
+  signal?: AbortSignal
+): Promise<RosterPreviewResponse> {
+  const body = new FormData()
+  body.append('archivo', file)
+
+  return apiPost<RosterPreviewResponse>('/grupos/nomina/preview', body, { signal })
+}

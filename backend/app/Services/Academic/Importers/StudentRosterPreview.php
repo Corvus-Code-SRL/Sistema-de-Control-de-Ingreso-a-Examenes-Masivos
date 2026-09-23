@@ -4,7 +4,7 @@ namespace App\Services\Academic\Importers;
 
 final class StudentRosterPreview
 {
-    private int $groupId;
+    private ?int $groupId;   // ← nullable
 
     private string $teacherId;
 
@@ -17,7 +17,7 @@ final class StudentRosterPreview
      * @param array<int, StudentRosterRow> $rows
      */
     public function __construct(
-        int $groupId,
+        ?int $groupId,
         string $teacherId,
         array $rows
     ) {
@@ -26,7 +26,7 @@ final class StudentRosterPreview
         $this->rows = $rows;
     }
 
-    public function groupId(): int
+    public function groupId(): ?int   // ← nullable
     {
         return $this->groupId;
     }

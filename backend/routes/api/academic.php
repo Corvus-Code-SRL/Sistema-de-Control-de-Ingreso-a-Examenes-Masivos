@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Academic\StandaloneRosterPreviewController;
 use App\Http\Controllers\Academic\GroupController;
 use App\Http\Controllers\Academic\PeriodController;
 use App\Http\Controllers\Academic\StudentRosterController;
@@ -30,6 +31,11 @@ Route::get('grupos/{id_grupo}', [GroupController::class, 'show']);
 Route::post('grupos', [GroupController::class, 'store']);
 
 Route::put('grupos/{id_grupo}', [GroupController::class, 'update']);
+
+Route::post(
+    'grupos/nomina/preview',
+    [StandaloneRosterPreviewController::class, 'preview']
+);
 
 Route::post(
     'grupos/{id_grupo}/nomina/preview',

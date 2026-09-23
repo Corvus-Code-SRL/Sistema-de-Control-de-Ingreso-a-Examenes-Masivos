@@ -75,4 +75,56 @@ class StudentRosterConfirmationService
 
         return $result;
     }
+
+    /**
+     * Confirma un preview standalone contra un grupo recién creado.
+     *
+     * El preview se generó sin id_grupo, así que no se validó contra
+     * un grupo existente. Al confirmar, el grupo ya existe y se
+     * reclasifica con el matcher normal.
+     */
+    public function confirmForNewGroup(
+        int $groupId,
+        string $token
+    ): StudentRosterConfirmationResult {
+        $preview = $this->previewStore->find($token);
+
+        if ($preview === null) {
+            throw new StudentRosterPreviewUnavailableException(
+                'El preview de la nómina no existe o ha expirado.',
+                404
+            );
+        }
+
+        $currentTeacherId = (string) config('sciem.docente_fijo_id');
+
+        if ($preview->teacherId() !== $currentTeacherId) {
+            throw new StudentRosterPreviewUnavailableException(
+                'El preview no pertenece al docente actual.',
+                403
+            );
+        }
+
+        // El preview standalone NO tiene grupo asignado.
+        if ($preview->groupId() !== null) {
+            throw new StudentRosterPreviewUnavailableException(
+                'El preview ya está asociado a un grupo.',
+                422
+            );
+        }
+
+        // Reclasificar con el id_grupo real.
+        $analysis = $this->analyzer->analyze(
+            $preview->rows()
+        );
+
+        $result = $this->confirmer->confirm(
+            $groupId,
+            $analysis
+        );
+
+        $this->previewStore->forget($token);
+
+        return $result;
+    }
 }

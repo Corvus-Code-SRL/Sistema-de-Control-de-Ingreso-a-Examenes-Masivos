@@ -25,6 +25,12 @@ class StoreGroupRequest extends FormRequest
             'id_materia' => ['required', 'integer', 'min:1'],
             'num_grupo' => ['required', 'string', 'max:5'],
             'id_periodo' => ['nullable', 'integer', 'min:1'],
+            'token' => [            
+                'nullable',
+                'string',
+                'size:64',
+                'regex:/^[a-f0-9]{64}$/',
+            ],
         ];
     }
 
@@ -35,6 +41,7 @@ class StoreGroupRequest extends FormRequest
             'id_materia' => 'materia',
             'num_grupo' => 'número de grupo',
             'id_periodo' => 'período académico',
+            'token' => 'token de nómina',
         ];
     }
 

@@ -18,7 +18,7 @@ class StudentRosterPreviewStore
     }
 
     public function store(
-        int $groupId,
+        ?int $groupId,
         string $teacherId,
         StudentRosterAnalysisResult $analysis
     ): string {
@@ -64,11 +64,9 @@ class StudentRosterPreviewStore
         }
 
         if (
-            !isset(
-                $data['group_id'],
-                $data['teacher_id'],
-                $data['rows']
-            )
+            !array_key_exists('group_id', $data)
+            || !array_key_exists('teacher_id', $data)
+            || !array_key_exists('rows', $data)
             || !is_array($data['rows'])
         ) {
             return null;
@@ -96,7 +94,7 @@ class StudentRosterPreviewStore
         }
 
         return new StudentRosterPreview(
-            (int) $data['group_id'],
+            $data['group_id'] !== null ? (int) $data['group_id'] : null,
             (string) $data['teacher_id'],
             $rows
         );
