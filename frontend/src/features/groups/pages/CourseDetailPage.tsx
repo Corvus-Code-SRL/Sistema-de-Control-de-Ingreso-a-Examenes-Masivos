@@ -16,7 +16,7 @@ import { CourseTabsShell } from '../components/CourseTabsShell'
 import { ActualizarGrupoForm } from '../components/GroupUpdateForm'
 import { useGroupDetail } from '../hooks/useGroupDetail'
 import { courseTitle } from '../types/group.types'
-import { Toast } from '@/components/ui/toast' 
+import { Toast } from '@/components/ui/toast'
 
 /**
  * Detalle de un curso con navegación de pestañas y contenido de nómina.
@@ -41,7 +41,7 @@ export function CourseDetailPage() {
   })
 
   const [isEditOpen, setIsEditOpen] = useState(false)
-  
+
   const title =
     detail && !isForbidden
       ? courseTitle(detail.subject, detail.group)
@@ -170,7 +170,12 @@ export function CourseDetailPage() {
             <ActualizarGrupoForm
               group={detail.group}
               subjectCareerLabel={subjectCareerLabel}
-              studentCount={(detail as any).total_estudiantes ?? 0}
+              // Antes: (detail as any).total_estudiantes — ese campo no existe
+              // en GroupDetail. El dato real es detail.group.cantidad_estudiantes.
+              studentCount={detail.group.cantidad_estudiantes ?? 0}
+              // Antes: no se pasaba en absoluto, así que siempre caía al
+              // default hardcodeado "P. Careaga" dentro del propio formulario.
+              teacherName={detail.group.docente.nombre_completo}
               onCancel={() => setIsEditOpen(false)}
               onUpdated={() => {
                 setIsEditOpen(false)

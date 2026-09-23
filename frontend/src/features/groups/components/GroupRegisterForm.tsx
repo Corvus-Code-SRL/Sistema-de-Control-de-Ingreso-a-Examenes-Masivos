@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { AlertOctagon, Lock, Upload } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -50,6 +50,12 @@ export function RegistrarGrupoForm({
   const [idPeriodo, setIdPeriodo] = useState<number | null>(activePeriodId)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
 
+  useEffect(() => {
+    if (idPeriodo === null && activePeriodId !== null) {
+      setIdPeriodo(activePeriodId)
+    }
+  }, [activePeriodId, idPeriodo])
+
   const isSubmitting = status === 'submitting'
 
   function validate(): boolean {
@@ -90,11 +96,21 @@ export function RegistrarGrupoForm({
 
   const backendNumGrupoError = error?.isValidation ? error.errors.num_grupo?.[0] : undefined
   const backendPeriodoError = error?.isValidation ? error.errors.id_periodo?.[0] : undefined
+  // CA 7: GroupService::assertTeacherHasAccessToPair rechaza con la clave
+  // "id_materia" cuando el docente no tiene ningún grupo previo en ese par.
+  // No hay un input "id_materia" visible (es contexto, no un campo del
+  // formulario), así que este error se muestra en la alerta global, no
+  // debajo de un campo.
+  const backendMateriaError = error?.isValidation ? error.errors.id_materia?.[0] : undefined
 
   const numGrupoError = fieldErrors.num_grupo ?? backendNumGrupoError
   const periodoError = fieldErrors.id_periodo ?? backendPeriodoError
 
   const totalErrors = [numGrupoError, periodoError].filter(Boolean).length
+  // Antes solo consideraba totalErrors y "error genérico no-422": un 422 con
+  // id_materia (sin num_grupo ni id_periodo) no encendía la alerta y el
+  // formulario se quedaba mudo. Se agrega backendMateriaError a la condición.
+  const showAlert = totalErrors > 0 || backendMateriaError !== undefined || (error !== null && !error.isValidation)
 
   return (
     <div className="w-full flex flex-col">
@@ -109,7 +125,7 @@ export function RegistrarGrupoForm({
       {/* Formulario */}
       <form onSubmit={handleSubmit} noValidate className="p-5 flex flex-col gap-3.5">
         {/* Alerta global de error (Alert Danger) */}
-        {(totalErrors > 0 || (error !== null && !error.isValidation)) && (
+        {showAlert && (
           <Alert className="border-[#A21B12]/20 bg-[#FDE2E1] text-[#A21B12] py-2 px-3">
             <svg className="size-4 text-[#A21B12]" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 16h.01"></path>
@@ -117,9 +133,11 @@ export function RegistrarGrupoForm({
               <path d="M15.312 2a2 2 0 0 1 1.414.586l4.688 4.688A2 2 0 0 1 22 8.688v6.624a2 2 0 0 1-.586 1.414l-4.688 4.688a2 2 0 0 1-1.414.586H8.688a2 2 0 0 1-1.414-.586l-4.688-4.688A2 2 0 0 1 2 15.312V8.688a2 2 0 0 1 .586-1.414l4.688-4.688A2 2 0 0 1 8.688 2z"></path>
             </svg>
             <AlertDescription className="text-xs font-medium text-[#A21B12] leading-tight">
-              {error !== null && !error.isValidation
-                ? error.message
-                : `Revise ${totalErrors} ${totalErrors === 1 ? 'campo' : 'campos'} antes de registrar el grupo.`}
+              {backendMateriaError
+                ? backendMateriaError
+                : error !== null && !error.isValidation
+                  ? error.message
+                  : `Revise ${totalErrors} ${totalErrors === 1 ? 'campo' : 'campos'} antes de registrar el grupo.`}
             </AlertDescription>
           </Alert>
         )}
