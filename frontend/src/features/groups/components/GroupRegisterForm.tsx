@@ -67,6 +67,9 @@ export function RegistrarGrupoForm({
   const [rosterErrorTitle, setRosterErrorTitle] = useState<string | null>(null)
   const [isPreviewing, setIsPreviewing] = useState(false)
 
+  // Auxiliar para filtrar la lista de estudiantes incorporables en el preview
+  const [auxiliarySearch, setAuxiliarySearch] = useState('')
+
   useEffect(() => {
     if (idPeriodo === null && activePeriodId !== null) {
       setIdPeriodo(activePeriodId)
@@ -291,6 +294,27 @@ export function RegistrarGrupoForm({
               )}
             </div>
           </div>
+
+          {/* Auxiliares: solo si no hay nómina adjunta */}
+          {!hasRoster && (
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="auxiliares_input" className="text-xs font-medium text-[#2C2C2C]">
+                Auxiliares{' '}
+                <span className="text-muted-foreground font-normal">(opcional)</span>
+              </Label>
+              <Input
+                id="auxiliares_input"
+                value={auxiliarySearch}
+                onChange={(e) => setAuxiliarySearch(e.target.value)}
+                placeholder="Buscar por nombre o código SIS"
+                disabled={isSubmitting}
+                className="h-8.5 px-3 py-1.5 text-xs bg-card text-[#2C2C2C] border-input placeholder:text-muted-foreground/60 w-full"
+              />
+              <p className="text-xs text-muted-foreground leading-normal">
+                Solo auxiliares registrados por el administrador.
+              </p>
+            </div>
+          )}
 
           {/* Nómina */}
           <div className="flex flex-col gap-2">
