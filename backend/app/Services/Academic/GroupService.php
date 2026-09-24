@@ -98,22 +98,16 @@ class GroupService
     /**
      * Registra un nuevo grupo dentro de un par materia-carrera (HU-18).
      *
-     * "El docente tiene permiso sobre la materia" (CA 7) se resuelve igual que en
-     * el resto del módulo: el par debe existir y estar activo en el catálogo
-     * institucional (findSelectablePair). No existe una asignación docente-materia
-     * previa en el esquema: la pertenencia de un grupo a un docente nace en el
-     * propio registro (id_usuario_docente = docente que lo crea).
+     * La única restricción de acceso (CA 7) es la de HU-16: el par debe existir y
+     * estar activo (findSelectablePair). No hay vínculo docente-materia en el esquema;
+     * registrar el primer grupo es justamente lo que incorpora la materia a
+     * "Mis materias", así que no se exige ningún grupo previo.
      */
     public function storeGroup(array $data): array
     {
         $pair = $this->subjectCatalog->findSelectablePair(
             (int) $data['id_carrera'],
             (int) $data['id_materia']
-        );
-
-        $this->assertTeacherHasAccessToPair(
-            (int) $pair->id_carrera,
-            (int) $pair->id_materia
         );
 
         $periodId = (int) ($data['id_periodo'] ?? $this->subjectCatalog->activePeriodId());
@@ -196,11 +190,7 @@ class GroupService
 
         return $this->showGroup($group);
     }
-    /**
-     * El mockup de "Nuevo grupo" (02-materias.html) solo pide N° de grupo y
-     * Período académico: no hay un input de "Gestión" independiente. grupo.gestion
-     * (varchar) se deriva del periodo.gestion (smallint) del período elegido.
-     */
+
     private function findPeriodOrFail(int $periodId): Period
     {
         $period = Period::query()->find($periodId);
@@ -214,6 +204,10 @@ class GroupService
         return $period;
     }
 
+    /**
+     * El formulario solo pide N° de grupo y período: no hay un input de "Gestión".
+     * grupo.gestion (varchar) se deriva del periodo.gestion (smallint) elegido.
+     */
     private function groupManagementFor(Period $period): string
     {
         return (string) $period->gestion;
@@ -307,32 +301,12 @@ class GroupService
     }
 
     /**
-     *un docente no opera grupos ajenos.
+     * Un docente no opera grupos ajenos.
      */
     private function assertGroupBelongsToTeacher(Group $group): void
     {
         if ((string) $group->id_usuario_docente !== $this->subjectCatalog->teacherId()) {
             throw new AuthorizationException('No tiene permiso sobre este grupo.');
-        }
-    }
-
-    private function assertTeacherHasAccessToPair(int $careerId, int $subjectId): void
-    {
-        $teacherId = $this->subjectCatalog->teacherId();
-
-        $hasAccess = Group::query()
-            ->where('id_carrera', $careerId)
-            ->where('id_materia', $subjectId)
-            ->where('id_usuario_docente', $teacherId)
-            ->exists();
-
-        if (!$hasAccess) {
-            throw ValidationException::withMessages([
-                'id_materia' => [
-                    'No tiene permiso para registrar grupos en esta materia. '
-                    . 'Solo puede hacerlo en materias donde ya dicta al menos un grupo.',
-                ],
-            ]);
         }
     }
 }
