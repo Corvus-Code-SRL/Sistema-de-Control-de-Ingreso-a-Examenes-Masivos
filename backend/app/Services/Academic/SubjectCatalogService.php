@@ -2,6 +2,7 @@
 
 namespace App\Services\Academic;
 
+use App\Exceptions\Academic\ActivePeriodNotConfiguredException;
 use App\Models\Group;
 use App\Models\SubjectCareer;
 use App\Support\RecordStatus;
@@ -54,9 +55,7 @@ class SubjectCatalogService
         $id = (int) config('sciem.periodo_activo_id');
 
         if ($id <= 0) {
-            throw new \RuntimeException(
-                'No hay período académico activo configurado (sciem.periodo_activo_id).'
-            );
+            throw new ActivePeriodNotConfiguredException();
         }
 
         return $id;

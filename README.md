@@ -244,6 +244,8 @@ Todo el equipo trabaja con los mismos registros: cada valor está escrito a mano
     SCIEM_USUARIO_PRUEBA=00000000-0000-4000-8000-000000000001
     ```
 
+    `SCIEM_PERIODO_ACTIVO_ID` es obligatorio: sin él, los endpoints que necesitan el periodo activo responden 500 con un mensaje que lo indica (`GET /api/periodos` sigue funcionando, con `id_periodo_activo` en `null`). El seeder crea el periodo `9303` que ese valor referencia.
+
 3. Ejecutar:
 
     ```bash
