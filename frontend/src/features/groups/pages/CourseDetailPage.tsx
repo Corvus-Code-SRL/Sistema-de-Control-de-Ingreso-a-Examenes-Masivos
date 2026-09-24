@@ -170,11 +170,7 @@ export function CourseDetailPage() {
             <ActualizarGrupoForm
               group={detail.group}
               subjectCareerLabel={subjectCareerLabel}
-              // Antes: (detail as any).total_estudiantes — ese campo no existe
-              // en GroupDetail. El dato real es detail.group.cantidad_estudiantes.
               studentCount={detail.group.cantidad_estudiantes ?? 0}
-              // Antes: no se pasaba en absoluto, así que siempre caía al
-              // default hardcodeado "P. Careaga" dentro del propio formulario.
               teacherName={detail.group.docente.nombre_completo}
               onCancel={() => setIsEditOpen(false)}
               onUpdated={() => {
