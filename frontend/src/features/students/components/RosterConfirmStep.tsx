@@ -83,12 +83,6 @@ export function RosterConfirmStep({
 
           <ConfirmStat
             icon={AlertTriangle}
-            label="Inscripción inactiva"
-            value={counts.inscripcionesInactivas}
-          />
-
-          <ConfirmStat
-            icon={AlertTriangle}
             label="Inconsistentes"
             value={counts.inconsistentes}
           />

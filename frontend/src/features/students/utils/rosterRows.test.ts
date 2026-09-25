@@ -37,43 +37,71 @@ describe('rowIssues', () => {
   it('clasifica los excesos de longitud como formato y cita el límite real', () => {
     const row = makeRosterRow({
       estado: 'inconsistent',
-      errores: ['sis_code_too_long', 'last_names_too_long', 'first_names_too_long'],
+      errores: ['last_names_too_long', 'first_names_too_long'],
     })
 
     expect(issuesOf(row)).toEqual([
-      { category: 'Formato', message: 'El código SIS supera los 15 caracteres' },
       { category: 'Formato', message: 'Los apellidos superan los 30 caracteres' },
       { category: 'Formato', message: 'Los nombres superan los 50 caracteres' },
     ])
   })
 
-  it('resume un código repetido en un solo mensaje con todas sus filas', () => {
+  it('explica las reglas del código SIS de estudiante: solo dígitos, de 8 a 12', () => {
+    const row = makeRosterRow({
+      estado: 'inconsistent',
+      errores: ['sis_code_not_numeric', 'sis_code_invalid_length'],
+    })
+
+    expect(issuesOf(row)).toEqual([
+      { category: 'Formato', message: 'El código SIS debe tener solo dígitos' },
+      { category: 'Formato', message: 'El código SIS debe tener entre 8 y 12 dígitos' },
+    ])
+  })
+
+  it('una fila repetida idéntica dice cuál es la fila que sí se importa', () => {
+    const rows = [
+      makeRosterRow({ numero_fila: 3, codigo_sis: '20260001' }),
+      makeRosterRow({ numero_fila: 5, codigo_sis: '20260001', estado: 'inconsistent', errores: ['duplicate_row_in_file'] }),
+      makeRosterRow({ numero_fila: 7, codigo_sis: '20260001', estado: 'inconsistent', errores: ['duplicate_row_in_file'] }),
+    ]
+
+    expect(issuesOf(rows[1], rows)).toEqual([
+      { category: 'Duplicado', message: 'Fila repetida: idéntica a la fila 3, que sí se importa' },
+    ])
+    expect(issuesOf(rows[2], rows)).toEqual(issuesOf(rows[1], rows))
+  })
+
+  it('un duplicado con datos distintos nombra todas las filas y explica por qué no se importa ninguna', () => {
     const rows = [3, 5, 7].map((numero_fila) =>
       makeRosterRow({
         numero_fila,
         codigo_sis: '20260001',
         estado: 'inconsistent',
-        errores: ['duplicate_sis_code_in_file'],
+        errores: ['conflicting_duplicate_in_file'],
       })
     )
 
-    expect(issuesOf(rows[0], rows)).toEqual([
-      { category: 'Duplicado', message: 'Código SIS repetido en las filas 3, 5 y 7' },
-    ])
+    const [issue] = issuesOf(rows[0], rows)
+
+    expect(issue.category).toBe('Duplicado')
+    expect(issue.message).toBe(
+      'Código SIS repetido con datos distintos en las filas 3, 5 y 7. ' +
+        'No se importa ninguna porque no hay forma de saber cuál es la correcta'
+    )
     // La misma frase en cada aparición: el backend marca todas.
     expect(issuesOf(rows[2], rows)).toEqual(issuesOf(rows[0], rows))
   })
 
   it('no pierde ocurrencias del duplicado al recibir solo parte de las filas', () => {
     const rows = [
-      makeRosterRow({ numero_fila: 3, codigo_sis: '20260001', errores: ['duplicate_sis_code_in_file'] }),
-      makeRosterRow({ numero_fila: 5, codigo_sis: '20260001', errores: ['duplicate_sis_code_in_file'] }),
+      makeRosterRow({ numero_fila: 3, codigo_sis: '20260001', errores: ['conflicting_duplicate_in_file'] }),
+      makeRosterRow({ numero_fila: 5, codigo_sis: '20260001', errores: ['conflicting_duplicate_in_file'] }),
     ]
 
     const duplicates = duplicateRowsBySis(rows)
 
-    expect(rowIssues(rows[0], duplicates.get('20260001') ?? [])[0].message).toBe(
-      'Código SIS repetido en las filas 3 y 5'
+    expect(rowIssues(rows[0], duplicates.get('20260001') ?? [])[0].message).toContain(
+      'en las filas 3 y 5'
     )
   })
 
@@ -100,7 +128,6 @@ describe('rowStateText', () => {
     expect(rowStateText('new_student').label).toBe('Nuevo en SCIEM')
     expect(rowStateText('existing_student').label).toBe('Se inscribirá')
     expect(rowStateText('already_enrolled').label).toBe('Ya en el grupo')
-    expect(rowStateText('inactive_enrollment').label).toBe('Inscripción inactiva')
     expect(rowStateText('inconsistent').label).toBe('Inconsistente')
   })
 
@@ -115,7 +142,6 @@ describe('rowStateText', () => {
     expect(isIncorporable('new_student')).toBe(true)
     expect(isIncorporable('existing_student')).toBe(true)
     expect(isIncorporable('already_enrolled')).toBe(false)
-    expect(isIncorporable('inactive_enrollment')).toBe(false)
     expect(isIncorporable('inconsistent')).toBe(false)
   })
 })
@@ -126,25 +152,34 @@ describe('countRosterRows', () => {
     makeRosterRow({ numero_fila: 3, estado: 'new_student' }),
     makeRosterRow({ numero_fila: 4, estado: 'existing_student' }),
     makeRosterRow({ numero_fila: 5, estado: 'already_enrolled' }),
-    makeRosterRow({ numero_fila: 6, estado: 'inactive_enrollment' }),
-    makeRosterRow({ numero_fila: 7, estado: 'inconsistent', errores: ['missing_sis_code'] }),
+    makeRosterRow({ numero_fila: 6, estado: 'inconsistent', errores: ['missing_sis_code'] }),
   ]).data
 
   it('separa lo que se incorpora de lo que ya está en el grupo', () => {
     expect(countRosterRows(preview)).toEqual({
-      leidas: 6,
+      leidas: 5,
       incorporables: 3,
       nuevos: 2,
-      yaEnElGrupo: 2,
+      yaEnElGrupo: 1,
       yaInscritos: 1,
-      inscripcionesInactivas: 1,
       inconsistentes: 1,
     })
   })
 
+  it('no tiene ningún otro estado de estudiante dentro de la nómina', () => {
+    expect(Object.keys(countRosterRows(preview)).sort()).toEqual([
+      'inconsistentes',
+      'incorporables',
+      'leidas',
+      'nuevos',
+      'yaEnElGrupo',
+      'yaInscritos',
+    ])
+  })
+
   it('no confunde las incorporables con las filas válidas del backend', () => {
-    // `filas_validas` incluye a quienes ya están en el grupo: 5 frente a 3.
-    expect(preview.filas_validas).toBe(5)
+    // `filas_validas` incluye a quienes ya están en el grupo: 4 frente a 3.
+    expect(preview.filas_validas).toBe(4)
     expect(countRosterRows(preview).incorporables).toBe(3)
   })
 })

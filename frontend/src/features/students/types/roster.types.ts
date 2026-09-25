@@ -10,17 +10,18 @@ export type RosterRowState =
   | 'new_student'
   | 'existing_student'
   | 'already_enrolled'
-  | 'inactive_enrollment'
   | 'inconsistent'
 
 export type RosterRowError =
   | 'missing_sis_code'
   | 'missing_last_names'
   | 'missing_first_names'
-  | 'sis_code_too_long'
+  | 'sis_code_not_numeric'
+  | 'sis_code_invalid_length'
   | 'last_names_too_long'
   | 'first_names_too_long'
-  | 'duplicate_sis_code_in_file'
+  | 'duplicate_row_in_file'
+  | 'conflicting_duplicate_in_file'
 
 /** Una fila leída del archivo, tal como la clasifica el backend. */
 export interface RosterPreviewRow {
@@ -57,7 +58,6 @@ export interface RosterConfirmationData {
   estudiantes_creados: number
   estudiantes_inscritos: number
   ya_inscritos: number
-  inscripciones_inactivas: number
 }
 
 export interface RosterConfirmationResponse {
@@ -76,13 +76,17 @@ export interface RosterIssue {
 /**
  * Estados que el confirm incorpora al grupo.
  *
- * `already_enrolled` e `inactive_enrollment` son filas sin errores, pero el
- * backend no duplica la inscripción ni reactiva la inactiva: contarlas como
- * incorporables prometería algo que no va a pasar.
+ * `already_enrolled` es una fila sin errores, pero el backend no duplica la
+ * inscripción (la carga es idempotente): contarla como incorporable prometería
+ * algo que no va a pasar. La nómina no tiene otros estados de estudiante.
  */
 export const INCORPORABLE_STATES: readonly RosterRowState[] = ['new_student', 'existing_student']
 
-/** Límites que aplica StudentRosterRowValidator en el backend. */
-export const SIS_CODE_MAX_LENGTH = 15
+/**
+ * Límites que aplica StudentRosterRowValidator en el backend. Las cotas del código
+ * SIS se configuran en el servidor (config/sciem.php); estas son solo su reflejo.
+ */
+export const SIS_CODE_MIN_LENGTH = 8
+export const SIS_CODE_MAX_LENGTH = 12
 export const LAST_NAMES_MAX_LENGTH = 30
 export const FIRST_NAMES_MAX_LENGTH = 50
