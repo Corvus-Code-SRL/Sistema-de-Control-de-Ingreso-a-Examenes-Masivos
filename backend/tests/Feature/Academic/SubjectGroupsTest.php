@@ -112,17 +112,48 @@ class SubjectGroupsTest extends TestCase
             ->assertJsonValidationErrors(['id_carrera', 'id_materia']);
     }
 
-    public function test_cada_grupo_expone_su_docente_y_estudiantes_activos(): void
+    /**
+     * Nómina cargada es tener filas en grupo_estudiante: el estado de la fila no se
+     * filtra, así que una fila escrita como INACTIVO por una versión anterior cuenta.
+     */
+    public function test_el_conteo_de_estudiantes_no_filtra_por_el_estado_de_la_inscripcion(): void
     {
         $this->seedAcademicCatalog();
-        $this->enrollStudents($this->grupoPropioId, 3, 2);
+        $this->enrollStudents($this->grupoPropioId, 2);
+
+        $studentId = DB::table('estudiante')->insertGetId([
+            'cod_sis' => '202499999',
+            'ci' => null,
+            'nombre' => 'ANA',
+            'apellido_paterno' => 'PEREZ',
+            'estado' => RecordStatus::ACTIVE,
+        ], 'id_estudiante');
+        DB::table('grupo_estudiante')->insert([
+            'id_grupo' => $this->grupoPropioId,
+            'id_estudiante' => $studentId,
+            'fecha_inscripcion' => '2026-02-15',
+            'estado' => RecordStatus::INACTIVE,
+        ]);
+
+        $grupos = collect(
+            $this->getJson($this->groupsUrl($this->sistemasId, $this->calculoId))
+                ->assertOk()
+                ->json('data.grupos')
+        )->keyBy('num_grupo');
+
+        $this->assertSame(3, $grupos['1']['cantidad_estudiantes']);
+    }
+
+    public function test_cada_grupo_expone_su_docente_y_su_cantidad_de_estudiantes(): void
+    {
+        $this->seedAcademicCatalog();
+        $this->enrollStudents($this->grupoPropioId, 3);
         $this->enrollStudents($this->grupoAjenoId, 1);
 
         $response = $this->getJson($this->groupsUrl($this->sistemasId, $this->calculoId))->assertOk();
 
         $grupos = collect($response->json('data.grupos'))->keyBy('num_grupo');
 
-        // Los retirados (INACTIVO) no cuentan como estudiantes del grupo.
         $this->assertSame(3, $grupos['1']['cantidad_estudiantes']);
         $this->assertSame(0, $grupos['2']['cantidad_estudiantes']);
         $this->assertSame(1, $grupos['3']['cantidad_estudiantes']);

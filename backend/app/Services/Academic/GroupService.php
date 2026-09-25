@@ -9,7 +9,6 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -216,26 +215,14 @@ class GroupService
     private function baseGroupQuery(): Builder
     {
         return Group::query()
+            ->withStudentCount()
             ->join('usuario', 'usuario.id_usuario', '=', 'grupo.id_usuario_docente')
-            ->select('grupo.*')
             ->addSelect([
                 'usuario.nombre as docente_nombre',
                 'usuario.apellido_paterno as docente_apellido_paterno',
                 'usuario.apellido_materno as docente_apellido_materno',
             ])
-            ->selectSub($this->activeStudentCountQuery(), 'cantidad_estudiantes')
             ->with('period');
-    }
-
-    /**
-     * Solo cuentan las inscripciones ACTIVAS: un retiro deja la fila en INACTIVO.
-     */
-    private function activeStudentCountQuery(): QueryBuilder
-    {
-        return DB::table('grupo_estudiante')
-            ->selectRaw('count(*)')
-            ->whereColumn('grupo_estudiante.id_grupo', 'grupo.id_grupo')
-            ->where('grupo_estudiante.estado', RecordStatus::ACTIVE);
     }
 
     private function markOwnGroups(Collection $groups): Collection

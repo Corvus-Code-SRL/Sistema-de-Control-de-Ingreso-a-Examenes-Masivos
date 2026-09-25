@@ -116,8 +116,15 @@ class GroupTestDataSeeder extends Seeder
             }
         }
 
-        // Retiro: la fila queda INACTIVA y no cuenta como inscrito.
-        $enrollments[] = $this->enrollment(Ids::GROUP_CALCULUS_SYS_1, 9507, 'INACTIVO');
+        /*
+         * Gabriela Guzmán (9507) existe como estudiante pero no está en la nómina del
+         * grupo. Una versión anterior la sembraba con una inscripción INACTIVA: la
+         * nómina no tiene estados, así que esa fila se retira si quedó en la base.
+         */
+        DB::table('grupo_estudiante')
+            ->where('id_grupo', Ids::GROUP_CALCULUS_SYS_1)
+            ->where('id_estudiante', 9507)
+            ->delete();
 
         DB::table('grupo_estudiante')->upsert($enrollments, ['id_grupo', 'id_estudiante']);
     }

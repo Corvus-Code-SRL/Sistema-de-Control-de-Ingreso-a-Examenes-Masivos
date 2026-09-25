@@ -4,6 +4,7 @@ namespace Tests\Feature\Exams;
 
 use App\Models\Exam;
 use App\Models\Group;
+use App\Services\Exams\ExamParticipantService;
 use App\Support\RecordStatus;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -11,7 +12,11 @@ use Tests\Concerns\SeedsExamCatalog;
 use Tests\TestCase;
 
 /**
- * Asignación de grupos y generación de la nómina habilitada del examen.
+ * Asignación de grupos a un examen.
+ *
+ * Asignar un grupo solo escribe el vínculo grupo-examen: examen_estudiante registra
+ * ingresos reales, así que nunca se llena aquí y los participantes se derivan de la
+ * nómina (ExamParticipantService).
  */
 class AssignGroupsTest extends TestCase
 {
@@ -33,7 +38,7 @@ class AssignGroupsTest extends TestCase
             ->value('id_grupo');
     }
 
-    public function test_crear_examen_asigna_grupos_y_solo_habilita_estudiantes_activos(): void
+    public function test_crear_examen_asigna_grupos_sin_copiar_la_nomina(): void
     {
         $response = $this->postJson('/api/examenes', $this->validPayload())
             ->assertCreated()
@@ -49,19 +54,29 @@ class AssignGroupsTest extends TestCase
         ]);
 
         $this->assertSame(
-            2,
+            0,
             DB::table('examen_estudiante')->where('id_examen', $examId)->count()
         );
+        $this->assertSame(
+            ['esperados' => 2, 'ingresados' => 0, 'pendientes' => 2],
+            app(ExamParticipantService::class)->counts($examId)
+        );
+    }
 
-        $withdrawnStudentId = DB::table('grupo_estudiante')
-            ->where('id_grupo', $this->grupoPropioId)
-            ->where('estado', RecordStatus::INACTIVE)
-            ->value('id_estudiante');
+    public function test_la_nomina_puede_cambiar_mientras_el_examen_esta_programado(): void
+    {
+        $exam = $this->createExam();
 
-        $this->assertDatabaseMissing('examen_estudiante', [
-            'id_examen' => $examId,
-            'id_estudiante' => $withdrawnStudentId,
-        ]);
+        $this->postJson("/api/examenes/{$exam->id_examen}/grupos", [
+            'grupos' => [$this->grupoPropioId],
+        ])->assertOk();
+
+        $this->enrollStudents($this->grupoPropioId, 3);
+
+        $this->assertSame(
+            ['esperados' => 5, 'ingresados' => 0, 'pendientes' => 5],
+            app(ExamParticipantService::class)->counts($exam->id_examen)
+        );
     }
 
     public function test_crear_examen_revierte_todo_si_el_grupo_no_tiene_nomina(): void
@@ -76,7 +91,7 @@ class AssignGroupsTest extends TestCase
         $this->assertSame(0, DB::table('examen_estudiante')->count());
     }
 
-    public function test_endpoint_reemplaza_grupos_y_nomina_en_una_transaccion(): void
+    public function test_endpoint_reemplaza_grupos_en_una_transaccion(): void
     {
         $exam = $this->createExam();
         $this->enrollStudents($this->groupWithoutRosterId, 1);
@@ -100,8 +115,12 @@ class AssignGroupsTest extends TestCase
             'id_grupo' => $this->groupWithoutRosterId,
         ]);
         $this->assertSame(
-            1,
+            0,
             DB::table('examen_estudiante')->where('id_examen', $exam->id_examen)->count()
+        );
+        $this->assertSame(
+            1,
+            app(ExamParticipantService::class)->counts($exam->id_examen)['esperados']
         );
     }
 
@@ -128,7 +147,7 @@ class AssignGroupsTest extends TestCase
         $this->assertGroupIsRejected($group->id_grupo);
     }
 
-    public function test_rechaza_grupo_sin_nomina_activa(): void
+    public function test_rechaza_grupo_sin_nomina(): void
     {
         $this->assertGroupIsRejected($this->groupWithoutRosterId);
     }
@@ -162,6 +181,7 @@ class AssignGroupsTest extends TestCase
             'id_examen' => $exam->id_examen,
             'id_grupo' => $this->grupoAjenoId,
         ]);
+        // Un ingreso real ya registrado de ese grupo: asignar grupos no lo toca.
         DB::table('examen_estudiante')->insert([
             'id_examen' => $exam->id_examen,
             'id_estudiante' => DB::table('grupo_estudiante')
@@ -229,7 +249,6 @@ class AssignGroupsTest extends TestCase
         ]);
         $studentId = DB::table('grupo_estudiante')
             ->where('id_grupo', $this->grupoPropioId)
-            ->where('estado', RecordStatus::ACTIVE)
             ->value('id_estudiante');
 
         DB::table('grupo_estudiante')->insert([
@@ -248,19 +267,13 @@ class AssignGroupsTest extends TestCase
         $this->assertSame(0, DB::table('examen_estudiante')->count());
     }
 
-    public function test_un_reemplazo_invalido_conserva_grupo_y_nomina_anteriores(): void
+    public function test_un_reemplazo_invalido_conserva_los_grupos_anteriores(): void
     {
         $exam = $this->createExam();
 
         $this->postJson("/api/examenes/{$exam->id_examen}/grupos", [
             'grupos' => [$this->grupoPropioId],
         ])->assertOk();
-
-        $originalRoster = DB::table('examen_estudiante')
-            ->where('id_examen', $exam->id_examen)
-            ->orderBy('id_estudiante')
-            ->pluck('id_estudiante')
-            ->all();
 
         $this->postJson("/api/examenes/{$exam->id_examen}/grupos", [
             'grupos' => [$this->groupWithoutRosterId],
@@ -274,14 +287,7 @@ class AssignGroupsTest extends TestCase
             'id_examen' => $exam->id_examen,
             'id_grupo' => $this->groupWithoutRosterId,
         ]);
-        $this->assertSame(
-            $originalRoster,
-            DB::table('examen_estudiante')
-                ->where('id_examen', $exam->id_examen)
-                ->orderBy('id_estudiante')
-                ->pluck('id_estudiante')
-                ->all()
-        );
+        $this->assertSame(0, DB::table('examen_estudiante')->count());
     }
 
     public function test_rechaza_modificar_examen_de_otro_docente(): void

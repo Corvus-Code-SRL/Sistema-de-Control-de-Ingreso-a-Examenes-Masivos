@@ -14,8 +14,8 @@ use App\Services\Academic\Importers\StudentRosterRow;
 use App\Services\Academic\Importers\StudentRosterRowValidator;
 use App\Services\Academic\Importers\StudentRosterStudentCreator;
 use App\Services\Academic\Importers\StudentRosterStudentMapper;
-use App\Services\Academic\Importers\TemporaryStudentCiGenerator;
 use App\Services\Academic\StudentRosterGroupAccess;
+use App\Services\Exams\ExamRosterLockService;
 use App\Support\RecordStatus;
 use Illuminate\Cache\ArrayStore;
 use Illuminate\Cache\Repository;
@@ -81,7 +81,6 @@ class StudentRosterConfirmationServiceTest extends TestCase
         $this->assertSame(0, $result->createdStudents());
         $this->assertSame(0, $result->enrolledStudents());
         $this->assertSame(1, $result->alreadyEnrolled());
-        $this->assertSame(0, $result->inactiveEnrollments());
 
         $this->assertSame(
             1,
@@ -224,7 +223,7 @@ class StudentRosterConfirmationServiceTest extends TestCase
 
         $service = new StudentRosterConfirmationService(
             $store,
-            new StudentRosterGroupAccess(),
+            new StudentRosterGroupAccess(new ExamRosterLockService()),
             new StudentRosterAnalyzer(
                 new StudentRosterRowValidator()
             ),
@@ -333,14 +332,13 @@ class StudentRosterConfirmationServiceTest extends TestCase
     ): StudentRosterConfirmationService {
         return new StudentRosterConfirmationService(
             $store,
-            new StudentRosterGroupAccess(),
+            new StudentRosterGroupAccess(new ExamRosterLockService()),
             new StudentRosterAnalyzer(
                 new StudentRosterRowValidator()
             ),
             new StudentRosterConfirmer(
                 new StudentRosterDatabaseMatcher(),
                 new StudentRosterStudentCreator(
-                    new TemporaryStudentCiGenerator(),
                     new StudentRosterStudentMapper()
                 )
             )

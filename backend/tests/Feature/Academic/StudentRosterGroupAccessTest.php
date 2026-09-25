@@ -3,18 +3,21 @@
 namespace Tests\Feature\Academic;
 
 use App\Exceptions\Academic\StudentRosterGroupAccessException;
+use App\Models\Exam;
 use App\Models\Group;
 use App\Services\Academic\StudentRosterGroupAccess;
+use App\Services\Exams\ExamRosterLockService;
 use App\Support\RecordStatus;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Tests\Concerns\SeedsAcademicCatalog;
+use Illuminate\Support\Facades\DB;
+use Tests\Concerns\SeedsExamCatalog;
 use Tests\TestCase;
 
 class StudentRosterGroupAccessTest extends TestCase
 {
     use DatabaseTransactions;
-    use SeedsAcademicCatalog;
+    use SeedsExamCatalog;
 
     public function test_devuelve_grupo_propio_activo_del_periodo_actual(): void
     {
@@ -106,9 +109,97 @@ class StudentRosterGroupAccessTest extends TestCase
         );
     }
 
+    /**
+     * @dataProvider lockingExamStates
+     */
+    public function test_rechaza_el_grupo_con_un_examen_en_ingreso_o_en_curso(string $state): void
+    {
+        $this->seedExamCatalog();
+
+        $group = $this->ownActiveGroup();
+        $this->linkExam($group, $state);
+
+        try {
+            $this->access()->getAvailable((int) $group->id_grupo);
+
+            $this->fail('El grupo con un examen en ' . $state . ' debía rechazarse.');
+        } catch (StudentRosterGroupAccessException $exception) {
+            $this->assertSame(422, $exception->getStatusCode());
+            $this->assertStringContainsString('en ingreso o en curso', $exception->getMessage());
+        }
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    public function lockingExamStates(): array
+    {
+        return [
+            'EN_INGRESO' => [Exam::EN_INGRESO],
+            'EN_CURSO' => [Exam::EN_CURSO],
+        ];
+    }
+
+    /**
+     * @dataProvider freeExamStates
+     */
+    public function test_permite_el_grupo_si_sus_examenes_no_estan_en_ingreso_ni_en_curso(string $state): void
+    {
+        $this->seedExamCatalog();
+
+        $group = $this->ownActiveGroup();
+        $this->linkExam($group, $state);
+
+        $this->assertSame(
+            (int) $group->id_grupo,
+            (int) $this->access()->getAvailable((int) $group->id_grupo)->id_grupo
+        );
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    public function freeExamStates(): array
+    {
+        return [
+            'PROGRAMADO' => [Exam::PROGRAMADO],
+            'FINALIZADO' => [Exam::FINALIZADO],
+            'CANCELADO' => [Exam::CANCELADO],
+        ];
+    }
+
+    public function test_solo_bloquea_el_grupo_del_examen_en_curso_y_no_otros_grupos(): void
+    {
+        $this->seedExamCatalog();
+
+        $group = $this->ownActiveGroup();
+        $otherGroupId = (int) Group::query()
+            ->where('id_usuario_docente', $this->docenteId)
+            ->where('id_periodo', $this->periodoActivoId)
+            ->where('id_grupo', '!=', $group->id_grupo)
+            ->value('id_grupo');
+
+        $this->linkExam($group, Exam::EN_CURSO);
+
+        $this->assertSame(
+            $otherGroupId,
+            (int) $this->access()->getAvailable($otherGroupId)->id_grupo
+        );
+    }
+
+    private function linkExam(Group $group, string $state): void
+    {
+        $exam = $this->createExam(['estado' => $state]);
+
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $group->id_grupo,
+        ]);
+    }
+
     private function access(): StudentRosterGroupAccess
     {
-        return new StudentRosterGroupAccess();
+        return new StudentRosterGroupAccess(new ExamRosterLockService());
     }
 
     private function ownActiveGroup(): Group

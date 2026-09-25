@@ -35,8 +35,8 @@ trait SeedsExamCatalog
         $this->otraAulaId = $this->createClassroom('692B', RecordStatus::ACTIVE);
         $this->aulaInactivaId = $this->createClassroom('OLD-1', RecordStatus::INACTIVE);
 
-        // Dos estudiantes activos y uno retirado: solo los activos rinden el examen.
-        $this->enrollStudents($this->grupoPropioId, 2, 1);
+        // Dos estudiantes inscritos en el grupo propio.
+        $this->enrollStudents($this->grupoPropioId, 2);
     }
 
     /** Una fecha segura en el futuro, en el formato que espera la API. */

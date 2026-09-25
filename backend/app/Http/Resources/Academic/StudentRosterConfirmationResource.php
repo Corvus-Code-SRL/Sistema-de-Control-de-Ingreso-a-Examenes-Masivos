@@ -14,7 +14,6 @@ class StudentRosterConfirmationResource extends JsonResource
             'estudiantes_creados' => $this->resource->createdStudents(),
             'estudiantes_inscritos' => $this->resource->enrolledStudents(),
             'ya_inscritos' => $this->resource->alreadyEnrolled(),
-            'inscripciones_inactivas' => $this->resource->inactiveEnrollments(),
         ];
     }
 }

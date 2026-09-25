@@ -39,7 +39,6 @@ class StudentRosterConfirmer
             $createdStudents = 0;
             $enrolledStudents = 0;
             $alreadyEnrolled = 0;
-            $inactiveEnrollments = 0;
 
             foreach ($matches as $match) {
                 if (
@@ -95,15 +94,6 @@ class StudentRosterConfirmer
                     continue;
                 }
 
-                if (
-                    $match->status()
-                    === StudentRosterDatabaseMatch::INACTIVE_ENROLLMENT
-                ) {
-                    $inactiveEnrollments++;
-
-                    continue;
-                }
-
                 throw new LogicException(
                     'Estado de clasificación de nómina no soportado.'
                 );
@@ -114,8 +104,7 @@ class StudentRosterConfirmer
                 $analysis->inconsistentRows(),
                 $createdStudents,
                 $enrolledStudents,
-                $alreadyEnrolled,
-                $inactiveEnrollments
+                $alreadyEnrolled
             );
         });
     }

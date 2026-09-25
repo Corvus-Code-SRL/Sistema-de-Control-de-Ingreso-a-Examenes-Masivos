@@ -14,7 +14,7 @@ class GroupDetailTest extends TestCase
     public function test_ubica_el_grupo_con_su_par_periodo_y_docente(): void
     {
         $this->seedAcademicCatalog();
-        $this->enrollStudents($this->grupoPropioId, 4, 1);
+        $this->enrollStudents($this->grupoPropioId, 4);
 
         $this->getJson($this->groupUrl($this->grupoPropioId))
             ->assertOk()

@@ -99,7 +99,11 @@ class StudentRosterDatabaseMatcherTest extends TestCase
         $this->assertNull($new->studentId());
     }
 
-    public function test_identifica_inscripcion_inactiva_sin_reactivarla(): void
+    /**
+     * La nómina no tiene estados: estar en ella es tener una fila en grupo_estudiante.
+     * Una fila cuyo estado sea INACTIVO (datos de una versión anterior) no cambia nada.
+     */
+    public function test_cualquier_fila_de_inscripcion_es_ya_inscrito_sin_leer_su_estado(): void
     {
         $this->seedAcademicCatalog();
 
@@ -132,7 +136,7 @@ class StudentRosterDatabaseMatcherTest extends TestCase
         $this->assertCount(1, $matches);
 
         $this->assertSame(
-            StudentRosterDatabaseMatch::INACTIVE_ENROLLMENT,
+            StudentRosterDatabaseMatch::ALREADY_ENROLLED,
             $matches[0]->status()
         );
 
@@ -300,7 +304,7 @@ class StudentRosterDatabaseMatcherTest extends TestCase
     private function analyze(array $rows)
     {
         return (new StudentRosterAnalyzer(
-            new StudentRosterRowValidator()
+            new StudentRosterRowValidator(8, 12)
         ))->analyze($rows);
     }
 

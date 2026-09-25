@@ -65,7 +65,7 @@ class ExamService
             ->get();
 
         $groups = Group::query()
-            ->withActiveStudentCount()
+            ->withStudentCount()
             ->where('id_usuario_docente', $this->currentTeacherId())
             ->where('id_periodo', $this->subjectCatalog->activePeriodId())
             ->where('estado', RecordStatus::ACTIVE)
@@ -385,7 +385,7 @@ class ExamService
             'subject',
             'career',
             'classrooms',
-            'groups' => fn ($query) => $query->withActiveStudentCount(),
+            'groups' => fn ($query) => $query->withStudentCount(),
         ]);
     }
 
