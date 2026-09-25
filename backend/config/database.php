@@ -71,11 +71,16 @@ return [
             'database' => env('DB_DATABASE', 'forge'),
             'username' => env('DB_USERNAME', 'forge'),
             'password' => env('DB_PASSWORD', ''),
-            'charset' => 'utf8',
+            'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'schema' => 'public',
-            'sslmode' => 'prefer',
+            // En Laravel 8 la clave `schema` es la que se aplica como search_path de la conexión.
+            'schema' => env('DB_SCHEMA', 'public'),
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Nunca conexiones persistentes: junto con un pooler producen errores muy difíciles de rastrear.
+            'options' => [
+                PDO::ATTR_PERSISTENT => false,
+            ],
         ],
 
         'sqlsrv' => [

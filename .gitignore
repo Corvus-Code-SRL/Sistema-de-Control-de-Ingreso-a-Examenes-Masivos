@@ -4,6 +4,8 @@
 .env
 .env.*
 !.env.example
+!.env.testing.example
+.env.testing
 
 backend/.env
 frontend/.env
