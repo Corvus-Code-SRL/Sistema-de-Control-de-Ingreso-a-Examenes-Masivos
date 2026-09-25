@@ -54,4 +54,20 @@ return [
 
     'zona_horaria' => env('SCIEM_ZONA_HORARIA', 'America/La_Paz'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Código SIS de estudiante (carga de nómina)
+    |--------------------------------------------------------------------------
+    |
+    | Los códigos SIS de estudiante son solo dígitos: 9 hoy, 8 antes del 2000. Esta
+    | regla es solo de la nómina de estudiantes. Docentes y administradores tienen
+    | códigos más cortos y alfanuméricos: no reutilizarla en el registro de cuentas.
+    |
+    */
+
+    'estudiante_cod_sis' => [
+        'min_length' => (int) env('SCIEM_ESTUDIANTE_COD_SIS_MIN', 8),
+        'max_length' => (int) env('SCIEM_ESTUDIANTE_COD_SIS_MAX', 12),
+    ],
+
 ];

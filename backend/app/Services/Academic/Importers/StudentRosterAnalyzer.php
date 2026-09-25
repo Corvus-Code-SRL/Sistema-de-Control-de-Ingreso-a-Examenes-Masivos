@@ -15,20 +15,17 @@ class StudentRosterAnalyzer
     public function analyze(iterable $rows): StudentRosterAnalysisResult
     {
         $rows = $this->toArray($rows);
-        $sisCodeOccurrences = $this->countSisCodeOccurrences($rows);
+        $rowsBySisCode = $this->groupBySisCode($rows);
 
         $analyzedRows = [];
 
         foreach ($rows as $row) {
             $errors = $this->validator->validate($row);
 
-            $sisCode = $row->sisCode();
+            $duplicateError = $this->duplicateError($row, $rowsBySisCode);
 
-            if (
-                $sisCode !== null
-                && $sisCodeOccurrences[$sisCode] > 1
-            ) {
-                $errors[] = 'duplicate_sis_code_in_file';
+            if ($duplicateError !== null) {
+                $errors[] = $duplicateError;
             }
 
             $analyzedRows[] = new StudentRosterRowAnalysis(
@@ -38,6 +35,53 @@ class StudentRosterAnalyzer
         }
 
         return new StudentRosterAnalysisResult($analyzedRows);
+    }
+
+    /**
+     * Un código SIS repetido con datos idénticos se importa una sola vez: la primera
+     * fila vale y las demás se reportan como duplicadas. Si las filas difieren en
+     * cualquier campo no hay forma de saber cuál es la correcta: ninguna se importa.
+     *
+     * @param array<string, array<int, StudentRosterRow>> $rowsBySisCode
+     */
+    private function duplicateError(
+        StudentRosterRow $row,
+        array $rowsBySisCode
+    ): ?string {
+        $sisCode = $row->sisCode();
+
+        if ($sisCode === null || count($rowsBySisCode[$sisCode]) < 2) {
+            return null;
+        }
+
+        $sameSisCode = $rowsBySisCode[$sisCode];
+
+        if (!$this->areIdentical($sameSisCode)) {
+            return 'conflicting_duplicate_in_file';
+        }
+
+        return $sameSisCode[0] === $row
+            ? null
+            : 'duplicate_row_in_file';
+    }
+
+    /**
+     * @param array<int, StudentRosterRow> $rows
+     */
+    private function areIdentical(array $rows): bool
+    {
+        $first = $rows[0];
+
+        foreach ($rows as $row) {
+            if (
+                $row->lastNames() !== $first->lastNames()
+                || $row->firstNames() !== $first->firstNames()
+            ) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -54,11 +98,11 @@ class StudentRosterAnalyzer
 
     /**
      * @param array<int, StudentRosterRow> $rows
-     * @return array<string, int>
+     * @return array<string, array<int, StudentRosterRow>>
      */
-    private function countSisCodeOccurrences(array $rows): array
+    private function groupBySisCode(array $rows): array
     {
-        $occurrences = [];
+        $grouped = [];
 
         foreach ($rows as $row) {
             $sisCode = $row->sisCode();
@@ -67,13 +111,9 @@ class StudentRosterAnalyzer
                 continue;
             }
 
-            if (!isset($occurrences[$sisCode])) {
-                $occurrences[$sisCode] = 0;
-            }
-
-            $occurrences[$sisCode]++;
+            $grouped[$sisCode][] = $row;
         }
 
-        return $occurrences;
+        return $grouped;
     }
 }
