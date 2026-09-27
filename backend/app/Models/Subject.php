@@ -3,17 +3,21 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Representa una materia en el catálogo institucional.
+ * Mapea public.materia.
+ *
+ * @property int $id_materia
+ * @property string $nombre
+ * @property string $codigo
+ * @property string|null $descripcion
+ * @property string $estado
  */
 class Subject extends Model
 {
-    use HasFactory;
-
     public const ESTADO_ACTIVO   = 'ACTIVO';
     public const ESTADO_INACTIVO = 'INACTIVO';
 
@@ -24,11 +28,15 @@ class Subject extends Model
     protected $primaryKey = 'id_materia';
     public $timestamps = false;
 
+    protected $casts = [
+        'estado' => 'string'
+    ];
+
     protected $fillable = [
         'nombre',
         'codigo',
         'descripcion',
-        'estado',
+        'estado'
     ];
 
     /**
@@ -45,5 +53,12 @@ class Subject extends Model
     public function scopeActivas(Builder $query): Builder
     {
         return $query->whereRaw('estado::text = ?', [self::ESTADO_ACTIVO]);
+    }
+
+    public function careers(): BelongsToMany
+    {
+        return $this->belongsToMany(Career::class, 'materia_carrera', 'id_materia', 'id_carrera')
+            ->using(SubjectCareer::class)
+            ->withPivot('nivel_semestre', 'obligatoria', 'estado');
     }
 }

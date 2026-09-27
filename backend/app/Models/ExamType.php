@@ -6,19 +6,25 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Catálogo de tipos de examen. Cada tipo pertenece a una categoría de public.categoria_examen.
+ * Mapea public.tipo_examen.
+ *
+ * @property int $id_tipo_examen
+ * @property string $nombre
+ * @property string $categoria
  */
 class ExamType extends Model
 {
     protected $table = 'tipo_examen';
-
     protected $primaryKey = 'id_tipo_examen';
-
     public $timestamps = false;
+
+    protected $casts = [
+        'categoria' => 'string'
+    ];
 
     protected $fillable = [
         'nombre',
-        'categoria',
+        'categoria'
     ];
 
     public function exams(): HasMany
