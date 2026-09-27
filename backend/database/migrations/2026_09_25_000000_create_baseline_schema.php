@@ -4,9 +4,9 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Migración base: reproduce el esquema vigente de SCIEM (tipos enum, 34 tablas, índices y
- * restricciones) a partir de una copia congelada de docs/database/creation-script.sql, ya con
- * los cambios de HU-21 y HU-24 incorporados.
+ * Migración base: reproduce el esquema final de SCIEM (tipos enum, 36 tablas, índices, restricciones y
+ * un trigger) a partir de docs/database/creation-script.sql, con HU-21, HU-24, las tablas de auxiliares,
+ * minutos_apertura y periodo.gestion ya incorporados.
  *
  * En bases donde el esquema ya existe (la base compartida) no se ejecuta: se marca como aplicada
  * siguiendo docs/database/migracion-base.md. Todo cambio estructural posterior va en una migración

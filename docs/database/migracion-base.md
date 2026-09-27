@@ -1,14 +1,15 @@
 # Migración base del esquema
 
 `backend/database/migrations/2026_09_25_000000_create_baseline_schema.php` reproduce el esquema vigente
-(7 tipos enum, 34 tablas, índices y restricciones, con los cambios de HU-21 y HU-24 ya incorporados).
-Ejecuta una copia **congelada** de `docs/database/creation-script.sql` guardada en
+(7 tipos enum, 36 tablas, índices, restricciones y un trigger, con HU-21, HU-24, las tablas de auxiliares
+(`grupo_auxiliar`, `examen_auxiliar`), `examen.minutos_apertura` y `periodo.gestion` ya incorporados).
+Ejecuta una copia de `docs/database/creation-script.sql` (que debe ser idéntica: lo verifica `DatabaseSchemaTest`) guardada en
 `backend/database/schema/baseline.sql`. Ese archivo y la migración no se editan nunca: todo cambio
 estructural posterior va en una migración nueva (`php artisan make:migration ...`).
 
 Sustituye a las seis migraciones parciales anteriores (`create_enum_types`, `create_rol_table`,
 `create_usuario_table`, `create_usuario_rol_table`, `create_accion_table`, `create_log_table`), que solo
-cubrían 6 de las 34 tablas y ya no coincidían con el script. Se conservan las de Laravel/Sanctum
+cubrían 6 de las tablas y ya no coincidían con el script. Se conservan las de Laravel/Sanctum
 (`failed_jobs`, `personal_access_tokens`), que no forman parte del script.
 
 `down()` lanza una excepción a propósito: revertir la base borraría todo el esquema.
@@ -27,27 +28,35 @@ PostgreSQL 15.19 limpio: el resultado es idéntico al de cargar `creation-script
 
 ## 2. Base compartida donde el esquema ya existe (Supabase)
 
-La migración base **no debe ejecutarse** ahí: fallaría en el primer `CREATE TYPE`. Se marca como aplicada.
-Lo hace **una sola persona**, avisando antes en el canal del equipo.
+**Ya está hecho (2026-09-26).** La base compartida se llevó al esquema final con
+`docs/database/alter-hu-24-examen.sql` y `docs/database/alter-esquema-final.sql` (ambos idempotentes, en una
+sola transacción), se creó la tabla `migrations` y se marcó la migración base como aplicada
+(`migrate:status` la muestra en `Yes`, lote 1). Nadie más debe repetirlo: en Supabase basta con
+`php artisan migrate` cuando haya migraciones nuevas.
 
-1. Confirmar que el esquema está al día con HU-21 y HU-24 (si no, aplicar primero
-   `alter-hu-21-estudiante-ci.sql` y `alter-hu-24-examen.sql`, que son idempotentes):
+Quedan pendientes las dos migraciones de Laravel (`failed_jobs` y `personal_access_tokens`, esta última la
+usa Sanctum). Son tablas nuevas que no tocan datos; se crean con `php artisan migrate` cuando el equipo lo
+decida. Hasta entonces `migrate --pretend` solo debe listar esas dos.
 
-   ```sql
-   SELECT count(*) FROM pg_tables WHERE schemaname = 'public';           -- 34 (más las de Laravel, si existen)
-   SELECT is_nullable FROM information_schema.columns
-    WHERE table_name = 'estudiante' AND column_name = 'ci';              -- YES
-   SELECT column_name FROM information_schema.columns
-    WHERE table_name = 'examen' AND column_name IN ('id_carrera','id_materia','id_usuario_docente','estado'); -- 4 filas
-   ```
+Si alguna vez hay que repetir el procedimiento en otra base con el esquema ya creado (la migración base **no
+debe ejecutarse** ahí: fallaría en el primer `CREATE TYPE`; se marca como aplicada):
 
-2. Crear la tabla de control (solo agrega una tabla; no toca datos):
+1. Comparar el esquema vivo con `creation-script.sql`. Si difiere, llevarlo al esquema final aplicando
+   `alter-hu-21-estudiante-ci.sql`, `alter-hu-24-examen.sql` y `alter-esquema-final.sql` (en ese orden).
+   Comprobar que la base no tenga filas o que los `alter` no las dañen.
+2. Crear la tabla de control (solo agrega una tabla):
 
    ```bash
    php artisan migrate:install
    ```
 
-3. Marcar la migración base como ejecutada:
+3. Comprobar con `--pretend`, que no ejecuta nada, qué haría `migrate`:
+
+   ```bash
+   php artisan migrate --pretend
+   ```
+
+4. Marcar la migración base como ejecutada:
 
    ```bash
    php artisan tinker --execute="DB::table('migrations')->insert(['migration' => '2026_09_25_000000_create_baseline_schema', 'batch' => DB::table('migrations')->max('batch') + 1]);"
@@ -55,20 +64,11 @@ Lo hace **una sola persona**, avisando antes en el canal del equipo.
 
    Equivale al SQL: `INSERT INTO migrations (migration, batch) VALUES ('2026_09_25_000000_create_baseline_schema', 1);`
 
-4. Verificar con `--pretend`, que no ejecuta nada:
+5. Repetir `php artisan migrate --pretend`: la migración base ya no debe aparecer. Comprobar con
+   `php artisan migrate:status`.
 
-   ```bash
-   php artisan migrate --pretend
-   ```
-
-   La salida solo debe listar `failed_jobs` y `personal_access_tokens`, y solo si esas tablas no existen
-   en la base (crearlas es aditivo e inocuo). Si ya existen, márquelas igual que en el paso 3 con sus
-   nombres (`2019_08_19_000000_create_failed_jobs_table`, `2019_12_14_000001_create_personal_access_tokens_table`).
-   La migración base **no** debe aparecer. Con todo marcado, la salida es `Nothing to migrate.`
-
-5. Ejecutar `php artisan migrate` y comprobar con `php artisan migrate:status` que todo figura como `Yes`.
-
-Este procedimiento se probó en una base local creada solo con `creation-script.sql`.
+Diferencia del esquema de Supabase frente al de una base local: `pgcrypto` vive en el esquema `extensions`
+(no en `public`), y Supabase trae sus propios esquemas (`auth`, `storage`, `realtime`...). No afectan a `public`.
 
 ## 3. Bases locales creadas con las migraciones parciales antiguas
 
@@ -82,3 +82,8 @@ base figura como pendiente y fallaría. Opciones: recrear la base local (`DROP D
 script no se actualice a la par de cada migración nueva, las pruebas no verán los cambios estructurales
 posteriores a la base. Pendiente de decisión del equipo: que `TestCase` cargue el esquema con
 `php artisan migrate` en lugar del script, conservando intacta la verificación del nombre `sciem_test`.
+
+Si una base local ya ejecutó la migración base **antes del 2026-09-26**, tiene una versión anterior del esquema
+(sin las tablas de auxiliares, sin `minutos_apertura` ni el trigger de cancelación) y `migrate` no la volverá a
+correr. Hay que recrear esa base local (`DROP DATABASE` / `createdb` / `php artisan migrate`). A partir de
+ahora la migración base no cambia más: todo cambio estructural va en una migración nueva.
