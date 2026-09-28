@@ -21,7 +21,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  */
 class Group extends Model
 {
-
     protected $table = 'grupo';
     protected $primaryKey = 'id_grupo';
     public $timestamps = false;

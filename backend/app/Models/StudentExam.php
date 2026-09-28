@@ -18,7 +18,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class StudentExam extends Pivot
 {
-
     protected $table = 'examen_estudiante';
     protected $primaryKey = null;
     public $incrementing = false;

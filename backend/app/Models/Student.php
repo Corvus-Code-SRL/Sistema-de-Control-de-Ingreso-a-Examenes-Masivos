@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * @property int $id_estudiante
  * @property string $cod_sis
- * @property string $ci
+ * @property string|null $ci
  * @property string $nombre
  * @property string $apellido_paterno
  * @property string|null $apellido_materno

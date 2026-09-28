@@ -15,7 +15,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class GroupStudent extends Pivot
 {
-
     protected $table = 'grupo_estudiante';
     protected $primaryKey = null;
     public $incrementing = false;
@@ -44,7 +43,7 @@ class GroupStudent extends Pivot
         return $this->belongsTo(Student::class, 'id_estudiante', 'id_estudiante');
     }
 
-    /** Consulta por la FK completa; usar ->get()/->first(), no with().  o en estos casos utilizar funciones de sql puro*/
+    /** Consulta por la FK completa; usar ->get()/->first(), no with(). */
     public function studentExamsQuery(): \Illuminate\Database\Eloquent\Builder
     {
         return StudentExam::on($this->getConnectionName())
