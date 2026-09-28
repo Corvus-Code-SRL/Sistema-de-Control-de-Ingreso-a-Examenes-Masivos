@@ -80,10 +80,7 @@ export function RosterPreviewStep({
             return isIncorporable(row.estado)
 
           case 'already_in_group':
-            return (
-              row.estado === 'already_enrolled' ||
-              row.estado === 'inactive_enrollment'
-            )
+            return row.estado === 'already_enrolled'
 
           case 'inconsistent':
             return row.estado === 'inconsistent'

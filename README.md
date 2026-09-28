@@ -295,7 +295,7 @@ Los códigos SIS siguen el formato de cada tipo de cuenta: el Administrador es a
 | Mismo número de grupo, misma materia, otra carrera | Grupo 1 de Cálculo I en Sistemas (9401) y en Economía (9403) | HU-017 |
 | Grupos de otro docente en el mismo par | Cálculo I en Sistemas: grupo 1 del docente fijo y grupo 2 de Rosario Salazar (9402), abierto en el listado y con 403 en el detalle | HU-017 |
 | Grupo sin nómina | Base de Datos I en Sistemas, grupo 1 (9404) | HU-017 |
-| Inscripción retirada, que no cuenta como inscrito | Gabriela Guzmán en el grupo 9401 (INACTIVO) | HU-017 |
+| Estudiante existente que no está en la nómina de un grupo | Gabriela Guzmán (`202150007`) respecto del grupo 9401: al cargarla se inscribe sin crear otro estudiante | HU-021 |
 | Grupo de un periodo anterior | Cálculo I en Sistemas, grupo 1 del periodo 1-2026 (9410) | HU-017 |
 | Cuenta sin rol | Lucía Terrazas | HU-004 |
 | Cuenta deshabilitada | Óscar Villarroel | HU-004 |

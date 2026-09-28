@@ -77,7 +77,7 @@ class StudentRosterAnalyzerTest extends TestCase
         );
     }
 
-    public function testItMarksEveryDuplicateSisCodeOccurrence(): void
+    public function testItImportsIdenticalDuplicatesOnceAndReportsTheExtraRows(): void
     {
         $rows = [
             new StudentRosterRow(
@@ -103,55 +103,110 @@ class StudentRosterAnalyzerTest extends TestCase
         $result = $this->analyzer()->analyze($rows);
 
         $this->assertSame(3, $result->totalRows());
+        $this->assertSame(2, $result->validRows());
+        $this->assertSame(1, $result->inconsistentRows());
+
+        $this->assertSame([], $result->rows()[0]->errors());
+        $this->assertSame([], $result->rows()[1]->errors());
+
+        $this->assertSame(
+            ['duplicate_row_in_file'],
+            $result->rows()[2]->errors()
+        );
+        $this->assertSame(4, $result->rows()[2]->row()->rowNumber());
+    }
+
+    public function testItImportsNeitherRowWhenDuplicatesDiffer(): void
+    {
+        $rows = [
+            new StudentRosterRow(2, '20200240', 'ACUÑA QUISPE', 'JOSE DIEGO'),
+            new StudentRosterRow(3, '20210567', 'PEREZ ROJAS', 'ANA MARIA'),
+            new StudentRosterRow(4, '20200240', 'ACUÑA QUISPE', 'JOSE DANIEL'),
+        ];
+
+        $result = $this->analyzer()->analyze($rows);
+
         $this->assertSame(1, $result->validRows());
         $this->assertSame(2, $result->inconsistentRows());
 
         $this->assertSame(
-            ['duplicate_sis_code_in_file'],
+            ['conflicting_duplicate_in_file'],
             $result->rows()[0]->errors()
         );
-
+        $this->assertSame([], $result->rows()[1]->errors());
         $this->assertSame(
-            [],
-            $result->rows()[1]->errors()
-        );
-
-        $this->assertSame(
-            ['duplicate_sis_code_in_file'],
+            ['conflicting_duplicate_in_file'],
             $result->rows()[2]->errors()
         );
+    }
+
+    public function testItRejectsAllRowsWhenOnlyOneOfSeveralDuplicatesDiffers(): void
+    {
+        $rows = [
+            new StudentRosterRow(2, '20200240', 'ACUÑA QUISPE', 'JOSE DIEGO'),
+            new StudentRosterRow(3, '20200240', 'ACUÑA QUISPE', 'JOSE DIEGO'),
+            new StudentRosterRow(4, '20200240', 'ACUÑA QUISPE', 'JOSE DANIEL'),
+        ];
+
+        $result = $this->analyzer()->analyze($rows);
+
+        $this->assertSame(0, $result->validRows());
+
+        foreach ($result->rows() as $analysis) {
+            $this->assertSame(['conflicting_duplicate_in_file'], $analysis->errors());
+        }
+    }
+
+    public function testItReportsEveryExtraCopyOfAnIdenticalDuplicate(): void
+    {
+        $rows = [
+            new StudentRosterRow(2, '20200240', 'ACUÑA QUISPE', 'JOSE DIEGO'),
+            new StudentRosterRow(3, '20200240', 'ACUÑA QUISPE', 'JOSE DIEGO'),
+            new StudentRosterRow(4, '20200240', 'ACUÑA QUISPE', 'JOSE DIEGO'),
+        ];
+
+        $result = $this->analyzer()->analyze($rows);
+
+        $this->assertSame(1, $result->validRows());
+        $this->assertSame([], $result->rows()[0]->errors());
+        $this->assertSame(['duplicate_row_in_file'], $result->rows()[1]->errors());
+        $this->assertSame(['duplicate_row_in_file'], $result->rows()[2]->errors());
     }
 
     public function testItCombinesValidationAndDuplicateErrors(): void
     {
         $rows = [
-            new StudentRosterRow(
-                2,
-                '20200240',
-                null,
-                'JOSE DIEGO'
-            ),
-            new StudentRosterRow(
-                3,
-                '20200240',
-                'ACUÑA QUISPE',
-                'JOSE DIEGO'
-            ),
+            new StudentRosterRow(2, '20200240', null, 'JOSE DIEGO'),
+            new StudentRosterRow(3, '20200240', 'ACUÑA QUISPE', 'JOSE DIEGO'),
         ];
 
         $result = $this->analyzer()->analyze($rows);
 
         $this->assertSame([
             'missing_last_names',
-            'duplicate_sis_code_in_file',
+            'conflicting_duplicate_in_file',
         ], $result->rows()[0]->errors());
 
         $this->assertSame([
-            'duplicate_sis_code_in_file',
+            'conflicting_duplicate_in_file',
         ], $result->rows()[1]->errors());
 
         $this->assertSame(0, $result->validRows());
         $this->assertSame(2, $result->inconsistentRows());
+    }
+
+    public function testItReportsInvalidSisCodesAsInvalidRows(): void
+    {
+        $rows = [
+            new StudentRosterRow(2, 'ABC-XYZ', 'PEREZ ROJAS', 'ANA'),
+        ];
+
+        $result = $this->analyzer()->analyze($rows);
+
+        $this->assertSame(0, $result->validRows());
+        $this->assertSame(1, $result->inconsistentRows());
+        $this->assertSame(2, $result->rows()[0]->row()->rowNumber());
+        $this->assertContains('sis_code_not_numeric', $result->rows()[0]->errors());
     }
 
     public function testItAnalyzesRowsDirectlyFromCsvReader(): void
@@ -170,8 +225,8 @@ class StudentRosterAnalyzerTest extends TestCase
         );
 
         $this->assertSame(3, $result->totalRows());
-        $this->assertSame(1, $result->validRows());
-        $this->assertSame(2, $result->inconsistentRows());
+        $this->assertSame(2, $result->validRows());
+        $this->assertSame(1, $result->inconsistentRows());
 
         $this->assertSame(
             2,
@@ -187,7 +242,7 @@ class StudentRosterAnalyzerTest extends TestCase
     private function analyzer(): StudentRosterAnalyzer
     {
         return new StudentRosterAnalyzer(
-            new StudentRosterRowValidator()
+            new StudentRosterRowValidator(8, 12)
         );
     }
 
