@@ -105,15 +105,4 @@ class Group extends Model
     {
         return $this->examGroups();
     }
-
-    /** Cantidad habilitable para exámenes: solo inscripciones activas. */
-    public function scopeWithActiveStudentCount(Builder $query): Builder
-    {
-        return $query->select('grupo.*')->selectSub(function ($subquery) {
-            $subquery->from('grupo_estudiante')
-                ->selectRaw('count(*)')
-                ->whereColumn('grupo_estudiante.id_grupo', 'grupo.id_grupo')
-                ->where('grupo_estudiante.estado', 'ACTIVO');
-        }, 'cantidad_estudiantes');
-    }
 }
