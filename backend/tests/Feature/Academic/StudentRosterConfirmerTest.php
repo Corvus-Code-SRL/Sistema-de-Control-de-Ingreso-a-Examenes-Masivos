@@ -12,7 +12,6 @@ use App\Services\Academic\Importers\StudentRosterRow;
 use App\Services\Academic\Importers\StudentRosterRowValidator;
 use App\Services\Academic\Importers\StudentRosterStudentCreator;
 use App\Services\Academic\Importers\StudentRosterStudentMapper;
-use App\Services\Academic\Importers\TemporaryStudentCiGenerator;
 use App\Support\RecordStatus;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
@@ -53,7 +52,7 @@ class StudentRosterConfirmerTest extends TestCase
             '10000002'
         );
 
-        $inactiveStudent = $this->createStudent(
+        $legacyRowStudent = $this->createStudent(
             '20230456',
             '10000003'
         );
@@ -67,8 +66,9 @@ class StudentRosterConfirmerTest extends TestCase
             ],
             [
                 'id_grupo' => $groupId,
-                'id_estudiante' => $inactiveStudent->id_estudiante,
+                'id_estudiante' => $legacyRowStudent->id_estudiante,
                 'fecha_inscripcion' => '2026-08-15',
+                // Fila escrita por una versión anterior: la nómina no lee ni cambia el estado.
                 'estado' => RecordStatus::INACTIVE,
             ],
         ]);
@@ -115,14 +115,14 @@ class StudentRosterConfirmerTest extends TestCase
         $this->assertSame(1, $result->inconsistentRows());
         $this->assertSame(1, $result->createdStudents());
         $this->assertSame(2, $result->enrolledStudents());
-        $this->assertSame(1, $result->alreadyEnrolled());
-        $this->assertSame(1, $result->inactiveEnrollments());
+        $this->assertSame(2, $result->alreadyEnrolled());
 
         $newStudent = Student::query()
             ->where('cod_sis', '20230001')
             ->first();
 
         $this->assertNotNull($newStudent);
+        $this->assertNull($newStudent->ci);
 
         $this->assertDatabaseHas('grupo_estudiante', [
             'id_grupo' => $groupId,
@@ -168,7 +168,7 @@ class StudentRosterConfirmerTest extends TestCase
 
         $this->assertDatabaseHas('grupo_estudiante', [
             'id_grupo' => $groupId,
-            'id_estudiante' => $inactiveStudent->id_estudiante,
+            'id_estudiante' => $legacyRowStudent->id_estudiante,
             'fecha_inscripcion' => '2026-08-15',
             'estado' => RecordStatus::INACTIVE,
         ]);
@@ -183,6 +183,93 @@ class StudentRosterConfirmerTest extends TestCase
         $this->assertDatabaseMissing('estudiante', [
             'cod_sis' => '20239999',
         ]);
+    }
+
+    public function test_los_estudiantes_nuevos_no_tienen_ci_y_pueden_ser_varios(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $groupId = $this->ownGroupId('1');
+
+        $result = $this->confirmer()->confirm($groupId, $this->analyze([
+            new StudentRosterRow(2, '202400001', 'PEREZ ROJAS', 'ANA'),
+            new StudentRosterRow(3, '202400002', 'ROJAS FLORES', 'CARLOS'),
+            new StudentRosterRow(4, '202400003', 'VARGAS PINTO', 'MARIA'),
+        ]));
+
+        $this->assertSame(3, $result->createdStudents());
+        $this->assertSame(
+            3,
+            Student::query()->whereIn('cod_sis', ['202400001', '202400002', '202400003'])
+                ->whereNull('ci')
+                ->count()
+        );
+        $this->assertSame(
+            3,
+            DB::table('grupo_estudiante')
+                ->where('id_grupo', $groupId)
+                ->where('estado', RecordStatus::ACTIVE)
+                ->count()
+        );
+    }
+
+    public function test_importa_una_sola_vez_las_filas_duplicadas_identicas(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $groupId = $this->ownGroupId('1');
+
+        $result = $this->confirmer()->confirm($groupId, $this->analyze([
+            new StudentRosterRow(2, '202400001', 'PEREZ ROJAS', 'ANA'),
+            new StudentRosterRow(3, '202400002', 'ROJAS FLORES', 'CARLOS'),
+            new StudentRosterRow(4, '202400001', 'PEREZ ROJAS', 'ANA'),
+        ]));
+
+        $this->assertSame(3, $result->totalRows());
+        $this->assertSame(1, $result->inconsistentRows());
+        $this->assertSame(2, $result->createdStudents());
+        $this->assertSame(2, $result->enrolledStudents());
+        $this->assertSame(1, Student::query()->where('cod_sis', '202400001')->count());
+        $this->assertSame(
+            2,
+            DB::table('grupo_estudiante')->where('id_grupo', $groupId)->count()
+        );
+    }
+
+    public function test_no_importa_ninguna_de_las_filas_duplicadas_que_difieren(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $groupId = $this->ownGroupId('1');
+
+        $result = $this->confirmer()->confirm($groupId, $this->analyze([
+            new StudentRosterRow(2, '202400001', 'PEREZ ROJAS', 'ANA'),
+            new StudentRosterRow(3, '202400002', 'ROJAS FLORES', 'CARLOS'),
+            new StudentRosterRow(4, '202400001', 'PEREZ ROJAS', 'ANA MARIA'),
+        ]));
+
+        $this->assertSame(2, $result->inconsistentRows());
+        $this->assertSame(1, $result->createdStudents());
+        $this->assertDatabaseMissing('estudiante', ['cod_sis' => '202400001']);
+        $this->assertDatabaseHas('estudiante', ['cod_sis' => '202400002']);
+    }
+
+    public function test_un_codigo_sis_invalido_no_crea_un_estudiante(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $groupId = $this->ownGroupId('1');
+
+        $result = $this->confirmer()->confirm($groupId, $this->analyze([
+            new StudentRosterRow(2, 'ABC-XYZ', 'PEREZ ROJAS', 'ANA'),
+            new StudentRosterRow(3, '1234567', 'ROJAS FLORES', 'CARLOS'),
+            new StudentRosterRow(4, '202400001', 'VARGAS PINTO', 'MARIA'),
+        ]));
+
+        $this->assertSame(2, $result->inconsistentRows());
+        $this->assertSame(1, $result->createdStudents());
+        $this->assertDatabaseMissing('estudiante', ['cod_sis' => 'ABC-XYZ']);
+        $this->assertDatabaseMissing('estudiante', ['cod_sis' => '1234567']);
     }
 
     public function test_revierte_todo_si_falla_la_confirmacion(): void
@@ -223,7 +310,6 @@ class StudentRosterConfirmerTest extends TestCase
         return new StudentRosterConfirmer(
             new StudentRosterDatabaseMatcher(),
             new StudentRosterStudentCreator(
-                new TemporaryStudentCiGenerator(),
                 new StudentRosterStudentMapper()
             )
         );

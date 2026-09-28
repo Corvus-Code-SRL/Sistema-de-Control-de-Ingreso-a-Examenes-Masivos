@@ -37,7 +37,7 @@ const groups: Group[] = [
 ]
 
 describe('AssignGroupsForm', () => {
-  it('permite alternar solamente grupos con nómina activa', async () => {
+  it('permite alternar solamente grupos con nómina cargada', async () => {
     const user = userEvent.setup()
     const onToggleGroup = vi.fn()
 

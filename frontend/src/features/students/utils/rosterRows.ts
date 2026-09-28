@@ -3,6 +3,7 @@ import {
   INCORPORABLE_STATES,
   LAST_NAMES_MAX_LENGTH,
   SIS_CODE_MAX_LENGTH,
+  SIS_CODE_MIN_LENGTH,
   type RosterIssue,
   type RosterPreviewData,
   type RosterPreviewRow,
@@ -34,7 +35,6 @@ export interface RosterRowCounts {
   nuevos: number
   yaEnElGrupo: number
   yaInscritos: number
-  inscripcionesInactivas: number
   inconsistentes: number
 }
 
@@ -42,7 +42,6 @@ const STATE_TEXT: Record<RosterRowState, RosterStateText> = {
   new_student: { label: 'Nuevo en SCIEM', tone: 'ok' },
   existing_student: { label: 'Se inscribirá', tone: 'ok' },
   already_enrolled: { label: 'Ya en el grupo', tone: 'neutral' },
-  inactive_enrollment: { label: 'Inscripción inactiva', tone: 'warn' },
   inconsistent: { label: 'Inconsistente', tone: 'danger' },
 }
 
@@ -50,9 +49,13 @@ const ERROR_ISSUE: Record<RosterRowError, RosterIssue> = {
   missing_sis_code: { category: 'Incompleto', message: 'Falta el código SIS' },
   missing_last_names: { category: 'Incompleto', message: 'Faltan los apellidos' },
   missing_first_names: { category: 'Incompleto', message: 'Faltan los nombres' },
-  sis_code_too_long: {
+  sis_code_not_numeric: {
     category: 'Formato',
-    message: `El código SIS supera los ${SIS_CODE_MAX_LENGTH} caracteres`,
+    message: 'El código SIS debe tener solo dígitos',
+  },
+  sis_code_invalid_length: {
+    category: 'Formato',
+    message: `El código SIS debe tener entre ${SIS_CODE_MIN_LENGTH} y ${SIS_CODE_MAX_LENGTH} dígitos`,
   },
   last_names_too_long: {
     category: 'Formato',
@@ -62,7 +65,11 @@ const ERROR_ISSUE: Record<RosterRowError, RosterIssue> = {
     category: 'Formato',
     message: `Los nombres superan los ${FIRST_NAMES_MAX_LENGTH} caracteres`,
   },
-  duplicate_sis_code_in_file: { category: 'Duplicado', message: 'Código SIS repetido en el archivo' },
+  duplicate_row_in_file: { category: 'Duplicado', message: 'Fila repetida en el archivo' },
+  conflicting_duplicate_in_file: {
+    category: 'Duplicado',
+    message: 'Código SIS repetido con datos distintos: no se importa ninguna de las filas',
+  },
 }
 
 /*
@@ -115,16 +122,22 @@ export function duplicateRowsBySis(rows: readonly RosterPreviewRow[]): Map<strin
 /**
  * Observaciones de una fila, una por inconsistencia.
  *
- * El backend marca `duplicate_sis_code_in_file` en todas las apariciones del
- * código, así que el mensaje nombra el conjunto completo una sola vez.
+ * Un código repetido con datos idénticos se importa una vez: el backend marca
+ * `duplicate_row_in_file` solo en las filas extra. Si los datos difieren marca
+ * `conflicting_duplicate_in_file` en todas: no hay forma de saber cuál es la
+ * correcta y no se importa ninguna. El mensaje nombra las filas implicadas.
  */
 export function rowIssues(
   row: RosterPreviewRow,
   duplicateRows: readonly number[] = []
 ): RosterIssue[] {
   return row.errores.map((code) => {
-    if (code === 'duplicate_sis_code_in_file' && duplicateRows.length > 0) {
-      return { category: 'Duplicado', message: duplicateMessage(duplicateRows) }
+    if (code === 'duplicate_row_in_file' && duplicateRows.length > 0) {
+      return { category: 'Duplicado', message: extraCopyMessage(duplicateRows) }
+    }
+
+    if (code === 'conflicting_duplicate_in_file' && duplicateRows.length > 0) {
+      return { category: 'Duplicado', message: conflictingMessage(duplicateRows) }
     }
 
     return ERROR_ISSUE_BY_KEY[code] ?? unknownIssue(code)
@@ -136,7 +149,6 @@ export function countRosterRows(preview: RosterPreviewData): RosterRowCounts {
     incorporables: 0,
     nuevos: 0,
     yaInscritos: 0,
-    inscripcionesInactivas: 0,
     inconsistentes: 0,
   }
 
@@ -144,23 +156,25 @@ export function countRosterRows(preview: RosterPreviewData): RosterRowCounts {
     if (isIncorporable(row.estado)) counts.incorporables += 1
     if (row.estado === 'new_student') counts.nuevos += 1
     if (row.estado === 'already_enrolled') counts.yaInscritos += 1
-    if (row.estado === 'inactive_enrollment') counts.inscripcionesInactivas += 1
     if (row.estado === 'inconsistent') counts.inconsistentes += 1
   })
 
   return {
     leidas: preview.total_filas,
-    yaEnElGrupo: counts.yaInscritos + counts.inscripcionesInactivas,
+    yaEnElGrupo: counts.yaInscritos,
     ...counts,
   }
 }
 
-function duplicateMessage(duplicateRows: readonly number[]): string {
-  const list = formatRowList(duplicateRows)
+function extraCopyMessage(duplicateRows: readonly number[]): string {
+  return `Fila repetida: idéntica a la fila ${duplicateRows[0]}, que sí se importa`
+}
 
-  return duplicateRows.length === 1
-    ? `Código SIS repetido en la fila ${list}`
-    : `Código SIS repetido en las filas ${list}`
+function conflictingMessage(duplicateRows: readonly number[]): string {
+  return (
+    `Código SIS repetido con datos distintos en las filas ${formatRowList(duplicateRows)}. ` +
+    'No se importa ninguna porque no hay forma de saber cuál es la correcta'
+  )
 }
 
 function unknownIssue(code: string): RosterIssue {

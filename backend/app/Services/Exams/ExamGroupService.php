@@ -12,7 +12,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Vincula grupos válidos con un examen y genera su nómina habilitada.
+ * Vincula grupos válidos con un examen.
+ *
+ * Solo escribe el vínculo grupo-examen. Los participantes no se copian: se derivan de
+ * grupo_estudiante (ver ExamParticipantService) y examen_estudiante solo registra
+ * ingresos reales, así que la nómina puede cambiar mientras el examen esté programado.
  */
 class ExamGroupService
 {
@@ -41,7 +45,7 @@ class ExamGroupService
 
             $this->assertGroupsMatchExam($exam, $groups, $groupIds);
 
-            $enrollments = $this->activeEnrollments($groupIds);
+            $enrollments = $this->enrollments($groupIds);
             $this->assertEveryGroupHasRoster($groups, $enrollments);
             $this->assertStudentsAreNotRepeated($enrollments);
 
@@ -59,31 +63,15 @@ class ExamGroupService
                 ->pluck('grupo.id_grupo')
                 ->all();
 
-            // examen_estudiante referencia grupo_examen: se retira antes de reasignar.
-            DB::table('examen_estudiante')
-                ->where('id_examen', $exam->id_examen)
-                ->whereIn('id_grupo', $previousOwnGroupIds)
-                ->delete();
-
             $exam->groups()->detach($previousOwnGroupIds);
             $exam->groups()->attach($groupIds);
-
-            DB::table('examen_estudiante')->insert(
-                $enrollments->map(fn ($enrollment) => [
-                    'id_examen' => $exam->id_examen,
-                    'id_estudiante' => $enrollment->id_estudiante,
-                    'id_grupo' => $enrollment->id_grupo,
-                    'estado_habilitacion' => 'HABILITADO',
-                    'estado_ingreso' => 'NO_INGRESO',
-                ])->all()
-            );
 
             return $exam->fresh([
                 'examType',
                 'subject',
                 'career',
                 'classrooms',
-                'groups' => fn ($query) => $query->withActiveStudentCount(),
+                'groups' => fn ($query) => $query->withStudentCount(),
             ]);
         });
     }
@@ -139,11 +127,13 @@ class ExamGroupService
         }
     }
 
-    private function activeEnrollments(array $groupIds): Collection
+    /**
+     * Nómina cargada es tener filas en grupo_estudiante; su estado no se consulta.
+     */
+    private function enrollments(array $groupIds): Collection
     {
         return DB::table('grupo_estudiante')
             ->whereIn('id_grupo', $groupIds)
-            ->where('estado', RecordStatus::ACTIVE)
             ->orderBy('id_grupo')
             ->orderBy('id_estudiante')
             ->get(['id_grupo', 'id_estudiante']);
@@ -160,7 +150,7 @@ class ExamGroupService
         if ($withoutRoster !== null) {
             throw ValidationException::withMessages([
                 'grupos' => [
-                    "El grupo {$withoutRoster->num_grupo} no tiene una nómina activa cargada.",
+                    "El grupo {$withoutRoster->num_grupo} no tiene nómina cargada.",
                 ],
             ]);
         }

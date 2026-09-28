@@ -15,6 +15,7 @@ use App\Services\Academic\Importers\StudentRosterReaderResolver;
 use App\Services\Academic\Importers\StudentRosterRowValidator;
 use App\Services\Academic\Importers\XlsxStudentRosterReader;
 use App\Services\Academic\StudentRosterGroupAccess;
+use App\Services\Exams\ExamRosterLockService;
 use App\Support\RecordStatus;
 use Illuminate\Cache\ArrayStore;
 use Illuminate\Cache\Repository;
@@ -58,7 +59,7 @@ class StudentRosterPreviewServiceTest extends TestCase
             '10000002'
         );
 
-        $inactiveStudent = $this->createStudent(
+        $legacyRowStudent = $this->createStudent(
             '20230456',
             '10000003'
         );
@@ -72,7 +73,7 @@ class StudentRosterPreviewServiceTest extends TestCase
             ],
             [
                 'id_grupo' => $group->id_grupo,
-                'id_estudiante' => $inactiveStudent->id_estudiante,
+                'id_estudiante' => $legacyRowStudent->id_estudiante,
                 'fecha_inscripcion' => '2026-08-15',
                 'estado' => RecordStatus::INACTIVE,
             ],
@@ -122,8 +123,9 @@ class StudentRosterPreviewServiceTest extends TestCase
             $rows[2]['status']
         );
 
+        // Una fila de inscripción es una fila de nómina, sea cual sea su estado.
         $this->assertSame(
-            StudentRosterDatabaseMatch::INACTIVE_ENROLLMENT,
+            StudentRosterDatabaseMatch::ALREADY_ENROLLED,
             $rows[3]['status']
         );
 
@@ -212,7 +214,7 @@ class StudentRosterPreviewServiceTest extends TestCase
         );
 
         $service = new StudentRosterPreviewService(
-            new StudentRosterGroupAccess(),
+            new StudentRosterGroupAccess(new ExamRosterLockService()),
             new StudentRosterReaderResolver(
                 new CsvStudentRosterReader(),
                 new XlsxStudentRosterReader()

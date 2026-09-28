@@ -10,8 +10,6 @@ final class StudentRosterDatabaseMatch
 
     public const ALREADY_ENROLLED = 'already_enrolled';
 
-    public const INACTIVE_ENROLLMENT = 'inactive_enrollment';
-
     private StudentRosterRowAnalysis $rowAnalysis;
 
     private ?int $studentId;
