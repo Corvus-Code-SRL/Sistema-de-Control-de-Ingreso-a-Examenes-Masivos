@@ -104,12 +104,6 @@ export function RosterResultStep({
 
           <ResultStat
             icon={AlertTriangle}
-            label="Inscripciones inactivas"
-            value={result.inscripciones_inactivas}
-          />
-
-          <ResultStat
-            icon={AlertTriangle}
             label="Filas inconsistentes"
             value={result.filas_inconsistentes}
           />
@@ -128,13 +122,6 @@ export function RosterResultStep({
             </p>
           )}
 
-          {result.inscripciones_inactivas > 0 && (
-            <p className="sciem-supporting">
-              <strong>{result.inscripciones_inactivas}</strong> tienen una
-              inscripción inactiva y no se reactivaron.
-            </p>
-          )}
-
           {result.filas_inconsistentes > 0 && (
             <p className="sciem-supporting">
               <strong>{result.filas_inconsistentes}</strong> filas quedaron
@@ -143,7 +130,6 @@ export function RosterResultStep({
           )}
 
           {result.ya_inscritos === 0 &&
-            result.inscripciones_inactivas === 0 &&
             result.filas_inconsistentes === 0 && (
               <p className="sciem-supporting text-muted-foreground">
                 No hubo observaciones adicionales en la confirmación.

@@ -187,7 +187,6 @@ export function rosterConfirmationResponse(
       estudiantes_creados: 1,
       estudiantes_inscritos: 2,
       ya_inscritos: 0,
-      inscripciones_inactivas: 0,
       ...overrides,
     },
   }

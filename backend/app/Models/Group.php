@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Support\RecordStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -36,6 +35,7 @@ class Group extends Model
     {
         return $this->belongsTo(Period::class, 'id_periodo', 'id_periodo');
     }
+
     public function students(): BelongsToMany
     {
         return $this->belongsToMany(
@@ -49,16 +49,20 @@ class Group extends Model
         ]);
     }
 
-    /** Incluye el tamaño de la nómina activa sin lanzar una consulta por grupo. */
-    public function scopeWithActiveStudentCount(Builder $query): Builder
+    /**
+     * Incluye el tamaño de la nómina sin lanzar una consulta por grupo.
+     *
+     * Nómina cargada es tener filas en grupo_estudiante: el estado de la fila no
+     * se filtra ni significa nada, la exactitud de la lista es de WEBSIS.
+     */
+    public function scopeWithStudentCount(Builder $query): Builder
     {
         return $query
             ->select('grupo.*')
             ->selectSub(function ($subquery) {
                 $subquery->from('grupo_estudiante')
                     ->selectRaw('count(*)')
-                    ->whereColumn('grupo_estudiante.id_grupo', 'grupo.id_grupo')
-                    ->where('grupo_estudiante.estado', RecordStatus::ACTIVE);
+                    ->whereColumn('grupo_estudiante.id_grupo', 'grupo.id_grupo');
             }, 'cantidad_estudiantes');
     }
 }
