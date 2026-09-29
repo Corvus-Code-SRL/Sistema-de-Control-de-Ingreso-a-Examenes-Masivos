@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react'
 import { Loader2, Plus } from 'lucide-react'
+import { ApiError } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -82,11 +83,13 @@ export function ClassroomForm({ onCreated }: ClassroomFormProps) {
       setForm(INITIAL_FORM)
       setErrors({})
       onCreated(classroom)
-    } catch (error: any) {
-      if (error?.errors) {
-        setErrors(error.errors)
+    } catch (error) {
+      if (error instanceof ApiError && error.isValidation) {
+        setErrors(error.errors as ClassroomValidationErrors)
+      } else if (error instanceof ApiError) {
+        setGeneralError(error.message)
       } else {
-        setGeneralError(error?.message ?? 'No se pudo registrar el ambiente. Intente nuevamente.')
+        setGeneralError('No se pudo registrar el ambiente. Intente nuevamente.')
       }
     } finally {
       setIsSubmitting(false)
