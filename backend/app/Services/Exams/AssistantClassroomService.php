@@ -70,7 +70,7 @@ class AssistantClassroomService
         $teacherId = $this->currentTeacherId();
 
         return DB::transaction(function () use ($exam, $userId, $classroomId, $teacherId) {
-            // El bloqueo evita asignar mientras el examen pasa a EN_INGRESO en paralelo.
+            // Serializa esta operación con las demás que bloquean el examen (edición y cancelación).
             $exam = Exam::query()->whereKey($exam->id_examen)->lockForUpdate()->firstOrFail();
 
             $this->assertOwnedBy($exam, $teacherId);
@@ -116,6 +116,12 @@ class AssistantClassroomService
         });
     }
 
+    /** Exámenes vigentes del auxiliar que usa el sistema. */
+    public function listForCurrentAssistant(): Collection
+    {
+        return $this->listForAssistant($this->currentAssistantId());
+    }
+
     /**
      * Exámenes vigentes del auxiliar con su ambiente, del más próximo al más lejano.
      * Los cancelados y finalizados no se muestran: ya no hay ingreso que controlar.
@@ -146,6 +152,20 @@ class AssistantClassroomService
         }
 
         return $teacherId;
+    }
+
+    /**
+     * Mientras no haya autenticación (HU-37), el auxiliar también sale de configuración.
+     */
+    private function currentAssistantId(): string
+    {
+        $assistantId = (string) config('sciem.auxiliar_fijo_id');
+
+        if ($assistantId === '') {
+            throw new RuntimeException('No hay un auxiliar configurado en SCIEM_AUXILIAR_FIJO_ID.');
+        }
+
+        return $assistantId;
     }
 
     private function assertOwnedBy(Exam $exam, string $teacherId): void

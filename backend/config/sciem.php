@@ -16,6 +16,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Auxiliar fijo
+    |--------------------------------------------------------------------------
+    |
+    | Mientras la autenticación no esté implementada (HU-37), la vista de solo
+    | lectura del auxiliar (HU-09) lo resuelve desde configuración. Corresponde a
+    | public.usuario.id_usuario, que es uuid.
+    |
+    */
+
+    'auxiliar_fijo_id' => env('SCIEM_AUXILIAR_FIJO_ID'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Periodo activo
     |--------------------------------------------------------------------------
     |

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Exams\AssistantClassroomController;
 use App\Http\Controllers\Exams\ExamController;
 use App\Http\Controllers\Exams\ExamGroupController;
 use Illuminate\Support\Facades\Route;
@@ -32,4 +33,18 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
     Route::post('/{exam}/grupos', [ExamGroupController::class, 'store'])
          ->whereNumber('exam')
          ->name('grupos.store');
+
+    // HU-09 — {user} es el id_usuario (uuid) del auxiliar habilitado.
+    Route::get('/{exam}/auxiliares', [AssistantClassroomController::class, 'index'])
+         ->whereNumber('exam')
+         ->name('auxiliares.index');
+
+    Route::put('/{exam}/auxiliares/{user}/ambiente', [AssistantClassroomController::class, 'update'])
+         ->whereNumber('exam')
+         ->whereUuid('user')
+         ->name('auxiliares.ambiente');
 });
+
+// HU-09 — vista de solo lectura del auxiliar.
+Route::get('auxiliar/examenes', [AssistantClassroomController::class, 'myExams'])
+     ->name('auxiliar.examenes');
