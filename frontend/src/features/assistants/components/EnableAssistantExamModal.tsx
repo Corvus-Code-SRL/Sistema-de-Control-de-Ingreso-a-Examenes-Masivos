@@ -1,10 +1,10 @@
 import { useState } from 'react'
+import { AlertCircle } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -16,77 +16,88 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { Assistant } from '../types/assistant.types'
-
-export interface ExamOption {
-  id_examen: number
-  nombre_examen: string
-}
+import type { AssistantWithGroups } from '../types/assistant.types'
 
 interface EnableAssistantExamModalProps {
   open: boolean
-  assistant: Assistant | null
-  exams: ExamOption[]
-  isLoading?: boolean
-  onConfirm: (examId: number) => void
+  assistant: AssistantWithGroups | null
+  onConfirm: (examId: number) => Promise<void>
   onCancel: () => void
+  error?: string | null
 }
 
 /**
- * Modal de habilitación de un auxiliar para un examen.
+ * Modal para habilitar un auxiliar para un examen.
  *
- * El docente elige el examen de la lista; el backend verifica que el auxiliar
- * pertenezca a algún grupo vinculado al examen y que no sea estudiante del
- * mismo examen.
+ * Solo muestra exámenes donde el auxiliar PUEDE ser habilitado (el backend
+ * ya filtró: grupo vinculado, no habilitado ya, no es estudiante).
  */
 export function EnableAssistantExamModal({
   open,
   assistant,
-  exams,
-  isLoading = false,
   onConfirm,
   onCancel,
+  error = null,
 }: EnableAssistantExamModalProps) {
   const [examId, setExamId] = useState<number | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  function handleConfirm() {
-    if (examId !== null) {
-      onConfirm(examId)
+  const availableExams = assistant?.examenes_disponibles ?? []
+
+  async function handleConfirm() {
+    if (examId === null) return
+
+    setIsSubmitting(true)
+    try {
+      await onConfirm(examId)
+      setExamId(null)
+    } catch {
+      // El error lo maneja el padre.
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
-  function handleOpenChange(next: boolean) {
-    if (!next) {
-      setExamId(null)
-      onCancel()
-    }
+  function handleClose() {
+    setExamId(null)
+    onCancel()
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Habilitar auxiliar para examen</DialogTitle>
-          {assistant && (
-            <DialogDescription>
-              {assistant.nombre_completo} ·{' '}
-              <span className="font-mono">{assistant.cod_sis}</span>
-            </DialogDescription>
-          )}
+          <DialogTitle>Habilitar para examen</DialogTitle>
         </DialogHeader>
 
+        {assistant && (
+          <div className="flex items-center gap-3 rounded-md border border-input bg-muted/30 px-3 py-2">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground text-xs font-medium">
+              {initialsOf(assistant)}
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium truncate">{assistant.nombre_completo}</p>
+              <p className="text-xs text-muted-foreground font-mono">
+                {assistant.cod_sis}
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-2">
-          <Label htmlFor="exam-select">Examen</Label>
+          <Label>
+            Examen <span className="text-destructive" aria-hidden="true">*</span>
+          </Label>
           <Select
             value={examId !== null ? String(examId) : undefined}
-            onValueChange={(value) => setExamId(Number(value))}
-            disabled={isLoading}
+            onValueChange={(v) => setExamId(Number(v))}
+            disabled={isSubmitting || availableExams.length === 0}
           >
-            <SelectTrigger id="exam-select">
+            <SelectTrigger>
               <SelectValue placeholder="Seleccione un examen" />
             </SelectTrigger>
             <SelectContent>
-              {exams.map((exam) => (
+              {availableExams.map((exam) => (
                 <SelectItem key={exam.id_examen} value={String(exam.id_examen)}>
                   {exam.nombre_examen}
                 </SelectItem>
@@ -94,22 +105,46 @@ export function EnableAssistantExamModal({
             </SelectContent>
           </Select>
 
-          {exams.length === 0 && (
-            <p className="text-xs text-muted-foreground">
-              No hay exámenes programados con grupos vinculados a este auxiliar.
-            </p>
+          {availableExams.length === 0 && (
+            <Alert className="border-info-border bg-info-soft text-info py-2 px-3">
+              <AlertCircle className="size-4" />
+              <AlertTitle>No hay exámenes disponibles</AlertTitle>
+              <AlertDescription>
+                Este auxiliar no tiene exámenes donde pueda ser habilitado.
+                Asegúrese de que su grupo esté vinculado a un examen programado
+                y que no sea estudiante del mismo.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {error && (
+            <Alert className="border-[#A21B12]/20 bg-[#FDE2E1] text-[#A21B12] py-2 px-3">
+              <AlertDescription className="text-xs font-medium">
+                {error}
+              </AlertDescription>
+            </Alert>
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="secondary" onClick={onCancel} disabled={isLoading}>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={handleClose} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button onClick={handleConfirm} disabled={isLoading || examId === null}>
-            {isLoading ? 'Habilitando…' : 'Habilitar'}
+          <Button
+            variant="default"
+            onClick={handleConfirm}
+            disabled={isSubmitting || examId === null}
+          >
+            {isSubmitting ? 'Habilitando…' : 'Habilitar'}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )
+}
+
+function initialsOf(assistant: AssistantWithGroups): string {
+  const n = assistant.nombre?.[0] ?? ''
+  const a = assistant.apellido_paterno?.[0] ?? ''
+  return (n + a).toUpperCase()
 }

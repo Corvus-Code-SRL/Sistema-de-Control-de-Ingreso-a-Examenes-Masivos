@@ -21,11 +21,15 @@ import { AssistantRowMenu } from '../components/AssistantRowMenu'
 import { AssignAssistantModal } from '../components/AssignAssistantModal'
 import { MoveAssistantModal } from '../components/MoveAssistantModal'
 import { RemoveAssistantFromGroupModal } from '../components/RemoveAssistantFromGroupModal'
+import { EnableAssistantExamModal } from '../components/EnableAssistantExamModal'
+import { RemoveAssistantFromExamModal } from '../components/RemoveAssistantFromExamModal'
 import {
   addAssistantToGroups,
+  enableAssistantForExam,
   getMyAssistants,
   getMyGroups,
   moveAssistantBetweenGroups,
+  removeAssistantFromExam,
   removeAssistantFromGroup,
 } from '../services/assistantService'
 import type { AssistantWithGroups } from '../types/assistant.types'
@@ -50,6 +54,9 @@ export function MyAssistantsPage() {
   const [isAssignOpen, setIsAssignOpen] = useState(false)
   const [assistantToMove, setAssistantToMove] = useState<AssistantWithGroups | null>(null)
   const [assistantToRemove, setAssistantToRemove] = useState<AssistantWithGroups | null>(null)
+  const [assistantToEnable, setAssistantToEnable] = useState<AssistantWithGroups | null>(null)
+  const [assistantToRemoveExam, setAssistantToRemoveExam] =
+    useState<AssistantWithGroups | null>(null)
 
   const filteredAssistants =
     search.trim() === ''
@@ -60,11 +67,11 @@ export function MyAssistantsPage() {
             a.cod_sis.includes(search)
         )
 
-async function handleAssign(userId: string, groupIds: number[]) {
-  await addAssistantToGroups(userId, groupIds)
-  setIsAssignOpen(false)
-  assistantsResource.reload()
-}
+  async function handleAssign(userId: string, groupIds: number[]) {
+    await addAssistantToGroups(userId, groupIds)
+    setIsAssignOpen(false)
+    assistantsResource.reload()
+  }
 
   async function handleMove(sourceGroupId: number, targetGroupId: number) {
     if (!assistantToMove) return
@@ -85,6 +92,24 @@ async function handleAssign(userId: string, groupIds: number[]) {
     await removeAssistantFromGroup(groupId, assistantToRemove.id_usuario)
 
     setAssistantToRemove(null)
+    assistantsResource.reload()
+  }
+
+  async function handleEnableForExam(examId: number) {
+    if (!assistantToEnable) return
+
+    await enableAssistantForExam(examId, assistantToEnable.id_usuario)
+
+    setAssistantToEnable(null)
+    assistantsResource.reload()
+  }
+
+  async function handleRemoveFromExam(examId: number) {
+    if (!assistantToRemoveExam) return
+
+    await removeAssistantFromExam(examId, assistantToRemoveExam.id_usuario)
+
+    setAssistantToRemoveExam(null)
     assistantsResource.reload()
   }
 
@@ -147,6 +172,7 @@ async function handleAssign(userId: string, groupIds: number[]) {
                 <TableHead>Auxiliar</TableHead>
                 <TableHead>Código SIS</TableHead>
                 <TableHead>Grupos</TableHead>
+                <TableHead>Exámenes</TableHead>
                 <TableHead className="w-12" />
               </TableRow>
             </TableHeader>
@@ -177,12 +203,28 @@ async function handleAssign(userId: string, groupIds: number[]) {
                     </div>
                   </TableCell>
                   <TableCell>
+                    {assistant.examenes.length === 0 ? (
+                      <span className="text-xs text-muted-foreground">Sin habilitar</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {assistant.examenes.map((e) => (
+                          <span
+                            key={e.id_examen}
+                            className="inline-flex items-center rounded-md bg-warn-soft px-2 py-0.5 text-xs font-medium text-warn-fg"
+                          >
+                            {e.nombre_examen}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <AssistantRowMenu
                       onMove={() => setAssistantToMove(assistant)}
+                      onEnableForExam={() => setAssistantToEnable(assistant)}
+                      onRemoveFromExam={() => setAssistantToRemoveExam(assistant)}
                       onRemove={() => setAssistantToRemove(assistant)}
-                      onReport={() => {
-                        // TODO: HU-31 "Reportar auxiliar" aún no está implementada.
-                      }}
+                      hasExams={assistant.examenes.length > 0}
                     />
                   </TableCell>
                 </TableRow>
@@ -213,6 +255,20 @@ async function handleAssign(userId: string, groupIds: number[]) {
         assistant={assistantToRemove}
         onConfirm={handleRemove}
         onCancel={() => setAssistantToRemove(null)}
+      />
+
+      <EnableAssistantExamModal
+        open={assistantToEnable !== null}
+        assistant={assistantToEnable}
+        onConfirm={handleEnableForExam}
+        onCancel={() => setAssistantToEnable(null)}
+      />
+
+      <RemoveAssistantFromExamModal
+        open={assistantToRemoveExam !== null}
+        assistant={assistantToRemoveExam}
+        onConfirm={handleRemoveFromExam}
+        onCancel={() => setAssistantToRemoveExam(null)}
       />
     </AppShell>
   )
