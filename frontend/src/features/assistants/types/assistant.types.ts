@@ -26,3 +26,18 @@ export interface ExamAssistantsData {
   ambientes: ExamClassroom[]
   auxiliares: ExamAssistant[]
 }
+
+/** Estados en los que un examen todavía aparece al auxiliar: el backend no envía otros. */
+export type AssistantExamStatus = 'PROGRAMADO' | 'EN_INGRESO' | 'EN_CURSO'
+
+/** Examen que controla el auxiliar, con el ambiente que le asignó el docente (HU-09). */
+export interface AssistantExam {
+  id_examen: number
+  nombre_examen: string
+  fecha: string | null
+  hora_inicio: string | null
+  hora_fin: string | null
+  estado: AssistantExamStatus
+  materia: string | null
+  ambiente: ExamClassroom | null
+}

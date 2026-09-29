@@ -1,5 +1,5 @@
 import { apiClient, apiPut } from '@/lib/api-client'
-import type { ExamAssistant, ExamAssistantsData } from '../types/assistant.types'
+import type { AssistantExam, ExamAssistant, ExamAssistantsData } from '../types/assistant.types'
 
 interface DataResponse<TData> {
   data: TData
@@ -20,6 +20,11 @@ export const assistantsService = {
       `/examenes/${examId}/auxiliares/${userId}/ambiente`,
       { id_ambiente: classroomId }
     )
+    return response.data
+  },
+
+  async listMyExams(signal?: AbortSignal): Promise<AssistantExam[]> {
+    const response = await apiClient<DataResponse<AssistantExam[]>>('/auxiliar/examenes', { signal })
     return response.data
   },
 }
