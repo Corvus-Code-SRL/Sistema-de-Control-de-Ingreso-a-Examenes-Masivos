@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 
 class StudentRosterStudentMapperTest extends TestCase
 {
-    public function testItMapsRosterRowToStudentAttributes(): void
+    public function testItMapsRosterRowToStudentAttributesWithoutCi(): void
     {
         $row = new StudentRosterRow(
             8,
@@ -18,14 +18,11 @@ class StudentRosterStudentMapperTest extends TestCase
             'JOSE DIEGO'
         );
 
-        $attributes = (new StudentRosterStudentMapper())->map(
-            $row,
-            'TMP7K2M91A'
-        );
+        $attributes = (new StudentRosterStudentMapper())->map($row);
 
         $this->assertSame([
             'cod_sis' => '20200240',
-            'ci' => 'TMP7K2M91A',
+            'ci' => null,
             'nombre' => 'JOSE DIEGO',
             'apellido_paterno' => 'ACUÑA QUISPE',
             'apellido_materno' => null,
@@ -35,24 +32,22 @@ class StudentRosterStudentMapperTest extends TestCase
         ], $attributes);
     }
 
+    public function testItNeverInventsACi(): void
+    {
+        $row = new StudentRosterRow(9, '00123456', 'PEREZ ROJAS', 'ANA');
+
+        $attributes = (new StudentRosterStudentMapper())->map($row);
+
+        $this->assertNull($attributes['ci']);
+    }
+
     public function testItPreservesSisCodeLeadingZeros(): void
     {
-        $row = new StudentRosterRow(
-            9,
-            '00123456',
-            'PEREZ ROJAS',
-            'ANA'
-        );
+        $row = new StudentRosterRow(9, '00123456', 'PEREZ ROJAS', 'ANA');
 
-        $attributes = (new StudentRosterStudentMapper())->map(
-            $row,
-            'TMP0Q8CX4Z'
-        );
+        $attributes = (new StudentRosterStudentMapper())->map($row);
 
-        $this->assertSame(
-            '00123456',
-            $attributes['cod_sis']
-        );
+        $this->assertSame('00123456', $attributes['cod_sis']);
     }
 
     public function testItKeepsCombinedLastNamesWithoutSplittingThem(): void
@@ -64,40 +59,9 @@ class StudentRosterStudentMapperTest extends TestCase
             'CARLOS'
         );
 
-        $attributes = (new StudentRosterStudentMapper())->map(
-            $row,
-            'TMP123ABCD'
-        );
+        $attributes = (new StudentRosterStudentMapper())->map($row);
 
-        $this->assertSame(
-            'DE LA FUENTE PEREZ',
-            $attributes['apellido_paterno']
-        );
-
-        $this->assertNull(
-            $attributes['apellido_materno']
-        );
-    }
-
-    public function testItUsesProvidedTemporaryCiWithoutGeneratingAnotherOne(): void
-    {
-        $row = new StudentRosterRow(
-            11,
-            '20230002',
-            'ROJAS FLORES',
-            'MARIA'
-        );
-
-        $temporaryCi = 'TMPABC1234';
-
-        $attributes = (new StudentRosterStudentMapper())->map(
-            $row,
-            $temporaryCi
-        );
-
-        $this->assertSame(
-            $temporaryCi,
-            $attributes['ci']
-        );
+        $this->assertSame('DE LA FUENTE PEREZ', $attributes['apellido_paterno']);
+        $this->assertNull($attributes['apellido_materno']);
     }
 }

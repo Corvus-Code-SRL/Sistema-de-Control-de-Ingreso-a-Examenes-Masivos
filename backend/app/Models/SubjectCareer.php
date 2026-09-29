@@ -2,28 +2,25 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Par materia-carrera: la unidad real de trabajo del docente.
+ * Mapea public.materia_carrera.
  *
- * Una misma materia puede pertenecer a varias carreras, por eso el contexto
- * académico nunca se resuelve por materia sola.
+ * @property int $id_carrera
+ * @property int $id_materia
+ * @property string|null $nivel_semestre
+ * @property bool|null $obligatoria
+ * @property string $estado
  */
-class SubjectCareer extends Model
+class SubjectCareer extends Pivot
 {
-    protected $table = 'materia_carrera';
 
-    /*
-     * La tabla tiene clave primaria compuesta (id_carrera, id_materia), que Eloquent
-     * no soporta de forma nativa: el modelo se usa para lectura y para inserciones
-     * explícitas, nunca para operaciones basadas en una clave única.
-     */
+    protected $table = 'materia_carrera';
     protected $primaryKey = null;
 
     public $incrementing = false;
-
     public $timestamps = false;
 
     protected $fillable = [
@@ -35,6 +32,8 @@ class SubjectCareer extends Model
     ];
 
     protected $casts = [
+        'id_carrera' => 'integer',
+        'id_materia' => 'integer',
         'obligatoria' => 'boolean',
     ];
 
@@ -46,5 +45,13 @@ class SubjectCareer extends Model
     public function career(): BelongsTo
     {
         return $this->belongsTo(Career::class, 'id_carrera', 'id_carrera');
+    }
+
+    /** Consulta por la FK completa; usar ->get()/->first(), no with(). */
+    public function groupsQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return Group::on($this->getConnectionName())
+            ->where('id_carrera', $this->id_carrera)
+            ->where('id_materia', $this->id_materia);
     }
 }

@@ -174,13 +174,14 @@ trait SeedsAcademicCatalog
     }
 
     /**
-     * Inscribe estudiantes en el grupo: los ACTIVOS primero y luego los retirados (INACTIVO).
+     * Inscribe estudiantes en el grupo. La nómina no tiene estados: toda inscripción se
+     * escribe ACTIVO y nunca se filtra por él.
      */
-    protected function enrollStudents(int $groupId, int $active, int $withdrawn = 0): void
+    protected function enrollStudents(int $groupId, int $count): void
     {
-        $total = $active + $withdrawn;
+        $alreadyEnrolled = DB::table('grupo_estudiante')->where('id_grupo', $groupId)->count();
 
-        for ($i = 1; $i <= $total; $i++) {
+        for ($i = $alreadyEnrolled + 1; $i <= $alreadyEnrolled + $count; $i++) {
             $code = $groupId . str_pad((string) $i, 4, '0', STR_PAD_LEFT);
 
             $studentId = DB::table('estudiante')->insertGetId([
@@ -195,7 +196,7 @@ trait SeedsAcademicCatalog
                 'id_grupo' => $groupId,
                 'id_estudiante' => $studentId,
                 'fecha_inscripcion' => '2026-02-15',
-                'estado' => $i <= $active ? RecordStatus::ACTIVE : RecordStatus::INACTIVE,
+                'estado' => RecordStatus::ACTIVE,
             ]);
         }
     }

@@ -14,22 +14,18 @@ final class StudentRosterConfirmationResult
 
     private int $alreadyEnrolled;
 
-    private int $inactiveEnrollments;
-
     public function __construct(
         int $totalRows,
         int $inconsistentRows,
         int $createdStudents,
         int $enrolledStudents,
-        int $alreadyEnrolled,
-        int $inactiveEnrollments
+        int $alreadyEnrolled
     ) {
         $this->totalRows = $totalRows;
         $this->inconsistentRows = $inconsistentRows;
         $this->createdStudents = $createdStudents;
         $this->enrolledStudents = $enrolledStudents;
         $this->alreadyEnrolled = $alreadyEnrolled;
-        $this->inactiveEnrollments = $inactiveEnrollments;
     }
 
     public function totalRows(): int
@@ -55,10 +51,5 @@ final class StudentRosterConfirmationResult
     public function alreadyEnrolled(): int
     {
         return $this->alreadyEnrolled;
-    }
-
-    public function inactiveEnrollments(): int
-    {
-        return $this->inactiveEnrollments;
     }
 }

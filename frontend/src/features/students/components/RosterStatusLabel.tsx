@@ -1,6 +1,5 @@
 import {
   AlertTriangle,
-  CircleAlert,
   CircleCheck,
   HelpCircle,
   UserPlus,
@@ -58,9 +57,6 @@ function getStateIcon(estado: RosterRowState) {
 
     case 'already_enrolled':
       return CircleCheck
-
-    case 'inactive_enrollment':
-      return CircleAlert
 
     case 'inconsistent':
       return AlertTriangle
