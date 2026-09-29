@@ -6,13 +6,11 @@ use App\Exceptions\Exams\ExamAssistantNotFoundException;
 use App\Exceptions\Exams\ExamOwnershipException;
 use App\Exceptions\Exams\ExamStateException;
 use App\Models\Exam;
-use App\Models\ExamAssistant;
 use App\Services\Exams\AssistantClassroomService;
-use App\Support\RecordStatus;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Tests\Concerns\SeedsExamCatalog;
+use Tests\Concerns\SeedsExamAssistants;
 use Tests\TestCase;
 
 /**
@@ -21,11 +19,7 @@ use Tests\TestCase;
 class AssistantClassroomServiceTest extends TestCase
 {
     use DatabaseTransactions;
-    use SeedsExamCatalog;
-
-    private const MARIA = '33333333-3333-4333-8333-000000000001';
-    private const JORGE = '33333333-3333-4333-8333-000000000002';
-    private const DANIELA = '33333333-3333-4333-8333-000000000003';
+    use SeedsExamAssistants;
 
     private AssistantClassroomService $service;
 
@@ -33,8 +27,7 @@ class AssistantClassroomServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->seedExamCatalog();
-        $this->seedAssistants();
+        $this->seedExamAssistants();
 
         $this->service = app(AssistantClassroomService::class);
     }
@@ -43,24 +36,24 @@ class AssistantClassroomServiceTest extends TestCase
     {
         $exam = $this->examWithAssistants();
 
-        $this->service->assign($exam, self::MARIA, $this->aulaId);
-        $this->service->assign($exam, self::JORGE, $this->otraAulaId);
-        $this->service->assign($exam, self::DANIELA, $this->aulaId);
+        $this->service->assign($exam, $this->mariaId, $this->aulaId);
+        $this->service->assign($exam, $this->jorgeId, $this->otraAulaId);
+        $this->service->assign($exam, $this->danielaId, $this->aulaId);
 
-        $reassigned = $this->service->assign($exam, self::DANIELA, $this->otraAulaId);
+        $reassigned = $this->service->assign($exam, $this->danielaId, $this->otraAulaId);
 
         $this->assertSame($this->otraAulaId, $reassigned->id_ambiente);
         $this->assertSame('692B', $reassigned->classroom->nro_aula);
-        $this->assertAssignedTo($exam, self::MARIA, $this->aulaId);
-        $this->assertAssignedTo($exam, self::JORGE, $this->otraAulaId);
-        $this->assertAssignedTo($exam, self::DANIELA, $this->otraAulaId);
+        $this->assertAssignedTo($exam, $this->mariaId, $this->aulaId);
+        $this->assertAssignedTo($exam, $this->jorgeId, $this->otraAulaId);
+        $this->assertAssignedTo($exam, $this->danielaId, $this->otraAulaId);
         $this->assertSame(4, DB::table('log')->where('tabla_afectada', 'examen_auxiliar')->count());
     }
 
     public function test_lista_los_auxiliares_con_su_ambiente_y_los_ambientes_del_examen(): void
     {
         $exam = $this->examWithAssistants();
-        $this->service->assign($exam, self::JORGE, $this->otraAulaId);
+        $this->service->assign($exam, $this->jorgeId, $this->otraAulaId);
 
         $result = $this->service->listForExam($exam);
 
@@ -91,25 +84,25 @@ class AssistantClassroomServiceTest extends TestCase
     {
         $exam = $this->examWithAssistants();
 
-        $this->service->assign($exam, self::MARIA, $this->aulaId);
-        $this->service->assign($exam, self::MARIA, $this->aulaId);
+        $this->service->assign($exam, $this->mariaId, $this->aulaId);
+        $this->service->assign($exam, $this->mariaId, $this->aulaId);
 
         $this->assertSame(1, DB::table('log')->where('tabla_afectada', 'examen_auxiliar')->count());
     }
 
-    public function test_rechaza_un_ambiente_que_no_es_del_examen(): void
+    public function test_rechaza_un_ambiente_que_no_pertenece_al_examen(): void
     {
         $exam = $this->examWithAssistants();
-        $this->service->assign($exam, self::MARIA, $this->aulaId);
+        $this->service->assign($exam, $this->mariaId, $this->aulaId);
 
         try {
-            $this->service->assign($exam, self::MARIA, $this->aulaInactivaId);
+            $this->service->assign($exam, $this->mariaId, $this->aulaInactivaId);
             $this->fail('Debió rechazar un ambiente ajeno al examen.');
         } catch (ValidationException $e) {
             $this->assertArrayHasKey('id_ambiente', $e->errors());
         }
 
-        $this->assertAssignedTo($exam, self::MARIA, $this->aulaId);
+        $this->assertAssignedTo($exam, $this->mariaId, $this->aulaId);
     }
 
     public function test_rechaza_un_auxiliar_no_habilitado_para_el_examen(): void
@@ -118,7 +111,7 @@ class AssistantClassroomServiceTest extends TestCase
 
         $this->expectException(ExamAssistantNotFoundException::class);
 
-        $this->service->assign($exam, self::MARIA, $this->aulaId);
+        $this->service->assign($exam, $this->mariaId, $this->aulaId);
     }
 
     public function test_rechaza_el_examen_de_otro_docente(): void
@@ -126,10 +119,10 @@ class AssistantClassroomServiceTest extends TestCase
         $exam = $this->examWithAssistants(['id_usuario_docente' => $this->otroDocenteId]);
 
         try {
-            $this->service->assign($exam, self::MARIA, $this->aulaId);
+            $this->service->assign($exam, $this->mariaId, $this->aulaId);
             $this->fail('Debió rechazar la asignación en el examen de otro docente.');
         } catch (ExamOwnershipException $e) {
-            $this->assertAssignedTo($exam, self::MARIA, null);
+            $this->assertAssignedTo($exam, $this->mariaId, null);
         }
 
         $this->expectException(ExamOwnershipException::class);
@@ -143,10 +136,10 @@ class AssistantClassroomServiceTest extends TestCase
             $exam = $this->examWithAssistants(['estado' => $status], $this->aulaId);
 
             try {
-                $this->service->assign($exam, self::MARIA, $this->otraAulaId);
+                $this->service->assign($exam, $this->mariaId, $this->otraAulaId);
                 $this->fail("Debió bloquear el cambio en estado {$status}.");
             } catch (ExamStateException $e) {
-                $this->assertAssignedTo($exam, self::MARIA, $this->aulaId);
+                $this->assertAssignedTo($exam, $this->mariaId, $this->aulaId);
             }
 
             $this->assertFalse($this->service->listForExam($exam)['editable']);
@@ -158,61 +151,14 @@ class AssistantClassroomServiceTest extends TestCase
         $later = $this->examWithAssistants(['fecha' => $this->futureDate(10), 'nombre_examen' => 'Segundo parcial']);
         $sooner = $this->examWithAssistants(['fecha' => $this->futureDate(3), 'nombre_examen' => 'Primer parcial']);
         $cancelled = $this->examWithAssistants(['estado' => Exam::CANCELADO, 'nombre_examen' => 'Cancelado']);
-        $this->service->assign($sooner, self::MARIA, $this->otraAulaId);
+        $this->service->assign($sooner, $this->mariaId, $this->otraAulaId);
 
-        $assignments = $this->service->listForAssistant(self::MARIA);
+        $assignments = $this->service->listForAssistant($this->mariaId);
 
         $this->assertSame([$sooner->id_examen, $later->id_examen], $assignments->pluck('id_examen')->all());
         $this->assertSame('692B', $assignments[0]->classroom->nro_aula);
         $this->assertNull($assignments[1]->classroom);
         $this->assertNotContains($cancelled->id_examen, $assignments->pluck('id_examen')->all());
         $this->assertCount(0, $this->service->listForAssistant('33333333-3333-4333-8333-000000000099'));
-    }
-
-    /** Examen del docente con los dos ambientes y los tres auxiliares habilitados. */
-    private function examWithAssistants(array $overrides = [], ?int $classroomId = null): Exam
-    {
-        $exam = $this->createExam($overrides, [$this->aulaId, $this->otraAulaId]);
-
-        foreach ([self::MARIA, self::JORGE, self::DANIELA] as $userId) {
-            ExamAssistant::create([
-                'id_examen' => $exam->id_examen,
-                'id_usuario' => $userId,
-                'id_usuario_docente_habilita' => $exam->id_usuario_docente,
-                'id_ambiente' => $classroomId,
-            ]);
-        }
-
-        return $exam;
-    }
-
-    private function assertAssignedTo(Exam $exam, string $userId, ?int $classroomId): void
-    {
-        $this->assertSame(
-            $classroomId,
-            ExamAssistant::forExamAndAssistant($exam->id_examen, $userId)->firstOrFail()->id_ambiente
-        );
-    }
-
-    private function seedAssistants(): void
-    {
-        $people = [
-            [self::MARIA, 'María', 'López', 'Arnez', '201900233'],
-            [self::JORGE, 'Jorge', 'Rocha', 'Vidal', '202000871'],
-            [self::DANIELA, 'Daniela', 'Ferrufino', 'Soliz', '201800451'],
-        ];
-
-        foreach ($people as [$id, $name, $lastName, $secondLastName, $sis]) {
-            DB::table('usuario')->insert([
-                'id_usuario' => $id,
-                'nombre' => $name,
-                'apellido_paterno' => $lastName,
-                'apellido_materno' => $secondLastName,
-                'correo' => strtolower($name) . '.' . $sis . '@umss.edu',
-                'contrasenia' => 'x',
-                'cod_sis' => $sis,
-                'estado' => RecordStatus::ACTIVE,
-            ]);
-        }
     }
 }
