@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useCurrentUser } from '@/features/auth'
 import { CreateExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
+import { MyAssistantsPage } from '@/features/assistants'
 import { CourseDetailPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
 import {
   AdminSubjectsPage,
@@ -25,6 +26,7 @@ function DocenteRoutes() {
         element={<SubjectGroupsPage />}
       />
       <Route path="/mis-cursos" element={<MyCoursesPage />} />
+      <Route path="/mis-auxiliares" element={<MyAssistantsPage />} />
       <Route path="/cursos/:idGrupo" element={<CourseDetailPage />} />
       <Route path="/examenes/nuevo" element={<CreateExamPage />} />
       <Route path="/examenes/programados" element={<ExamsPage />} />
