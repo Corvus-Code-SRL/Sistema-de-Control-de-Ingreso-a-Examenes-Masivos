@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { MyAssignmentsPage } from '@/features/assistants'
 import { useCurrentUser } from '@/features/auth'
 import { CreateExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
 import { CourseDetailPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
@@ -32,6 +33,20 @@ function DocenteRoutes() {
 }
 
 /**
+ * Rutas del auxiliar (HU-09): por ahora solo la consulta de sus exámenes y del
+ * ambiente que el docente le asignó.
+ */
+function AuxiliarRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/mis-examenes" replace />} />
+      <Route path="/mis-examenes" element={<MyAssignmentsPage />} />
+      <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
+    </Routes>
+  )
+}
+
+/**
  * Rutas de la administración del catálogo institucional.
  *
  * Cuentas y Materias tienen pantallas disponibles. Facultades y carreras
@@ -57,10 +72,13 @@ function AdministradorRoutes() {
  *
  * Esto no es una guarda de seguridad: mientras no exista autenticación, el área
  * la elige a mano quien desarrolla. Separarlas evita que una URL de un área
- * caiga en la pantalla de la otra.
+ * caiga en la pantalla de otra.
  */
 export function AppRouter() {
   const { area } = useCurrentUser()
 
-  return area === 'administrador' ? <AdministradorRoutes /> : <DocenteRoutes />
+  if (area === 'administrador') return <AdministradorRoutes />
+  if (area === 'auxiliar') return <AuxiliarRoutes />
+
+  return <DocenteRoutes />
 }
