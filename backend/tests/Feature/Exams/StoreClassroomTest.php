@@ -4,14 +4,16 @@ namespace Tests\Feature\Exams;
 
 use App\Models\AuditLog;
 use App\Models\Classroom;
-use Database\Seeders\ActionSeeder;
-use Database\Seeders\UserSeeder;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Tests\Concerns\SeedsSecurityAccounts;
 use Tests\TestCase;
 
 class StoreClassroomTest extends TestCase
 {
     use DatabaseTransactions;
+    use SeedsSecurityAccounts;
 
     private array $datosValidos = [
         'nro_aula' => 'Aula 101',
@@ -23,8 +25,7 @@ class StoreClassroomTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(UserSeeder::class);
-        $this->seed(ActionSeeder::class);
+        $this->seedSecurityAccounts();
     }
 
     /** @test */
@@ -108,5 +109,84 @@ class StoreClassroomTest extends TestCase
         $this->assertSame('Aula 101', $log->nuevo_valor['nro_aula']);
         $this->assertSame(30, $log->nuevo_valor['capacidad']);
         $this->assertSame('ACTIVO', $log->nuevo_valor['estado']);
+    }
+
+    /** @test */
+    public function rechaza_un_nro_aula_duplicado_con_distinto_case_y_espacios()
+    {
+        Classroom::create([
+            'nro_aula' => 'Aula 1',
+            'capacidad' => 20,
+            'ubicacion' => 'Modulo B',
+            'estado' => 'ACTIVO',
+        ]);
+
+        $this->postJson('/api/ambientes', [
+            'nro_aula' => 'aula 1 ',
+            'capacidad' => 30,
+            'ubicacion' => 'Modulo C',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('nro_aula');
+    }
+
+    /** @test */
+    public function normaliza_los_espacios_del_nro_aula_antes_de_guardar()
+    {
+        $this->postJson('/api/ambientes', [
+            'nro_aula' => '  Aula   105  ',
+            'capacidad' => 30,
+            'ubicacion' => 'Modulo D',
+        ])
+            ->assertStatus(201)
+            ->assertJsonPath('data.nro_aula', 'Aula 105');
+
+        $this->assertDatabaseHas('ambiente', ['nro_aula' => 'Aula 105']);
+    }
+
+    /** @test */
+    public function rechaza_el_registro_de_un_docente()
+    {
+        $docente = User::factory()->create();
+        $this->giveRole($docente, Role::DOCENTE);
+        $this->actAs($docente);
+
+        $this->postJson('/api/ambientes', $this->datosValidos)->assertForbidden();
+    }
+
+    /**
+     * CA del sprint: registrar 3 ambientes distintos y rechazar un cuarto duplicado.
+     *
+     * @test
+     */
+    public function registra_tres_ambientes_distintos_y_rechaza_un_cuarto_duplicado()
+    {
+        $this->postJson('/api/ambientes', [
+            'nro_aula' => 'Aula 101',
+            'capacidad' => 30,
+            'ubicacion' => 'Modulo A',
+        ])->assertStatus(201);
+
+        $this->postJson('/api/ambientes', [
+            'nro_aula' => 'Aula 102',
+            'capacidad' => 25,
+            'ubicacion' => 'Modulo A',
+        ])->assertStatus(201);
+
+        $this->postJson('/api/ambientes', [
+            'nro_aula' => 'Lab 1',
+            'capacidad' => 20,
+            'ubicacion' => 'Modulo B',
+        ])->assertStatus(201);
+
+        $this->postJson('/api/ambientes', [
+            'nro_aula' => 'Aula 101',
+            'capacidad' => 40,
+            'ubicacion' => 'Modulo C',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('nro_aula');
+
+        $this->assertDatabaseCount('ambiente', 3);
     }
 }

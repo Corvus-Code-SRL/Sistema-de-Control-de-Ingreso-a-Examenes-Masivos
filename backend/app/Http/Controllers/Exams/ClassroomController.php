@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Exams;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Exams\IndexClassroomRequest;
 use App\Http\Requests\Exams\StoreClassroomRequest;
 use App\Http\Resources\Exams\ClassroomResource;
 use App\Services\Exams\ClassroomService;
@@ -18,7 +19,7 @@ class ClassroomController extends Controller
         $this->classroomService = $classroomService;
     }
 
-    public function index(): AnonymousResourceCollection
+    public function index(IndexClassroomRequest $request): AnonymousResourceCollection
     {
         return ClassroomResource::collection($this->classroomService->listAll());
     }
