@@ -36,7 +36,10 @@ class ExamAssistantResourceTest extends TestCase
         $data = $this->serialize($assistant);
 
         $this->assertSame(7, $data['id_ambiente']);
-        $this->assertSame(['id_ambiente' => 7, 'nro_aula' => '691A', 'capacidad' => 60], $data['ambiente']);
+        // ClassroomResource es de HU-07 y puede crecer: se comprueban solo los campos que usa HU-09.
+        $this->assertSame(7, $data['ambiente']['id_ambiente']);
+        $this->assertSame('691A', $data['ambiente']['nro_aula']);
+        $this->assertSame(60, $data['ambiente']['capacidad']);
     }
 
     /** Serializa como lo haría la API, incluidos los recursos anidados. */
