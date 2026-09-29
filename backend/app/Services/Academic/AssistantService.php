@@ -70,23 +70,24 @@ class AssistantService
             ->get();
 
         return $auxiliares->map(function (User $user) {
-            $grupos = $user->groupsAsAuxiliar->map(function (Group $g) {
-                $tieneExamen = DB::table('grupo_examen')
-                    ->join('examen', 'examen.id_examen', '=', 'grupo_examen.id_examen')
-                    ->where('grupo_examen.id_grupo', $g->id_grupo)
-                    ->where('examen.estado', 'PROGRAMADO')
-                    ->exists();
+    $grupos = $user->groupsAsAuxiliar->map(function (Group $g) {
+            $examen = DB::table('grupo_examen')
+        ->join('examen', 'examen.id_examen', '=', 'grupo_examen.id_examen')
+        ->where('grupo_examen.id_grupo', $g->id_grupo)
+        ->where('examen.estado', 'PROGRAMADO')
+        ->select('examen.nombre_examen', 'examen.fecha')
+        ->first();
 
-                return [
-                    'id_grupo' => (int) $g->id_grupo,
-                    'label' => sprintf(
-                        '%s · G%s',
-                        $g->subject?->nombre ?? 'Materia',
-                        $g->num_grupo
-                    ),
-                    'tiene_examen_programado' => $tieneExamen,
-                ];
-            })->values()->all();
+    return [
+        'id_grupo' => (int) $g->id_grupo,
+        'label' => sprintf('%s · Grupo %s', $g->subject?->nombre ?? 'Materia', $g->num_grupo),
+        'tiene_examen_programado' => $examen !== null,
+        'examen_programado' => $examen ? [
+            'nombre_examen' => $examen->nombre_examen,
+            'fecha' => $examen->fecha,
+        ] : null,
+    ];
+    })->values()->all();
 
             return [
                 'id_usuario' => (string) $user->id_usuario,
