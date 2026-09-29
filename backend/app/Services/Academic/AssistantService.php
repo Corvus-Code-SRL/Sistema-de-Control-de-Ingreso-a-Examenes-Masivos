@@ -41,8 +41,8 @@ class AssistantService
     }
 
     /**
-     * Auxiliares con sus grupos del período activo y si esos grupos tienen
-     * exámenes PROGRAMADOS (no cancelados ni finalizados).
+     * Auxiliares con sus grupos del período activo, sus exámenes habilitados
+     * y si esos grupos tienen exámenes PROGRAMADOS.
      *
      * @return array<int, array>
      */
@@ -54,40 +54,42 @@ class AssistantService
         $auxiliares = User::query()
             ->whereHas('groupsAsAuxiliar', function ($q) use ($teacherId, $periodId) {
                 $q->where('grupo.id_usuario_docente', $teacherId)
-                  ->where('grupo.id_periodo', $periodId)
-                  ->where('grupo.estado', RecordStatus::ACTIVE)
-                  ->where('grupo_auxiliar.estado', RecordStatus::ACTIVE);
+                ->where('grupo.id_periodo', $periodId)
+                ->where('grupo.estado', RecordStatus::ACTIVE)
+                ->where('grupo_auxiliar.estado', RecordStatus::ACTIVE);
             })
             ->with(['groupsAsAuxiliar' => function ($q) use ($teacherId, $periodId) {
                 $q->where('grupo.id_usuario_docente', $teacherId)
-                  ->where('grupo.id_periodo', $periodId)
-                  ->where('grupo.estado', RecordStatus::ACTIVE)
-                  ->where('grupo_auxiliar.estado', RecordStatus::ACTIVE)
-                  ->with('subject');
+                ->where('grupo.id_periodo', $periodId)
+                ->where('grupo.estado', RecordStatus::ACTIVE)
+                ->where('grupo_auxiliar.estado', RecordStatus::ACTIVE)
+                ->with('subject');
             }])
             ->orderBy('apellido_paterno')
             ->orderBy('nombre')
             ->get();
 
-        return $auxiliares->map(function (User $user) {
-    $grupos = $user->groupsAsAuxiliar->map(function (Group $g) {
-            $examen = DB::table('grupo_examen')
-        ->join('examen', 'examen.id_examen', '=', 'grupo_examen.id_examen')
-        ->where('grupo_examen.id_grupo', $g->id_grupo)
-        ->where('examen.estado', 'PROGRAMADO')
-        ->select('examen.nombre_examen', 'examen.fecha')
-        ->first();
+        return $auxiliares->map(function (User $user) use ($teacherId) {
+            $grupos = $user->groupsAsAuxiliar->map(function (Group $g) {
+                $examen = DB::table('grupo_examen')
+                    ->join('examen', 'examen.id_examen', '=', 'grupo_examen.id_examen')
+                    ->where('grupo_examen.id_grupo', $g->id_grupo)
+                    ->where('examen.estado', Exam::PROGRAMADO)
+                    ->select('examen.nombre_examen', 'examen.fecha')
+                    ->first();
 
-    return [
-        'id_grupo' => (int) $g->id_grupo,
-        'label' => sprintf('%s · Grupo %s', $g->subject?->nombre ?? 'Materia', $g->num_grupo),
-        'tiene_examen_programado' => $examen !== null,
-        'examen_programado' => $examen ? [
-            'nombre_examen' => $examen->nombre_examen,
-            'fecha' => $examen->fecha,
-        ] : null,
-    ];
-    })->values()->all();
+                return [
+                    'id_grupo' => (int) $g->id_grupo,
+                    'label' => sprintf('%s · Grupo %s', $g->subject?->nombre ?? 'Materia', $g->num_grupo),
+                    'tiene_examen_programado' => $examen !== null,
+                    'examen_programado' => $examen ? [
+                        'nombre_examen' => $examen->nombre_examen,
+                        'fecha' => $examen->fecha,
+                    ] : null,
+                ];
+            })->values()->all();
+
+            $groupIds = $user->groupsAsAuxiliar->pluck('id_grupo')->all();
 
             return [
                 'id_usuario' => (string) $user->id_usuario,
@@ -98,6 +100,8 @@ class AssistantService
                 'cod_sis' => $user->cod_sis,
                 'correo' => $user->correo,
                 'grupos' => $grupos,
+                'examenes' => $this->examenesHabilitadosPara($user, $teacherId),
+                'examenes_disponibles' => $this->examenesDisponiblesPara($user, $teacherId, $groupIds),
             ];
         })->all();
     }
@@ -128,7 +132,7 @@ class AssistantService
                     'id_grupo' => (int) $group->id_grupo,
                     'num_grupo' => (string) $group->num_grupo,
                     'label' => sprintf(
-                        '%s · G%s',
+                        '%s · Grupo %s',
                         $group->subject?->nombre ?? 'Materia',
                         $group->num_grupo
                     ),
@@ -527,5 +531,80 @@ class AssistantService
         }
 
         return $user;
+    }
+
+    /**
+     * Exámenes en los que el auxiliar ya está habilitado (PROGRAMADOS).
+     *
+     * @return array<int, array>
+     */
+    private function examenesHabilitadosPara(User $user, string $teacherId): array
+    {
+        return DB::table('examen_auxiliar')
+            ->join('examen', 'examen.id_examen', '=', 'examen_auxiliar.id_examen')
+            ->where('examen_auxiliar.id_usuario', $user->id_usuario)
+            ->where('examen.id_usuario_docente', $teacherId)
+            ->where('examen.estado', Exam::PROGRAMADO)
+            ->orderBy('examen.fecha')
+            ->select('examen.id_examen', 'examen.nombre_examen', 'examen.fecha')
+            ->get()
+            ->map(fn ($e) => [
+                'id_examen' => (int) $e->id_examen,
+                'nombre_examen' => $e->nombre_examen,
+                'fecha' => $e->fecha,
+            ])
+            ->all();
+    }
+
+    /**
+     * Exámenes donde el auxiliar PUEDE ser habilitado.
+     *
+     * Filtros:
+     *  - El examen es del docente y está PROGRAMADO.
+     *  - Al menos un grupo del auxiliar está vinculado al examen.
+     *  - El auxiliar no está ya habilitado en ese examen.
+     *  - El auxiliar no es estudiante del mismo examen (por cod_sis).
+     *
+     * @param array<int, int> $groupIds
+     * @return array<int, array>
+     */
+    private function examenesDisponiblesPara(
+        User $user,
+        string $teacherId,
+        array $groupIds
+    ): array {
+        if ($groupIds === []) {
+            return [];
+        }
+
+        $yaHabilitados = DB::table('examen_auxiliar')
+            ->where('id_usuario', $user->id_usuario)
+            ->pluck('id_examen')
+            ->all();
+
+        return DB::table('examen')
+            ->join('grupo_examen', 'grupo_examen.id_examen', '=', 'examen.id_examen')
+            ->whereIn('grupo_examen.id_grupo', $groupIds)
+            ->where('examen.id_usuario_docente', $teacherId)
+            ->where('examen.estado', Exam::PROGRAMADO)
+            ->whereNotIn('examen.id_examen', $yaHabilitados)
+            // Excluir exámenes donde el auxiliar es estudiante (mismo cod_sis)
+            ->whereNotExists(function ($query) use ($user) {
+                $query->select(DB::raw(1))
+                    ->from('examen_estudiante')
+                    ->join('estudiante', 'estudiante.id_estudiante', '=', 'examen_estudiante.id_estudiante')
+                    ->whereColumn('examen_estudiante.id_examen', 'examen.id_examen')
+                    ->where('estudiante.cod_sis', $user->cod_sis);
+            })
+            ->orderBy('examen.fecha')
+            ->select('examen.id_examen', 'examen.nombre_examen', 'examen.fecha')
+            ->distinct()
+            ->get()
+            ->map(fn ($e) => [
+                'id_examen' => (int) $e->id_examen,
+                'nombre_examen' => $e->nombre_examen,
+                'fecha' => $e->fecha,
+            ])
+            ->all();
     }
 }
