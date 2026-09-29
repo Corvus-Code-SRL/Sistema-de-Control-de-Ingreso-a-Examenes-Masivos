@@ -189,4 +189,20 @@ class User extends Authenticatable
     {
         return $this->hasMany(UserRole::class, 'id_usuario', 'id_usuario');
     }
+    /* =========================================================================
+    * 7. AUXILIAR: grupos y exámenes donde participa (N:M)
+    * ========================================================================= */
+    public function groupsAsAuxiliar(): BelongsToMany
+    {
+        return $this->belongsToMany(Group::class, 'grupo_auxiliar', 'id_usuario', 'id_grupo')
+                    ->using(GroupAssistant::class)
+                    ->withPivot('fecha_incorporacion', 'estado');
+    }
+
+    public function examsAsAuxiliar(): BelongsToMany
+    {
+        return $this->belongsToMany(Exam::class, 'examen_auxiliar', 'id_usuario', 'id_examen')
+                    ->using(ExamAssistant::class)
+                    ->withPivot('id_usuario_docente_habilita', 'fecha_habilitacion', 'id_ambiente');
+    }
 }

@@ -133,4 +133,11 @@ class Exam extends Model
                     ->using(StudentExam::class)
                     ->withPivot('id_grupo', 'estado_habilitacion', 'estado_ingreso', 'hora_ingreso', 'observacion');
     }
+
+    public function auxiliares(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'examen_auxiliar', 'id_examen', 'id_usuario')
+                    ->using(ExamAssistant::class)
+                    ->withPivot('id_usuario_docente_habilita', 'fecha_habilitacion', 'id_ambiente');
+    }
 }
