@@ -58,7 +58,7 @@ function AssistantExamCard({ exam }: { exam: AssistantExam }) {
     <article className="space-y-2 rounded-xl border bg-card p-4 shadow-xs">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-semibold tabular-nums">
-            {formatDate(exam.fecha)} · {formatSchedule(exam)}
+          {formatDate(exam.fecha)} · {formatSchedule(exam)}
         </span>
         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${className}`}>{label}</span>
       </div>
