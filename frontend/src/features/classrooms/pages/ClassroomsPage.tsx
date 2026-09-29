@@ -5,6 +5,8 @@ import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { ClassroomForm } from '../components/ClassroomForm'
 import { useClassrooms } from '../hooks/useClassrooms'
@@ -40,12 +42,9 @@ export function ClassroomsPage() {
           </div>
 
           {successMessage && (
-            <div
-              role="status"
-              className="mb-5 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
-            >
-              {successMessage}
-            </div>
+            <Alert role="status" className="mb-5">
+              <AlertDescription>{successMessage}</AlertDescription>
+            </Alert>
           )}
 
           <ClassroomForm
@@ -97,15 +96,9 @@ export function ClassroomsPage() {
                       <td className="px-6 py-4">{classroom.ubicacion}</td>
 
                       <td className="px-6 py-4">
-                        <span
-                          className={
-                            classroom.activo
-                              ? 'rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-800'
-                              : 'rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground'
-                          }
-                        >
+                        <Badge variant={classroom.activo ? 'default' : 'secondary'}>
                           {classroom.activo ? 'Activo' : 'Inactivo'}
-                        </span>
+                        </Badge>
                       </td>
                     </tr>
                   ))}
