@@ -1,4 +1,4 @@
-import type { ExamAssistant, ExamAssistantsData, ExamClassroom } from '@/features/assistants'
+import type { AssistantExam, ExamAssistant, ExamAssistantsData, ExamClassroom } from '@/features/assistants'
 
 /** Datos de prueba de HU-09: dos ambientes del examen y dos auxiliares, uno sin ambiente. */
 
@@ -31,4 +31,26 @@ export function examAssistantsData(overrides: Partial<ExamAssistantsData> = {}):
     auxiliares: [daniela, maria],
     ...overrides,
   }
+}
+
+
+/** Vista del auxiliar: un examen con ambiente y otro todavía sin asignar. */
+export const assignedExam: AssistantExam = {
+  id_examen: 7,
+  nombre_examen: '1er Parcial BD I',
+  fecha: '2026-10-06',
+  hora_inicio: '08:00',
+  hora_fin: '10:00',
+  estado: 'PROGRAMADO',
+  materia: 'Bases de Datos I',
+  ambiente: auditorio,
+}
+
+export const unassignedExam: AssistantExam = {
+  ...assignedExam,
+  id_examen: 8,
+  nombre_examen: 'Parcial práctico IP',
+  fecha: '2026-10-09',
+  materia: 'Introducción a la Programación',
+  ambiente: null,
 }
