@@ -148,12 +148,27 @@ class ExamService
             $this->assertNoUnconfirmedWarnings($data, $teacherId, $exam->id_examen);
 
             $exam->update($attributes);
+            $this->releaseRemovedClassrooms($exam, $data['ambientes']);
             $exam->classrooms()->sync($data['ambientes']);
 
             return $exam;
         });
 
         return $this->loadDetail($exam);
+    }
+
+    /**
+     * Un auxiliar no puede quedar en un ambiente que el examen ya no tiene (FK
+     * examen_auxiliar → examen_ambiente). Antes del sync quedan sin ambiente solo
+     * los auxiliares de los ambientes quitados; el docente les asigna otro desde
+     * la sección Personal del examen (HU-09).
+     */
+    private function releaseRemovedClassrooms(Exam $exam, array $classroomIds): void
+    {
+        $exam->assistants()
+            ->whereNotNull('id_ambiente')
+            ->whereNotIn('id_ambiente', $classroomIds)
+            ->update(['id_ambiente' => null]);
     }
 
     /**

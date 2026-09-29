@@ -6,6 +6,9 @@ use App\Models\Exam;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\Concerns\SeedsExamCatalog;
 use Tests\TestCase;
+use App\Models\ExamAssistant;
+use App\Support\RecordStatus;
+use Illuminate\Support\Facades\DB;
 
 /**
  * HU-24 — criterios 10 y 11: la información general se edita solo mientras el
@@ -66,6 +69,71 @@ class UpdateExamTest extends TestCase
             [$this->otraAulaId],
             $exam->classrooms()->pluck('ambiente.id_ambiente')->all()
         );
+    }
+
+    /**
+     * Descubierto en HU-09: quitar del examen un ambiente que ya tenía un auxiliar
+     * asignado violaba la FK compuesta examen_auxiliar → examen_ambiente (500).
+     * El auxiliar de ese ambiente queda sin ambiente y los demás no cambian.
+     */
+    public function test_quitar_un_ambiente_deja_sin_ambiente_solo_a_sus_auxiliares(): void
+    {
+        $exam = $this->createExam([], [$this->aulaId, $this->otraAulaId]);
+
+        $releasedId = '00000000-0000-4000-8000-000000000091';
+        $keptId = '00000000-0000-4000-8000-000000000092';
+
+        DB::table('usuario')->insert([
+            [
+                'id_usuario'       => $releasedId,
+                'nombre'           => 'Auxiliar',
+                'apellido_paterno' => 'Liberado',
+                'apellido_materno' => null,
+                'correo'           => 'auxiliar.liberado@umss.edu',
+                'contrasenia'      => 'x',
+                'cod_sis'          => '209900091',
+                'estado'           => RecordStatus::ACTIVE,
+            ],
+            [
+                'id_usuario'       => $keptId,
+                'nombre'           => 'Auxiliar',
+                'apellido_paterno' => 'Conservado',
+                'apellido_materno' => null,
+                'correo'           => 'auxiliar.conservado@umss.edu',
+                'contrasenia'      => 'x',
+                'cod_sis'          => '209900092',
+                'estado'           => RecordStatus::ACTIVE,
+            ],
+        ]);
+
+        foreach ([$releasedId => $this->aulaId, $keptId => $this->otraAulaId] as $userId => $classroomId) {
+            ExamAssistant::create([
+                'id_examen'                   => $exam->id_examen,
+                'id_usuario'                  => $userId,
+                'id_usuario_docente_habilita' => $exam->id_usuario_docente,
+                'id_ambiente'                 => $classroomId,
+            ]);
+        }
+
+        $this->putJson($this->url($exam), $this->validPayload([
+            'fecha'     => $this->futureDate(10),
+            'ambientes' => [$this->otraAulaId],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('examen_auxiliar', [
+            'id_examen'   => $exam->id_examen,
+            'id_usuario'  => $releasedId,
+            'id_ambiente' => null,
+        ]);
+        $this->assertDatabaseHas('examen_auxiliar', [
+            'id_examen'   => $exam->id_examen,
+            'id_usuario'  => $keptId,
+            'id_ambiente' => $this->otraAulaId,
+        ]);
+        $this->assertDatabaseMissing('examen_ambiente', [
+            'id_examen'   => $exam->id_examen,
+            'id_ambiente' => $this->aulaId,
+        ]);
     }
 
     public function test_la_edicion_no_se_advierte_contra_el_propio_examen(): void
