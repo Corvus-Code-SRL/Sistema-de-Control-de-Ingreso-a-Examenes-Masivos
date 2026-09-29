@@ -171,7 +171,7 @@ export function AssignAssistantModal({
                     />
                     <span className="text-sm">{g.label}</span>
                     {isAssigned && (
-                      <span className="ml-auto text-xs text-muted-foreground">
+                      <span className="ml-auto text-xs text-destructive">
                         Ya está asignada a este grupo.
                       </span>
                     )}
@@ -193,11 +193,12 @@ export function AssignAssistantModal({
         )}
 
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={handleClose} disabled={isSubmitting}>
+          <Button variant="outline" onClick={handleClose} disabled={isSubmitting}>
             Cancelar
           </Button>
           {result && (
             <Button
+              variant="default"
               onClick={handleConfirm}
               disabled={isSubmitting || newAssignmentsCount === 0}
             >

@@ -86,7 +86,9 @@ export function MoveAssistantModal({
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <Label>Grupo de origen</Label>
+            <Label>
+              Grupo de origen <span className="text-destructive" aria-hidden="true">*</span>
+            </Label>
             <Select
               value={sourceId !== null ? String(sourceId) : undefined}
               onValueChange={(v) => {
@@ -109,7 +111,9 @@ export function MoveAssistantModal({
           </div>
 
           <div className="space-y-1">
-            <Label>Grupo de destino</Label>
+            <Label>
+              Grupo de destino <span className="text-destructive" aria-hidden="true">*</span>
+            </Label>
             <Select
               value={targetId !== null ? String(targetId) : undefined}
               onValueChange={(v) => setTargetId(Number(v))}
@@ -134,7 +138,7 @@ export function MoveAssistantModal({
           </div>
         </div>
 
-        {sourceGroup?.tiene_examen_programado && (
+        {sourceGroup?.tiene_examen_programado && sourceGroup.examen_programado && (
           <Alert className="border-warn-border bg-warn-soft text-warn-fg">
             <AlertTriangle className="size-4" />
             <AlertTitle>Tiene un examen programado en el grupo de origen</AlertTitle>
@@ -145,10 +149,11 @@ export function MoveAssistantModal({
         )}
 
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={onCancel} disabled={isSubmitting}>
+          <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar
           </Button>
           <Button
+            variant="default"
             onClick={handleConfirm}
             disabled={
               isSubmitting ||

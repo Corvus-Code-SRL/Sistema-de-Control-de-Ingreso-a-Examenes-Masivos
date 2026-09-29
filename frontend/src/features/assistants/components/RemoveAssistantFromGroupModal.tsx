@@ -27,7 +27,9 @@ interface RemoveAssistantFromGroupModalProps {
 /**
  * Modal para quitar un auxiliar de un grupo.
  *
- * Si el grupo tiene exámenes programados, se nombra en la confirmación.
+ * Si el grupo tiene un examen PROGRAMADO, se nombra en el mensaje:
+ * "Dejará de estar asignada a <materia> · Grupo <n>. Examen afectado:
+ *  <nombre del examen> (<dd/mm>)."
  */
 export function RemoveAssistantFromGroupModal({
   open,
@@ -88,22 +90,26 @@ export function RemoveAssistantFromGroupModal({
         {group && (
           <p className="text-sm text-muted-foreground">
             Dejará de estar asignada a {group.label}.
-            {group.tiene_examen_programado && (
+            {group.tiene_examen_programado && group.examen_programado && (
               <>
                 {' '}
-                Examen afectado en el grupo:{' '}
-                <strong>revisar en Programados</strong>.
+                Examen afectado:{' '}
+                <strong>
+                  {group.examen_programado.nombre_examen} (
+                  {formatDate(group.examen_programado.fecha)})
+                </strong>
+                .
               </>
             )}
           </p>
         )}
 
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={onCancel} disabled={isSubmitting}>
+          <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar
           </Button>
           <Button
-            variant="destructive"
+            variant="danger"
             onClick={handleConfirm}
             disabled={isSubmitting || groupId === null}
           >
@@ -113,4 +119,10 @@ export function RemoveAssistantFromGroupModal({
       </DialogContent>
     </Dialog>
   )
+}
+
+/** Convierte "2026-09-29" en "29/09". */
+function formatDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split('-')
+  return `${day}/${month}`
 }
