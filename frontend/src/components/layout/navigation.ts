@@ -69,6 +69,17 @@ const navegacionDocente: NavGroup[] = [
 ]
 
 /**
+ * Navegación lateral del auxiliar (HU-09): solo consulta los exámenes que
+ * controla. El control de ingreso se suma con HU-10 y HU-11.
+ */
+const navegacionAuxiliar: NavGroup[] = [
+  {
+    label: 'Exámenes',
+    items: [{ label: 'Mis exámenes', icon: CalendarClock, to: '/mis-examenes' }],
+  },
+]
+
+/**
  * Navegación lateral del administrador.
  *
  * Cuentas y Materias tienen pantallas disponibles. Facultades, carreras y
@@ -90,6 +101,7 @@ const navegacionAdministrador: NavGroup[] = [
 
 export const navigationByArea: Record<Area, NavGroup[]> = {
   docente: navegacionDocente,
+  auxiliar: navegacionAuxiliar,
   administrador: navegacionAdministrador,
 }
 

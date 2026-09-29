@@ -2,15 +2,16 @@
  * Áreas de trabajo de SCIEM.
  *
  * Cada área tiene su propia navegación y su propio juego de rutas. No se
- * mezclan: una pantalla pertenece a un área, nunca a las dos.
+ * mezclan: una pantalla pertenece a un área, nunca a dos.
  */
-export type Area = 'docente' | 'administrador'
+export type Area = 'docente' | 'auxiliar' | 'administrador'
 
 /** Orden en el que se ofrecen las áreas al elegirlas. */
-export const AREAS: readonly Area[] = ['docente', 'administrador']
+export const AREAS: readonly Area[] = ['docente', 'auxiliar', 'administrador']
 
 export const AREA_LABELS: Record<Area, string> = {
   docente: 'Docente',
+  auxiliar: 'Auxiliar',
   administrador: 'Administrador',
 }
 
