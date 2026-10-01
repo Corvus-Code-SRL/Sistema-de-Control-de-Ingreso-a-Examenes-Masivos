@@ -61,10 +61,21 @@ class ExamGroupService
             $previousOwnGroupIds = $exam->groups()
                 ->where('id_usuario_docente', $teacherId)
                 ->pluck('grupo.id_grupo')
+                ->map(fn ($groupId) => (int) $groupId)
                 ->all();
 
-            $exam->groups()->detach($previousOwnGroupIds);
-            $exam->groups()->attach($groupIds);
+            $groupsToDetach = array_values(array_diff($previousOwnGroupIds, $groupIds));
+            $groupsToAttach = array_values(array_diff($groupIds, $previousOwnGroupIds));
+
+            $this->assertRemovedGroupsHaveNoEntries($exam, $groupsToDetach);
+
+            if ($groupsToDetach !== []) {
+                $exam->groups()->detach($groupsToDetach);
+            }
+
+            if ($groupsToAttach !== []) {
+                $exam->groups()->attach($groupsToAttach);
+            }
 
             return $exam->fresh([
                 'examType',
@@ -151,6 +162,26 @@ class ExamGroupService
             throw ValidationException::withMessages([
                 'grupos' => [
                     "El grupo {$withoutRoster->num_grupo} no tiene nómina cargada.",
+                ],
+            ]);
+        }
+    }
+
+    private function assertRemovedGroupsHaveNoEntries(Exam $exam, array $groupIds): void
+    {
+        if ($groupIds === []) {
+            return;
+        }
+
+        $hasEntries = DB::table('examen_estudiante')
+            ->where('id_examen', $exam->id_examen)
+            ->whereIn('id_grupo', $groupIds)
+            ->exists();
+
+        if ($hasEntries) {
+            throw ValidationException::withMessages([
+                'grupos' => [
+                    'No se puede retirar un grupo que ya tiene registros de estudiantes en el examen.',
                 ],
             ]);
         }
