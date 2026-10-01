@@ -2,7 +2,10 @@
 
 namespace App\Console;
 
-use App\Jobs\AbrirControlIngresoJob;
+use App\Jobs\FinalizeExpiredExamsJob;
+use App\Jobs\OpenEntryControlJob;
+use App\Services\EntryControl\RoomAssignmentService;
+use App\Services\Exams\ExamLifecycleService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -16,10 +19,14 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        // $schedule->command('inspire')->hourly();
-        
-        //HU-10 -> Despertador automatico
-        $schedule->job(new AbrirControlIngresoJob)->everyMinute();
+        // La apertura corre cada minuto sin depender de un trabajador de cola.
+        $schedule->call(function (): void {
+            app(OpenEntryControlJob::class)->handle(app(RoomAssignmentService::class));
+        })->name('open-entry-control')->everyMinute()->withoutOverlapping(2);
+
+        $schedule->call(function (): void {
+            app(FinalizeExpiredExamsJob::class)->handle(app(ExamLifecycleService::class));
+        })->name('finalize-expired-exams')->everyMinute()->withoutOverlapping(2);
     }
 
     /**
