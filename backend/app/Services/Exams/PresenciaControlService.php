@@ -2,6 +2,7 @@
 
 namespace App\Services\Exams;
 
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -15,7 +16,7 @@ class PresenciaControlService
     public function registerHeartbeat(int $examId, string $userId, string $userName): void
     {
         $cacheKey = "exam_{$examId}_connected_users";
-        $connected = Cache::get($cacheKey, []);
+        $connected = $this->cache()->get($cacheKey, []);
 
         // Actualizamos o insertamos al usuario con su timestamp actual
         $connected[$userId] = [
@@ -24,7 +25,7 @@ class PresenciaControlService
         ];
 
         // Guardamos el array en Redis con un tiempo de vida máximo de 30 segundos
-        Cache::put($cacheKey, $connected, 30);
+        $this->cache()->put($cacheKey, $connected, 30);
     }
 
     /**
@@ -33,7 +34,7 @@ class PresenciaControlService
     public function getConnectedUsers(int $examId): array
     {
         $cacheKey = "exam_{$examId}_connected_users";
-        $connected = Cache::get($cacheKey, []);
+        $connected = $this->cache()->get($cacheKey, []);
         
         $activeUsers = [];
         $now = now()->timestamp;
@@ -46,5 +47,10 @@ class PresenciaControlService
         }
 
         return $activeUsers;
+    }
+
+    private function cache(): Repository
+    {
+        return Cache::store(config("sciem.entry_control_cache_store", "redis"));
     }
 }
