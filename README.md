@@ -204,6 +204,10 @@ php artisan migrate
 php artisan serve        # http://localhost:8000
 ```
 
+En otra terminal, desde `backend`, inicia `php artisan schedule:work`. El
+planificador abre automáticamente el control de ingreso según `minutos_apertura`
+de cada examen (10 minutos por defecto). Con Docker, el servicio `scheduler` se inicia con `up -d`.
+
 > Usar `composer install`, **nunca** `composer update`, para respetar las versiones de `composer.lock`.
 > No usar `php artisan migrate:fresh` sobre una base de datos con información que se desee conservar.
 

@@ -12,8 +12,9 @@ por separado.
 | Servicio   | Imagen                 | Versión | Acceso                                    |
 |------------|------------------------|---------|-------------------------------------------|
 | `app`      | `sciem-php:dev` (local)| PHP 8.0.30 · Composer 2.9.6 | `http://localhost:8000`   |
+| `scheduler` | `sciem-php:dev` (local)| PHP 8.0.30 | Sin puerto; ejecuta el planificador cada minuto |
 | `postgres` | `postgres:15.0`        | 15.0    | Interno `postgres:5432` · Host `localhost:5433` |
-| `redis`    | `redis:7.4.3`          | 7.4.3   | Solo interno: `redis:6379`                |
+| `redis`    | `redis:7.4.3`          | 7.4.3   | Interno `redis:6379` · Host `localhost:6379` |
 
 - Extensiones PHP instaladas: `pdo_pgsql`, `bcmath`, `redis`, `zip`, `gd` (el resto de las
   exigidas por el README vienen incluidas en la imagen oficial). `gd` la exige
@@ -23,6 +24,7 @@ por separado.
   debajo de los 10 MB que admite la nómina de HU-021, y un archivo descartado por PHP
   nunca llega al validador de Laravel.
 - PostgreSQL se publica en **5433** para no chocar con una instalación local en 5432.
+- Redis se publica en **6379** para que el backend ejecutado fuera de Docker use `REDIS_HOST=127.0.0.1`.
 - Los datos de PostgreSQL se guardan en el volumen `sciem_postgres_data`.
 
 ## Requisitos
@@ -89,6 +91,7 @@ npm run dev        # http://localhost:5173
 $DC exec app php artisan <comando>                  # artisan
 $DC exec app composer install                       # nunca composer update
 $DC exec app php artisan test                       # pruebas
+$DC logs -f scheduler                               # aperturas automáticas
 $DC logs -f app                                     # logs del servidor
 $DC exec postgres psql -U postgres -d sciem_db      # consola SQL
 $DC build app                                       # reconstruir la imagen tras cambiar el Dockerfile
@@ -126,3 +129,21 @@ $DC build app                                       # reconstruir la imagen tras
 - **Nuevas extensiones:** si un paquete nuevo exige una extensión, `composer install` falla.
   Se verifica con `$DC exec app composer check-platform-reqs`, se agrega la extensión al
   Dockerfile y se reconstruye con `$DC build app`.
+## Apertura automática de ingreso
+
+El servicio `scheduler` ejecuta el planificador de Laravel cada minuto. Un examen
+`PROGRAMADO` con nómina y ambientes suficientes prepara en Redis un snapshot versionado
+con identidades, pertenencia, aulas, antecedentes, permisos, contadores y últimos ingresos.
+Solo después activa el snapshot y pasa a `EN_INGRESO`, al llegar a la anticipación indicada
+por `examen.minutos_apertura` (10 minutos por defecto, entre 0 y 30) en la zona
+`SCIEM_ZONA_HORARIA`. El cambio no requiere una migración de base de datos.
+
+Durante `EN_INGRESO`, verificar, buscar y consultar `/estado` leen Redis. La confirmación
+persiste el ingreso en PostgreSQL y, después del commit, actualiza contadores, últimos
+ingresos y la versión Redis que consume el polling. Si se pierden las claves de un examen
+abierto, el siguiente ciclo del scheduler reconstruye el snapshot.
+
+Comprueba el planificador con `$DC ps` y `$DC logs -f scheduler`. Si el examen no
+tiene nómina o capacidad, conserva `PROGRAMADO` y registra el motivo en el log de
+Laravel. En una instalación sin Docker, ejecuta `php artisan schedule:work` en
+otro proceso, o programa `php artisan schedule:run` cada minuto con cron.
