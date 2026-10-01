@@ -1,7 +1,8 @@
 import React from 'react';
 import { CreateExamFormData, SubjectCareerOption, Classroom } from '../types/exams.types';
 import { localToday, MAX_DURATION_MINUTES } from '../utils/examValidators';
-import { Calendar as CalendarIcon, Clock as ClockIcon, ChevronDown } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock as ClockIcon } from 'lucide-react';
+import { FormSelect } from '@/components/common/FormSelect';
 
 interface Props {
   formData: CreateExamFormData;
@@ -53,19 +54,19 @@ export const ExamForm: React.FC<Props> = ({
           <label htmlFor="categoria" className="block text-xs font-bold text-[#2C2C2C]">
             Categoría *
           </label>
-          <div className="relative">
-            <select
-              id="categoria"
-              value={formData.categoria}
-              onChange={(e) => updateFormData({ categoria: e.target.value as CreateExamFormData['categoria'] })}
-              className="w-full px-3.5 py-2.5 bg-white border border-[#DDDDDD] rounded-lg text-xs outline-none focus:border-[#005E68] text-[#2C2C2C] appearance-none cursor-pointer pr-9 font-medium"
-            >
-              <option value="REGULAR">REGULAR</option>
-              <option value="MESA">MESA</option>
-              <option value="ADMISION">ADMISION</option>
-            </select>
-            <ChevronDown className="h-4 w-4 text-[#6C757D] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+          <FormSelect
+            id="categoria"
+            value={formData.categoria}
+            placeholder="Seleccionar categoría"
+            options={[
+              { value: 'REGULAR', label: 'REGULAR' },
+              { value: 'MESA', label: 'MESA' },
+              { value: 'ADMISION', label: 'ADMISIÓN' },
+            ]}
+            onValueChange={(value) => updateFormData({
+              categoria: value as CreateExamFormData['categoria'],
+            })}
+          />
         </div>
 
         <div className="space-y-1.5">
@@ -93,28 +94,24 @@ export const ExamForm: React.FC<Props> = ({
           <label htmlFor="materia" className="block text-xs font-bold text-[#2C2C2C]">
             Materia *
           </label>
-          <div className="relative">
-            <select
-              id="materia"
-              value={formData.materia ? pairKey(formData.materia) : ''}
-              onChange={(e) => {
-                const pair = subjects.find((sub) => pairKey(sub) === e.target.value);
-                updateFormData({
-                  materia: pair ? { id_carrera: pair.id_carrera, id_materia: pair.id_materia } : null,
-                });
-              }}
-              className={`w-full px-3.5 py-2.5 bg-white border ${errors.materia ? 'border-red-500' : 'border-[#DDDDDD]'
-                } rounded-lg text-xs outline-none focus:border-[#005E68] text-[#2C2C2C] appearance-none cursor-pointer pr-9 font-medium`}
-            >
-              <option value="">Seleccionar Materia...</option>
-              {subjects.map((sub) => (
-                <option key={pairKey(sub)} value={pairKey(sub)}>
-                  {sub.nombre} — {sub.carrera}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="h-4 w-4 text-[#6C757D] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+          <FormSelect
+            id="materia"
+            value={formData.materia ? pairKey(formData.materia) : undefined}
+            placeholder="Seleccionar materia..."
+            invalid={Boolean(errors.materia)}
+            options={subjects.map((subject) => ({
+              value: pairKey(subject),
+              label: `${subject.nombre} — ${subject.carrera}`,
+            }))}
+            onValueChange={(value) => {
+              const pair = subjects.find((subject) => pairKey(subject) === value);
+              updateFormData({
+                materia: pair
+                  ? { id_carrera: pair.id_carrera, id_materia: pair.id_materia }
+                  : null,
+              });
+            }}
+          />
           {errors.materia && (
             <p className="text-[11px] text-red-600 font-medium">{errors.materia}</p>
           )}
@@ -168,23 +165,17 @@ export const ExamForm: React.FC<Props> = ({
           <label htmlFor="ambientes" className="block text-xs font-bold text-[#2C2C2C]">
             Ambiente(s) *
           </label>
-          <div className="relative">
-            <select
-              id="ambientes"
-              value={formData.ambientes[0] ?? ''}
-              onChange={(e) => updateFormData({ ambientes: e.target.value ? [Number(e.target.value)] : [] })}
-              className={`w-full px-3.5 py-2.5 bg-white border ${errors.ambientes ? 'border-red-500' : 'border-[#DDDDDD]'
-                } rounded-lg text-xs outline-none focus:border-[#005E68] text-[#2C2C2C] appearance-none cursor-pointer pr-9 font-medium`}
-            >
-              <option value="">Seleccionar Aula...</option>
-              {classrooms.map((room) => (
-                <option key={room.id_ambiente} value={room.id_ambiente}>
-                  Aula {room.nro_aula} ({room.capacidad} pupitres)
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="h-4 w-4 text-[#6C757D] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+          <FormSelect
+            id="ambientes"
+            value={formData.ambientes[0] ? String(formData.ambientes[0]) : undefined}
+            placeholder="Seleccionar aula..."
+            invalid={Boolean(errors.ambientes)}
+            options={classrooms.map((room) => ({
+              value: String(room.id_ambiente),
+              label: `Aula ${room.nro_aula} (${room.capacidad} pupitres)`,
+            }))}
+            onValueChange={(value) => updateFormData({ ambientes: [Number(value)] })}
+          />
           {errors.ambientes && (
             <p className="text-[11px] text-red-600 font-medium">{errors.ambientes}</p>
           )}
