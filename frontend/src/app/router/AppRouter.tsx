@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useCurrentUser } from '@/features/auth'
+import { EntryControlPage, OpenEntryControlsPage } from '@/features/entry-control'
 import { CreateExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
 import { CourseDetailPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
 import {
@@ -29,6 +30,8 @@ function DocenteRoutes() {
       <Route path="/examenes/nuevo" element={<CreateExamPage />} />
       <Route path="/examenes/programados" element={<ExamsPage />} />
       <Route path="/examenes/:examId" element={<ExamDetailPage />} />
+      <Route path="/control-ingreso" element={<OpenEntryControlsPage />} />
+      <Route path="/examenes/:examId/control-ingreso" element={<EntryControlPage />} />
       <Route path="*" element={<Navigate to="/materias" replace />} />
     </Routes>
   )
