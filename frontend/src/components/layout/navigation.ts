@@ -13,7 +13,7 @@ import {
   ScrollText,
   ShieldCheck,
   SquarePen,
-  Users,
+  Users
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Area } from '@/features/auth'
@@ -45,8 +45,8 @@ const navegacionDocente: NavGroup[] = [
     items: [
       { label: 'Materias', icon: BookOpen, to: '/materias' },
       { label: 'Mis cursos', icon: GraduationCap, to: '/mis-cursos' },
-      { label: 'Mis auxiliares', icon: Users },
-    ],
+      { label: 'Mis auxiliares', icon: Users }
+    ]
   },
   {
     label: 'Exámenes',
@@ -56,16 +56,16 @@ const navegacionDocente: NavGroup[] = [
       { label: 'Control de ingreso', icon: DoorOpen, to: '/control-ingreso' },
       { label: 'En curso', icon: PlaySquare },
       { label: 'Incidencias', icon: AlertTriangle, badge: 3 },
-      { label: 'Historial', icon: History },
-    ],
+      { label: 'Historial', icon: History }
+    ]
   },
   {
     label: 'Central de riesgo',
     items: [
       { label: 'Verificar antecedentes', icon: FileSearch },
-      { label: 'Registros', icon: ClipboardList },
-    ],
-  },
+      { label: 'Registros', icon: ClipboardList }
+    ]
+  }
 ]
 
 /**
@@ -82,15 +82,16 @@ const navegacionAdministrador: NavGroup[] = [
       { label: 'Cuentas', icon: Users, to: '/cuentas' },
       { label: 'Materias', icon: BookOpen, to: '/materias' },
       { label: 'Facultades', icon: Building2 },
+      { label: 'Ambientes', icon: DoorOpen, to: '/ambientes' },
       { label: 'Carreras', icon: GraduationCap },
-      { label: 'Bitácora', icon: ScrollText },
-    ],
-  },
+      { label: 'Bitácora', icon: ScrollText }
+    ]
+  }
 ]
 
 export const navigationByArea: Record<Area, NavGroup[]> = {
   docente: navegacionDocente,
-  administrador: navegacionAdministrador,
+  administrador: navegacionAdministrador
 }
 
 export const shieldIcon = ShieldCheck
