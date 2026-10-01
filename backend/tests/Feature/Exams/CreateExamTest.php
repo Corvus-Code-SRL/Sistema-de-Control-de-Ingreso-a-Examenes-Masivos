@@ -46,6 +46,7 @@ class CreateExamTest extends TestCase
         $this->assertDatabaseHas('examen', [
             'id_examen'          => $response->json('data.id_examen'),
             'estado'             => Exam::PROGRAMADO,
+            'minutos_apertura'   => 10,
             'id_carrera'         => $this->sistemasId,
             'id_materia'         => $this->calculoId,
             'id_usuario_docente' => $this->docenteId,

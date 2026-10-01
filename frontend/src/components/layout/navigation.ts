@@ -53,7 +53,7 @@ const navegacionDocente: NavGroup[] = [
     items: [
       { label: 'Nuevo examen', icon: SquarePen, to: '/examenes/nuevo' },
       { label: 'Programados', icon: CalendarClock, to: '/examenes/programados' },
-      { label: 'Control de ingreso', icon: DoorOpen },
+      { label: 'Control de ingreso', icon: DoorOpen, to: '/control-ingreso' },
       { label: 'En curso', icon: PlaySquare },
       { label: 'Incidencias', icon: AlertTriangle, badge: 3 },
       { label: 'Historial', icon: History }

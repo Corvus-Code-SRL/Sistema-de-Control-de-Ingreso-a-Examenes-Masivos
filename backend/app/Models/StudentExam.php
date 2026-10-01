@@ -29,7 +29,10 @@ class StudentExam extends Pivot
         'estado_habilitacion' => 'string',
         'estado_ingreso' => 'string',
         'hora_ingreso' => 'string',
-        'id_grupo' => 'int'
+        'id_grupo' => 'int',
+        'id_ambiente' => 'int',
+        'id_usuario_controlador' => 'string',
+        'registrado_en' => 'datetime',
     ];
 
     protected $fillable = [
@@ -40,6 +43,9 @@ class StudentExam extends Pivot
         'estado_ingreso',
         'hora_ingreso',
         'id_grupo',
+        'id_ambiente',
+        'id_usuario_controlador',
+        'registrado_en',
     ];
 
     /** Consulta por la FK completa; usar ->get()/->first(), no with(). */

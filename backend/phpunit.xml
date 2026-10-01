@@ -21,6 +21,7 @@
         <server name="APP_ENV" value="testing"/>
         <server name="BCRYPT_ROUNDS" value="4"/>
         <server name="CACHE_DRIVER" value="array"/>
+        <server name="ENTRY_CONTROL_CACHE_STORE" value="array"/>
         <!-- El esquema usa enums y claves foráneas compuestas de PostgreSQL: SQLite no sirve. -->
         <server name="DB_CONNECTION" value="pgsql"/>
         <server name="DB_DATABASE" value="sciem_test"/>

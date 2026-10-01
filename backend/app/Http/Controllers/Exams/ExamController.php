@@ -11,6 +11,7 @@ use App\Http\Resources\Exams\GroupResource;
 use App\Http\Resources\Exams\SubjectResource;
 use App\Models\Exam;
 use App\Services\Exams\ExamService;
+use App\Services\Exams\ExamLifecycleService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
@@ -76,5 +77,13 @@ class ExamController extends Controller
         $exam = $this->examService->cancel($exam);
 
         return ApiResponse::success(new ExamResource($exam), 'Examen cancelado correctamente.');
+    }
+
+    /** POST /api/examenes/{exam}/finalizar */
+    public function finish(Exam $exam, ExamLifecycleService $lifecycle): JsonResponse
+    {
+        $exam = $lifecycle->finishManually($exam);
+
+        return ApiResponse::success(new ExamResource($exam), 'Examen finalizado correctamente.');
     }
 }
