@@ -29,6 +29,10 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
          ->whereNumber('exam')
          ->name('cancelar');
 
+    Route::post('/{exam}/finalizar', [ExamController::class, 'finish'])
+         ->whereNumber('exam')
+         ->name('finalizar');
+
     Route::post('/{exam}/grupos', [ExamGroupController::class, 'store'])
          ->whereNumber('exam')
          ->name('grupos.store');
