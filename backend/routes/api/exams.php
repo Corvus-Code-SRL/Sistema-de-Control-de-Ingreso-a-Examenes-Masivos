@@ -3,7 +3,17 @@
 use App\Http\Controllers\Exams\ExamController;
 use App\Http\Controllers\Exams\ExamGroupController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Exams\ClassroomController;
 
+// ...
+
+Route::prefix('ambientes')->name('ambientes.')->group(function () {
+    Route::get('/', [ClassroomController::class, 'index'])
+         ->name('index');
+
+    Route::post('/', [ClassroomController::class, 'store'])
+         ->name('store');
+});
 // Rutas del módulo: exams
 
 // HU-24 — {exam} es el id_examen: cualquier otro valor responde 404 sin llegar a la base.

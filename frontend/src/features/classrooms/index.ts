@@ -1,2 +1,3 @@
 // API pública del feature classrooms
-export {};
+export {}
+export { ClassroomsPage } from './pages/ClassroomsPage'
