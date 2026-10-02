@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\SisCode;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -62,6 +63,12 @@ class User extends Authenticatable
                 $user->id_usuario = (string) Str::uuid();
             }
         });
+    }
+
+    /** El SIS se guarda siempre en su forma canónica (ver SisCode). */
+    public function setCodSisAttribute($value): void
+    {
+        $this->attributes['cod_sis'] = is_string($value) ? SisCode::normalize($value) : $value;
     }
 
     /** Permite usar {user} en las rutas resolviendo por id_usuario. */

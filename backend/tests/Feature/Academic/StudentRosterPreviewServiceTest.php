@@ -92,7 +92,8 @@ class StudentRosterPreviewServiceTest extends TestCase
         $result = $service->generate(
             (int) $group->id_grupo,
             $this->temporaryFile,
-            'csv'
+            'csv',
+            $this->docenteId
         );
 
         $this->assertSame(5, $result->totalRows());

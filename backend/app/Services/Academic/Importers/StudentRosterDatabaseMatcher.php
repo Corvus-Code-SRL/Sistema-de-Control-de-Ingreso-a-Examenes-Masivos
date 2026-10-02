@@ -3,6 +3,7 @@
 namespace App\Services\Academic\Importers;
 
 use App\Models\Student;
+use App\Support\SisCode;
 use Illuminate\Support\Facades\DB;
 
 class StudentRosterDatabaseMatcher
@@ -33,7 +34,7 @@ class StudentRosterDatabaseMatcher
 
         foreach ($students as $student) {
             $studentsBySis[
-                'sis:' . $student->cod_sis
+                'sis:' . SisCode::normalize($student->cod_sis)
             ] = $student;
         }
 

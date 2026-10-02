@@ -73,7 +73,8 @@ class StudentRosterConfirmationServiceTest extends TestCase
             $store
         )->confirm(
             (int) $group->id_grupo,
-            $token
+            $token,
+            $this->docenteId
         );
 
         $this->assertSame(1, $result->totalRows());
@@ -116,7 +117,8 @@ class StudentRosterConfirmationServiceTest extends TestCase
         try {
             $this->confirmationService($store)->confirm(
                 (int) $group->id_grupo,
-                str_repeat('a', 64)
+                str_repeat('a', 64),
+                $this->docenteId
             );
 
             $this->fail(
@@ -161,7 +163,8 @@ class StudentRosterConfirmationServiceTest extends TestCase
         try {
             $this->confirmationService($store)->confirm(
                 (int) $group->id_grupo,
-                $token
+                $token,
+                $this->docenteId
             );
 
             $this->fail(
@@ -233,7 +236,8 @@ class StudentRosterConfirmationServiceTest extends TestCase
         try {
             $service->confirm(
                 (int) $group->id_grupo,
-                $token
+                $token,
+                $this->docenteId
             );
 
             $this->fail(
@@ -298,7 +302,8 @@ class StudentRosterConfirmationServiceTest extends TestCase
         try {
             $this->confirmationService($store)->confirm(
                 (int) $requestedGroup->id_grupo,
-                $token
+                $token,
+                $this->docenteId
             );
 
             $this->fail(

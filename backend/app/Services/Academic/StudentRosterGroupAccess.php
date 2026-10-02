@@ -16,13 +16,9 @@ class StudentRosterGroupAccess
         $this->rosterLock = $rosterLock;
     }
 
-    public function getAvailable(int $groupId): Group
+    public function getAvailable(int $groupId, string $teacherId): Group
     {
         $group = Group::query()->findOrFail($groupId);
-
-        $teacherId = (string) config(
-            'sciem.docente_fijo_id'
-        );
 
         $activePeriodId = (int) config(
             'sciem.periodo_activo_id'

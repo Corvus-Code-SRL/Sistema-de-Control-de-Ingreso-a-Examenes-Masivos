@@ -50,9 +50,11 @@ class ExamService
      * Catálogos del formulario: pares materia-carrera activos, ambientes activos y los
      * grupos del docente en el periodo activo.
      */
-    public function formOptions(): array
+    public function formOptions(string $teacherId): array
     {
-        $pairs = $this->subjectCatalog->listSubjectCareers()['pairs']
+        $this->assertTeacherGiven($teacherId);
+
+        $pairs = $this->subjectCatalog->listSubjectCareers($teacherId)['pairs']
             ->filter(function ($pair) {
                 return $pair->estado === RecordStatus::ACTIVE
                     && $pair->subject->estado === RecordStatus::ACTIVE;
@@ -66,7 +68,7 @@ class ExamService
 
         $groups = Group::query()
             ->withStudentCount()
-            ->where('id_usuario_docente', $this->currentTeacherId())
+            ->where('id_usuario_docente', $teacherId)
             ->where('id_periodo', $this->subjectCatalog->activePeriodId())
             ->where('estado', RecordStatus::ACTIVE)
             ->orderBy('id_carrera')
@@ -82,32 +84,35 @@ class ExamService
     }
 
     /**
-     * Exámenes del docente actual, del más próximo al más lejano (vista Programados).
+     * Exámenes del docente indicado, del más próximo al más lejano (vista Programados).
      */
-    public function listForCurrentTeacher(): Collection
+    public function listForTeacher(string $teacherId): Collection
     {
+        $this->assertTeacherGiven($teacherId);
+
         return Exam::query()
             ->with(['examType', 'subject', 'career'])
-            ->where('id_usuario_docente', $this->currentTeacherId())
+            ->where('id_usuario_docente', $teacherId)
             ->orderBy('fecha')
             ->orderBy('hora_inicio')
             ->get();
     }
 
     /** Detalle de un examen propio, para editarlo o gestionar sus grupos. */
-    public function find(Exam $exam): Exam
+    public function find(Exam $exam, string $teacherId): Exam
     {
-        $this->assertOwnedBy($exam, $this->currentTeacherId());
+        $this->assertTeacherGiven($teacherId);
+        $this->assertOwnedBy($exam, $teacherId);
 
         return $this->loadDetail($exam);
     }
 
-    public function create(array $data): Exam
+    public function create(array $data, string $teacherId): Exam
     {
-        $teacherId = $this->currentTeacherId();
+        $this->assertTeacherGiven($teacherId);
 
         $exam = DB::transaction(function () use ($data, $teacherId) {
-            $attributes = $this->prepareAttributes($data);
+            $attributes = $this->prepareAttributes($data, $teacherId);
 
             $this->lockSchedules($teacherId, $data['ambientes']);
             $this->assertNoUnconfirmedWarnings($data, $teacherId, null);
@@ -119,7 +124,7 @@ class ExamService
 
             $exam->classrooms()->attach($data['ambientes']);
 
-            return $this->groupService->assignGroups($exam, $data['grupos']);
+            return $this->groupService->assignGroups($exam, $data['grupos'], $teacherId);
         });
 
         return $this->loadDetail($exam);
@@ -129,9 +134,9 @@ class ExamService
      * Criterios 10 y 11: la información general solo cambia mientras el examen está
      * PROGRAMADO. Desde EN_INGRESO nombre, fecha, hora, duración y materia quedan fijos.
      */
-    public function update(Exam $exam, array $data): Exam
+    public function update(Exam $exam, array $data, string $teacherId): Exam
     {
-        $teacherId = $this->currentTeacherId();
+        $this->assertTeacherGiven($teacherId);
 
         $exam = DB::transaction(function () use ($exam, $data, $teacherId) {
             $exam = $this->lockExam($exam);
@@ -142,7 +147,7 @@ class ExamService
                 throw new ExamStateException($this->notEditableMessage($exam->estado));
             }
 
-            $attributes = $this->prepareAttributes($data);
+            $attributes = $this->prepareAttributes($data, $teacherId);
 
             $this->lockSchedules($teacherId, $data['ambientes']);
             $this->assertNoUnconfirmedWarnings($data, $teacherId, $exam->id_examen);
@@ -160,9 +165,9 @@ class ExamService
      * Criterio 12: se cancela solo mientras el control de ingreso no empezó. El examen
      * no se borra: pasa a CANCELADO y la bitácora guarda quién lo canceló y cuándo.
      */
-    public function cancel(Exam $exam): Exam
+    public function cancel(Exam $exam, string $teacherId): Exam
     {
-        $teacherId = $this->currentTeacherId();
+        $this->assertTeacherGiven($teacherId);
 
         $exam = DB::transaction(function () use ($exam, $teacherId) {
             $exam = $this->lockExam($exam);
@@ -189,28 +194,24 @@ class ExamService
         return $this->loadDetail($exam);
     }
 
-    /**
-     * Mientras no haya autenticación, el docente es el de configuración, el mismo que
-     * usan las consultas de materias y grupos (HU-16, HU-17).
-     */
-    private function currentTeacherId(): string
+    private function assertTeacherGiven(string $teacherId): void
     {
-        $teacherId = $this->subjectCatalog->teacherId();
-
         if ($teacherId === '') {
             throw new RuntimeException('No hay un docente configurado en SCIEM_DOCENTE_FIJO_ID.');
         }
-
-        return $teacherId;
     }
 
     /**
      * Columnas del examen a partir de los datos validados. El par debe estar activo
      * (materia y materia_carrera, regla de HU-16) y el tipo sale del catálogo.
      */
-    private function prepareAttributes(array $data): array
+    private function prepareAttributes(array $data, string $teacherId): array
     {
-        $this->subjectCatalog->findSelectablePair((int) $data['id_carrera'], (int) $data['id_materia']);
+        $this->subjectCatalog->findSelectablePair(
+            (int) $data['id_carrera'],
+            (int) $data['id_materia'],
+            $teacherId
+        );
 
         $startsAt = $this->startsAt($data);
 
