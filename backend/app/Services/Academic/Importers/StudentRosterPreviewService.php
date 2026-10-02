@@ -35,9 +35,10 @@ class StudentRosterPreviewService
     public function generate(
         int $groupId,
         string $path,
-        string $extension
+        string $extension,
+        string $teacherId
     ): StudentRosterPreviewResult {
-        $group = $this->groupAccess->getAvailable($groupId);
+        $this->groupAccess->getAvailable($groupId, $teacherId);
 
         $reader = $this->readerResolver->resolve($extension);
 
@@ -58,7 +59,7 @@ class StudentRosterPreviewService
 
         $token = $this->previewStore->store(
             $groupId,
-            (string) $group->id_usuario_docente,
+            $teacherId,
             $analysis
         );
 
