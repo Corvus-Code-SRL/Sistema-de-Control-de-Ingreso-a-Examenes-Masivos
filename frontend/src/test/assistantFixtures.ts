@@ -1,6 +1,9 @@
 import type { AssistantExam, ExamAssistant, ExamAssistantsData, ExamClassroom } from '@/features/assistants'
 
-/** Datos de prueba de HU-09: dos ambientes del examen y dos auxiliares, uno sin ambiente. */
+/**
+ * Datos de prueba de HU-09: dos ambientes del examen y dos auxiliares, uno sin ambiente.
+ * Jorge completa los tres auxiliares de la prueba de aceptación.
+ */
 
 export const auditorio: ExamClassroom = { id_ambiente: 11, nro_aula: 'Auditorio FCyT', capacidad: 250 }
 
@@ -22,6 +25,15 @@ export const maria: ExamAssistant = {
   nombre_completo: 'María López Arnez',
   cod_sis: '201900233',
   ambiente: auditorio,
+}
+
+export const jorge: ExamAssistant = {
+  id_examen: 7,
+  id_usuario: '33333333-3333-4333-8333-000000000002',
+  id_ambiente: null,
+  nombre_completo: 'Jorge Rocha Vidal',
+  cod_sis: '202000871',
+  ambiente: null,
 }
 
 export function examAssistantsData(overrides: Partial<ExamAssistantsData> = {}): ExamAssistantsData {
