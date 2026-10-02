@@ -2,16 +2,16 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
 /**
- * Mapea public.examen_auxiliar.
+ * Mapea public.examen_auxiliar: auxiliar habilitado para un examen (HU-08) y el
+ * ambiente donde controla el ingreso (HU-09).
  *
- * Auxiliar habilitado para un examen. A diferencia de grupo_auxiliar, esta
- * tabla no tiene estado: quitar un auxiliar de un examen borra la fila.
- *
- * id_ambiente lo asigna HU-09; aquí se deja NULL al habilitar.
+ * La clave es compuesta y el modelo no la conoce, así que las modificaciones se hacen
+ * con consultas que filtran por examen y auxiliar (scope forExamAndAssistant).
  *
  * @property int $id_examen
  * @property string $id_usuario
@@ -47,7 +47,7 @@ class ExamAssistant extends Pivot
         return $this->belongsTo(Exam::class, 'id_examen', 'id_examen');
     }
 
-    public function user(): BelongsTo
+    public function assistant(): BelongsTo
     {
         return $this->belongsTo(User::class, 'id_usuario', 'id_usuario');
     }
@@ -55,5 +55,15 @@ class ExamAssistant extends Pivot
     public function enabledBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'id_usuario_docente_habilita', 'id_usuario');
+    }
+
+    public function classroom(): BelongsTo
+    {
+        return $this->belongsTo(Classroom::class, 'id_ambiente', 'id_ambiente');
+    }
+
+    public function scopeForExamAndAssistant(Builder $query, int $examId, string $userId): Builder
+    {
+        return $query->where('id_examen', $examId)->where('id_usuario', $userId);
     }
 }

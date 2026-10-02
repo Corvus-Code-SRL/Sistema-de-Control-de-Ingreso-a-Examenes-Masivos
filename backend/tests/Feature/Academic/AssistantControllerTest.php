@@ -235,4 +235,41 @@ class AssistantControllerTest extends TestCase
         $response->assertStatus(200);
         $this->assertGreaterThanOrEqual(1, count($response->json('data')));
     }
+
+    public function test_rechaza_habilitar_auxiliar_si_el_examen_no_esta_programado(): void
+    {
+        // Cambia el examen a EN_INGRESO
+        DB::table('examen')->where('id_examen', $this->examId)->update(['estado' => 'EN_INGRESO']);
+
+        $response = $this->postJson("/api/docente/examenes/{$this->examId}/auxiliares", [
+            'id_usuario' => $this->auxiliarAId,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('id_examen');
+    }
+
+    public function test_rechaza_quitar_auxiliar_si_el_examen_no_esta_programado(): void
+    {
+        // 1. Primero hay que incorporar al auxiliar al grupo vinculado al examen.
+        $this->postJson("/api/docente/grupos/{$this->grupoPropioId}/auxiliares", [
+            'id_usuario' => $this->auxiliarAId,
+        ])->assertStatus(201);
+
+        // 2. Ahora sí, habilitarlo para el examen.
+        $this->postJson("/api/docente/examenes/{$this->examId}/auxiliares", [
+            'id_usuario' => $this->auxiliarAId,
+        ])->assertStatus(201);
+
+        // 3. Cambiar el examen a FINALIZADO.
+        DB::table('examen')->where('id_examen', $this->examId)->update(['estado' => 'FINALIZADO']);
+
+        // 4. Intentar quitar: debe fallar con 422.
+        $response = $this->deleteJson(
+            "/api/docente/examenes/{$this->examId}/auxiliares/{$this->auxiliarAId}"
+        );
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('id_examen');
+    }
 }

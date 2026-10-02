@@ -1,5 +1,5 @@
 /* =========================================================================
- * Tipos base del auxiliar
+ * HU-08 — Auxiliares del docente
  * ========================================================================= */
 
 /** Auxiliar devuelto por la API. */
@@ -23,17 +23,13 @@ export interface AssistantWithGroupsListResponse {
   data: AssistantWithGroups[]
 }
 
-/* =========================================================================
- * Grupos y exámenes asignados
- * ========================================================================= */
-
 /** Examen programado vinculado a un grupo del docente. */
 export interface AssistantScheduledExam {
   nombre_examen: string
-  fecha: string   // 'YYYY-MM-DD'
+  fecha: string
 }
 
-/** Grupo donde el auxiliar está incorporado, con etiqueta lista para UI. */
+/** Grupo donde el auxiliar está incorporado. */
 export interface AssistantGroupAssignment {
   id_grupo: number
   label: string
@@ -48,21 +44,19 @@ export interface AssistantExamAssignment {
   fecha: string
 }
 
-/* =========================================================================
- * Auxiliar con sus asignaciones (grupos y exámenes)
- * ========================================================================= */
-
-export interface AssistantWithGroups extends Assistant {
-  grupos: AssistantGroupAssignment[]
-  /** Exámenes donde el auxiliar ya está habilitado. */
-  examenes: AssistantExamAssignment[]
-  /** Exámenes donde el auxiliar puede ser habilitado (filtrado en backend). */
-  examenes_disponibles: AvailableExamForAssistant[]
+/** Examen al que el auxiliar PUEDE ser habilitado. */
+export interface AvailableExamForAssistant {
+  id_examen: number
+  nombre_examen: string
+  fecha: string
 }
 
-/* =========================================================================
- * Opciones y payloads
- * ========================================================================= */
+/** Auxiliar tal como lo devuelve GET /docente/auxiliares. */
+export interface AssistantWithGroups extends Assistant {
+  grupos: AssistantGroupAssignment[]
+  examenes: AssistantExamAssignment[]
+  examenes_disponibles: AvailableExamForAssistant[]
+}
 
 /** Grupo devuelto por GET /docente/grupos para poblar selectores. */
 export interface GroupOption {
@@ -84,9 +78,46 @@ export interface MoveAssistantPayload {
   id_grupo_destino: number
 }
 
-/** Examen al que el auxiliar PUEDE ser habilitado. */
-export interface AvailableExamForAssistant {
+/* =========================================================================
+ * HU-09 — Ambiente del auxiliar por examen
+ * ========================================================================= */
+
+/** Ambiente de un examen, como lo devuelve ClassroomResource. */
+export interface ExamClassroom {
+  id_ambiente: number
+  nro_aula: string
+  capacidad: number
+}
+
+/** Auxiliar habilitado para un examen y el ambiente donde controla el ingreso. */
+export interface ExamAssistant {
+  id_examen: number
+  id_usuario: string
+  id_ambiente: number | null
+  nombre_completo: string
+  cod_sis: string
+  ambiente: ExamClassroom | null
+}
+
+/** Respuesta de GET /examenes/{id}/auxiliares. */
+export interface ExamAssistantsData {
+  estado: AssistantExamStatus | 'FINALIZADO' | 'CANCELADO'
+  editable: boolean
+  ambientes: ExamClassroom[]
+  auxiliares: ExamAssistant[]
+}
+
+/** Estados en los que un examen todavía aparece al auxiliar. */
+export type AssistantExamStatus = 'PROGRAMADO' | 'EN_INGRESO' | 'EN_CURSO'
+
+/** Examen que controla el auxiliar, con el ambiente asignado. */
+export interface AssistantExam {
   id_examen: number
   nombre_examen: string
-  fecha: string
+  fecha: string | null
+  hora_inicio: string | null
+  hora_fin: string | null
+  estado: AssistantExamStatus
+  materia: string | null
+  ambiente: ExamClassroom | null
 }

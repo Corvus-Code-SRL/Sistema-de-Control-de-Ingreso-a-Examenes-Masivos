@@ -134,10 +134,9 @@ class Exam extends Model
                     ->withPivot('id_grupo', 'estado_habilitacion', 'estado_ingreso', 'hora_ingreso', 'observacion');
     }
 
-    public function auxiliares(): BelongsToMany
+    /** Auxiliares habilitados para el examen y su ambiente asignado. */
+    public function assistants(): HasMany
     {
-        return $this->belongsToMany(User::class, 'examen_auxiliar', 'id_examen', 'id_usuario')
-                    ->using(ExamAssistant::class)
-                    ->withPivot('id_usuario_docente_habilita', 'fecha_habilitacion', 'id_ambiente');
+        return $this->hasMany(ExamAssistant::class, 'id_examen', 'id_examen');
     }
 }

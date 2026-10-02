@@ -329,56 +329,79 @@ class AssistantService
      *
      * Reglas:
      *  - El examen debe ser del docente.
+     *  - El examen debe estar PROGRAMADO: desde que se abre el control de
+     *    ingreso, las habilitaciones quedan fijas.
      *  - El auxiliar debe pertenecer a algún grupo vinculado al examen.
      *  - El auxiliar no debe estar registrado como estudiante del mismo examen.
+     *
+     * El examen se bloquea con lockForUpdate para que no cambie de estado
+     * entre la verificación y el insert.
      */
     public function habilitarParaExamen(int $idExamen, string $idUsuarioAuxiliar): void
     {
-        $exam = $this->findOwnExamOrFail($idExamen);
         $auxiliar = $this->findAuxiliarOrFail($idUsuarioAuxiliar);
 
-        $perteneceAlExamen = DB::table('grupo_auxiliar')
-            ->join('grupo_examen', 'grupo_examen.id_grupo', '=', 'grupo_auxiliar.id_grupo')
-            ->where('grupo_examen.id_examen', $idExamen)
-            ->where('grupo_auxiliar.id_usuario', $idUsuarioAuxiliar)
-            ->where('grupo_auxiliar.estado', RecordStatus::ACTIVE)
-            ->exists();
+        DB::transaction(function () use ($idExamen, $idUsuarioAuxiliar, $auxiliar) {
+            // Bloquea el examen para evitar carreras con el cambio de estado.
+            $exam = Exam::query()->lockForUpdate()->find($idExamen);
 
-        if (!$perteneceAlExamen) {
-            throw ValidationException::withMessages([
-                'id_usuario' => [
-                    'El auxiliar no pertenece a ningún grupo vinculado a este examen.',
-                ],
-            ]);
-        }
+            if ($exam === null) {
+                throw new ModelNotFoundException('No existe el examen indicado.');
+            }
 
-        $esEstudianteDelExamen = DB::table('examen_estudiante')
-            ->join('estudiante', 'estudiante.id_estudiante', '=', 'examen_estudiante.id_estudiante')
-            ->where('examen_estudiante.id_examen', $idExamen)
-            ->where('estudiante.cod_sis', $auxiliar->cod_sis)
-            ->exists();
+            if ((string) $exam->id_usuario_docente !== $this->subjectCatalog->teacherId()) {
+                throw new AuthorizationException('El examen no pertenece al docente actual.');
+            }
 
-        if ($esEstudianteDelExamen) {
-            throw ValidationException::withMessages([
-                'id_usuario' => [
-                    'Esta persona ya está registrada como estudiante en este examen. '
-                    . 'No puede habilitarse como auxiliar.',
-                ],
-            ]);
-        }
+            if ($exam->estado !== Exam::PROGRAMADO) {
+                throw ValidationException::withMessages([
+                    'id_examen' => [
+                        'Solo se pueden habilitar auxiliares mientras el examen está PROGRAMADO.',
+                    ],
+                ]);
+            }
 
-        $yaHabilitado = DB::table('examen_auxiliar')
-            ->where('id_examen', $idExamen)
-            ->where('id_usuario', $idUsuarioAuxiliar)
-            ->exists();
+            $perteneceAlExamen = DB::table('grupo_auxiliar')
+                ->join('grupo_examen', 'grupo_examen.id_grupo', '=', 'grupo_auxiliar.id_grupo')
+                ->where('grupo_examen.id_examen', $idExamen)
+                ->where('grupo_auxiliar.id_usuario', $idUsuarioAuxiliar)
+                ->where('grupo_auxiliar.estado', RecordStatus::ACTIVE)
+                ->exists();
 
-        if ($yaHabilitado) {
-            throw ValidationException::withMessages([
-                'id_usuario' => ['El auxiliar ya está habilitado para este examen.'],
-            ]);
-        }
+            if (!$perteneceAlExamen) {
+                throw ValidationException::withMessages([
+                    'id_usuario' => [
+                        'El auxiliar no pertenece a ningún grupo vinculado a este examen.',
+                    ],
+                ]);
+            }
 
-        DB::transaction(function () use ($exam, $idUsuarioAuxiliar) {
+            $esEstudianteDelExamen = DB::table('examen_estudiante')
+                ->join('estudiante', 'estudiante.id_estudiante', '=', 'examen_estudiante.id_estudiante')
+                ->where('examen_estudiante.id_examen', $idExamen)
+                ->where('estudiante.cod_sis', $auxiliar->cod_sis)
+                ->exists();
+
+            if ($esEstudianteDelExamen) {
+                throw ValidationException::withMessages([
+                    'id_usuario' => [
+                        'Esta persona ya está registrada como estudiante en este examen. '
+                        . 'No puede habilitarse como auxiliar.',
+                    ],
+                ]);
+            }
+
+            $yaHabilitado = DB::table('examen_auxiliar')
+                ->where('id_examen', $idExamen)
+                ->where('id_usuario', $idUsuarioAuxiliar)
+                ->exists();
+
+            if ($yaHabilitado) {
+                throw ValidationException::withMessages([
+                    'id_usuario' => ['El auxiliar ya está habilitado para este examen.'],
+                ]);
+            }
+
             DB::table('examen_auxiliar')->insert([
                 'id_examen' => $exam->id_examen,
                 'id_usuario' => $idUsuarioAuxiliar,
@@ -442,24 +465,46 @@ class AssistantService
      * Quita un auxiliar de un examen.
      *
      * examen_auxiliar NO tiene estado: se borra la fila.
+     *
+     * Reglas:
+     *  - El examen debe ser del docente.
+     *  - El examen debe estar PROGRAMADO: desde que se abre el control de
+     *    ingreso, las habilitaciones quedan fijas.
      */
     public function quitarDeExamen(int $idExamen, string $idUsuarioAuxiliar): void
     {
-        $this->findOwnExamOrFail($idExamen);
         $this->findAuxiliarOrFail($idUsuarioAuxiliar);
 
-        $existing = DB::table('examen_auxiliar')
-            ->where('id_examen', $idExamen)
-            ->where('id_usuario', $idUsuarioAuxiliar)
-            ->first();
-
-        if ($existing === null) {
-            throw new ModelNotFoundException(
-                'El auxiliar no está habilitado para este examen.'
-            );
-        }
-
         DB::transaction(function () use ($idExamen, $idUsuarioAuxiliar) {
+            $exam = Exam::query()->lockForUpdate()->find($idExamen);
+
+            if ($exam === null) {
+                throw new ModelNotFoundException('No existe el examen indicado.');
+            }
+
+            if ((string) $exam->id_usuario_docente !== $this->subjectCatalog->teacherId()) {
+                throw new AuthorizationException('El examen no pertenece al docente actual.');
+            }
+
+            if ($exam->estado !== Exam::PROGRAMADO) {
+                throw ValidationException::withMessages([
+                    'id_examen' => [
+                        'Solo se pueden modificar los auxiliares mientras el examen está PROGRAMADO.',
+                    ],
+                ]);
+            }
+
+            $existing = DB::table('examen_auxiliar')
+                ->where('id_examen', $idExamen)
+                ->where('id_usuario', $idUsuarioAuxiliar)
+                ->first();
+
+            if ($existing === null) {
+                throw new ModelNotFoundException(
+                    'El auxiliar no está habilitado para este examen.'
+                );
+            }
+
             DB::table('examen_auxiliar')
                 ->where('id_examen', $idExamen)
                 ->where('id_usuario', $idUsuarioAuxiliar)
@@ -495,21 +540,6 @@ class AssistantService
         }
 
         return $group;
-    }
-
-    private function findOwnExamOrFail(int $idExamen): Exam
-    {
-        $exam = Exam::query()->find($idExamen);
-
-        if ($exam === null) {
-            throw new ModelNotFoundException('No existe el examen indicado.');
-        }
-
-        if ((string) $exam->id_usuario_docente !== $this->subjectCatalog->teacherId()) {
-            throw new AuthorizationException('El examen no pertenece al docente actual.');
-        }
-
-        return $exam;
     }
 
     private function findAuxiliarOrFail(string $idUsuario): User

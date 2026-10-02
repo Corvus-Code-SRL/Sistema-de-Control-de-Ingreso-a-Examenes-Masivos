@@ -199,10 +199,9 @@ class User extends Authenticatable
                     ->withPivot('fecha_incorporacion', 'estado');
     }
 
-    public function examsAsAuxiliar(): BelongsToMany
+    /** Habilitaciones del usuario como auxiliar de exámenes, con su ambiente (HU-09). */
+    public function assistantAssignments(): HasMany
     {
-        return $this->belongsToMany(Exam::class, 'examen_auxiliar', 'id_usuario', 'id_examen')
-                    ->using(ExamAssistant::class)
-                    ->withPivot('id_usuario_docente_habilita', 'fecha_habilitacion', 'id_ambiente');
+        return $this->hasMany(ExamAssistant::class, 'id_usuario', 'id_usuario');
     }
 }
