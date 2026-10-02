@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\SisCode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -35,6 +36,12 @@ class Student extends Model
         'telefono',
         'estado'
     ];
+
+    /** El SIS se guarda siempre en su forma canónica (ver SisCode). */
+    public function setCodSisAttribute($value): void
+    {
+        $this->attributes['cod_sis'] = is_string($value) ? SisCode::normalize($value) : $value;
+    }
 
     public function groups(): BelongsToMany
     {
