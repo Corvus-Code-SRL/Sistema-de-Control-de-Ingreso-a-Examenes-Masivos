@@ -161,4 +161,34 @@ class AssistantClassroomServiceTest extends TestCase
         $this->assertNotContains($cancelled->id_examen, $assignments->pluck('id_examen')->all());
         $this->assertCount(0, $this->service->listForAssistant('33333333-3333-4333-8333-000000000099'));
     }
+
+    public function test_el_auxiliar_ve_examenes_en_ingreso_y_en_curso_ordenados_por_hora(): void
+    {
+        $date = $this->futureDate(5);
+        $afternoon = $this->examWithAssistants([
+            'fecha' => $date,
+            'hora_inicio' => '14:00',
+            'estado' => Exam::EN_CURSO,
+        ]);
+        $morning = $this->examWithAssistants([
+            'fecha' => $date,
+            'hora_inicio' => '08:00',
+            'estado' => Exam::EN_INGRESO,
+        ]);
+        $finished = $this->examWithAssistants([
+            'fecha' => $date,
+            'hora_inicio' => '11:00',
+            'estado' => Exam::FINALIZADO,
+        ]);
+        $createdIds = [$morning->id_examen, $afternoon->id_examen, $finished->id_examen];
+
+        // Solo se miran los exámenes de esta prueba: el orden no depende de otros datos.
+        $examIds = array_values(array_intersect(
+            $this->service->listForAssistant($this->mariaId)->pluck('id_examen')->all(),
+            $createdIds
+        ));
+
+        $this->assertSame([$morning->id_examen, $afternoon->id_examen], $examIds);
+        $this->assertNotContains($finished->id_examen, $examIds);
+    }
 }
