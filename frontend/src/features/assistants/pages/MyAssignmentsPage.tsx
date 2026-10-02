@@ -60,7 +60,7 @@ function AssistantExamCard({ exam }: { exam: AssistantExam }) {
         <span className="text-sm font-semibold tabular-nums">
           {formatDate(exam.fecha)} · {formatSchedule(exam)}
         </span>
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${className}`}>{label}</span>
+        <span className={`ml-auto rounded-full px-2 py-0.5 text-xs font-medium ${className}`}>{label}</span>
       </div>
 
       <h2 className="sciem-h3">{exam.nombre_examen}</h2>

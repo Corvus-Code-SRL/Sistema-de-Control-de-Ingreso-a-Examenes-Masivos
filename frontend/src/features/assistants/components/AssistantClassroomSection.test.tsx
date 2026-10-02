@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { examAssistantsData } from '@/test/assistantFixtures'
 import { assistantsService } from '../services/assistantsService'
@@ -41,7 +41,10 @@ describe('AssistantClassroomSection', () => {
 
     expect(await screen.findByText('El control de ingreso ya se abrió')).toBeVisible()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
-    expect(screen.getByText('Sin asignar')).toBeVisible()
+    // Sin ambiente: solo el aviso. Con ambiente: el aula como texto, sin selector.
+    const [unassignedRow, assignedRow] = screen.getAllByRole('listitem')
+    expect(within(unassignedRow).getByText('Sin ambiente')).toBeVisible()
+    expect(within(assignedRow).getByText('Auditorio FCyT')).toBeVisible()
   })
 
   it('explica cuando el examen no tiene auxiliares habilitados', async () => {
