@@ -2,9 +2,11 @@
 
 namespace Tests;
 
+use App\Support\CurrentUser;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use RuntimeException;
+use Tests\Support\FakeCurrentUser;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -29,6 +31,25 @@ abstract class TestCase extends BaseTestCase
         }
 
         parent::setUp();
+    }
+
+    /** Fija el docente que actúa en Academic y Exams, sin tocar la configuración. */
+    protected function actAsTeacher(string $teacherId): void
+    {
+        $this->app->instance(CurrentUser::class, $this->fakeCurrentUser()->withTeacherId($teacherId));
+    }
+
+    /** Fija la cuenta que actúa en Security y la bitácora. */
+    protected function actAsUserId(string $userId): void
+    {
+        $this->app->instance(CurrentUser::class, $this->fakeCurrentUser()->withId($userId));
+    }
+
+    private function fakeCurrentUser(): FakeCurrentUser
+    {
+        $current = $this->app->make(CurrentUser::class);
+
+        return $current instanceof FakeCurrentUser ? $current : new FakeCurrentUser();
     }
 
     private static function loadDatabaseSchema(Application $app): void

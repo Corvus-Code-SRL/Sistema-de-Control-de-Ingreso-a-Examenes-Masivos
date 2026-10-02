@@ -12,6 +12,8 @@ class ClassroomServiceTest extends TestCase
 {
     use DatabaseTransactions;
 
+    private const ACTOR_ID = '00000000-0000-4000-8000-0000000000aa';
+
     /**
      * Simula la condición de carrera: nada aguas arriba detectó el duplicado (se
      * inserta directo en la base, sin pasar por el Form Request) y es la propia
@@ -34,7 +36,7 @@ class ClassroomServiceTest extends TestCase
             'nro_aula' => 'Aula 101',
             'capacidad' => 30,
             'ubicacion' => 'Modulo A',
-        ]);
+        ], self::ACTOR_ID);
     }
 
     /** @test */
@@ -46,6 +48,6 @@ class ClassroomServiceTest extends TestCase
             'nro_aula' => 'Aula 202',
             'capacidad' => 0,
             'ubicacion' => 'Modulo A',
-        ]);
+        ], self::ACTOR_ID);
     }
 }
