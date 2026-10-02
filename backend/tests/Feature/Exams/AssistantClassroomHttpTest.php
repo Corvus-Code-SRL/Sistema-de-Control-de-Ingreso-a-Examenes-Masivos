@@ -50,6 +50,7 @@ class AssistantClassroomHttpTest extends TestCase
 
         $this->getJson("/api/examenes/{$exam->id_examen}/auxiliares")
             ->assertOk()
+            ->assertJsonPath('data.estado', Exam::PROGRAMADO)
             ->assertJsonPath('data.editable', true)
             ->assertJsonCount(2, 'data.ambientes')
             ->assertJsonCount(3, 'data.auxiliares')

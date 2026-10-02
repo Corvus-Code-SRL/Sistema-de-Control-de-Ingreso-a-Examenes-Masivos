@@ -38,6 +38,7 @@ export const jorge: ExamAssistant = {
 
 export function examAssistantsData(overrides: Partial<ExamAssistantsData> = {}): ExamAssistantsData {
   return {
+    estado: 'PROGRAMADO',
     editable: true,
     ambientes: [auditorio, aula691A],
     auxiliares: [daniela, maria],

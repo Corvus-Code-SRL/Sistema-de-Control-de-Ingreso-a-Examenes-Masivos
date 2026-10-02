@@ -31,6 +31,7 @@ class AssistantClassroomController extends Controller
         $result = $this->service->listForExam($exam);
 
         return ApiResponse::success([
+            'estado'     => $result['estado'],
             'editable'   => $result['editable'],
             'ambientes'  => ClassroomResource::collection($result['classrooms']),
             'auxiliares' => ExamAssistantResource::collection($result['assistants']),

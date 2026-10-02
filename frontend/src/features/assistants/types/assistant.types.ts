@@ -18,10 +18,10 @@ export interface ExamAssistant {
 /**
  * Respuesta de GET /examenes/{id}/auxiliares.
  *
- * `editable` lo decide el backend según el estado del examen: la vista nunca lo
- * deduce de la hora.
+ * `estado` y `editable` los decide el backend: la vista nunca los deduce de la hora.
  */
 export interface ExamAssistantsData {
+  estado: AssistantExamStatus | 'FINALIZADO' | 'CANCELADO'
   editable: boolean
   ambientes: ExamClassroom[]
   auxiliares: ExamAssistant[]

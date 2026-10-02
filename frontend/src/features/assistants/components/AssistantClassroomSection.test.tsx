@@ -90,7 +90,7 @@ describe('AssistantClassroomSection', () => {
   })
 
   it('con el control de ingreso abierto muestra las asignaciones sin selectores', async () => {
-    listExamAssistants.mockResolvedValue(examAssistantsData({ editable: false }))
+    listExamAssistants.mockResolvedValue(examAssistantsData({ estado: 'EN_INGRESO', editable: false }))
 
     render(<AssistantClassroomSection examId={7} />)
 
@@ -108,6 +108,17 @@ describe('AssistantClassroomSection', () => {
     render(<AssistantClassroomSection examId={7} />)
 
     expect(await screen.findByText('Este examen no tiene auxiliares habilitados')).toBeVisible()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+  })
+
+  it('en un examen cancelado lo dice y no ofrece selectores', async () => {
+    listExamAssistants.mockResolvedValue(examAssistantsData({ estado: 'CANCELADO', editable: false }))
+
+    render(<AssistantClassroomSection examId={7} />)
+
+    expect(await screen.findByText('El examen fue cancelado')).toBeVisible()
+    expect(screen.getByText('Las asignaciones ya no se modifican.')).toBeVisible()
+    expect(screen.queryByText('El control de ingreso ya se abrió')).not.toBeInTheDocument()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   })
 

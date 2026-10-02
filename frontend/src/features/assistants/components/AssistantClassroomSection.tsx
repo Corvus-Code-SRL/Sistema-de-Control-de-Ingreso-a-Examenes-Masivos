@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { Toast } from '@/components/ui/toast'
 import { useExamAssistants } from '../hooks/useExamAssistants'
-import type { ExamAssistant, ExamClassroom } from '../types/assistant.types'
+import type { ExamAssistant, ExamAssistantsData, ExamClassroom } from '../types/assistant.types'
 import { AssistantClassroomRow } from './AssistantClassroomRow'
 
 interface AssistantClassroomSectionProps {
@@ -83,8 +83,7 @@ export function AssistantClassroomSection({ examId }: AssistantClassroomSectionP
             <Notice
               icon={Lock}
               className="border-warn-border bg-warn-soft text-warn-fg"
-              title="El control de ingreso ya se abrió"
-              body="Las asignaciones quedaron fijas."
+              {...readOnlyNotice(data.estado)}
             />
           )}
 
@@ -152,6 +151,13 @@ function Notice({ icon: Icon, className, title, body }: NoticeProps) {
       </div>
     </div>
   )
+}
+
+/** Aviso de solo lectura según el estado del examen que informa el backend. */
+function readOnlyNotice(status: ExamAssistantsData['estado']): Pick<NoticeProps, 'title' | 'body'> {
+  return status === 'CANCELADO'
+    ? { title: 'El examen fue cancelado', body: 'Las asignaciones ya no se modifican.' }
+    : { title: 'El control de ingreso ya se abrió', body: 'Las asignaciones quedaron fijas.' }
 }
 
 interface AssignmentSummaryProps {
