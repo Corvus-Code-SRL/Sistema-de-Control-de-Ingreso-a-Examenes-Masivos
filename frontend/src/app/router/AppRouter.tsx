@@ -72,7 +72,7 @@ function AdministradorRoutes() {
  *
  * Esto no es una guarda de seguridad: mientras no exista autenticación, el área
  * la elige a mano quien desarrolla. Separarlas evita que una URL de un área
- * caiga en la pantalla de otra.
+ * caiga en la pantalla de la otra.
  */
 export function AppRouter() {
   const { area } = useCurrentUser()

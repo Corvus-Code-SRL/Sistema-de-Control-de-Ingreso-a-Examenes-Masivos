@@ -40,7 +40,7 @@ class AssistantClassroomService
      * Auxiliares habilitados del examen con su ambiente, los ambientes del examen y si
      * todavía se pueden cambiar. Todo en cuatro consultas, sin importar cuántos auxiliares haya.
      *
-     * @return array{exam: Exam, editable: bool, classrooms: Collection, assistants: Collection}
+     * @return array{editable: bool, classrooms: Collection, assistants: Collection}
      */
     public function listForExam(Exam $exam): array
     {
@@ -53,7 +53,6 @@ class AssistantClassroomService
             ->values();
 
         return [
-            'exam'       => $exam,
             'editable'   => $exam->estado === Exam::PROGRAMADO,
             'classrooms' => $exam->classrooms()->orderBy('nro_aula')->get(),
             'assistants' => $assistants,

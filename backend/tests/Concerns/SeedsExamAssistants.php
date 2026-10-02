@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * Tres auxiliares registrados y exámenes del docente con ellos habilitados (HU-09).
  *
- * Mientras no exista HU-08, la habilitación se escribe directo en examen_auxiliar.
+ * La habilitación (HU-08) se escribe directo en examen_auxiliar para que estas
+ * pruebas no dependan de sus endpoints.
  */
 trait SeedsExamAssistants
 {

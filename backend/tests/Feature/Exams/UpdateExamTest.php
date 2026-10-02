@@ -3,12 +3,12 @@
 namespace Tests\Feature\Exams;
 
 use App\Models\Exam;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Tests\Concerns\SeedsExamCatalog;
-use Tests\TestCase;
 use App\Models\ExamAssistant;
 use App\Support\RecordStatus;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Tests\Concerns\SeedsExamCatalog;
+use Tests\TestCase;
 
 /**
  * HU-24 — criterios 10 y 11: la información general se edita solo mientras el

@@ -2,7 +2,7 @@
  * Áreas de trabajo de SCIEM.
  *
  * Cada área tiene su propia navegación y su propio juego de rutas. No se
- * mezclan: una pantalla pertenece a un área, nunca a dos.
+ * mezclan: una pantalla pertenece a un área, nunca a las dos.
  */
 export type Area = 'docente' | 'auxiliar' | 'administrador'
 

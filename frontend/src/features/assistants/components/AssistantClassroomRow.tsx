@@ -95,7 +95,11 @@ export function AssistantClassroomRow({
           </Select>
 
           {saving && (
-            <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" aria-label="Guardando" />
+            <Loader2
+              role="status"
+              aria-label="Guardando"
+              className="size-4 shrink-0 animate-spin text-muted-foreground"
+            />
           )}
         </div>
       ) : (

@@ -33,7 +33,6 @@ export function examAssistantsData(overrides: Partial<ExamAssistantsData> = {}):
   }
 }
 
-
 /** Vista del auxiliar: un examen con ambiente y otro todavía sin asignar. */
 export const assignedExam: AssistantExam = {
   id_examen: 7,
