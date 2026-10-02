@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Security;
 
+use App\Support\SisCode;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreUserRequest extends FormRequest
@@ -9,6 +10,14 @@ class StoreUserRequest extends FormRequest
     public function authorize(): bool
     {
         return true;   // Sprint 1: sin autenticación real
+    }
+
+    /** El SIS se normaliza antes de validar para que 'unique' compare la forma canónica. */
+    protected function prepareForValidation(): void
+    {
+        if (is_string($this->cod_sis)) {
+            $this->merge(['cod_sis' => SisCode::normalize($this->cod_sis)]);
+        }
     }
 
     public function rules(): array

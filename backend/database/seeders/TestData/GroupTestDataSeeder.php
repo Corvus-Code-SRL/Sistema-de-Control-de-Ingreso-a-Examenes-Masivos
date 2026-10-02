@@ -2,6 +2,7 @@
 
 namespace Database\Seeders\TestData;
 
+use App\Support\SisCode;
 use Database\Seeders\TestData\TestDataIds as Ids;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -64,7 +65,7 @@ class GroupTestDataSeeder extends Seeder
     {
         DB::table('estudiante')->upsert(array_map(fn (array $student) => [
             'id_estudiante' => $student[0],
-            'cod_sis' => $student[1],
+            'cod_sis' => SisCode::normalize($student[1]),
             'ci' => $student[2],
             'nombre' => $student[3],
             'apellido_paterno' => $student[4],

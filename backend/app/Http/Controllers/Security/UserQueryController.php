@@ -9,6 +9,7 @@ use App\Http\Resources\Security\UserDetailResource;
 use App\Http\Resources\Security\UserResource;
 use App\Models\User;
 use App\Services\Security\UserQueryService;
+use App\Support\CurrentUser;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 /**
@@ -21,22 +22,25 @@ class UserQueryController extends Controller
 {
     private UserQueryService $users;
 
-    public function __construct(UserQueryService $users)
+    private CurrentUser $currentUser;
+
+    public function __construct(UserQueryService $users, CurrentUser $currentUser)
     {
         $this->users = $users;
+        $this->currentUser = $currentUser;
     }
 
     /** GET /api/usuarios */
     public function index(IndexUserRequest $request): AnonymousResourceCollection
     {
         return UserResource::collection($this->users->listUsers())
-            ->additional(['meta' => $this->users->meta()]);
+            ->additional(['meta' => $this->users->meta($this->currentUser->id())]);
     }
 
     /** GET /api/usuarios/{user} */
     public function show(ShowUserRequest $request, User $user): UserDetailResource
     {
         return (new UserDetailResource($this->users->findUser($user)))
-            ->additional(['meta' => $this->users->meta()]);
+            ->additional(['meta' => $this->users->meta($this->currentUser->id())]);
     }
 }
