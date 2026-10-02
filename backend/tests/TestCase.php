@@ -70,5 +70,14 @@ abstract class TestCase extends BaseTestCase
 
         $connection->unprepared('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
         $connection->unprepared(file_get_contents($script));
+
+        // Las tablas de Sanctum no forman parte del script de creación: las crean sus migraciones.
+        $app->make(\Illuminate\Contracts\Console\Kernel::class)->call('migrate', [
+            '--path' => [
+                'database/migrations/2019_12_14_000001_create_personal_access_tokens_table.php',
+                'database/migrations/2026_10_02_000000_adapt_personal_access_tokens_for_uuid_users.php',
+            ],
+            '--force' => true,
+        ]);
     }
 }
