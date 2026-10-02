@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Academic\AssistantController;
+use App\Http\Controllers\Academic\MyGroupsController;
 use App\Http\Controllers\Academic\GroupController;
 use App\Http\Controllers\Academic\PeriodController;
 use App\Http\Controllers\Academic\StudentRosterController;
@@ -40,3 +42,22 @@ Route::post(
     'grupos/{id_grupo}/nomina/confirm',
     [StudentRosterController::class, 'confirm']
 );
+
+// HU-08: auxiliares del docente
+Route::prefix('docente')->group(function () {
+    Route::get('auxiliares', [AssistantController::class, 'index']);
+    Route::get('auxiliares/buscar', [AssistantController::class, 'buscar']);
+
+    Route::get('grupos', [MyGroupsController::class, 'index']);
+
+    Route::post(
+        'auxiliares/{id_usuario}/grupos',
+        [AssistantController::class, 'anadirAVariosGrupos']
+    );
+
+    Route::post('grupos/{id_grupo}/auxiliares', [AssistantController::class, 'anadirAGrupo']);
+    Route::post('examenes/{id_examen}/auxiliares', [AssistantController::class, 'habilitarParaExamen']);
+
+    Route::delete('grupos/{id_grupo}/auxiliares/{id_usuario}', [AssistantController::class, 'quitarDeGrupo']);
+    Route::delete('examenes/{id_examen}/auxiliares/{id_usuario}', [AssistantController::class, 'quitarDeExamen']);
+});

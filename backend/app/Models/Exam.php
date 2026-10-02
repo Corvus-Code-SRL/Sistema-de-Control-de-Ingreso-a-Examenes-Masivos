@@ -133,4 +133,10 @@ class Exam extends Model
                     ->using(StudentExam::class)
                     ->withPivot('id_grupo', 'estado_habilitacion', 'estado_ingreso', 'hora_ingreso', 'observacion');
     }
+
+    /** Auxiliares habilitados para el examen y su ambiente asignado. */
+    public function assistants(): HasMany
+    {
+        return $this->hasMany(ExamAssistant::class, 'id_examen', 'id_examen');
+    }
 }
