@@ -73,3 +73,48 @@ function jsonResponse({ status = 200, body = {}, invalidJson = false }: StubbedR
     },
   } as Response
 }
+
+
+export interface RecordedRequest {
+  url: string
+  method: string
+  headers: Record<string, string>
+  body: unknown
+}
+
+/**
+ * Responde según la petición completa (método, cabeceras y cuerpo), no solo la URL.
+ *
+ * Hace falta para probar la sesión: el mismo endpoint responde distinto según el método y las
+ * pruebas miran si viajó la cabecera Authorization. Devuelve el `fetch` simulado para inspeccionar
+ * las llamadas. Una petición que el manejador no resuelve (devuelve `undefined`) falla la prueba.
+ */
+export function mockApiWith(
+  handler: (request: RecordedRequest) => StubbedResponse | undefined
+): { calls: RecordedRequest[] } {
+  const calls: RecordedRequest[] = []
+
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const request: RecordedRequest = {
+        url: String(input),
+        method: init.method ?? 'GET',
+        headers: (init.headers ?? {}) as Record<string, string>,
+        body: typeof init.body === 'string' ? JSON.parse(init.body) : init.body,
+      }
+
+      calls.push(request)
+
+      const response = handler(request)
+
+      if (!response) {
+        throw new Error(`Petición no esperada en la prueba: ${request.method} ${request.url}`)
+      }
+
+      return jsonResponse(response)
+    })
+  )
+
+  return { calls }
+}

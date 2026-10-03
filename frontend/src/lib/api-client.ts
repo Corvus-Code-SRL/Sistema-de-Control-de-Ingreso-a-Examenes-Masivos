@@ -13,11 +13,28 @@ export class ApiError extends Error {
   /** Campos rechazados en un 422; vacío en el resto de los errores. */
   readonly errors: Record<string, string[]>
 
-  constructor(status: number, message: string, errors: Record<string, string[]> = {}) {
+  /** Código estable de los rechazos de autenticación (`cuenta_inactiva`, `sin_rol_vigente`…). */
+  readonly motivo?: string
+
+  constructor(
+    status: number,
+    message: string,
+    errors: Record<string, string[]> = {},
+    motivo?: string
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.errors = errors
+    this.motivo = motivo
+  }
+
+  get isUnauthorized(): boolean {
+    return this.status === 401
+  }
+
+  get isTooManyRequests(): boolean {
+    return this.status === 429
   }
 
   /** El recurso existe pero no es del docente. */
@@ -41,6 +58,22 @@ const UNEXPECTED_ERROR = 'Ocurrió un error inesperado al consultar el servidor.
 export type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 type Query = Record<string, string | number | undefined>
 
+/**
+ * Lo que el cliente HTTP necesita saber de la sesión sin depender del feature `auth`:
+ * el token a enviar y qué hacer cuando una petición con token recibe un 401.
+ */
+export interface SessionHandlers {
+  getToken: () => string | null
+  onSessionExpired: () => void
+}
+
+let sessionHandlers: SessionHandlers | null = null
+
+/** El proveedor de sesión se registra aquí al montarse y se da de baja al desmontarse. */
+export function configureSessionHandlers(handlers: SessionHandlers | null): void {
+  sessionHandlers = handlers
+}
+
 export interface ApiClientOptions {
   method?: ApiMethod
   /**
@@ -50,6 +83,16 @@ export interface ApiClientOptions {
   body?: unknown
   signal?: AbortSignal
   query?: Query
+  /**
+   * La petición no usa la sesión: no lleva token y un 401 no significa «sesión muerta».
+   * Es el caso del inicio de sesión, donde el 401 son credenciales incorrectas.
+   */
+  skipAuth?: boolean
+  /**
+   * La petición lleva el token, pero un 401 lo resuelve quien la hace y no pone la app en
+   * «sesión expirada» (rehidratar la sesión y cerrarla).
+   */
+  ignoreUnauthorized?: boolean
 }
 
 /**
@@ -67,6 +110,12 @@ export async function apiClient<TResponse>(
   const isFormData = options.body instanceof FormData
 
   const headers: Record<string, string> = { Accept: 'application/json' }
+
+  const token = options.skipAuth ? null : sessionHandlers?.getToken() ?? null
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
 
   /*
    * Un multipart lo arma el navegador, que es quien conoce el `boundary` con el
@@ -96,6 +145,15 @@ export async function apiClient<TResponse>(
   }
 
   if (!response.ok) {
+    /*
+     * Un 401 con token enviado es una sesión muerta. Sin token no lo es: sin sesión la app sigue
+     * funcionando y algunas rutas ya responden 401 a los anónimos; y en el login, un 401 son
+     * credenciales incorrectas, nunca una sesión caída.
+     */
+    if (response.status === 401 && token && !options.ignoreUnauthorized) {
+      sessionHandlers?.onSessionExpired()
+    }
+
     throw await toApiError(response)
   }
 
@@ -154,6 +212,7 @@ async function toApiError(response: Response): Promise<ApiError> {
   return new ApiError(
     response.status,
     body?.message ?? UNEXPECTED_ERROR,
-    body?.errors ?? {}
+    body?.errors ?? {},
+    body?.motivo
   )
 }
