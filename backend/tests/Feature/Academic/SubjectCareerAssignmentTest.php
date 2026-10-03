@@ -231,4 +231,89 @@ class SubjectCareerAssignmentTest extends TestCase
             'tabla_afectada' => 'materia_carrera',
         ]);
     }
+
+    public function test_administrador_lista_unicamente_carreras_activas(): void
+    {
+        $inactiveCareer = Career::create([
+            'nombre' => 'Carrera Archivada',
+            'codigo' => 'ARC',
+            'estado' => RecordStatus::INACTIVE,
+            'id_facultad' => $this->career->id_facultad,
+        ]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->getJson('/api/administracion/carreras')
+            ->assertOk();
+
+        $careerIds = collect($response->json('data'))
+            ->pluck('id_carrera')
+            ->all();
+
+        $this->assertContains($this->career->id_carrera, $careerIds);
+        $this->assertNotContains($inactiveCareer->id_carrera, $careerIds);
+    }
+
+    public function test_administrador_lista_solo_materias_asignables(): void
+    {
+        $assignedActivePair = Subject::create([
+            'nombre' => 'Sistemas Operativos',
+            'codigo' => '2008002',
+            'estado' => RecordStatus::ACTIVE,
+        ]);
+
+        $assignedInactivePair = Subject::create([
+            'nombre' => 'Redes de Computadoras',
+            'codigo' => '2008003',
+            'estado' => RecordStatus::ACTIVE,
+        ]);
+
+        $inactiveSubject = Subject::create([
+            'nombre' => 'Materia Archivada',
+            'codigo' => '2008004',
+            'estado' => RecordStatus::INACTIVE,
+        ]);
+
+        SubjectCareer::create([
+            'id_carrera' => $this->career->id_carrera,
+            'id_materia' => $assignedActivePair->id_materia,
+            'estado' => RecordStatus::ACTIVE,
+        ]);
+
+        SubjectCareer::create([
+            'id_carrera' => $this->career->id_carrera,
+            'id_materia' => $assignedInactivePair->id_materia,
+            'estado' => RecordStatus::INACTIVE,
+        ]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->getJson(
+                "/api/administracion/carreras/{$this->career->id_carrera}/materias-asignables"
+            )
+            ->assertOk();
+
+        $subjectIds = collect($response->json('data'))
+            ->pluck('id_materia')
+            ->all();
+
+        $this->assertContains($this->subject->id_materia, $subjectIds);
+        $this->assertNotContains($assignedActivePair->id_materia, $subjectIds);
+        $this->assertNotContains($assignedInactivePair->id_materia, $subjectIds);
+        $this->assertNotContains($inactiveSubject->id_materia, $subjectIds);
+    }
+
+    public function test_docente_no_puede_listar_carreras_administrativas(): void
+    {
+        $this->actingAs($this->teacherUser)
+            ->getJson('/api/administracion/carreras')
+            ->assertForbidden();
+    }
+
+    public function test_docente_no_puede_listar_materias_asignables(): void
+    {
+        $this->actingAs($this->teacherUser)
+            ->getJson(
+                "/api/administracion/carreras/{$this->career->id_carrera}/materias-asignables"
+            )
+            ->assertForbidden();
+    }
 }
