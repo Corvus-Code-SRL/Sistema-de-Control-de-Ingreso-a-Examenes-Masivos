@@ -50,7 +50,7 @@ Cuerpo:
 }
 ```
 
-Rechazos (cada uno con su propio `motivo`):
+Rechazos. **El contrato es `motivo`, no `message`:** el cliente decide con el código y muestra el texto; reescribir un mensaje no rompe nada, cambiar un código sí. Los tres códigos son estables y no se renombran. Todos los rechazos de autenticación tienen exactamente la forma `{ "message": "…", "motivo": "…" }`.
 
 | Caso | Estado | `motivo` | `message` |
 |---|---|---|---|
@@ -58,9 +58,30 @@ Rechazos (cada uno con su propio `motivo`):
 | Cuenta inactiva (con contraseña correcta) | 403 | `cuenta_inactiva` | `Su cuenta está deshabilitada. Contacte al Administrador.` |
 | Sin rol vigente (con contraseña correcta) | 403 | `sin_rol_vigente` | `Su cuenta no tiene un rol vigente. Contacte al Administrador.` |
 | Campos vacíos | 422 | — | errores de validación por campo |
-| Más de 5 intentos por minuto desde la misma IP | 429 | — | `Too Many Attempts.` (cabecera `Retry-After`) |
+| Más de 5 intentos por minuto desde la misma IP | 429 | — | `Too Many Attempts.` (sin `motivo`; ver «Límite de intentos») |
 
 El estado de la cuenta y su rol solo se revelan cuando la contraseña es correcta.
+
+**Un 401 no revela si la cuenta existe.** «Código inexistente» y «contraseña incorrecta» responden el mismo estado, el mismo `message` y el mismo `motivo`, con el cuerpo idéntico byte a byte; un test lo comprueba. Los dos 403 sí son distinguibles entre sí, y solo se alcanzan con la contraseña correcta:
+
+| Pantalla del cliente | Condición | Estado | `motivo` |
+|---|---|---|---|
+| Credenciales incorrectas | código inexistente o contraseña errónea | 401 | `credenciales_invalidas` |
+| Panel gris «cuenta inactiva», sin formulario (reintentar no sirve) | `usuario.estado = INACTIVO` | 403 | `cuenta_inactiva` |
+| Panel azul «cuenta sin rol», con acción para pedir el rol al Administrador | sin asignación de rol abierta | 403 | `sin_rol_vigente` |
+
+### Límite de intentos (429)
+
+`POST /api/auth/login` admite 5 intentos por minuto y por IP (`throttle:5,1`); el sexto responde 429 con `{ "message": "Too Many Attempts." }` y estas cabeceras:
+
+| Cabecera | Valor |
+|---|---|
+| `Retry-After` | segundos enteros hasta poder reintentar (entre 1 y 60; en las pruebas, `59` al sexto intento inmediato) |
+| `X-RateLimit-Limit` | `5` |
+| `X-RateLimit-Remaining` | `0` |
+| `X-RateLimit-Reset` | marca de tiempo Unix en que se libera |
+
+El frontend sirve la API desde otro origen (sin proxy), y el navegador solo deja leer a JavaScript las cabeceras de respuesta que el servidor expone. Por eso `config/cors.php` expone `Retry-After` (`Access-Control-Expose-Headers: Retry-After`): con él se arma la cuenta regresiva. Las demás cabeceras `X-RateLimit-*` llegan por la red pero no están expuestas: no deben usarse desde el cliente. Las respuestas 401 y 403 no llevan `Retry-After`.
 
 **Bitácora.** Todo intento fallido de una cuenta existente queda en `log` con la acción `INICIO_SESION_FALLIDO`; `nuevo_valor` guarda `cod_sis`, `ip` y `motivo`, y `fecha_hora` la hora. `log.id_usuario` es `NOT NULL`, así que un código que no corresponde a ninguna cuenta no puede registrarse ahí: va al log de la aplicación (`Log::warning`) con los mismos datos. La contraseña nunca se registra.
 
