@@ -1,8 +1,12 @@
-import { apiClient, apiPut } from '@/lib/api-client'
+import { apiClient, apiPost, apiPut } from '@/lib/api-client'
 import type { PageRequest } from '@/types/api.types'
 import type {
+  AdminCareersResponse,
   AdminSubjectSummary,
+  AssignableSubjectsResponse,
   MateriaFormState,
+  SubjectCareerAssignmentPayload,
+  SubjectCareerAssignmentResponse,
   SubjectCatalogPage,
   SubjectCatalogResponse,
   UpdateSubjectPayload,
@@ -79,7 +83,7 @@ export async function getAdminSubjects(
 }
 
 /* ==========================================================================
-    HU-006 (Registrar Materia)
+    Flujo legado: Registrar Materia
    ========================================================================== */
 
 /**
@@ -103,6 +107,54 @@ export async function registrarMateria(data: MateriaFormState) {
   }
 
   return response.json();
+}
+
+/* ==========================================================================
+   HU-06 (Asignar Materia a Carrera)
+   ========================================================================== */
+
+/**
+ * Obtiene las carreras activas disponibles para Administración.
+ */
+export async function getAdminCareers(
+  signal?: AbortSignal
+): Promise<AdminCareersResponse['data']> {
+  const response = await apiClient<AdminCareersResponse>(
+    '/administracion/carreras',
+    { signal }
+  )
+
+  return response.data
+}
+
+/**
+ * Obtiene las materias activas que todavía no están vinculadas a la carrera.
+ */
+export async function getAssignableSubjects(
+  careerId: number,
+  signal?: AbortSignal
+): Promise<AssignableSubjectsResponse['data']> {
+  const response = await apiClient<AssignableSubjectsResponse>(
+    `/administracion/carreras/${careerId}/materias-asignables`,
+    { signal }
+  )
+
+  return response.data
+}
+
+/**
+ * Asigna una materia existente a una carrera.
+ */
+export async function assignSubjectToCareer(
+  careerId: number,
+  payload: SubjectCareerAssignmentPayload,
+  signal?: AbortSignal
+): Promise<SubjectCareerAssignmentResponse> {
+  return apiPost<SubjectCareerAssignmentResponse>(
+    `/administracion/carreras/${careerId}/materias`,
+    payload,
+    { signal }
+  )
 }
 
 /* ==========================================================================
