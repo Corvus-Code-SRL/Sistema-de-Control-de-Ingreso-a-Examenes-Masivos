@@ -105,8 +105,15 @@ function defaultKind(status: number): ApiErrorKind {
   return status >= 500 ? 'server' : 'http'
 }
 
-/** Tiempo máximo de espera de una petición. */
-export const REQUEST_TIMEOUT_MS = 15_000
+/**
+ * Plazos máximos de espera. El plazo depende del tipo de petición, no de la URL, para que una carga
+ * de archivos futura reciba el plazo correcto sin que nadie tenga que acordarse:
+ * - peticiones normales: 15 s. Es corto a propósito: con la red caída, el login lo informa pronto.
+ * - cuerpo `FormData` (subida de archivos, como la nómina de hasta 10 MB): 120 s.
+ * `timeoutMs` en las opciones gana siempre sobre ambos.
+ */
+export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000
+export const UPLOAD_REQUEST_TIMEOUT_MS = 120_000
 
 const NETWORK_ERROR = 'No se pudo conectar con el servidor. Revise su conexión.'
 const TIMEOUT_ERROR = 'El servidor tardó demasiado en responder. Intente de nuevo.'
@@ -141,8 +148,9 @@ export interface ApiClientOptions {
   signal?: AbortSignal
   query?: Query
   /**
-   * Tiempo máximo de espera en milisegundos; por defecto `REQUEST_TIMEOUT_MS` (15 s).
-   * Al vencer, el error es de tipo `timeout`.
+   * Tiempo máximo de espera en milisegundos. Sin él: `DEFAULT_REQUEST_TIMEOUT_MS` (15 s), o
+   * `UPLOAD_REQUEST_TIMEOUT_MS` (120 s) si el cuerpo es `FormData`. Al vencer, el error es de tipo
+   * `timeout`; una subida también puede fallar por plazo.
    */
   timeoutMs?: number
   /**
@@ -201,7 +209,7 @@ export async function apiClient<TResponse>(
   const timer = setTimeout(() => {
     timedOut = true
     controller.abort()
-  }, options.timeoutMs ?? REQUEST_TIMEOUT_MS)
+  }, options.timeoutMs ?? defaultTimeoutFor(hasBody && isFormData))
 
   const forwardCancellation = () => controller.abort()
 
@@ -327,4 +335,9 @@ function parseRetryAfter(value: string | null): number | undefined {
   const date = Date.parse(value)
 
   return Number.isNaN(date) ? undefined : Math.max(0, Math.ceil((date - Date.now()) / 1000))
+}
+
+/** Una subida de archivos tarda más que una consulta; sigue teniendo plazo, no espera sin límite. */
+function defaultTimeoutFor(isUpload: boolean): number {
+  return isUpload ? UPLOAD_REQUEST_TIMEOUT_MS : DEFAULT_REQUEST_TIMEOUT_MS
 }

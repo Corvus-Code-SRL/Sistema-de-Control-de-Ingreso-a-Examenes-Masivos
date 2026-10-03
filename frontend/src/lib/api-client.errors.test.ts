@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockApiWith } from '@/test/http'
 import {
   ApiError,
-  REQUEST_TIMEOUT_MS,
+  DEFAULT_REQUEST_TIMEOUT_MS,
+  UPLOAD_REQUEST_TIMEOUT_MS,
   apiClient,
   apiPost,
   configureSessionHandlers,
@@ -151,7 +152,7 @@ describe('api-client — petición no completada frente a respuesta con error', 
 
     const pending = apiPost('/auth/login', {}, { skipAuth: true }).catch((e: unknown) => e)
 
-    await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS - 1)
+    await vi.advanceTimersByTimeAsync(DEFAULT_REQUEST_TIMEOUT_MS - 1)
     // Aún dentro del plazo: no hay error todavía.
     let settled = false
     void pending.then(() => (settled = true))
@@ -162,7 +163,7 @@ describe('api-client — petición no completada frente a respuesta con error', 
 
     const error = (await pending) as ApiError
 
-    expect(REQUEST_TIMEOUT_MS).toBe(15_000)
+    expect(DEFAULT_REQUEST_TIMEOUT_MS).toBe(15_000)
     expect(error).toBeInstanceOf(ApiError)
     expect(error.kind).toBe('timeout')
     expect(error.status).toBe(0)
@@ -175,7 +176,7 @@ describe('api-client — petición no completada frente a respuesta con error', 
     stubHangingFetch()
 
     const pending = apiPost('/auth/login', {}, { skipAuth: true }).catch((e: unknown) => e)
-    await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS)
+    await vi.advanceTimersByTimeAsync(DEFAULT_REQUEST_TIMEOUT_MS)
     const timeout = (await pending) as ApiError
 
     mockApiWith(() => ({ status: 401, body: { message: 'x', motivo: 'credenciales_invalidas' } }))
@@ -239,5 +240,120 @@ describe('api-client — petición no completada frente a respuesta con error', 
     await apiClient('/materias')
 
     expect(vi.getTimerCount()).toBe(0)
+  })
+})
+
+/**
+ * El plazo depende del tipo de petición: una subida (cuerpo FormData) tiene 120 s; el resto, 15 s.
+ * Un `timeoutMs` explícito gana sobre ambos. Y una subida igualmente puede fallar por plazo.
+ */
+describe('api-client — plazo según el tipo de petición', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  function stubHangingFetch(): void {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: unknown, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () =>
+              reject(new DOMException('The operation was aborted.', 'AbortError'))
+            )
+          })
+      )
+    )
+  }
+
+  function uploadBody(): FormData {
+    const body = new FormData()
+    body.append('archivo', new File(['x'], 'nomina.csv'))
+
+    return body
+  }
+
+  /** Avanza el reloj y dice si la petición ya terminó. */
+  async function finishedAfter(pending: Promise<unknown>, ms: number): Promise<boolean> {
+    let finished = false
+    void pending.then(() => (finished = true))
+
+    await vi.advanceTimersByTimeAsync(ms)
+
+    return finished
+  }
+
+  it('los valores por defecto son 15 s y 120 s', () => {
+    expect(DEFAULT_REQUEST_TIMEOUT_MS).toBe(15_000)
+    expect(UPLOAD_REQUEST_TIMEOUT_MS).toBe(120_000)
+  })
+
+  it('una petición normal vence a los 15 s', async () => {
+    vi.useFakeTimers()
+    stubHangingFetch()
+
+    const pending = apiPost('/grupos', { a: 1 }).catch((e: unknown) => e)
+
+    expect(await finishedAfter(pending, 14_999)).toBe(false)
+    expect(await finishedAfter(pending, 1)).toBe(true)
+    expect(((await pending) as ApiError).kind).toBe('timeout')
+  })
+
+  it('una petición con FormData sigue viva a los 15 s y vence a los 120 s', async () => {
+    vi.useFakeTimers()
+    stubHangingFetch()
+
+    const pending = apiPost('/grupos/1/nomina/preview', uploadBody()).catch((e: unknown) => e)
+
+    expect(await finishedAfter(pending, DEFAULT_REQUEST_TIMEOUT_MS)).toBe(false)
+    expect(await finishedAfter(pending, UPLOAD_REQUEST_TIMEOUT_MS - DEFAULT_REQUEST_TIMEOUT_MS - 1)).toBe(false)
+    expect(await finishedAfter(pending, 1)).toBe(true)
+  })
+
+  it('una subida que excede su plazo termina como timeout: el plazo largo no es «sin plazo»', async () => {
+    vi.useFakeTimers()
+    stubHangingFetch()
+
+    const pending = apiPost('/grupos/1/nomina/preview', uploadBody()).catch((e: unknown) => e)
+    await vi.advanceTimersByTimeAsync(UPLOAD_REQUEST_TIMEOUT_MS)
+
+    const error = (await pending) as ApiError
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error.kind).toBe('timeout')
+    expect(error.status).toBe(0)
+    expect(error.isUnauthorized).toBe(false)
+  })
+
+  it('timeoutMs explícito gana sobre el plazo de una petición normal', async () => {
+    vi.useFakeTimers()
+    stubHangingFetch()
+
+    const pending = apiPost('/grupos', { a: 1 }, { timeoutMs: 60_000 }).catch((e: unknown) => e)
+
+    expect(await finishedAfter(pending, DEFAULT_REQUEST_TIMEOUT_MS)).toBe(false)
+    expect(await finishedAfter(pending, 60_000 - DEFAULT_REQUEST_TIMEOUT_MS)).toBe(true)
+  })
+
+  it('timeoutMs explícito gana sobre el plazo de una subida', async () => {
+    vi.useFakeTimers()
+    stubHangingFetch()
+
+    const pending = apiPost('/grupos/1/nomina/preview', uploadBody(), { timeoutMs: 5_000 }).catch(
+      (e: unknown) => e
+    )
+
+    expect(await finishedAfter(pending, 4_999)).toBe(false)
+    expect(await finishedAfter(pending, 1)).toBe(true)
+    expect(((await pending) as ApiError).kind).toBe('timeout')
+  })
+
+  it('un GET no hereda el plazo de subida aunque se le pase un FormData', async () => {
+    vi.useFakeTimers()
+    stubHangingFetch()
+
+    const pending = apiClient('/materias', { method: 'GET', body: uploadBody() }).catch((e: unknown) => e)
+
+    expect(await finishedAfter(pending, DEFAULT_REQUEST_TIMEOUT_MS)).toBe(true)
   })
 })
