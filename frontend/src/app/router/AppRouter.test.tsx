@@ -1,7 +1,7 @@
 import { render, screen, waitForElementToBeRemoved } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
-import { CurrentUserProvider } from '@/features/auth'
+import { CurrentUserProvider, type Area } from '@/features/auth'
 import { mockApiOnce } from '@/test/http'
 import { AppRouter } from './AppRouter'
 
@@ -18,7 +18,7 @@ function LocationSpy({ onChange }: { onChange: (pathname: string) => void }) {
   return null
 }
 
-function renderAppRouterAt(area: 'docente' | 'administrador', route: string) {
+function renderAppRouterAt(area: Area, route: string) {
   window.localStorage.setItem(AREA_STORAGE_KEY, area)
 
   let pathname = ''
@@ -62,5 +62,14 @@ describe('AppRouter — acceso a /ambientes por área', () => {
     expect(location.pathname).toBe('/materias')
 
     await waitForElementToBeRemoved(() => screen.queryByRole('status'))
+  })
+
+  it('un Auxiliar que navega a /ambientes es redirigido a Mis exámenes', async () => {
+    mockApiOnce({ body: { data: [] } })
+
+    const location = renderAppRouterAt('auxiliar', '/ambientes')
+
+    expect(location.pathname).toBe('/mis-examenes')
+    expect(await screen.findByText('No tiene exámenes por controlar')).toBeVisible()
   })
 })

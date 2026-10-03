@@ -22,6 +22,7 @@ const STORAGE_KEY = 'sciem.dev.area'
  */
 const USUARIOS: Record<Area, CurrentUser> = {
   docente: { nombre: 'P. Careaga', iniciales: 'PC', area: 'docente' },
+  auxiliar: { nombre: 'D. Ferrufino', iniciales: 'DF', area: 'auxiliar' },
   administrador: { nombre: 'R. Salazar', iniciales: 'RS', area: 'administrador' },
 }
 

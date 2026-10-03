@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { MyAssignmentsPage } from '@/features/assistants'
 import { useCurrentUser } from '@/features/auth'
 import { CreateExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
 import { CourseDetailPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
@@ -27,6 +28,20 @@ function DocenteRoutes() {
       <Route path="/examenes/programados" element={<ExamsPage />} />
       <Route path="/examenes/:examId" element={<ExamDetailPage />} />
       <Route path="*" element={<Navigate to="/materias" replace />} />
+    </Routes>
+  )
+}
+
+/**
+ * Rutas del auxiliar (HU-09): por ahora solo la consulta de sus exámenes y del
+ * ambiente que el docente le asignó.
+ */
+function AuxiliarRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/mis-examenes" replace />} />
+      <Route path="/mis-examenes" element={<MyAssignmentsPage />} />
+      <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
     </Routes>
   )
 }
@@ -62,5 +77,8 @@ function AdministradorRoutes() {
 export function AppRouter() {
   const { area } = useCurrentUser()
 
-  return area === 'administrador' ? <AdministradorRoutes /> : <DocenteRoutes />
+  if (area === 'administrador') return <AdministradorRoutes />
+  if (area === 'auxiliar') return <AuxiliarRoutes />
+
+  return <DocenteRoutes />
 }
