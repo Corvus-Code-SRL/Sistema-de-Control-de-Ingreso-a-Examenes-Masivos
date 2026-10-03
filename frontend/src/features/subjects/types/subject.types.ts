@@ -100,6 +100,31 @@ export interface SubjectData {
   estado: string
 }
 
+export interface SubjectCareerAssignmentPayload {
+  id_materia: number
+}
+
+export interface SubjectCareerAssignment {
+  id_carrera: number
+  id_materia: number
+  estado: string
+  carrera: Career
+  materia: SubjectData
+}
+
+export interface SubjectCareerAssignmentResponse {
+  data: SubjectCareerAssignment
+  mensaje: string
+}
+
+export interface AdminCareersResponse {
+  data: Career[]
+}
+
+export interface AssignableSubjectsResponse {
+  data: SubjectData[]
+}
+
 export interface UpdateSubjectResponse {
   data: SubjectData
   mensaje: string
