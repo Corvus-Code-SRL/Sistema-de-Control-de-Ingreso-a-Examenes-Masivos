@@ -124,6 +124,9 @@ describe('useAssignableSubjects', () => {
 
     rerender({ careerId: 4 })
 
+    expect(result.current.subjects).toEqual([])
+    expect(result.current.status).toBe('loading')
+
     await waitFor(() =>
       expect(result.current.subjects[0]?.id_materia).toBe(30)
     )
