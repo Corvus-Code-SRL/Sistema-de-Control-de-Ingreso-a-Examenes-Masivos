@@ -12,6 +12,8 @@ interface StubbedResponse {
   body?: unknown
   /** El cuerpo no es JSON, como en un 500 que devuelve HTML. */
   invalidJson?: boolean
+  /** Cabeceras de la respuesta, como `Retry-After` en un 429. */
+  headers?: Record<string, string>
 }
 
 type RouteMatcher = (url: string) => boolean
@@ -60,10 +62,16 @@ export const matchers = {
   rosterConfirm: (url: string) => /\/grupos\/\d+\/nomina\/confirm$/.test(url),
 }
 
-function jsonResponse({ status = 200, body = {}, invalidJson = false }: StubbedResponse): Response {
+function jsonResponse({
+  status = 200,
+  body = {},
+  invalidJson = false,
+  headers = {},
+}: StubbedResponse): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
+    headers: new Headers(headers),
     json: async () => {
       if (invalidJson) {
         throw new SyntaxError('Unexpected token < in JSON at position 0')
