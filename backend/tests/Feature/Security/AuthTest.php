@@ -275,6 +275,55 @@ class AuthTest extends TestCase
         $this->login('10452', 'incorrecta')->assertStatus(429);
     }
 
+    public function test_el_429_trae_retry_after_con_los_segundos_que_faltan(): void
+    {
+        for ($attempt = 1; $attempt <= 5; $attempt++) {
+            $this->login('10452', 'incorrecta')->assertStatus(401);
+        }
+
+        $response = $this->login('10452', 'incorrecta')->assertStatus(429);
+
+        $retryAfter = $response->headers->get('Retry-After');
+
+        $this->assertNotNull($retryAfter);
+        $this->assertGreaterThan(0, (int) $retryAfter);
+        $this->assertLessThanOrEqual(60, (int) $retryAfter);
+    }
+
+    public function test_el_navegador_puede_leer_retry_after_entre_origenes(): void
+    {
+        for ($attempt = 1; $attempt <= 5; $attempt++) {
+            $this->login('10452', 'incorrecta');
+        }
+
+        $response = $this->withHeaders(['Origin' => 'http://localhost:5173'])
+            ->postJson('/api/auth/login', ['cod_sis' => '10452', 'password' => 'incorrecta'])
+            ->assertStatus(429);
+
+        $this->assertStringContainsString(
+            'Retry-After',
+            (string) $response->headers->get('Access-Control-Expose-Headers')
+        );
+    }
+
+    public function test_cada_rechazo_trae_su_codigo_de_motivo_ademas_del_mensaje(): void
+    {
+        $this->login('10452', 'incorrecta')->assertStatus(401)->assertExactJson([
+            'message' => 'Código SIS o contraseña incorrectos.',
+            'motivo' => 'credenciales_invalidas',
+        ]);
+
+        $this->login('10398')->assertStatus(403)->assertExactJson([
+            'message' => 'Su cuenta está deshabilitada. Contacte al Administrador.',
+            'motivo' => 'cuenta_inactiva',
+        ]);
+
+        $this->login('202000315')->assertStatus(403)->assertExactJson([
+            'message' => 'Su cuenta no tiene un rol vigente. Contacte al Administrador.',
+            'motivo' => 'sin_rol_vigente',
+        ]);
+    }
+
     public function test_el_login_no_protege_ninguna_ruta_existente(): void
     {
         // Fase 1: las rutas actuales siguen abiertas y atribuidas al usuario fijo.
