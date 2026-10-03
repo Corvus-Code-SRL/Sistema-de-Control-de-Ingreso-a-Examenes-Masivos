@@ -6,22 +6,28 @@ import { useLoginForm } from '../hooks/useLoginForm'
  * Dos campos y un botón, suficientes para recorrer el flujo completo de punta a punta. La fase 2b
  * reemplaza SOLO este marcado por la pantalla real: toda la lógica vive en `useLoginForm` y en
  * `authService`, y no debe moverse aquí. Los atributos `data-failure-kind` existen para que 2b
- * estile cada resultado: credenciales (también 429), cuenta inactiva, sin rol, red y desconocido.
+ * estile cada resultado: credenciales, cuenta inactiva, sin rol, límite de intentos (con `retryAfter`),
+ * indisponible (sin conexión, tiempo agotado o 5xx; conserva lo escrito y ofrece reintentar) y desconocido.
  */
 export function LoginPage() {
-  const { codSis, setCodSis, password, setPassword, isSubmitting, failure, passwordRef, submit } =
+  const { codSis, setCodSis, password, setPassword, isSubmitting, failure, passwordRef, submit, retry } =
     useLoginForm()
 
-  const credentialsFailed = failure?.kind === 'credenciales' || failure?.kind === 'limitado'
+  const credentialsFailed = failure?.kind === 'credenciales'
 
   return (
     <main>
       <h1>Iniciar sesión</h1>
 
       {failure && !credentialsFailed && (
-        <p role="alert" data-failure-kind={failure.kind}>
-          {failure.message}
-        </p>
+        <div role="alert" data-failure-kind={failure.kind}>
+          <p>{failure.message}</p>
+          {failure.kind === 'indisponible' && (
+            <button type="button" onClick={retry} disabled={isSubmitting}>
+              Reintentar
+            </button>
+          )}
+        </div>
       )}
 
       <form onSubmit={submit} noValidate>

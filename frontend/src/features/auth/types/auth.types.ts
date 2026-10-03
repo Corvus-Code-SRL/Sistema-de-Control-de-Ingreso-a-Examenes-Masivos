@@ -107,16 +107,28 @@ export interface AuthState {
   estado: AuthStatus
 }
 
-/** Por qué falló un inicio de sesión; la pantalla elige cómo mostrar cada caso. */
+/**
+ * Por qué falló un inicio de sesión; la pantalla elige cómo mostrarlo.
+ *
+ * - `credenciales` (401): SIS o contraseña incorrectos; no revela si la cuenta existe.
+ * - `cuenta-inactiva` (403): la cuenta está dada de baja; reintentar no sirve.
+ * - `sin-rol` (403): la cuenta no tiene rol vigente; hay que pedirlo al Administrador.
+ * - `limitado` (429): demasiados intentos; trae `retryAfter` en segundos.
+ * - `indisponible`: la petición no se completó (sin conexión, 15 s sin respuesta) o el servidor falló
+ *   (5xx). No dice nada de la cuenta: se conserva lo escrito y se ofrece reintentar.
+ * - `desconocido`: cualquier otra respuesta.
+ */
 export type LoginFailureKind =
   | 'credenciales'
   | 'cuenta-inactiva'
   | 'sin-rol'
   | 'limitado'
-  | 'red'
+  | 'indisponible'
   | 'desconocido'
 
 export interface LoginFailure {
   kind: LoginFailureKind
   message: string
+  /** Segundos de espera; solo en `limitado`. Sin `Retry-After` en la respuesta se asumen 60. */
+  retryAfter?: number
 }

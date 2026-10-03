@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mockApiWith } from '@/test/http'
 import { TOKEN_STORAGE_KEY, loginBody, loginErrors, meBody, type AccountKey } from '@/test/authFixtures'
 import { AuthProvider } from '../components/AuthProvider'
@@ -126,30 +126,87 @@ describe('LoginPage — resultados del inicio de sesión', () => {
     expect(alert).toHaveAttribute('data-failure-kind', 'sin-rol')
   })
 
-  it('límite de intentos (429): estado propio, pero con el mismo mensaje que credenciales incorrectas', async () => {
-    mockApiWith(() => loginErrors.throttled)
+  it('límite de intentos (429): estado propio, no se confunde con credenciales incorrectas', async () => {
+    mockApiWith(() => ({ ...loginErrors.throttled, headers: { 'Retry-After': '45' } }))
 
     renderLogin()
     await fillAndSubmit('10452', 'mala')
 
     const alert = await screen.findByRole('alert')
 
-    expect(alert).toHaveTextContent('Código SIS o contraseña incorrectos.')
     expect(alert).toHaveAttribute('data-failure-kind', 'limitado')
+    expect(alert).not.toHaveTextContent('Código SIS o contraseña incorrectos.')
     expect(screen.getByLabelText('Contraseña')).toHaveFocus()
   })
 
-  it('una caída de red se distingue de unas credenciales incorrectas', async () => {
-    const user = userEvent.setup()
-    mockApiWith(() => undefined)
+  describe('petición no completada (sin conexión, tiempo agotado o 5xx)', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
 
-    renderLogin()
-    await user.type(screen.getByLabelText('Código SIS'), '10452')
-    await user.type(screen.getByLabelText('Contraseña'), 'password')
-    await user.click(screen.getByRole('button', { name: 'Ingresar' }))
+    it.each([
+      ['una caída de red', () => mockApiWith(() => undefined)],
+      ['un error del servidor (503)', () => mockApiWith(() => ({ status: 503, body: { message: 'Service Unavailable' } }))],
+    ])('%s: aviso neutro que conserva lo escrito, contraseña incluida', async (_label, stub) => {
+      stub()
 
-    const alert = await screen.findByRole('alert')
+      renderLogin()
+      await fillAndSubmit('10452', 'password')
 
-    expect(alert).toHaveAttribute('data-failure-kind', 'red')
+      const alert = await screen.findByRole('alert')
+
+      expect(alert).toHaveAttribute('data-failure-kind', 'indisponible')
+      // No dice nada de la cuenta: nada que ver con credenciales.
+      expect(alert).not.toHaveTextContent('incorrectos')
+      expect(screen.getByLabelText('Código SIS')).toHaveValue('10452')
+      expect(screen.getByLabelText('Contraseña')).toHaveValue('password')
+      expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument()
+    })
+
+    it('15 s sin respuesta es indisponible, no un problema de credenciales', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          (_url: unknown, init: RequestInit) =>
+            new Promise((_resolve, reject) => {
+              init.signal?.addEventListener('abort', () =>
+                reject(new DOMException('The operation was aborted.', 'AbortError'))
+              )
+            })
+        )
+      )
+
+      renderLogin()
+      await fillAndSubmit('10452', 'password')
+      await vi.advanceTimersByTimeAsync(15_000)
+
+      const alert = await screen.findByRole('alert')
+
+      expect(alert).toHaveAttribute('data-failure-kind', 'indisponible')
+      expect(screen.getByLabelText('Contraseña')).toHaveValue('password')
+    })
+
+    it('«Reintentar» reenvía lo mismo que se había escrito y entra si ya hay servicio', async () => {
+      const user = userEvent.setup()
+      let attempts = 0
+
+      const { calls } = mockApiWith(() => {
+        attempts += 1
+
+        return attempts === 1 ? { status: 503, body: {} } : { body: loginBody('docente') }
+      })
+
+      renderLogin()
+      await fillAndSubmit('10452', 'password')
+
+      await user.click(await screen.findByRole('button', { name: 'Reintentar' }))
+
+      await waitFor(() =>
+        expect(screen.getByTestId('estado')).toHaveTextContent('autenticado:Docente')
+      )
+      expect(calls).toHaveLength(2)
+      expect(calls[1].body).toEqual({ cod_sis: '10452', password: 'password' })
+    })
   })
 })

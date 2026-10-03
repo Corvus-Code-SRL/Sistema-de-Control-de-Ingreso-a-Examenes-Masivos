@@ -13,8 +13,11 @@ import { useAuth } from './useAuth'
 
 export const LOGIN_REDIRECT_KEY = 'from'
 
-/** Mismo texto para credenciales incorrectas y para el límite de intentos (429). */
-const CREDENTIALS_MESSAGE = 'Código SIS o contraseña incorrectos.'
+/** Espera que se asume cuando un 429 no trae `Retry-After`; coincide con la ventana de `throttle:5,1`. */
+export const DEFAULT_RETRY_AFTER_SECONDS = 60
+
+const THROTTLED_MESSAGE = 'Demasiados intentos. Espere un momento antes de reintentar.'
+const UNAVAILABLE_MESSAGE = 'No se pudo conectar con el servidor. Puede reintentar.'
 
 export interface UseLoginFormResult {
   codSis: string
@@ -24,20 +27,27 @@ export interface UseLoginFormResult {
   isSubmitting: boolean
   /** `null` mientras no haya un intento fallido. */
   failure: LoginFailure | null
-  /** Referencia del campo de contraseña: tras un fallo recibe el foco. */
+  /** Referencia del campo de contraseña: tras un fallo de credenciales recibe el foco. */
   passwordRef: RefObject<HTMLInputElement>
-  submit: (event: FormEvent) => Promise<void>
+  submit: (event?: FormEvent) => Promise<void>
+  /** Reenvía exactamente lo escrito; es lo que ofrece «Reintentar» tras un fallo `indisponible`. */
+  retry: () => Promise<void>
 }
 
 /**
  * Clasifica el fallo para que la pantalla elija cómo mostrarlo:
+ * - petición no completada o 5xx: `indisponible`, antes que nada: no dice nada de la cuenta.
  * - 401: credenciales incorrectas (también cuando la cuenta no existe).
- * - 403: cuenta inactiva o sin rol vigente, según `motivo`.
- * - 429: límite de intentos; se trata como credenciales incorrectas, con el mismo texto.
+ * - 403: cuenta inactiva o sin rol vigente, según `motivo` (el texto del mensaje no se mira).
+ * - 429: límite de intentos, con los segundos de `Retry-After`.
  */
 export function toLoginFailure(error: unknown): LoginFailure {
   if (!(error instanceof ApiError)) {
     return { kind: 'desconocido', message: 'No se pudo iniciar sesión. Intente de nuevo.' }
+  }
+
+  if (error.isUnavailable) {
+    return { kind: 'indisponible', message: UNAVAILABLE_MESSAGE }
   }
 
   if (error.isUnauthorized) {
@@ -45,7 +55,11 @@ export function toLoginFailure(error: unknown): LoginFailure {
   }
 
   if (error.isTooManyRequests) {
-    return { kind: 'limitado', message: CREDENTIALS_MESSAGE }
+    return {
+      kind: 'limitado',
+      message: THROTTLED_MESSAGE,
+      retryAfter: error.retryAfter ?? DEFAULT_RETRY_AFTER_SECONDS,
+    }
   }
 
   if (error.isForbidden && error.motivo === 'cuenta_inactiva') {
@@ -54,10 +68,6 @@ export function toLoginFailure(error: unknown): LoginFailure {
 
   if (error.isForbidden && error.motivo === 'sin_rol_vigente') {
     return { kind: 'sin-rol', message: error.message }
-  }
-
-  if (error.status === 0) {
-    return { kind: 'red', message: error.message }
   }
 
   return { kind: 'desconocido', message: error.message }
@@ -90,8 +100,8 @@ export function useLoginForm(): UseLoginFormResult {
   }, [failureCount])
 
   const submit = useCallback(
-    async (event: FormEvent) => {
-      event.preventDefault()
+    async (event?: FormEvent) => {
+      event?.preventDefault()
 
       if (isSubmitting) return
 
@@ -106,9 +116,16 @@ export function useLoginForm(): UseLoginFormResult {
 
         navigate(safeDestination(state?.[LOGIN_REDIRECT_KEY]), { replace: true })
       } catch (error) {
-        setFailure(toLoginFailure(error))
-        setPassword('')
-        setFailureCount((count) => count + 1)
+        const nextFailure = toLoginFailure(error)
+
+        setFailure(nextFailure)
+
+        // Si la petición no se completó no hay nada que corregir: se conserva todo lo escrito,
+        // contraseña incluida. En cualquier otro fallo la contraseña se vacía y recibe el foco.
+        if (nextFailure.kind !== 'indisponible') {
+          setPassword('')
+          setFailureCount((count) => count + 1)
+        }
       } finally {
         setIsSubmitting(false)
       }
@@ -116,5 +133,7 @@ export function useLoginForm(): UseLoginFormResult {
     [codSis, isSubmitting, iniciarSesion, location.state, navigate, password]
   )
 
-  return { codSis, setCodSis, password, setPassword, isSubmitting, failure, passwordRef, submit }
+  const retry = useCallback(() => submit(), [submit])
+
+  return { codSis, setCodSis, password, setPassword, isSubmitting, failure, passwordRef, submit, retry }
 }
