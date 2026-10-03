@@ -9,6 +9,7 @@ import {
   GraduationCap,
   History,
   Home,
+  Link2,
   PlaySquare,
   ScrollText,
   ShieldCheck,
@@ -71,8 +72,9 @@ const navegacionDocente: NavGroup[] = [
 /**
  * Navegación lateral del administrador.
  *
- * Cuentas y Materias tienen pantallas disponibles. Facultades, carreras y
- * bitácora permanecen deshabilitadas hasta sus respectivas historias.
+ * Cuentas, Materias, Asignar materia y Ambientes tienen pantallas disponibles.
+ * Facultades, carreras y bitácora permanecen deshabilitadas hasta sus
+ * respectivas historias.
  */
 const navegacionAdministrador: NavGroup[] = [
   { items: [{ label: 'Inicio', icon: Home }] },
@@ -81,6 +83,7 @@ const navegacionAdministrador: NavGroup[] = [
     items: [
       { label: 'Cuentas', icon: Users, to: '/cuentas' },
       { label: 'Materias', icon: BookOpen, to: '/materias' },
+      { label: 'Asignar materia', icon: Link2, to: '/materias/asignar' },
       { label: 'Facultades', icon: Building2 },
       { label: 'Ambientes', icon: DoorOpen, to: '/ambientes' },
       { label: 'Carreras', icon: GraduationCap },
