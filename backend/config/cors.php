@@ -25,7 +25,9 @@ return [
 
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    // Retry-After no es una cabecera que el navegador deje leer a JS entre orígenes: la pantalla
+    // de login arma su cuenta regresiva con el de la respuesta 429.
+    'exposed_headers' => ['Retry-After'],
 
     'max_age' => 0,
 
