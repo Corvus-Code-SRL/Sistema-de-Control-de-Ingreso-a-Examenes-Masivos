@@ -2,7 +2,7 @@ import { createContext, useCallback, useEffect, useMemo, useRef, useState, type 
 import { ApiError, configureSessionHandlers } from '@/lib/api-client'
 import { confirmPassword, getSession, login, logout } from '../services/authService'
 import { clearStoredToken, readStoredToken, storeToken } from '../services/tokenStorage'
-import type { AuthState } from '../types/auth.types'
+import type { AuthState, SessionRole } from '../types/auth.types'
 
 /**
  * Sesión de la aplicación (RNF-02, fase 2a).
@@ -19,9 +19,21 @@ import type { AuthState } from '../types/auth.types'
  *   bloquea (SessionExpiredOverlay) hasta que el usuario vuelva a entrar.
  */
 
+export interface IniciarSesionOptions {
+  /** Se llama cuando el servidor aceptó las credenciales, antes de pedir el rol a GET /auth/yo. */
+  onCredentialsAccepted?: () => void
+}
+
 export interface AuthContextValue extends AuthState {
-  /** Rechaza con `ApiError` si el servidor no acepta las credenciales. */
-  iniciarSesion: (codSis: string, password: string) => Promise<void>
+  /**
+   * Inicia sesión y devuelve el rol vigente, que sale de GET /auth/yo y nunca del código SIS.
+   * Rechaza con `ApiError` si el servidor no acepta las credenciales o si /yo falla.
+   */
+  iniciarSesion: (
+    codSis: string,
+    password: string,
+    options?: IniciarSesionOptions
+  ) => Promise<SessionRole>
   /** Cierra la sesión del servidor y la local; si el servidor falla, la local se cierra igual. */
   cerrarSesion: () => Promise<void>
   /** Rechaza con `ApiError` (422) si la contraseña es incorrecta. */
@@ -107,11 +119,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [apply])
 
   const iniciarSesion = useCallback(
-    async (codSis: string, password: string) => {
-      const { data } = await login(codSis, password)
+    async (codSis: string, password: string, options?: IniciarSesionOptions) => {
+      const { data: credentials } = await login(codSis, password)
 
-      storeToken(data.token)
-      apply({ usuario: data.usuario, rol: data.rol, token: data.token, estado: 'autenticado' })
+      /*
+       * El token se guarda ANTES de pedir /yo: esa petición tiene que llevarlo. La sesión solo pasa a
+       * `autenticado` cuando /yo responde, porque el rol y la navegación salen de ahí; si /yo falla,
+       * no queda nada a medias y la pantalla vuelve al formulario con el error.
+       */
+      storeToken(credentials.token)
+      tokenRef.current = credentials.token
+      options?.onCredentialsAccepted?.()
+
+      try {
+        const { data: session } = await getSession()
+
+        apply({
+          usuario: session.usuario,
+          rol: session.rol,
+          token: credentials.token,
+          estado: 'autenticado',
+        })
+
+        return session.rol
+      } catch (error) {
+        clearStoredToken()
+        tokenRef.current = null
+
+        throw error
+      }
     },
     [apply]
   )

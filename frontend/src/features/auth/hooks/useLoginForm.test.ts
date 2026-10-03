@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api-client'
-import { DEFAULT_RETRY_AFTER_SECONDS, safeDestination, toLoginFailure } from './useLoginForm'
+import { homeForRole, resolveDestination, safeDestination } from '../lib/destination'
+import { DEFAULT_RETRY_AFTER_SECONDS, toLoginFailure } from './useLoginForm'
 
 /**
  * La pantalla decide con el estado y el código `motivo`, nunca con el texto del mensaje:
@@ -64,9 +65,25 @@ describe('toLoginFailure', () => {
 describe('safeDestination', () => {
   it('acepta rutas internas y descarta lo demás', () => {
     expect(safeDestination('/examenes/programados?x=1')).toBe('/examenes/programados?x=1')
-    expect(safeDestination('//evil.example')).toBe('/')
-    expect(safeDestination('https://evil.example')).toBe('/')
-    expect(safeDestination('/login')).toBe('/')
-    expect(safeDestination(undefined)).toBe('/')
+    expect(safeDestination('//evil.example')).toBeNull()
+    expect(safeDestination('https://evil.example')).toBeNull()
+    expect(safeDestination('/login')).toBeNull()
+    expect(safeDestination(undefined)).toBeNull()
+  })
+})
+
+describe('destino después de iniciar sesión', () => {
+  it('cada rol va a la entrada que ya tiene', () => {
+    expect(homeForRole('Administrador')).toBe('/cuentas')
+    expect(homeForRole('Docente')).toBe('/materias')
+    expect(homeForRole('Auxiliar')).toBe('/')
+    expect(homeForRole('Invitado')).toBe('/')
+    expect(homeForRole(undefined)).toBe('/')
+  })
+
+  it('la ruta en la que estaba la persona gana sobre la entrada del rol', () => {
+    expect(resolveDestination('/examenes/programados', 'Docente')).toBe('/examenes/programados')
+    expect(resolveDestination(undefined, 'Administrador')).toBe('/cuentas')
+    expect(resolveDestination('https://evil.example', 'Docente')).toBe('/materias')
   })
 })
