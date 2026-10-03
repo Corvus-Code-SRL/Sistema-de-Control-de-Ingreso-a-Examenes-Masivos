@@ -3,29 +3,47 @@ import { useAsyncResource } from '@/hooks/useAsyncResource'
 import { getAssignableSubjects } from '../services/subjectsService'
 import type { SubjectData } from '../types/subject.types'
 
+interface AssignableSubjectsSnapshot {
+  careerId: number | null
+  subjects: SubjectData[]
+}
+
 /**
  * Materias activas que todavía pueden asignarse a la carrera seleccionada.
  *
  * Sin carrera seleccionada no consulta al backend y expone una colección vacía.
+ * Al cambiar de carrera oculta inmediatamente los resultados de la carrera anterior.
  */
 export function useAssignableSubjects(careerId: number | null) {
-  const resource = useAsyncResource<SubjectData[]>(
+  const resource = useAsyncResource<AssignableSubjectsSnapshot>(
     useCallback(
-      (signal) => {
-        if (careerId === null) {
-          return Promise.resolve([])
-        }
-
-        return getAssignableSubjects(careerId, signal)
-      },
+      async (signal) => ({
+        careerId,
+        subjects:
+          careerId === null
+            ? []
+            : await getAssignableSubjects(careerId, signal),
+      }),
       [careerId]
     ),
     [careerId]
   )
 
+  const belongsToCurrentCareer =
+    resource.data?.careerId === careerId
+
+  const status =
+    resource.error !== null
+      ? 'error'
+      : resource.status === 'success' && belongsToCurrentCareer
+        ? 'success'
+        : 'loading'
+
   return {
-    subjects: resource.data ?? [],
-    status: resource.status,
+    subjects: belongsToCurrentCareer
+      ? resource.data?.subjects ?? []
+      : [],
+    status,
     error: resource.error,
     reload: resource.reload,
   }
