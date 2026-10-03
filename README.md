@@ -395,7 +395,7 @@ Detalle completo (idioma, PSR-12, naming, capas) en [`.claude/rules/code-style-b
 ## Flujo de trabajo
 
 - `develop` es la rama de integración; `main` representa versiones estables. No se desarrolla directamente sobre ninguna de las dos.
-- Cada ítem del backlog se desarrolla en una rama propia creada desde `develop`, siguiendo el formato y los tipos definidos en [`.claude/rules/git-branches.md`](.claude/rules/git-branches.md):
+- Cada ítem del backlog se desarrolla en una rama propia creada desde `develop`, siguiendo el formato y los tipos definidos en [`.claude/skills/git-branches/SKILL.md`](.claude/skills/git-branches/SKILL.md):
 
 | Tipo | Uso | Ejemplo |
 |---|---|---|
@@ -425,7 +425,7 @@ Detalle completo (idioma, PSR-12, naming, capas) en [`.claude/rules/code-style-b
 | [`deployment/docker/README.md`](deployment/docker/README.md) | Entorno de desarrollo con Docker (PHP, PostgreSQL y Redis) |
 | [`docs/architecture/decisions/`](docs/architecture/decisions/) | Registro de decisiones de arquitectura (ADR) |
 | [`docs/architecture/decisions/0001-actualizacion-en-tiempo-real-por-consulta-periodica.md`](docs/architecture/decisions/0001-actualizacion-en-tiempo-real-por-consulta-periodica.md) | ADR 0001 — por qué la actualización en tiempo real es por consulta periódica |
-| [`.claude/rules/git-branches.md`](.claude/rules/git-branches.md) | Convención de nombres de ramas |
+| [`.claude/skills/git-branches/SKILL.md`](.claude/skills/git-branches/SKILL.md) | Convención de nombres de ramas |
 | [`.claude/rules/git-commits.md`](.claude/rules/git-commits.md) | Convención de mensajes de commit |
 | [`.claude/rules/code-style-backend.md`](.claude/rules/code-style-backend.md) | Estándares de código del backend |
 
