@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  assignSubjectToCareer,
   actualizarMateria,
+  getAdminCareers,
   getAdminSubjects,
+  getAssignableSubjects,
   getSubjectCatalog,
 } from './subjectsService'
 import { makeSubject, subjectCatalogResponse } from '@/test/fixtures'
@@ -110,6 +113,141 @@ describe('getAdminSubjects', () => {
         codigo: '2008058',
       },
     ])
+  })
+})
+
+describe('getAdminCareers', () => {
+  it('consulta las carreras administrativas y devuelve la colección', async () => {
+    mockApiOnce({
+      body: {
+        data: [
+          {
+            id_carrera: 1,
+            nombre: 'Ingenieria de Sistemas',
+            codigo: 'SIS',
+            id_facultad: 1,
+          },
+        ],
+      },
+    })
+
+    const careers = await getAdminCareers()
+
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+
+    expect(String(url)).toContain('/administracion/carreras')
+    expect(init.method).toBe('GET')
+    expect(careers).toEqual([
+      {
+        id_carrera: 1,
+        nombre: 'Ingenieria de Sistemas',
+        codigo: 'SIS',
+        id_facultad: 1,
+      },
+    ])
+  })
+})
+
+describe('getAssignableSubjects', () => {
+  it('consulta las materias asignables de la carrera indicada', async () => {
+    mockApiOnce({
+      body: {
+        data: [
+          {
+            id_materia: 10,
+            nombre: 'Inteligencia Artificial',
+            codigo: '2008001',
+            descripcion: 'Materia de prueba',
+            estado: 'ACTIVO',
+          },
+        ],
+      },
+    })
+
+    const subjects = await getAssignableSubjects(3)
+
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+
+    expect(String(url)).toContain(
+      '/administracion/carreras/3/materias-asignables'
+    )
+    expect(init.method).toBe('GET')
+    expect(subjects[0].id_materia).toBe(10)
+    expect(subjects[0].nombre).toBe('Inteligencia Artificial')
+  })
+})
+
+describe('assignSubjectToCareer', () => {
+  it('envia la materia por POST a la carrera indicada', async () => {
+    mockApiOnce({
+      body: {
+        data: {
+          id_carrera: 3,
+          id_materia: 10,
+          estado: 'ACTIVO',
+          carrera: {
+            id_carrera: 3,
+            nombre: 'Ingenieria de Sistemas',
+            codigo: 'SIS',
+            id_facultad: 1,
+          },
+          materia: {
+            id_materia: 10,
+            nombre: 'Inteligencia Artificial',
+            codigo: '2008001',
+            descripcion: null,
+            estado: 'ACTIVO',
+          },
+        },
+        mensaje: 'Materia asignada a la carrera correctamente.',
+      },
+    })
+
+    const response = await assignSubjectToCareer(3, {
+      id_materia: 10,
+    })
+
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+
+    expect(String(url)).toContain('/administracion/carreras/3/materias')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBe(
+      JSON.stringify({
+        id_materia: 10,
+      })
+    )
+    expect(response.data.id_carrera).toBe(3)
+    expect(response.data.id_materia).toBe(10)
+    expect(response.mensaje).toBe(
+      'Materia asignada a la carrera correctamente.'
+    )
+  })
+
+  it('conserva el error 422 cuando la materia ya esta asignada', async () => {
+    mockApiOnce({
+      status: 422,
+      body: {
+        message: 'The given data was invalid.',
+        errors: {
+          id_materia: [
+            'La materia ya está asignada a la carrera seleccionada.',
+          ],
+        },
+      },
+    })
+
+    await expect(
+      assignSubjectToCareer(3, {
+        id_materia: 10,
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      errors: {
+        id_materia: [
+          'La materia ya está asignada a la carrera seleccionada.',
+        ],
+      },
+    })
   })
 })
 
