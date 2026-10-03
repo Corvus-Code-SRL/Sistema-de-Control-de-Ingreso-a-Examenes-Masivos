@@ -102,13 +102,13 @@ describe('sesión expirada', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Iniciar sesión' }))
 
-    await screen.findByRole('heading', { name: 'Iniciar sesión' })
+    await screen.findByRole('heading', { name: 'Ingresar' })
     expect(app.pathname).toBe('/login')
     // En el propio login el aviso no bloquea: es donde se resuelve.
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
 
-    await user.type(screen.getByLabelText('Código SIS'), '10452')
-    await user.type(screen.getByLabelText('Contraseña'), 'password')
+    await user.type(screen.getByLabelText(/^Código SIS/), '10452')
+    await user.type(screen.getByLabelText(/^Contraseña/), 'password')
     await user.click(screen.getByRole('button', { name: 'Ingresar' }))
 
     await waitFor(() => expect(app.pathname).toBe('/examenes/programados'))
@@ -122,11 +122,11 @@ describe('sesión expirada', () => {
 
     const app = renderApp('/login')
 
-    await user.type(await screen.findByLabelText('Código SIS'), '10452')
-    await user.type(screen.getByLabelText('Contraseña'), 'mala')
+    await user.type(await screen.findByLabelText(/^Código SIS/), '10452')
+    await user.type(screen.getByLabelText(/^Contraseña/), 'mala')
     await user.click(screen.getByRole('button', { name: 'Ingresar' }))
 
-    await screen.findByText('Código SIS o contraseña incorrectos.')
+    await screen.findByText('Código SIS o contraseña incorrectos')
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     expect(app.pathname).toBe('/login')
@@ -219,7 +219,7 @@ describe('cuenta en el sidebar', () => {
 
     await user.click(screen.getAllByRole('button', { name: 'Cerrar sesión' })[0])
 
-    await screen.findByRole('heading', { name: 'Iniciar sesión' })
+    await screen.findByRole('heading', { name: 'Ingresar' })
 
     const logout = calls.find((call) => call.url.endsWith('/auth/logout'))
 
@@ -236,5 +236,75 @@ describe('cuenta en el sidebar', () => {
 
     expect(screen.queryByText('Vista de desarrollo')).not.toBeInTheDocument()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * Después de iniciar sesión cada rol va a la entrada que ya tiene: los inicios /docente/inicio,
+ * /auxiliar/inicio y /admin/inicio del diseño no existen todavía. El rol sale de /auth/yo.
+ */
+describe('redirección después de iniciar sesión', () => {
+  function stubLoginServer(me: AccountKey) {
+    mockApiWith(({ url, method }) => {
+      if (url.endsWith('/auth/yo')) return { body: meBody(me) }
+      if (url.endsWith('/auth/login') && method === 'POST') return { body: loginBody(me) }
+      if (url.endsWith('/usuarios')) return { body: { data: [], meta: { id_usuario_actual: 'x' } } }
+      if (url.endsWith('/materias')) {
+        return { body: { data: [], meta: { total: 0, total_mias: 0, id_periodo_activo: 1 } } }
+      }
+
+      return { body: { data: [] } }
+    })
+  }
+
+  async function loginAs(sis: string) {
+    const user = userEvent.setup()
+
+    await user.type(await screen.findByLabelText(/^Código SIS/), sis)
+    await user.type(screen.getByLabelText(/^Contraseña/), 'password')
+    await user.click(screen.getByRole('button', { name: 'Ingresar' }))
+  }
+
+  it.each<[string, AccountKey, string]>([
+    ['10452', 'docente', '/materias'],
+    ['ADM0001', 'administrador', '/cuentas'],
+    ['201800451', 'auxiliar', '/materias'],
+  ])('%s (%s) llega a %s', async (sis, account, destination) => {
+    stubLoginServer(account)
+
+    const app = renderApp('/login')
+
+    await loginAs(sis)
+
+    await waitFor(() => expect(app.pathname).toBe(destination))
+  })
+
+  it('el Auxiliar no tiene pantallas propias todavía: cae en la entrada del área y ve el aviso de permiso', async () => {
+    stubLoginServer('auxiliar')
+
+    renderApp('/login')
+    await loginAs('201800451')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Su rol no tiene permiso')
+  })
+
+  it('el destino sale del rol que devuelve /yo, no del formato del código', async () => {
+    // Un código de formato Docente (5 dígitos) cuyo /yo dice Administrador.
+    stubLoginServer('administrador')
+
+    const app = renderApp('/login')
+
+    await loginAs('10452')
+
+    await waitFor(() => expect(app.pathname).toBe('/cuentas'))
+  })
+
+  it('quien ya tiene sesión y abre /login vuelve a la entrada de su rol', async () => {
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, 'tok')
+    stubLoginServer('administrador')
+
+    const app = renderApp('/login')
+
+    await waitFor(() => expect(app.pathname).toBe('/cuentas'))
   })
 })

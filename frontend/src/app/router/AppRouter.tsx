@@ -6,7 +6,7 @@ import {
   LoginPage,
   ProtectedRoute,
   SessionExpiredOverlay,
-  safeDestination,
+  resolveDestination,
   useAuth,
   useCurrentUser,
   type Capability,
@@ -80,15 +80,17 @@ function AdministradorRoutes() {
   )
 }
 
-/** Quien ya tiene sesión no necesita el formulario: vuelve a donde iba. */
+/** Quien ya tiene sesión no necesita el formulario: vuelve a donde iba o a la entrada de su rol. */
 function LoginRoute() {
-  const { estado } = useAuth()
+  const { estado, rol } = useAuth()
   const location = useLocation()
 
   if (estado === 'autenticado') {
     const state = location.state as Record<string, unknown> | null
 
-    return <Navigate to={safeDestination(state?.[LOGIN_REDIRECT_KEY])} replace />
+    return (
+      <Navigate to={resolveDestination(state?.[LOGIN_REDIRECT_KEY], rol?.nombre_rol)} replace />
+    )
   }
 
   return <LoginPage />
