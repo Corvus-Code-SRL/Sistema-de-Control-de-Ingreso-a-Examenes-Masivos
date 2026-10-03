@@ -1,8 +1,8 @@
-import { NavLink } from 'react-router-dom'
+import { LogIn, LogOut } from 'lucide-react'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { AREA_LABELS, useCurrentUser } from '@/features/auth'
+import { AREA_LABELS, LOGIN_PATH, useAuth, useCurrentUser } from '@/features/auth'
 import { cn } from '@/lib/utils'
-import { DevAreaSwitcher } from './DevAreaSwitcher'
 import { navigationByArea } from './navigation'
 
 interface AppSidebarProps {
@@ -19,7 +19,16 @@ interface AppSidebarProps {
  */
 export function AppSidebar({ onNavigate }: AppSidebarProps) {
   const { user, area } = useCurrentUser()
+  const { estado, cerrarSesion } = useAuth()
+  const navigate = useNavigate()
   const navigation = navigationByArea[area]
+  const hasSession = estado === 'autenticado'
+
+  async function handleLogout() {
+    await cerrarSesion()
+    onNavigate?.()
+    navigate(LOGIN_PATH, { replace: true })
+  }
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -86,19 +95,41 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
         ))}
       </nav>
 
-      <div className="flex items-center gap-2.5 border-t border-sidebar-border px-4 py-3">
-        <Avatar className="size-8">
-          <AvatarFallback className="bg-sidebar-accent text-xs font-semibold text-white">
-            {user.iniciales}
-          </AvatarFallback>
-        </Avatar>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-white">{user.nombre}</p>
-          <p className="truncate text-xs text-sb-sub">{AREA_LABELS[area]}</p>
-        </div>
-      </div>
+      <section aria-label="Cuenta" className="border-t border-sidebar-border px-4 py-3">
+        <p className="sciem-overline pb-2 text-sb-group">Cuenta</p>
 
-      <DevAreaSwitcher />
+        <div className="flex items-center gap-2.5">
+          <Avatar className="size-8">
+            <AvatarFallback className="bg-sidebar-accent text-xs font-semibold text-white">
+              {user.iniciales}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-white">{user.nombre}</p>
+            <p className="truncate text-xs text-sb-sub">{AREA_LABELS[area]}</p>
+          </div>
+        </div>
+
+        {hasSession ? (
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mt-3 flex h-9 w-full items-center gap-2 rounded-md px-2 text-sm font-medium text-sidebar-foreground hover:bg-sb-hover"
+          >
+            <LogOut className="size-4 shrink-0" aria-hidden="true" />
+            Cerrar sesión
+          </button>
+        ) : (
+          <NavLink
+            to={LOGIN_PATH}
+            onClick={onNavigate}
+            className="mt-3 flex h-9 w-full items-center gap-2 rounded-md px-2 text-sm font-medium text-sidebar-foreground hover:bg-sb-hover"
+          >
+            <LogIn className="size-4 shrink-0" aria-hidden="true" />
+            Iniciar sesión
+          </NavLink>
+        )}
+      </section>
     </div>
   )
 }
