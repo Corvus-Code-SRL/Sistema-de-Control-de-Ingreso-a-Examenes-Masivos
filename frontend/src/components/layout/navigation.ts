@@ -45,8 +45,8 @@ const navegacionDocente: NavGroup[] = [
     items: [
       { label: 'Materias', icon: BookOpen, to: '/materias' },
       { label: 'Mis cursos', icon: GraduationCap, to: '/mis-cursos' },
-      { label: 'Mis auxiliares', icon: Users }
-    ]
+      { label: 'Mis auxiliares', icon: Users, to: '/mis-auxiliares' },
+    ],
   },
   {
     label: 'Exámenes',

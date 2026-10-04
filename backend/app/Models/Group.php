@@ -105,4 +105,11 @@ class Group extends Model
     {
         return $this->examGroups();
     }
+
+    public function assistants(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'grupo_auxiliar', 'id_grupo', 'id_usuario')
+                    ->using(GroupAssistant::class)
+                    ->withPivot('fecha_incorporacion', 'estado');
+    }
 }

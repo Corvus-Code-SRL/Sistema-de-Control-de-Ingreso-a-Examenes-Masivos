@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { LoadingState } from '@/components/common/LoadingState'
-import { MyAssignmentsPage } from '@/features/assistants'
+import { MyAssignmentsPage, MyAssistantsPage } from '@/features/assistants'
 import {
   LOGIN_REDIRECT_KEY,
   LoginPage,
@@ -39,6 +39,10 @@ function DocenteRoutes() {
         element={guarded('grupos.gestionar', <SubjectGroupsPage />)}
       />
       <Route path="/mis-cursos" element={guarded('grupos.gestionar', <MyCoursesPage />)} />
+      <Route
+        path="/mis-auxiliares"
+        element={guarded('auxiliares.gestionar', <MyAssistantsPage />)}
+      />
       <Route path="/cursos/:idGrupo" element={guarded('grupos.gestionar', <CourseDetailPage />)} />
       <Route path="/examenes/nuevo" element={guarded('examenes.gestionar', <CreateExamPage />)} />
       <Route
