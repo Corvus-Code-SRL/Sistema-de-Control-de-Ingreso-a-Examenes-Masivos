@@ -271,7 +271,7 @@ Todo el equipo trabaja con los mismos registros: cada valor está escrito a mano
 
 El seeder no está registrado en `DatabaseSeeder`, así que `php artisan db:seed` a secas no lo carga. Se niega a correr con cualquier `APP_ENV` que no sea `local` o `development` y rechaza expresamente la base `sciem_test`, incluso en entorno local. La suite construye su propio esquema y nunca usa estos datos. También ejecuta `RoleSeeder`, `ActionSeeder` y `ExamTypeSeeder`, que son idempotentes.
 
-**Antes de sembrar la base compartida, coordinar en el canal del equipo.** Una inserción masiva sin avisar deja a los demás preguntándose de dónde salieron los registros.
+**Estos seeders ya no se pueden ejecutar contra la base compartida:** escriben ids fijos con *upsert* y se niegan a correr si `DB_HOST` no es `postgres`, `127.0.0.1` ni `localhost` (ver «Seeders: para qué sirve cada uno»). Si hay que cargarlos en un servidor remoto, el cambio de la guarda se decide primero con el equipo.
 
 ### Comprobar qué datos ve el frontend
 

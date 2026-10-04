@@ -3,6 +3,7 @@
 namespace Database\Seeders\TestData;
 
 use App\Support\SisCode;
+use Database\Seeders\Support\LocalDatabaseGuard;
 use Database\Seeders\TestData\TestDataIds as Ids;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -63,6 +64,8 @@ class GroupTestDataSeeder extends Seeder
 
     public function run()
     {
+        LocalDatabaseGuard::assertLocal(static::class);
+
         DB::table('estudiante')->upsert(array_map(fn (array $student) => [
             'id_estudiante' => $student[0],
             'cod_sis' => SisCode::normalize($student[1]),
