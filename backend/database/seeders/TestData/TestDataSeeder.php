@@ -5,6 +5,7 @@ namespace Database\Seeders\TestData;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\ExamTypeSeeder;
 use Database\Seeders\RoleSeeder;
+use Database\Seeders\Support\LocalDatabaseGuard;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,8 @@ class TestDataSeeder extends Seeder
 
     public function run()
     {
+        LocalDatabaseGuard::assertLocal(static::class);
+
         // Nunca en producción ni en la suite de pruebas (APP_ENV=testing).
         if (! app()->environment(self::ALLOWED_ENVIRONMENTS)) {
             throw new RuntimeException(sprintf(
