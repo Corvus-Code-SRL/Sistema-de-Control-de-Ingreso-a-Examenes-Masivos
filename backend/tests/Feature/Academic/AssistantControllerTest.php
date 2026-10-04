@@ -166,13 +166,8 @@ class AssistantControllerTest extends TestCase
             'estado' => RecordStatus::ACTIVE,
         ]);
 
-        DB::table('examen_estudiante')->insert([
-            'id_examen' => $this->examId,
-            'id_estudiante' => $estudianteId,
-            'estado_habilitacion' => 'HABILITADO',
-            'estado_ingreso' => 'NO_INGRESO',
-            'id_grupo' => $this->grupoPropioId,
-        ]);
+        // Con el examen PROGRAMADO no hay ingresos: el estudiante solo es "esperado" por su grupo.
+        $this->assertSame(0, DB::table('examen_estudiante')->where('id_examen', $this->examId)->count());
 
         // Crear un auxiliar con el mismo cod_sis del estudiante
         $roleAuxiliar = Role::where('nombre_rol', Role::AUXILIAR)->firstOrFail();
@@ -247,6 +242,31 @@ class AssistantControllerTest extends TestCase
 
         $response->assertStatus(422);
         $response->assertJsonValidationErrors('id_examen');
+    }
+
+    public function test_las_respuestas_llevan_data_y_mensaje(): void
+    {
+        $this->postJson("/api/docente/grupos/{$this->grupoPropioId}/auxiliares", [
+            'id_usuario' => $this->auxiliarAId,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('mensaje', 'Auxiliar incorporado al grupo correctamente.')
+            ->assertJsonPath('data', null);
+
+        $this->getJson('/api/docente/auxiliares')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id_usuario', $this->auxiliarAId)
+            ->assertJsonPath('data.0.grupos.0.id_grupo', $this->grupoPropioId)
+            ->assertJsonPath('data.0.examenes_disponibles.0.id_examen', $this->examId);
+
+        $this->getJson('/api/docente/grupos')
+            ->assertOk()
+            ->assertJsonPath('data.0.id_grupo', $this->grupoPropioId);
+
+        $this->deleteJson("/api/docente/grupos/{$this->grupoPropioId}/auxiliares/{$this->auxiliarAId}")
+            ->assertOk()
+            ->assertJsonPath('mensaje', 'Auxiliar quitado del grupo correctamente.');
     }
 
     public function test_rechaza_quitar_auxiliar_si_el_examen_no_esta_programado(): void
