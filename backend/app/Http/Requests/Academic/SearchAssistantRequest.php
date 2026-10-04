@@ -2,15 +2,8 @@
 
 namespace App\Http\Requests\Academic;
 
-use Illuminate\Foundation\Http\FormRequest;
-
-class SearchAssistantRequest extends FormRequest
+class SearchAssistantRequest extends AssistantManagementRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
-
     public function rules(): array
     {
         return [

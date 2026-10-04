@@ -2,15 +2,8 @@
 
 namespace App\Http\Requests\Academic;
 
-use Illuminate\Foundation\Http\FormRequest;
-
-class EnableAssistantForExamRequest extends FormRequest
+class EnableAssistantForExamRequest extends AssistantManagementRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
-
     public function rules(): array
     {
         return [
