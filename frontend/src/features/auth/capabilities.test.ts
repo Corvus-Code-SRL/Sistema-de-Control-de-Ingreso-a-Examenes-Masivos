@@ -33,7 +33,7 @@ describe('capacidades por rol', () => {
   it('el área sale del rol', () => {
     expect(areaForRole('Administrador')).toBe('administrador')
     expect(areaForRole('Docente')).toBe('docente')
-    expect(areaForRole('Auxiliar')).toBe('docente')
+    expect(areaForRole('Auxiliar')).toBe('auxiliar')
     expect(areaForRole(null)).toBe('docente')
   })
 })

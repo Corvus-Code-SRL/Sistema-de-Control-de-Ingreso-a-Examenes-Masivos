@@ -179,13 +179,13 @@ describe('acceso por capacidad', () => {
     expect(app.pathname).toBe('/examenes/programados')
   })
 
-  it('un Auxiliar no tiene la capacidad de gestionar exámenes: ve el aviso y conserva la sesión', async () => {
+  it('un Auxiliar cae en su propia área aunque abra una URL del Docente y conserva la sesión', async () => {
     stubBackend({ session: 'auxiliar' })
 
     const app = renderApp('/examenes/nuevo')
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Su rol no tiene permiso')
-    expect(app.pathname).toBe('/examenes/nuevo')
+    await waitFor(() => expect(app.pathname).toBe('/mis-examenes'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBe('tok-inicial')
     expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument()
   })
@@ -268,7 +268,7 @@ describe('redirección después de iniciar sesión', () => {
   it.each<[string, AccountKey, string]>([
     ['10452', 'docente', '/materias'],
     ['ADM0001', 'administrador', '/cuentas'],
-    ['201800451', 'auxiliar', '/materias'],
+    ['201800451', 'auxiliar', '/mis-examenes'],
   ])('%s (%s) llega a %s', async (sis, account, destination) => {
     stubLoginServer(account)
 
@@ -279,13 +279,14 @@ describe('redirección después de iniciar sesión', () => {
     await waitFor(() => expect(app.pathname).toBe(destination))
   })
 
-  it('el Auxiliar no tiene pantallas propias todavía: cae en la entrada del área y ve el aviso de permiso', async () => {
+  it('el Auxiliar llega a su pantalla propia y no ve el aviso de permiso', async () => {
     stubLoginServer('auxiliar')
 
-    renderApp('/login')
+    const app = renderApp('/login')
     await loginAs('201800451')
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Su rol no tiene permiso')
+    await waitFor(() => expect(app.pathname).toBe('/mis-examenes'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('el destino sale del rol que devuelve /yo, no del formato del código', async () => {

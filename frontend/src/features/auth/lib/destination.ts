@@ -5,8 +5,7 @@
  * otro sprint y esas rutas no existen. Cada rol va a la pantalla de entrada que ya tiene hoy:
  * - Administrador → /cuentas (la home de su área).
  * - Docente → /materias (la home de su área).
- * - Auxiliar → «/»: todavía no tiene pantallas propias, así que cae en la home por defecto del área
- *   Docente; cuando existan sus pantallas, es aquí donde se cambia.
+ * - Auxiliar → «/»: el router del área Auxiliar lo lleva a /mis-examenes, su home (HU-09).
  */
 const HOME_BY_ROLE: Record<string, string> = {
   Administrador: '/cuentas',
