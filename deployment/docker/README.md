@@ -12,7 +12,7 @@ por separado.
 | Servicio   | Imagen                 | Versión | Acceso                                    |
 |------------|------------------------|---------|-------------------------------------------|
 | `app`      | `sciem-php:dev` (local)| PHP 8.0.30 · Composer 2.9.6 | `http://localhost:8000`   |
-| `scheduler` | `sciem-php:dev` (local)| PHP 8.0.30 | Sin puerto; ejecuta el planificador cada minuto |
+| `scheduler` | `sciem-php:dev` (local)| PHP 8.0.30 | **Perfil opcional** (`--profile scheduler`): no arranca con `up -d`. Sin puerto; ejecuta el planificador cada minuto |
 | `postgres` | `postgres:15.0`        | 15.0    | Interno `postgres:5432` · Host `localhost:5433` |
 | `redis`    | `redis:7.4.3`          | 7.4.3   | Interno `redis:6379` · Host `localhost:6379` |
 
@@ -91,7 +91,7 @@ npm run dev        # http://localhost:5173
 $DC exec app php artisan <comando>                  # artisan
 $DC exec app composer install                       # nunca composer update
 $DC exec app php artisan test                       # pruebas
-$DC logs -f scheduler                               # aperturas automáticas
+$DC logs -f scheduler                               # aperturas automáticas (solo si se levantó con el perfil)
 $DC logs -f app                                     # logs del servidor
 $DC exec postgres psql -U postgres -d sciem_db      # consola SQL
 $DC build app                                       # reconstruir la imagen tras cambiar el Dockerfile
@@ -129,21 +129,91 @@ $DC build app                                       # reconstruir la imagen tras
 - **Nuevas extensiones:** si un paquete nuevo exige una extensión, `composer install` falla.
   Se verifica con `$DC exec app composer check-platform-reqs`, se agrega la extensión al
   Dockerfile y se reconstruye con `$DC build app`.
+
 ## Apertura automática de ingreso
 
-El servicio `scheduler` ejecuta el planificador de Laravel cada minuto. Un examen
-`PROGRAMADO` con nómina y ambientes suficientes prepara en Redis un snapshot versionado
-con identidades, pertenencia, aulas, antecedentes, permisos, contadores y últimos ingresos.
-Solo después activa el snapshot y pasa a `EN_INGRESO`, al llegar a la anticipación indicada
-por `examen.minutos_apertura` (10 minutos por defecto, entre 0 y 30) en la zona
-`SCIEM_ZONA_HORARIA`. El cambio no requiere una migración de base de datos.
+Un examen pasa a `EN_INGRESO` **solo** por el planificador de Laravel: no hay acción manual de "abrir
+control" ni ruta HTTP para hacerlo (eso es de la HU-12). Cada minuto, `OpenEntryControlJob` busca los
+exámenes `PROGRAMADO` cuya hora de inicio esté dentro de `examen.minutos_apertura` minutos (10 por defecto,
+entre 0 y 30, en la zona `SCIEM_ZONA_HORARIA`) y que aún no hayan terminado. Si tienen nómina y ambientes
+con capacidad suficiente, prepara en Redis un snapshot versionado (identidades, pertenencia, aulas,
+antecedentes, permisos, contadores y últimos ingresos), lo activa y recién entonces cambia el estado. Si no
+tienen nómina o capacidad, conservan `PROGRAMADO` y el motivo queda en el log de Laravel. Durante
+`EN_INGRESO`, verificar, buscar y consultar `/estado` leen Redis; confirmar persiste en PostgreSQL y
+actualiza Redis después del commit. Si se pierden las claves de un examen abierto, el siguiente ciclo
+reconstruye el snapshot. El cambio de estado no requiere ninguna migración.
 
-Durante `EN_INGRESO`, verificar, buscar y consultar `/estado` leen Redis. La confirmación
-persiste el ingreso en PostgreSQL y, después del commit, actualiza contadores, últimos
-ingresos y la versión Redis que consume el polling. Si se pierden las claves de un examen
-abierto, el siguiente ciclo del scheduler reconstruye el snapshot.
+### ⚠ Nunca con la base compartida
 
-Comprueba el planificador con `$DC ps` y `$DC logs -f scheduler`. Si el examen no
-tiene nómina o capacidad, conserva `PROGRAMADO` y registra el motivo en el log de
-Laravel. En una instalación sin Docker, ejecuta `php artisan schedule:work` en
-otro proceso, o programa `php artisan schedule:run` cada minuto con cron.
+El planificador **escribe**: cambia el estado de exámenes y llena Redis. Con el `.env` de Supabase movería
+exámenes reales del equipo. Por eso el servicio `scheduler` está en el perfil opcional `scheduler`
+(`docker compose up -d` jamás lo inicia) y, además, fija `DB_*` a la PostgreSQL local de este compose, que
+pisa lo que diga `backend/.env`. El servicio `app` **no** hace eso: usa `backend/.env` tal cual, así que para
+una demostración completa ese archivo debe apuntar también a la base local.
+
+### Pasos para una demostración local
+
+```bash
+DC="docker compose -f deployment/docker/docker-compose.dev.yml"
+
+# 1. Respaldar el .env compartido y apuntar el .env a la base local (restáuralo al terminar)
+cp backend/.env backend/.env.compartido
+```
+
+En `backend/.env` deja estos valores (el resto sigue igual):
+
+```dotenv
+APP_ENV=local
+DB_HOST=postgres
+DB_PORT=5432
+DB_DATABASE=sciem_db
+DB_USERNAME=postgres
+DB_PASSWORD=sciem_dev
+DB_SSLMODE=prefer
+REDIS_HOST=redis
+SCIEM_DOCENTE_FIJO_ID=00000000-0000-4000-8000-000000000011
+SCIEM_PERIODO_ACTIVO_ID=9303
+```
+
+```bash
+# 2. Levantar solo PostgreSQL y Redis y recrear sciem_db con las migraciones
+$DC up -d postgres redis
+$DC exec postgres psql -U postgres -c "DROP DATABASE IF EXISTS sciem_db" -c "CREATE DATABASE sciem_db"
+
+# 3. Migrar y cargar los datos de prueba. `run` con el perfil usa las DB_* fijas del scheduler,
+#    así que estos comandos no pueden tocar la base compartida
+R="$DC --profile scheduler run --rm scheduler"
+$R php artisan migrate --force
+$R php artisan db:seed --class="Database\Seeders\TestData\TestDataSeeder"
+
+# 4. Comprobar el destino ANTES de levantar nada más (debe decir: postgres / sciem_db)
+$R php artisan tinker --execute="echo config('database.connections.pgsql.host').' / '.DB::connection()->getDatabaseName();"
+
+# 5. Levantar el backend y, a propósito, el planificador
+$DC up -d app
+$DC --profile scheduler up -d scheduler
+$DC logs -f scheduler
+```
+
+Para ver el control de ingreso:
+
+1. Entra a la interfaz con el docente fijo: código SIS **`10452`** y contraseña **`password`** (Marcelo
+   Quiroga; es la cuenta de `SCIEM_DOCENTE_FIJO_ID` y dueña de los exámenes que crea la aplicación). Los
+   auxiliares sembrados son `201800451` (Daniela Ferrufino) y `201900782` (Iván Choque), con la misma
+   contraseña. Las rutas de control de ingreso exigen sesión; no hay usuario de desarrollo implícito.
+2. Crea un examen con grupos que tengan nómina y ambientes con capacidad, y una hora de inicio dentro de
+   los próximos `minutos_apertura` minutos (por ejemplo, 5 minutos desde ahora).
+3. Si quieres que un auxiliar controle, habilítalo (HU-08) y, si el examen tiene más de un ambiente,
+   asígnale uno (HU-09). Con un solo ambiente controla ese sin asignación.
+4. Espera el siguiente minuto: el log del `scheduler` muestra `open-entry-control` y el examen aparece en
+   **Control de ingreso**. Para forzar un ciclo sin esperar: `$R php artisan schedule:run`.
+
+Al terminar:
+
+```bash
+$DC --profile scheduler stop scheduler    # o: $DC --profile scheduler down
+cp backend/.env.compartido backend/.env   # vuelve a la base compartida
+```
+
+En una instalación sin Docker, ejecuta `php artisan schedule:work` en otro proceso (o `schedule:run` por cron
+cada minuto), **siempre con un `.env` que apunte a una base local**.
