@@ -36,7 +36,7 @@ export function IdentificationForm(props: Props) {
             <Input id="entry-sis" inputMode="numeric" autoComplete="off" value={props.sis} onChange={(event) => props.onSisChange(event.target.value)} placeholder="Código SIS" className="h-12 sciem-tnum text-base" maxLength={15} disabled={props.disabled} required />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="entry-ci">Carnet de identidad</Label>
+            <Label htmlFor="entry-ci">Carnet de identidad (opcional)</Label>
             <Input id="entry-ci" inputMode="numeric" autoComplete="off" value={props.ci} onChange={(event) => props.onCiChange(event.target.value)} placeholder="Si está disponible" className="h-12 sciem-tnum text-base" maxLength={10} disabled={props.disabled} />
           </div>
         </div>
