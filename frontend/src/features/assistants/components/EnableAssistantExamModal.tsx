@@ -118,7 +118,7 @@ export function EnableAssistantExamModal({
           )}
 
           {error && (
-            <Alert className="border-[#A21B12]/20 bg-[#FDE2E1] text-[#A21B12] py-2 px-3">
+            <Alert className="border-danger-border bg-danger-soft text-danger-fg py-2 px-3">
               <AlertDescription className="text-xs font-medium">
                 {error}
               </AlertDescription>
