@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\DB;
  * Participantes de un examen, derivados y nunca copiados.
  *
  *   esperados = estudiantes de los grupos del examen en grupo_estudiante
- *   ingresados = filas de examen_estudiante (solo existen desde un ingreso real)
- *   pendientes = esperados que todavía no tienen fila en examen_estudiante
+ *   ingresados = filas con estado INGRESO o CON_RETRASO
+ *   pendientes = esperados sin ingreso real, incluso si tienen una fila NO_INGRESO
  *
  * Es la única fuente de esta derivación: el control de ingreso y el seguimiento del
  * examen la consumen en lugar de reescribirla.
@@ -37,6 +37,7 @@ class ExamParticipantService
         return DB::table('examen_estudiante')
             ->join('estudiante', 'estudiante.id_estudiante', '=', 'examen_estudiante.id_estudiante')
             ->where('examen_estudiante.id_examen', $examId)
+            ->whereIn('examen_estudiante.estado_ingreso', ['INGRESO', 'CON_RETRASO'])
             ->select(
                 'estudiante.*',
                 'examen_estudiante.id_grupo',
@@ -53,7 +54,8 @@ class ExamParticipantService
                 $query->from('examen_estudiante')
                     ->selectRaw('1')
                     ->whereColumn('examen_estudiante.id_estudiante', 'estudiante.id_estudiante')
-                    ->where('examen_estudiante.id_examen', $examId);
+                    ->where('examen_estudiante.id_examen', $examId)
+                    ->whereIn('examen_estudiante.estado_ingreso', ['INGRESO', 'CON_RETRASO']);
             }
         );
     }

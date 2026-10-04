@@ -3,9 +3,11 @@
 `backend/database/migrations/2026_09_25_000000_create_baseline_schema.php` reproduce el esquema vigente
 (7 tipos enum, 36 tablas, índices, restricciones y un trigger, con HU-21, HU-24, las tablas de auxiliares
 (`grupo_auxiliar`, `examen_auxiliar`), `examen.minutos_apertura` y `periodo.gestion` ya incorporados).
-Ejecuta una copia de `docs/database/creation-script.sql` (que debe ser idéntica: lo verifica `DatabaseSchemaTest`) guardada en
-`backend/database/schema/baseline.sql`. Ese archivo y la migración no se editan nunca: todo cambio
-estructural posterior va en una migración nueva (`php artisan make:migration ...`).
+Ejecuta `backend/database/schema/baseline.sql`, que es el comienzo exacto de `docs/database/creation-script.sql`
+(lo verifica `DatabaseSchemaTest`). Ese archivo y la migración no se editan nunca: todo cambio
+estructural posterior va en una migración nueva (`php artisan make:migration ...`) y, para que
+`creation-script.sql` siga siendo el esquema final, el SQL equivalente se **agrega al final** de ese script, en la
+sección «CAMBIOS POSTERIORES A LA BASE» (hoy: la migración `2026_09_29_000001` de HU-11).
 
 Sustituye a las seis migraciones parciales anteriores (`create_enum_types`, `create_rol_table`,
 `create_usuario_table`, `create_usuario_rol_table`, `create_accion_table`, `create_log_table`), que solo
@@ -23,7 +25,7 @@ php artisan migrate
 ```
 
 Requiere que el usuario pueda ejecutar `CREATE EXTENSION pgcrypto` (el script lo incluye). Verificado en
-PostgreSQL 15.19 limpio: el resultado es idéntico al de cargar `creation-script.sql`, más las tablas
+PostgreSQL 15.19 limpio: el resultado es idéntico al de cargar `creation-script.sql` completo (baseline más los cambios posteriores), más las tablas
 `migrations`, `failed_jobs` y `personal_access_tokens` de Laravel.
 
 ## 2. Base compartida donde el esquema ya existe (Supabase)
@@ -78,10 +80,22 @@ base figura como pendiente y fallaría. Opciones: recrear la base local (`DROP D
 
 ## 4. Pruebas automáticas
 
-`tests/TestCase.php` sigue cargando `docs/database/creation-script.sql` en `sciem_test`. Mientras ese
-script no se actualice a la par de cada migración nueva, las pruebas no verán los cambios estructurales
-posteriores a la base. Pendiente de decisión del equipo: que `TestCase` cargue el esquema con
-`php artisan migrate` en lugar del script, conservando intacta la verificación del nombre `sciem_test`.
+`tests/TestCase.php` arma `sciem_test` con `php artisan migrate` (baseline y migraciones posteriores, incluidas las de
+Sanctum), después de comprobar que la base se llama `sciem_test`: si no, aborta antes de borrar nada. Así las
+pruebas siempre ven el esquema que producen las migraciones, y no el del script.
+
+`creation-script.sql` sigue siendo la referencia legible y lo que carga el servicio `postgres` de Docker en una base
+nueva. Para que no se desfase, `DatabaseSchemaTest` comprueba dos cosas: que el script empieza con el baseline sin
+cambios y que contiene los objetos que agregan las migraciones posteriores. **Al crear una migración estructural:**
+
+1. Escribe la migración (`up` y `down`).
+2. Agrega al final de `creation-script.sql` el SQL equivalente, con los mismos nombres de restricciones e índices
+   que genera la migración (compara con `pg_dump -s` de una base migrada y otra cargada desde el script; la de la
+   HU-11 coincide en sus 284 objetos).
+3. Ajusta `testCreationScriptDeclaresWhatLaterMigrationsAdd` si la migración agrega objetos nuevos.
+
+Una base creada con el script de Docker ya trae esos cambios: no se le corre `migrate` (la migración base fallaría);
+sirve para desarrollar, no para probar migraciones.
 
 Si una base local ya ejecutó la migración base **antes del 2026-09-26**, tiene una versión anterior del esquema
 (sin las tablas de auxiliares, sin `minutos_apertura` ni el trigger de cancelación) y `migrate` no la volverá a

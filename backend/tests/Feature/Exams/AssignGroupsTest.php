@@ -91,6 +91,72 @@ class AssignGroupsTest extends TestCase
         $this->assertSame(0, DB::table('examen_estudiante')->count());
     }
 
+    public function test_guardar_el_mismo_grupo_con_registros_no_elimina_el_vinculo(): void
+    {
+        $exam = $this->createExam();
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
+
+        $studentId = DB::table('grupo_estudiante')
+            ->where('id_grupo', $this->grupoPropioId)
+            ->value('id_estudiante');
+
+        DB::table('examen_estudiante')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_estudiante' => $studentId,
+            'id_grupo' => $this->grupoPropioId,
+            'estado_habilitacion' => 'HABILITADO',
+            'estado_ingreso' => 'NO_INGRESO',
+        ]);
+
+        $this->postJson("/api/examenes/{$exam->id_examen}/grupos", [
+            'grupos' => [$this->grupoPropioId],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('grupo_examen', [
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
+        $this->assertDatabaseHas('examen_estudiante', [
+            'id_examen' => $exam->id_examen,
+            'id_estudiante' => $studentId,
+        ]);
+    }
+
+    public function test_no_retira_un_grupo_que_tiene_registros_de_estudiantes(): void
+    {
+        $exam = $this->createExam();
+        $this->enrollStudents($this->groupWithoutRosterId, 1);
+
+        DB::table('grupo_examen')->insert([
+            ['id_examen' => $exam->id_examen, 'id_grupo' => $this->grupoPropioId],
+            ['id_examen' => $exam->id_examen, 'id_grupo' => $this->groupWithoutRosterId],
+        ]);
+
+        $studentId = DB::table('grupo_estudiante')
+            ->where('id_grupo', $this->groupWithoutRosterId)
+            ->value('id_estudiante');
+
+        DB::table('examen_estudiante')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_estudiante' => $studentId,
+            'id_grupo' => $this->groupWithoutRosterId,
+            'estado_habilitacion' => 'HABILITADO',
+            'estado_ingreso' => 'NO_INGRESO',
+        ]);
+
+        $this->postJson("/api/examenes/{$exam->id_examen}/grupos", [
+            'grupos' => [$this->grupoPropioId],
+        ])->assertUnprocessable()->assertJsonValidationErrors('grupos');
+
+        $this->assertDatabaseHas('grupo_examen', [
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->groupWithoutRosterId,
+        ]);
+    }
+
     public function test_endpoint_reemplaza_grupos_en_una_transaccion(): void
     {
         $exam = $this->createExam();

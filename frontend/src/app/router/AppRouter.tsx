@@ -12,6 +12,7 @@ import {
   useCurrentUser,
   type Capability,
 } from '@/features/auth'
+import { EntryControlPage, OpenEntryControlsPage } from '@/features/entry-control'
 import { CreateExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
 import { CourseDetailPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
 import { ClassroomsPage } from '@/features/classrooms'
@@ -50,20 +51,30 @@ function DocenteRoutes() {
         element={guarded('examenes.gestionar', <ExamsPage />)}
       />
       <Route path="/examenes/:examId" element={guarded('examenes.gestionar', <ExamDetailPage />)} />
+      <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
+      <Route
+        path="/examenes/:examId/control-ingreso"
+        element={guarded('ingreso.operar', <EntryControlPage />)}
+      />
       <Route path="*" element={<Navigate to="/materias" replace />} />
     </Routes>
   )
 }
 
 /**
- * Rutas del auxiliar (HU-09): por ahora solo la consulta de sus exámenes y del
- * ambiente que el docente le asignó.
+ * Rutas del auxiliar: la consulta de sus exámenes y del ambiente que el docente le asignó (HU-09)
+ * y el control de ingreso de los exámenes donde está habilitado (HU-11).
  */
 function AuxiliarRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/mis-examenes" replace />} />
       <Route path="/mis-examenes" element={guarded('ingreso.operar', <MyAssignmentsPage />)} />
+      <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
+      <Route
+        path="/examenes/:examId/control-ingreso"
+        element={guarded('ingreso.operar', <EntryControlPage />)}
+      />
       <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
     </Routes>
   )

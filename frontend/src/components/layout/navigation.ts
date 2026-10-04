@@ -53,7 +53,7 @@ const navegacionDocente: NavGroup[] = [
     items: [
       { label: 'Nuevo examen', icon: SquarePen, to: '/examenes/nuevo' },
       { label: 'Programados', icon: CalendarClock, to: '/examenes/programados' },
-      { label: 'Control de ingreso', icon: DoorOpen },
+      { label: 'Control de ingreso', icon: DoorOpen, to: '/control-ingreso' },
       { label: 'En curso', icon: PlaySquare },
       { label: 'Incidencias', icon: AlertTriangle, badge: 3 },
       { label: 'Historial', icon: History }
@@ -69,13 +69,16 @@ const navegacionDocente: NavGroup[] = [
 ]
 
 /**
- * Navegación lateral del auxiliar (HU-09): solo consulta los exámenes que
- * controla. El control de ingreso se suma con HU-10 y HU-11.
+ * Navegación lateral del auxiliar: consulta los exámenes que controla (HU-09) y
+ * registra el ingreso de los estudiantes (HU-11).
  */
 const navegacionAuxiliar: NavGroup[] = [
   {
     label: 'Exámenes',
-    items: [{ label: 'Mis exámenes', icon: CalendarClock, to: '/mis-examenes' }]
+    items: [
+      { label: 'Mis exámenes', icon: CalendarClock, to: '/mis-examenes' },
+      { label: 'Control de ingreso', icon: DoorOpen, to: '/control-ingreso' },
+    ]
   }
 ]
 

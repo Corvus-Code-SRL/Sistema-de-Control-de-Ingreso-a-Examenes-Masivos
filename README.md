@@ -198,6 +198,8 @@ php artisan serve        # http://localhost:8000
 
 **No ejecutar `php artisan migrate` a ciegas contra la base compartida.** El esquema ya está cargado; las migraciones nuevas se aplican después de un `git pull` y coordinando con el equipo.
 
+**Control de ingreso (HU-10 y HU-11).** Todas sus rutas exigen iniciar sesión: no hay usuario de desarrollo implícito. Un examen pasa a `EN_INGRESO` solo por el planificador de Laravel (`php artisan schedule:work`), que abre el control según `minutos_apertura` de cada examen (10 minutos por defecto). **Nunca ejecutes el planificador con el `.env` de la base compartida**: movería exámenes reales de estado. Los pasos para correrlo contra una base local están en [`deployment/docker/README.md`](deployment/docker/README.md#apertura-automática-de-ingreso). El servicio `scheduler` de Docker no arranca con `up -d`: pertenece al perfil opcional `scheduler`.
+
 > Usar `composer install`, **nunca** `composer update`, para respetar las versiones de `composer.lock`.
 
 ### 3. Frontend

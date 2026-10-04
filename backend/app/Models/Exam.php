@@ -43,6 +43,7 @@ class Exam extends Model
     protected $casts = [
         'fecha' => 'date',
         'duracion' => 'integer',
+        'minutos_apertura' => 'integer',
         'id_tipo_examen' => 'integer',
         'id_carrera' => 'integer',
         'id_materia' => 'integer',
