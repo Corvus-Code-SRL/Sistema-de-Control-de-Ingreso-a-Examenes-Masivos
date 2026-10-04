@@ -94,6 +94,8 @@ cambios y que contiene los objetos que agregan las migraciones posteriores. **Al
    HU-11 coincide en sus 284 objetos).
 3. Ajusta `testCreationScriptDeclaresWhatLaterMigrationsAdd` si la migración agrega objetos nuevos.
 
+Las migraciones **de datos** no cambian el esquema y no se reflejan en `creation-script.sql`, que no contiene datos: por ejemplo `2026_10_04_000000_delete_legacy_accion_rows`, que borra cuatro filas heredadas del catálogo `accion` en la base compartida y no hace nada en una base nueva.
+
 Una base creada con el script de Docker ya trae esos cambios: no se le corre `migrate` (la migración base fallaría);
 sirve para desarrollar, no para probar migraciones.
 
