@@ -11,7 +11,7 @@ describe('navigationByArea', () => {
     expect(labelsOf('docente')).not.toContain('Ambientes')
   })
 
-  it('el auxiliar solo ve Mis exámenes', () => {
-    expect(labelsOf('auxiliar')).toEqual(['Mis exámenes'])
+  it('el auxiliar ve Mis exámenes y el control de ingreso', () => {
+    expect(labelsOf('auxiliar')).toEqual(['Mis exámenes', 'Control de ingreso'])
   })
 })
