@@ -164,24 +164,46 @@ describe('RegistrarCuentaModal', () => {
     })
   })
 
-  it('confirma el registro y envía solo los campos que el backend declara', async () => {
+  it('confirma el registro con horas reales, correo devuelto y campos declarados', async () => {
     mockApi([
       { matches: userMatchers.sisVerification, body: { data: sisPerson } },
       {
         matches: userMatchers.accounts,
         status: 201,
-        body: { data: makeAccount({ cod_sis: COD_SIS }), mensaje: 'Cuenta creada correctamente.' },
+        body: {
+          data: makeAccount({
+            cod_sis: COD_SIS,
+            correo: 'laura.mendoza@umss.edu',
+          }),
+          mensaje: 'Cuenta creada correctamente.',
+        },
       },
     ])
     renderModal()
 
-    await goToAccountData()
+    await verifyCode()
+
+    expect(await screen.findByText('Persona reconocida por el SIS')).toBeInTheDocument()
+    expect(screen.getByText(/^Verificado a las \d{2}:\d{2}\.$/i)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /continuar/i }))
+
+    expect(screen.getByText('Este correo quedará asociado a la cuenta.')).toBeInTheDocument()
+    expect(screen.queryByText(/recibirá sus credenciales de acceso/i)).not.toBeInTheDocument()
+
     await userEvent.type(screen.getByLabelText(/correo institucional/i), 'l.mendoza@umss.edu')
     await userEvent.type(screen.getByLabelText(/teléfono/i), '71234567')
     await userEvent.click(screen.getByRole('button', { name: 'Registrar cuenta' }))
 
     expect(await screen.findByText('Cuenta creada')).toBeInTheDocument()
     expect(screen.getByText(/laura mendoza rivas · sis 202312345 · sin rol/i)).toBeInTheDocument()
+
+    expect(
+      screen.getByText(/^Registrada a las \d{2}:\d{2} · queda en la bitácora$/i)
+    ).toBeInTheDocument()
+
+    expect(screen.getByText('laura.mendoza@umss.edu')).toBeInTheDocument()
+
     expect(registrations()).toEqual([
       {
         method: 'POST',
