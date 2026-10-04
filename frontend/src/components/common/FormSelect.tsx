@@ -44,7 +44,7 @@ export function FormSelect({
       >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent align="start">
+      <SelectContent position="popper" align="start">
         {options.map((option) => (
           <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
             {option.label}
