@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Academic;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Academic\ManageAssistantsRequest;
 use App\Http\Resources\Academic\GroupOptionResource;
 use App\Services\Academic\AssistantService;
+use App\Support\ApiResponse;
+use App\Support\CurrentUser;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -18,17 +21,18 @@ class MyGroupsController extends Controller
 {
     private AssistantService $assistantService;
 
-    public function __construct(AssistantService $assistantService)
+    private CurrentUser $currentUser;
+
+    public function __construct(AssistantService $assistantService, CurrentUser $currentUser)
     {
         $this->assistantService = $assistantService;
+        $this->currentUser = $currentUser;
     }
 
-    public function index(): JsonResponse
+    public function index(ManageAssistantsRequest $request): JsonResponse
     {
-        $groups = $this->assistantService->listarMisGrupos();
+        $groups = $this->assistantService->listTeacherGroups($this->currentUser->teacherId());
 
-        return response()->json([
-            'data' => GroupOptionResource::collection($groups),
-        ]);
+        return ApiResponse::success(GroupOptionResource::collection($groups));
     }
 }

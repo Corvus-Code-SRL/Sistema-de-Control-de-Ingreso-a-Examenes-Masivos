@@ -5,102 +5,94 @@ namespace App\Http\Controllers\Academic;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Academic\AddAssistantToGroupRequest;
 use App\Http\Requests\Academic\AddAssistantToGroupsRequest;
-use App\Http\Requests\Academic\SearchAssistantRequest;
 use App\Http\Requests\Academic\EnableAssistantForExamRequest;
+use App\Http\Requests\Academic\ManageAssistantsRequest;
+use App\Http\Requests\Academic\SearchAssistantRequest;
 use App\Http\Resources\Academic\AssistantResource;
+use App\Http\Resources\Academic\AssistantWithGroupsResource;
 use App\Services\Academic\AssistantService;
+use App\Support\ApiResponse;
+use App\Support\CurrentUser;
 use Illuminate\Http\JsonResponse;
 
 /**
  * Gestión de auxiliares del docente (HU-08).
  *
- * Todos los endpoints verifican que el grupo o examen sea del docente actual
- * dentro de AssistantService. No hay auth real todavía.
+ * El Controller entrega el docente actual al Service, que verifica que el grupo o
+ * examen le pertenezca. El rol se valida en cada Form Request.
  */
 class AssistantController extends Controller
 {
     private AssistantService $assistantService;
 
-    public function __construct(AssistantService $assistantService)
+    private CurrentUser $currentUser;
+
+    public function __construct(AssistantService $assistantService, CurrentUser $currentUser)
     {
         $this->assistantService = $assistantService;
+        $this->currentUser = $currentUser;
     }
 
-    public function index(): JsonResponse
+    public function index(ManageAssistantsRequest $request): JsonResponse
     {
-        $auxiliares = $this->assistantService->listarMisAuxiliares();
+        $assistants = $this->assistantService->listForTeacher($this->currentUser->teacherId());
 
-        return response()->json([
-            'data' => $auxiliares,
-        ]);
+        return ApiResponse::success(AssistantWithGroupsResource::collection($assistants));
     }
 
-    public function buscar(SearchAssistantRequest $request): JsonResponse   // ← CAMBIO
+    public function search(SearchAssistantRequest $request): JsonResponse
     {
-        $auxiliares = $this->assistantService->buscar(
+        $assistants = $this->assistantService->search(
             $request->validated()['criterio']
         );
 
-        return response()->json([
-            'data' => AssistantResource::collection($auxiliares),
-        ]);
+        return ApiResponse::success(AssistantResource::collection($assistants));
     }
 
-    public function anadirAGrupo(AddAssistantToGroupRequest $request, int $id_grupo): JsonResponse
+    public function addToGroup(AddAssistantToGroupRequest $request, int $id_grupo): JsonResponse
     {
-        $this->assistantService->anadirAGrupo(
+        $this->assistantService->addToGroup(
             $id_grupo,
-            $request->validated()['id_usuario']
+            $request->validated()['id_usuario'],
+            $this->currentUser->teacherId()
         );
 
-        return response()->json([
-            'message' => 'Auxiliar incorporado al grupo correctamente.',
-        ], 201);
+        return ApiResponse::created(null, 'Auxiliar incorporado al grupo correctamente.');
     }
 
-    public function anadirAVariosGrupos(
-        AddAssistantToGroupsRequest $request,
-        string $id_usuario
-    ): JsonResponse {
-        $this->assistantService->anadirAVariosGrupos(
+    public function addToGroups(AddAssistantToGroupsRequest $request, string $id_usuario): JsonResponse
+    {
+        $this->assistantService->addToGroups(
             $id_usuario,
-            $request->validated()['grupos']
+            $request->validated()['grupos'],
+            $this->currentUser->teacherId()
         );
 
-        return response()->json([
-            'message' => 'Auxiliar incorporado a los grupos seleccionados.',
-        ], 201);
+        return ApiResponse::created(null, 'Auxiliar incorporado a los grupos seleccionados.');
     }
 
-    public function habilitarParaExamen(
-        EnableAssistantForExamRequest $request,
-        int $id_examen
-    ): JsonResponse {
-        $this->assistantService->habilitarParaExamen(
+    public function enableForExam(EnableAssistantForExamRequest $request, int $id_examen): JsonResponse
+    {
+        $this->assistantService->enableForExam(
             $id_examen,
-            $request->validated()['id_usuario']
+            $request->validated()['id_usuario'],
+            $this->currentUser->teacherId()
         );
 
-        return response()->json([
-            'message' => 'Auxiliar habilitado para el examen correctamente.',
-        ], 201);
+        return ApiResponse::created(null, 'Auxiliar habilitado para el examen correctamente.');
     }
 
-    public function quitarDeGrupo(int $id_grupo, string $id_usuario): JsonResponse
+    public function removeFromGroup(ManageAssistantsRequest $request, int $id_grupo, string $id_usuario): JsonResponse
     {
-        $this->assistantService->quitarDeGrupo($id_grupo, $id_usuario);
+        $this->assistantService->removeFromGroup($id_grupo, $id_usuario, $this->currentUser->teacherId());
 
-        return response()->json([
-            'message' => 'Auxiliar quitado del grupo correctamente.',
-        ]);
+        return ApiResponse::success(null, 'Auxiliar quitado del grupo correctamente.');
     }
 
-    public function quitarDeExamen(int $id_examen, string $id_usuario): JsonResponse
+    public function removeFromExam(ManageAssistantsRequest $request, int $id_examen, string $id_usuario): JsonResponse
     {
-        $this->assistantService->quitarDeExamen($id_examen, $id_usuario);
+        $this->assistantService->removeFromExam($id_examen, $id_usuario, $this->currentUser->teacherId());
 
-        return response()->json([
-            'message' => 'Auxiliar quitado del examen correctamente.',
-        ]);
+        return ApiResponse::success(null, 'Auxiliar quitado del examen correctamente.');
     }
 }
