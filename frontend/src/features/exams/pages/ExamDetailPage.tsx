@@ -20,6 +20,8 @@ import { ExamForm } from '../components/ExamForm';
 import { AssignGroupsForm } from '../components/AssignGroupsForm';
 import { ExamStatusBadge } from '../components/ExamStatusBadge';
 import { validateExamForm, validateGroupsStep } from '../utils/examValidators';
+import { assistantSectionKey } from '../utils/assistantSectionKey';
+import { AssistantClassroomSection } from '@/features/assistants';
 
 /**
  * Detalle de un examen: edición de su información general, gestión de grupos
@@ -250,6 +252,8 @@ export function ExamDetailPage() {
               </div>
             </div>
           )}
+
+          <AssistantClassroomSection key={assistantSectionKey(exam)} examId={exam.id_examen} />
         </div>
       )}
 

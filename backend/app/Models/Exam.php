@@ -91,6 +91,12 @@ class Exam extends Model
             ->using(ExamRoom::class);
     }
 
+    /** Auxiliares habilitados para el examen y su ambiente asignado. */
+    public function assistants(): HasMany
+    {
+        return $this->hasMany(ExamAssistant::class, 'id_examen', 'id_examen');
+    }
+
     public function groups(): BelongsToMany
     {
         return $this->belongsToMany(Group::class, 'grupo_examen', 'id_examen', 'id_grupo')

@@ -7,6 +7,7 @@ use App\Http\Requests\Academic\ShowSubjectCareerGroupsRequest;
 use App\Http\Resources\Academic\GroupResource;
 use App\Http\Resources\Academic\SubjectCareerResource;
 use App\Services\Academic\GroupService;
+use App\Support\CurrentUser;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -16,9 +17,12 @@ class SubjectGroupController extends Controller
 {
     private GroupService $groupService;
 
-    public function __construct(GroupService $groupService)
+    private CurrentUser $currentUser;
+
+    public function __construct(GroupService $groupService, CurrentUser $currentUser)
     {
         $this->groupService = $groupService;
+        $this->currentUser = $currentUser;
     }
 
     public function index(ShowSubjectCareerGroupsRequest $request): JsonResponse
@@ -27,7 +31,8 @@ class SubjectGroupController extends Controller
 
         $result = $this->groupService->listGroupsForPair(
             (int) $validated['id_carrera'],
-            (int) $validated['id_materia']
+            (int) $validated['id_materia'],
+            $this->currentUser->teacherId()
         );
 
         return response()->json([

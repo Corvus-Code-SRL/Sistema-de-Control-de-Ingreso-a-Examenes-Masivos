@@ -81,7 +81,7 @@ class SubjectCatalogTest extends TestCase
     public function test_un_docente_sin_grupos_igual_puede_consultar_el_catalogo(): void
     {
         $this->seedAcademicCatalog();
-        config()->set('sciem.docente_fijo_id', '33333333-3333-4333-8333-333333333333');
+        $this->actAsTeacher('33333333-3333-4333-8333-333333333333');
 
         $response = $this->getJson('/api/materias');
 

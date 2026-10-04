@@ -18,7 +18,7 @@ export function Toast({ title, description, duration = 5000, onClose }: ToastPro
 
   return (
     <div
-      className="fixed top-20 right-8 z-50 flex items-start gap-3 w-[380px] bg-card text-card-foreground p-3.5 rounded-lg border border-border shadow-lg animate-in fade-in slide-in-from-top-2 duration-200"
+      className="fixed top-20 inset-x-4 z-50 flex items-start gap-3 bg-card text-card-foreground p-3.5 rounded-lg border border-border shadow-lg animate-in fade-in slide-in-from-top-2 duration-200 sm:inset-x-auto sm:right-8 sm:w-[380px]"
       role="status"
       aria-live="polite"
     >

@@ -10,6 +10,7 @@ use App\Http\Resources\Academic\SubjectResource;
 use App\Models\Subject;
 use App\Services\Academic\SubjectCatalogService;
 use App\Services\Academic\SubjectService;
+use App\Support\CurrentUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -21,18 +22,23 @@ class SubjectController extends Controller
 {
     private SubjectCatalogService $subjectCatalog;
     private SubjectService $subjectService;
+    private CurrentUser $currentUser;
 
     // Se inyectan ambos servicios (el de tu compañero y el tuyo)
-    public function __construct(SubjectCatalogService $subjectCatalog, SubjectService $subjectService)
-    {
+    public function __construct(
+        SubjectCatalogService $subjectCatalog,
+        SubjectService $subjectService,
+        CurrentUser $currentUser
+    ) {
         $this->subjectCatalog = $subjectCatalog;
         $this->subjectService = $subjectService;
+        $this->currentUser = $currentUser;
     }
 
     // Método de tu compañero (no lo tocamos, queda intacto)
     public function index(): AnonymousResourceCollection
     {
-        $result = $this->subjectCatalog->listSubjectCareers();
+        $result = $this->subjectCatalog->listSubjectCareers($this->currentUser->teacherId());
 
         $additional = ['meta' => $result['meta']];
 
@@ -55,7 +61,7 @@ class SubjectController extends Controller
 
     public function store(StoreSubjectRequest $request): JsonResponse
     {
-        $subject = $this->subjectService->create($request->validated());
+        $subject = $this->subjectService->create($request->validated(), $this->currentUser->id());
 
         return response()->json([
             'data'    => new SubjectResource($subject),
@@ -67,7 +73,8 @@ class SubjectController extends Controller
     {
         $subject = $this->subjectService->update(
             $subject,
-            $request->validated()
+            $request->validated(),
+            $this->currentUser->id()
         );
 
         return response()->json([

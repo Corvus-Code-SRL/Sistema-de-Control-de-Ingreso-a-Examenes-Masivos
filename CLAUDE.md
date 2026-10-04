@@ -4,20 +4,13 @@ Plataforma de Corvus Code S.R.L. para la Universidad Mayor de San Simón: contro
 
 **IMPORTANTE**: responde siempre en español, sin importar el idioma de la consulta. Esto aplica solo a tus respuestas y explicaciones — el código sigue las reglas de idioma de `.claude/rules/code-style-backend.md`.
 
-## Estructura (monorepo)
-
-- `backend/` — API Laravel (PHP)
-- `frontend/` — SPA React + TypeScript (Vite)
-- `docs/` — arquitectura, API, BD, QA, historias de usuario
-- `deployment/` — Docker (no necesario para dev local)
-
-**Estado actual**: ambas apps son scaffolds. El backend ya tiene la estructura de carpetas por módulo (`Http/Controllers/<Modulo>`, `Http/Requests/<Modulo>`, `Services/<Modulo>`, `routes/api/<modulo>.php`) pero sin lógica ni rutas reales todavía; el frontend tiene primitivas shadcn listas y `features/*` vacíos.
+Monorepo: `deployment/` (Docker) no es necesario para dev local.
 
 ## Comandos
 
-**Backend** (`cd backend`): `composer install` (nunca `update` sin coordinar) · `php artisan migrate` (nunca `migrate:fresh` con datos que importen) · `php artisan serve` → `127.0.0.1:8000` · `php artisan test`
+**Backend** (`cd backend`): nunca `composer update` sin coordinar · nunca `migrate:fresh` con datos que importen
 
-**Frontend** (`cd frontend`): `npm ci` (nunca `update` sin coordinar) · `npm run dev` → `localhost:5173` · `npm run build` (validar antes de cualquier PR) · `npm run shadcn -- add <componente>`
+**Frontend** (`cd frontend`): `npm ci` (nunca `update` sin coordinar) · `npm run build` (validar antes de cualquier PR) · `npm run shadcn -- add <componente>`
 
 ## Arquitectura
 
@@ -54,7 +47,7 @@ Dos contextos independientes que **nunca** deben mezclarse ni referenciarse entr
 ## Estándares del equipo
 
 Detalle completo en `.claude/rules/`:
-- `git-branches.md` — nomenclatura de ramas
+- Ramas: `<tipo>/<identificador>-<descripcion-corta>` (ej. `feature/HU-11-...`, `tech/RNF-02-...`) — antes de crear una rama, cargar el skill `git-branches` (`.claude/skills/git-branches/SKILL.md`)
 - `git-commits.md` — formato de commits
 - `code-style-backend.md` — PSR-12, idioma, nombres, capas, comentarios
 

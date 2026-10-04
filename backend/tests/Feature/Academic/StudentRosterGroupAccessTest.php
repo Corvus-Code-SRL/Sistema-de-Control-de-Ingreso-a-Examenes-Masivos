@@ -26,7 +26,8 @@ class StudentRosterGroupAccessTest extends TestCase
         $group = $this->ownActiveGroup();
 
         $result = $this->access()->getAvailable(
-            (int) $group->id_grupo
+            (int) $group->id_grupo,
+            $this->docenteId
         );
 
         $this->assertSame(
@@ -43,7 +44,7 @@ class StudentRosterGroupAccessTest extends TestCase
             ModelNotFoundException::class
         );
 
-        $this->access()->getAvailable(999999);
+        $this->access()->getAvailable(999999, $this->docenteId);
     }
 
     public function test_rechaza_grupo_de_otro_docente(): void
@@ -64,7 +65,8 @@ class StudentRosterGroupAccessTest extends TestCase
         $this->assertRejectedWith(
             403,
             fn () => $this->access()->getAvailable(
-                (int) $group->id_grupo
+                (int) $group->id_grupo,
+                $this->docenteId
             )
         );
     }
@@ -81,7 +83,8 @@ class StudentRosterGroupAccessTest extends TestCase
         $this->assertRejectedWith(
             422,
             fn () => $this->access()->getAvailable(
-                (int) $group->id_grupo
+                (int) $group->id_grupo,
+                $this->docenteId
             )
         );
     }
@@ -104,7 +107,8 @@ class StudentRosterGroupAccessTest extends TestCase
         $this->assertRejectedWith(
             422,
             fn () => $this->access()->getAvailable(
-                (int) $group->id_grupo
+                (int) $group->id_grupo,
+                $this->docenteId
             )
         );
     }
@@ -120,7 +124,7 @@ class StudentRosterGroupAccessTest extends TestCase
         $this->linkExam($group, $state);
 
         try {
-            $this->access()->getAvailable((int) $group->id_grupo);
+            $this->access()->getAvailable((int) $group->id_grupo, $this->docenteId);
 
             $this->fail('El grupo con un examen en ' . $state . ' debía rechazarse.');
         } catch (StudentRosterGroupAccessException $exception) {
@@ -152,7 +156,7 @@ class StudentRosterGroupAccessTest extends TestCase
 
         $this->assertSame(
             (int) $group->id_grupo,
-            (int) $this->access()->getAvailable((int) $group->id_grupo)->id_grupo
+            (int) $this->access()->getAvailable((int) $group->id_grupo, $this->docenteId)->id_grupo
         );
     }
 
@@ -183,7 +187,7 @@ class StudentRosterGroupAccessTest extends TestCase
 
         $this->assertSame(
             $otherGroupId,
-            (int) $this->access()->getAvailable($otherGroupId)->id_grupo
+            (int) $this->access()->getAvailable($otherGroupId, $this->docenteId)->id_grupo
         );
     }
 

@@ -13,6 +13,7 @@ use App\Models\Exam;
 use App\Services\Exams\ExamService;
 use App\Services\Exams\ExamLifecycleService;
 use App\Support\ApiResponse;
+use App\Support\CurrentUser;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -22,15 +23,18 @@ class ExamController extends Controller
 {
     private ExamService $examService;
 
-    public function __construct(ExamService $examService)
+    private CurrentUser $currentUser;
+
+    public function __construct(ExamService $examService, CurrentUser $currentUser)
     {
         $this->examService = $examService;
+        $this->currentUser = $currentUser;
     }
 
     /** GET /api/examenes/formulario */
     public function formOptions(): JsonResponse
     {
-        $options = $this->examService->formOptions();
+        $options = $this->examService->formOptions($this->currentUser->teacherId());
 
         return ApiResponse::success([
             'materias'  => SubjectResource::collection($options['pairs']),
@@ -42,7 +46,7 @@ class ExamController extends Controller
     /** GET /api/examenes — vista Programados: los exámenes del docente actual. */
     public function index(): JsonResponse
     {
-        $exams = $this->examService->listForCurrentTeacher();
+        $exams = $this->examService->listForTeacher($this->currentUser->teacherId());
 
         return ApiResponse::success(ExamResource::collection($exams));
     }
@@ -50,7 +54,7 @@ class ExamController extends Controller
     /** GET /api/examenes/{exam} */
     public function show(Exam $exam): JsonResponse
     {
-        $exam = $this->examService->find($exam);
+        $exam = $this->examService->find($exam, $this->currentUser->teacherId());
 
         return ApiResponse::success(new ExamResource($exam));
     }
@@ -58,7 +62,7 @@ class ExamController extends Controller
     /** POST /api/examenes */
     public function store(CreateExamRequest $request): JsonResponse
     {
-        $exam = $this->examService->create($request->validated());
+        $exam = $this->examService->create($request->validated(), $this->currentUser->teacherId());
 
         return ApiResponse::created(new ExamResource($exam), 'Examen creado en estado Programado.');
     }
@@ -66,7 +70,7 @@ class ExamController extends Controller
     /** PUT /api/examenes/{exam} */
     public function update(UpdateExamRequest $request, Exam $exam): JsonResponse
     {
-        $exam = $this->examService->update($exam, $request->validated());
+        $exam = $this->examService->update($exam, $request->validated(), $this->currentUser->teacherId());
 
         return ApiResponse::success(new ExamResource($exam), 'Examen actualizado correctamente.');
     }
@@ -74,7 +78,7 @@ class ExamController extends Controller
     /** POST /api/examenes/{exam}/cancelar */
     public function cancel(Exam $exam): JsonResponse
     {
-        $exam = $this->examService->cancel($exam);
+        $exam = $this->examService->cancel($exam, $this->currentUser->teacherId());
 
         return ApiResponse::success(new ExamResource($exam), 'Examen cancelado correctamente.');
     }

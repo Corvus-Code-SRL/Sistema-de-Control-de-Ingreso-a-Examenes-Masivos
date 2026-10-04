@@ -113,7 +113,7 @@ trait SeedsAcademicCatalog
 
         $this->seedGroups();
 
-        config()->set('sciem.docente_fijo_id', $this->docenteId);
+        $this->actAsTeacher($this->docenteId);
         config()->set('sciem.periodo_activo_id', $this->periodoActivoId);
     }
 

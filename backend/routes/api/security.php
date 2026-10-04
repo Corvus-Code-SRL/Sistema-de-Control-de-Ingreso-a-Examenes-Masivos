@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Security\AuthController;
 use App\Http\Controllers\Security\RoleController;
 use App\Http\Controllers\Security\UserController;
 use App\Http\Controllers\Security\UserQueryController;
@@ -38,3 +39,16 @@ Route::post('/usuarios/{user}/rol', [UserRoleController::class, 'store'])
 Route::get('/usuarios/{user}/asignaciones', [UserRoleController::class, 'assignments'])
      ->whereUuid('user')
      ->name('usuarios.asignaciones');
+
+// RNF-02 fase 1 — el login queda fuera de auth:sanctum; el resto exige el token.
+Route::prefix('auth')->name('auth.')->group(function () {
+    Route::post('/login', [AuthController::class, 'login'])
+         ->middleware('throttle:5,1')
+         ->name('login');
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+        Route::get('/yo', [AuthController::class, 'me'])->name('yo');
+        Route::post('/confirmar-password', [AuthController::class, 'confirmPassword'])->name('confirmar-password');
+    });
+});

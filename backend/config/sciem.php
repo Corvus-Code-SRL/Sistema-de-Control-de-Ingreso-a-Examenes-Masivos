@@ -9,6 +9,7 @@ return [
     |
     | Mientras la autenticación no esté implementada, el docente se resuelve
     | desde configuración. Corresponde a public.usuario.id_usuario, que es uuid.
+    | Solo lo lee App\Support\CurrentUser (ver docs/architecture/usuario-actual.md).
     |
     */
 
@@ -36,6 +37,7 @@ return [
     | la bitácora necesita un autor: este uuid lo provee y UserSeeder siembra
     | la fila correspondiente. Lleva valor por defecto para que la aplicación
     | funcione sin tocar el .env. Se elimina al implementar la autenticación.
+    | Solo lo lee App\Support\CurrentUser (ver docs/architecture/usuario-actual.md).
     |
     */
 
