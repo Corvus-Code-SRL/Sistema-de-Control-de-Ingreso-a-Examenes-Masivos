@@ -36,9 +36,9 @@ class AssignAssistantClassroomRequestTest extends TestCase
         }
     }
 
-    public function test_autoriza_la_solicitud(): void
+    public function test_autoriza_a_quien_no_es_auxiliar(): void
     {
-        $this->assertTrue((new AssignAssistantClassroomRequest())->authorize());
+        $this->assertTrue(app()->call([new AssignAssistantClassroomRequest(), 'authorize']));
     }
 
     private function validator(array $data): \Illuminate\Validation\Validator

@@ -2,6 +2,9 @@
 
 namespace App\Http\Requests\Exams;
 
+use App\Services\Security\UserRoleService;
+use App\Support\CurrentUser;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -14,9 +17,18 @@ class AssignAssistantClassroomRequest extends FormRequest
 {
     private const MAX_ID = 2147483647;
 
-    public function authorize(): bool
+    /**
+     * Quien asigna es el docente: una cuenta con rol Auxiliar no puede, aunque esté habilitada
+     * en el examen. Sin sesión se actúa como el docente fijo, igual que en el resto de Exams.
+     */
+    public function authorize(CurrentUser $currentUser, UserRoleService $roles): bool
     {
-        return true;
+        return ! $roles->isAssistant($currentUser->id());
+    }
+
+    protected function failedAuthorization(): void
+    {
+        throw new AuthorizationException('Un auxiliar no puede asignar ambientes a otros auxiliares.');
     }
 
     public function rules(): array

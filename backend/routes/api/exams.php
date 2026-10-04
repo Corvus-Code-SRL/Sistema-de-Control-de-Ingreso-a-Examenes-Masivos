@@ -57,4 +57,5 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
 
 // HU-09 — vista de solo lectura del auxiliar.
 Route::get('auxiliar/examenes', [AssistantClassroomController::class, 'myExams'])
+     ->middleware('auth:sanctum')
      ->name('auxiliar.examenes');

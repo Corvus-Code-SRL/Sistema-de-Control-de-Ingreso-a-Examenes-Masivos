@@ -3,7 +3,11 @@
 namespace Tests\Feature\Exams;
 
 use App\Models\Exam;
+use App\Models\Role;
+use App\Models\User;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Tests\Concerns\SeedsExamAssistants;
 use Tests\TestCase;
 
@@ -121,7 +125,7 @@ class AssistantClassroomHttpTest extends TestCase
 
     public function test_el_auxiliar_consulta_sus_examenes_con_el_ambiente_asignado(): void
     {
-        config()->set('sciem.auxiliar_fijo_id', $this->mariaId);
+        $this->actingAs(User::findOrFail($this->mariaId));
         $exam = $this->examWithAssistants(['nombre_examen' => 'Primer parcial', 'hora_inicio' => '08:00']);
         $this->assign($exam, $this->mariaId, $this->otraAulaId);
 
@@ -133,6 +137,56 @@ class AssistantClassroomHttpTest extends TestCase
             ->assertJsonPath('data.0.hora_inicio', '08:00')
             ->assertJsonPath('data.0.estado', Exam::PROGRAMADO)
             ->assertJsonPath('data.0.ambiente.nro_aula', '692B');
+    }
+
+    public function test_el_auxiliar_no_puede_asignar_ambientes_y_recibe_403(): void
+    {
+        $exam = $this->examWithAssistants();
+        $this->giveRoleTo($this->mariaId, Role::AUXILIAR);
+        $this->actAsUserId($this->mariaId);
+
+        $this->assign($exam, $this->jorgeId, $this->aulaId)
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Un auxiliar no puede asignar ambientes a otros auxiliares.');
+
+        $this->assertAssignedTo($exam, $this->jorgeId, null);
+    }
+
+    public function test_un_docente_ajeno_al_examen_recibe_403_al_asignar(): void
+    {
+        $exam = $this->examWithAssistants();
+        $this->actAsTeacher($this->otroDocenteId);
+
+        $this->assign($exam, $this->mariaId, $this->aulaId)->assertForbidden();
+
+        $this->assertAssignedTo($exam, $this->mariaId, null);
+    }
+
+    public function test_la_consulta_del_auxiliar_sin_sesion_responde_401(): void
+    {
+        $this->getJson('/api/auxiliar/examenes')->assertUnauthorized();
+    }
+
+    public function test_el_auxiliar_solo_ve_los_examenes_donde_esta_habilitado(): void
+    {
+        $this->examWithAssistants();
+        $this->actingAs(User::findOrFail($this->mariaId));
+        DB::table('examen_auxiliar')->where('id_usuario', $this->mariaId)->delete();
+
+        $this->getJson('/api/auxiliar/examenes')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
+    private function giveRoleTo(string $userId, string $roleName): void
+    {
+        $this->seed(RoleSeeder::class);
+
+        DB::table('usuario_rol')->insert([
+            'id_usuario'   => $userId,
+            'id_rol'       => Role::where('nombre_rol', $roleName)->value('id_rol'),
+            'fecha_inicio' => '2026-01-10 08:00:00',
+        ]);
     }
 
     private function assign(Exam $exam, string $userId, int $classroomId): \Illuminate\Testing\TestResponse
