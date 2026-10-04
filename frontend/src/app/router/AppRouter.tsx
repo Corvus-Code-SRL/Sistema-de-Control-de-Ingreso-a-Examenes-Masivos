@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { LoadingState } from '@/components/common/LoadingState'
+import { MyAssignmentsPage } from '@/features/assistants'
 import {
   LOGIN_REDIRECT_KEY,
   LoginPage,
@@ -46,6 +47,20 @@ function DocenteRoutes() {
       />
       <Route path="/examenes/:examId" element={guarded('examenes.gestionar', <ExamDetailPage />)} />
       <Route path="*" element={<Navigate to="/materias" replace />} />
+    </Routes>
+  )
+}
+
+/**
+ * Rutas del auxiliar (HU-09): por ahora solo la consulta de sus exámenes y del
+ * ambiente que el docente le asignó.
+ */
+function AuxiliarRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/mis-examenes" replace />} />
+      <Route path="/mis-examenes" element={guarded('ingreso.operar', <MyAssignmentsPage />)} />
+      <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
     </Routes>
   )
 }
@@ -99,14 +114,17 @@ function LoginRoute() {
 /**
  * Cada área tiene su propio juego de rutas, incluido su destino por defecto.
  *
- * El área sale del rol de la sesión (Administrador → administrador; Docente y Auxiliar →
+ * El área sale del rol de la sesión (Administrador → administrador; Auxiliar → auxiliar; Docente →
  * docente; sin sesión → docente). Separarlas evita que una URL de un área caiga en la pantalla
  * de la otra.
  */
 function AreaRoutes() {
   const { area } = useCurrentUser()
 
-  return area === 'administrador' ? <AdministradorRoutes /> : <DocenteRoutes />
+  if (area === 'administrador') return <AdministradorRoutes />
+  if (area === 'auxiliar') return <AuxiliarRoutes />
+
+  return <DocenteRoutes />
 }
 
 export function AppRouter() {

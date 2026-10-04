@@ -48,5 +48,8 @@ export function hasCapability(roleName: string | null | undefined, capability: C
 
 /** El área de trabajo (navegación y rutas) que corresponde a un rol. */
 export function areaForRole(roleName: string | null | undefined): Area {
-  return roleName === 'Administrador' ? 'administrador' : 'docente'
+  if (roleName === 'Administrador') return 'administrador'
+  if (roleName === 'Auxiliar') return 'auxiliar'
+
+  return 'docente'
 }

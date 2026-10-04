@@ -44,7 +44,7 @@ describe('CuentaDetallePage', () => {
 
     expect(screen.getAllByRole('row')).toHaveLength(3)
     expect(screen.getByText('Vigente')).toBeInTheDocument()
-    expect(screen.getByText('Auxiliar')).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: 'Auxiliar' })).toBeInTheDocument()
   })
 
   it('no incluye acciones ni datos que pertenecen a otras historias', async () => {

@@ -5,10 +5,11 @@
  * mezclan: una pantalla pertenece a un área, nunca a las dos. El área sale
  * del rol de la sesión (ver `areaForRole`).
  */
-export type Area = 'docente' | 'administrador'
+export type Area = 'docente' | 'auxiliar' | 'administrador'
 
 export const AREA_LABELS: Record<Area, string> = {
   docente: 'Docente',
+  auxiliar: 'Auxiliar',
   administrador: 'Administrador',
 }
 
