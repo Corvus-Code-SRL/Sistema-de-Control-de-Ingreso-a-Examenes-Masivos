@@ -42,7 +42,14 @@ class EntryAccessService
                             ->from('examen_auxiliar')
                             ->whereColumn('examen_auxiliar.id_examen', 'examen.id_examen')
                             ->where('examen_auxiliar.id_usuario', $actor->id_usuario)
-                            ->whereNotNull('examen_auxiliar.id_ambiente');
+                            ->where(function ($room): void {
+                                // Sin ambiente asignado solo controla si el examen tiene uno solo.
+                                $room->whereNotNull('examen_auxiliar.id_ambiente')
+                                    ->orWhereRaw(
+                                        '(select count(*) from examen_ambiente '
+                                        . 'where examen_ambiente.id_examen = examen.id_examen) = 1'
+                                    );
+                            });
                     });
             })
             ->orderBy('fecha')
@@ -63,10 +70,7 @@ class EntryAccessService
         $this->assertCanControl($exam, $actor);
 
         $isTeacher = (string) $exam->id_usuario_docente === (string) $actor->id_usuario;
-        $assignedRoomId = $isTeacher ? null : (int) DB::table('examen_auxiliar')
-            ->where('id_examen', $exam->id_examen)
-            ->where('id_usuario', $actor->id_usuario)
-            ->value('id_ambiente');
+        $assignedRoomId = $isTeacher ? null : $this->assistantRoomId($exam, $actor);
 
         $exam->loadMissing(['subject', 'career', 'classrooms', 'groups']);
 
@@ -96,14 +100,20 @@ class EntryAccessService
         }
 
         $isTeacher = (string) $exam->id_usuario_docente === (string) $actor->id_usuario;
-        $isAssistant = ! $isTeacher && DB::table('examen_auxiliar')
-            ->where('id_examen', $exam->id_examen)
-            ->where('id_usuario', $actor->id_usuario)
-            ->whereNotNull('id_ambiente')
-            ->exists();
 
-        if (! $isTeacher && ! $isAssistant) {
-            throw new AuthorizationException('No tiene permiso para controlar este examen.');
+        if (! $isTeacher) {
+            $enablement = DB::table('examen_auxiliar')
+                ->where('id_examen', $exam->id_examen)
+                ->where('id_usuario', $actor->id_usuario)
+                ->first(['id_ambiente']);
+
+            if ($enablement === null) {
+                throw new AuthorizationException('No tiene permiso para controlar este examen.');
+            }
+
+            if ($this->assistantRoomId($exam, $actor) === null) {
+                throw new AuthorizationException(EntryControlSnapshotService::UNASSIGNED_ROOM_MESSAGE);
+            }
         }
 
         if (! in_array($exam->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO], true)
@@ -111,5 +121,26 @@ class EntryAccessService
             || $this->timing->hasEnded($exam)) {
             throw new ExamStateException('El tiempo de control de ingreso del examen ya terminó.');
         }
+    }
+
+    /**
+     * Ambiente donde controla el auxiliar: el que le asignó el docente (HU-09) o, si no tiene y
+     * el examen tiene un solo ambiente, ese. Se resuelve al consultar y nunca se escribe.
+     */
+    private function assistantRoomId(Exam $exam, User $actor): ?int
+    {
+        $assigned = DB::table('examen_auxiliar')
+            ->where('id_examen', $exam->id_examen)
+            ->where('id_usuario', $actor->id_usuario)
+            ->value('id_ambiente');
+
+        $rooms = DB::table('examen_ambiente')
+            ->where('id_examen', $exam->id_examen)
+            ->orderBy('id_ambiente')
+            ->get(['id_ambiente'])
+            ->map(fn ($room) => ['id_ambiente' => (int) $room->id_ambiente])
+            ->all();
+
+        return EntryControlSnapshotService::controlRoomOf($assigned === null ? null : (int) $assigned, $rooms);
     }
 }

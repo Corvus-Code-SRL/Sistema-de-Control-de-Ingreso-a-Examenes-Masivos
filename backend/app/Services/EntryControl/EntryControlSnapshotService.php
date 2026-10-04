@@ -17,6 +17,8 @@ class EntryControlSnapshotService
 {
     private const PREFIX = 'entry-control';
 
+    public const UNASSIGNED_ROOM_MESSAGE = 'Asigne un ambiente a este auxiliar antes de abrir el control.';
+
     private ExamTimingService $timing;
 
     public function __construct(ExamTimingService $timing)
@@ -74,13 +76,20 @@ class EntryControlSnapshotService
         $auxiliaries = DB::table('examen_auxiliar as ea')
             ->join('usuario as u', 'u.id_usuario', '=', 'ea.id_usuario')
             ->where('ea.id_examen', $examId)
-            ->whereNotNull('ea.id_ambiente')
             ->where('u.estado', User::ESTADO_ACTIVO)
             ->get(['ea.id_usuario', 'ea.id_ambiente']);
+        $unassigned = [];
         foreach ($auxiliaries as $auxiliary) {
+            $roomId = $this->controlRoomOf($auxiliary->id_ambiente, $rooms);
+
+            if ($roomId === null) {
+                $unassigned[] = (string) $auxiliary->id_usuario;
+                continue;
+            }
+
             $controllers[(string) $auxiliary->id_usuario] = [
                 'rol' => 'AUXILIAR',
-                'ambientes' => [(int) $auxiliary->id_ambiente],
+                'ambientes' => [$roomId],
             ];
         }
 
@@ -90,6 +99,7 @@ class EntryControlSnapshotService
             'carrera' => $career,
             'ambientes' => $rooms,
             'controladores' => $controllers,
+            'auxiliares_sin_ambiente' => $unassigned,
             'control_cierra_en' => $this->timing->endsAt($exam)->toIso8601String(),
             'expira_en' => $expiresAt->toIso8601String(),
         ];
@@ -201,7 +211,7 @@ class EntryControlSnapshotService
         $meta = $this->meta($examId);
         $controller = $meta['controladores'][(string) $actor->id_usuario] ?? null;
         if ($controller === null) {
-            throw new AuthorizationException('No tiene permiso para controlar este examen.');
+            throw $this->notAController($meta, $actor);
         }
 
         if (! in_array($requestedRoomId, $controller['ambientes'], true)) {
@@ -221,10 +231,35 @@ class EntryControlSnapshotService
             throw new AuthorizationException('No tiene permiso para controlar este examen.');
         }
 
-        $controllers = $this->meta($examId)['controladores'];
-        if (! isset($controllers[(string) $actor->id_usuario])) {
-            throw new AuthorizationException('No tiene permiso para controlar este examen.');
+        $meta = $this->meta($examId);
+        if (! isset($meta['controladores'][(string) $actor->id_usuario])) {
+            throw $this->notAController($meta, $actor);
         }
+    }
+
+    /**
+     * Ambiente donde controla un auxiliar. Si el docente le asignó uno (HU-09) es ese; si no y el
+     * examen tiene un solo ambiente, controla ese. Se resuelve aquí y nunca se escribe en
+     * examen_auxiliar. Con varios ambientes y sin asignación no controla (null).
+     *
+     * @param array<int, array{id_ambiente: int}> $rooms
+     */
+    public static function controlRoomOf(?int $assignedRoomId, array $rooms): ?int
+    {
+        if ($assignedRoomId !== null) {
+            return (int) $assignedRoomId;
+        }
+
+        return count($rooms) === 1 ? (int) $rooms[0]['id_ambiente'] : null;
+    }
+
+    private function notAController(array $meta, User $actor): AuthorizationException
+    {
+        if (in_array((string) $actor->id_usuario, $meta['auxiliares_sin_ambiente'] ?? [], true)) {
+            return new AuthorizationException(self::UNASSIGNED_ROOM_MESSAGE);
+        }
+
+        return new AuthorizationException('No tiene permiso para controlar este examen.');
     }
 
     public function studentBySis(int $examId, string $sis): ?array
