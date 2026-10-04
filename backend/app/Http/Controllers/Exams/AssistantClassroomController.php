@@ -10,6 +10,7 @@ use App\Http\Resources\Exams\ExamAssistantResource;
 use App\Models\Exam;
 use App\Services\Exams\AssistantClassroomService;
 use App\Support\ApiResponse;
+use App\Support\CurrentUser;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -20,15 +21,18 @@ class AssistantClassroomController extends Controller
 {
     private AssistantClassroomService $service;
 
-    public function __construct(AssistantClassroomService $service)
+    private CurrentUser $currentUser;
+
+    public function __construct(AssistantClassroomService $service, CurrentUser $currentUser)
     {
         $this->service = $service;
+        $this->currentUser = $currentUser;
     }
 
     /** GET /api/examenes/{exam}/auxiliares */
     public function index(Exam $exam): JsonResponse
     {
-        $result = $this->service->listForExam($exam);
+        $result = $this->service->listForExam($exam, $this->currentUser->teacherId());
 
         return ApiResponse::success([
             'estado'     => $result['estado'],
@@ -41,7 +45,12 @@ class AssistantClassroomController extends Controller
     /** PUT /api/examenes/{exam}/auxiliares/{user}/ambiente */
     public function update(AssignAssistantClassroomRequest $request, Exam $exam, string $user): JsonResponse
     {
-        $assistant = $this->service->assign($exam, $user, (int) $request->validated()['id_ambiente']);
+        $assistant = $this->service->assign(
+            $exam,
+            $user,
+            (int) $request->validated()['id_ambiente'],
+            $this->currentUser->teacherId()
+        );
 
         return ApiResponse::success(new ExamAssistantResource($assistant), 'Ambiente asignado correctamente.');
     }
@@ -50,7 +59,7 @@ class AssistantClassroomController extends Controller
     public function myExams(): JsonResponse
     {
         return ApiResponse::success(
-            AssistantExamResource::collection($this->service->listForCurrentAssistant())
+            AssistantExamResource::collection($this->service->listForAssistant((string) $this->currentUser->id()))
         );
     }
 }

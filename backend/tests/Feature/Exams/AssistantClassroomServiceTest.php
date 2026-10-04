@@ -36,11 +36,11 @@ class AssistantClassroomServiceTest extends TestCase
     {
         $exam = $this->examWithAssistants();
 
-        $this->service->assign($exam, $this->mariaId, $this->aulaId);
-        $this->service->assign($exam, $this->jorgeId, $this->otraAulaId);
-        $this->service->assign($exam, $this->danielaId, $this->aulaId);
+        $this->service->assign($exam, $this->mariaId, $this->aulaId, $this->docenteId);
+        $this->service->assign($exam, $this->jorgeId, $this->otraAulaId, $this->docenteId);
+        $this->service->assign($exam, $this->danielaId, $this->aulaId, $this->docenteId);
 
-        $reassigned = $this->service->assign($exam, $this->danielaId, $this->otraAulaId);
+        $reassigned = $this->service->assign($exam, $this->danielaId, $this->otraAulaId, $this->docenteId);
 
         $this->assertSame($this->otraAulaId, $reassigned->id_ambiente);
         $this->assertSame('692B', $reassigned->classroom->nro_aula);
@@ -53,9 +53,9 @@ class AssistantClassroomServiceTest extends TestCase
     public function test_lista_los_auxiliares_con_su_ambiente_y_los_ambientes_del_examen(): void
     {
         $exam = $this->examWithAssistants();
-        $this->service->assign($exam, $this->jorgeId, $this->otraAulaId);
+        $this->service->assign($exam, $this->jorgeId, $this->otraAulaId, $this->docenteId);
 
-        $result = $this->service->listForExam($exam);
+        $result = $this->service->listForExam($exam, $this->docenteId);
 
         $this->assertTrue($result['editable']);
         $this->assertSame(['691A', '692B'], $result['classrooms']->pluck('nro_aula')->all());
@@ -72,7 +72,7 @@ class AssistantClassroomServiceTest extends TestCase
         $exam = $this->examWithAssistants();
 
         DB::enableQueryLog();
-        $this->service->listForExam($exam);
+        $this->service->listForExam($exam, $this->docenteId);
         $queries = count(DB::getQueryLog());
         DB::disableQueryLog();
 
@@ -84,8 +84,8 @@ class AssistantClassroomServiceTest extends TestCase
     {
         $exam = $this->examWithAssistants();
 
-        $this->service->assign($exam, $this->mariaId, $this->aulaId);
-        $this->service->assign($exam, $this->mariaId, $this->aulaId);
+        $this->service->assign($exam, $this->mariaId, $this->aulaId, $this->docenteId);
+        $this->service->assign($exam, $this->mariaId, $this->aulaId, $this->docenteId);
 
         $this->assertSame(1, DB::table('log')->where('tabla_afectada', 'examen_auxiliar')->count());
     }
@@ -93,10 +93,10 @@ class AssistantClassroomServiceTest extends TestCase
     public function test_rechaza_un_ambiente_que_no_pertenece_al_examen(): void
     {
         $exam = $this->examWithAssistants();
-        $this->service->assign($exam, $this->mariaId, $this->aulaId);
+        $this->service->assign($exam, $this->mariaId, $this->aulaId, $this->docenteId);
 
         try {
-            $this->service->assign($exam, $this->mariaId, $this->aulaInactivaId);
+            $this->service->assign($exam, $this->mariaId, $this->aulaInactivaId, $this->docenteId);
             $this->fail('Debió rechazar un ambiente ajeno al examen.');
         } catch (ValidationException $e) {
             $this->assertArrayHasKey('id_ambiente', $e->errors());
@@ -111,7 +111,7 @@ class AssistantClassroomServiceTest extends TestCase
 
         $this->expectException(ExamAssistantNotFoundException::class);
 
-        $this->service->assign($exam, $this->mariaId, $this->aulaId);
+        $this->service->assign($exam, $this->mariaId, $this->aulaId, $this->docenteId);
     }
 
     public function test_rechaza_el_examen_de_otro_docente(): void
@@ -119,7 +119,7 @@ class AssistantClassroomServiceTest extends TestCase
         $exam = $this->examWithAssistants(['id_usuario_docente' => $this->otroDocenteId]);
 
         try {
-            $this->service->assign($exam, $this->mariaId, $this->aulaId);
+            $this->service->assign($exam, $this->mariaId, $this->aulaId, $this->docenteId);
             $this->fail('Debió rechazar la asignación en el examen de otro docente.');
         } catch (ExamOwnershipException $e) {
             $this->assertAssignedTo($exam, $this->mariaId, null);
@@ -127,7 +127,7 @@ class AssistantClassroomServiceTest extends TestCase
 
         $this->expectException(ExamOwnershipException::class);
 
-        $this->service->listForExam($exam);
+        $this->service->listForExam($exam, $this->docenteId);
     }
 
     public function test_bloquea_los_cambios_desde_que_se_abre_el_control_de_ingreso(): void
@@ -136,13 +136,13 @@ class AssistantClassroomServiceTest extends TestCase
             $exam = $this->examWithAssistants(['estado' => $status], $this->aulaId);
 
             try {
-                $this->service->assign($exam, $this->mariaId, $this->otraAulaId);
+                $this->service->assign($exam, $this->mariaId, $this->otraAulaId, $this->docenteId);
                 $this->fail("Debió bloquear el cambio en estado {$status}.");
             } catch (ExamStateException $e) {
                 $this->assertAssignedTo($exam, $this->mariaId, $this->aulaId);
             }
 
-            $this->assertFalse($this->service->listForExam($exam)['editable']);
+            $this->assertFalse($this->service->listForExam($exam, $this->docenteId)['editable']);
         }
     }
 
@@ -151,7 +151,7 @@ class AssistantClassroomServiceTest extends TestCase
         $later = $this->examWithAssistants(['fecha' => $this->futureDate(10), 'nombre_examen' => 'Segundo parcial']);
         $sooner = $this->examWithAssistants(['fecha' => $this->futureDate(3), 'nombre_examen' => 'Primer parcial']);
         $cancelled = $this->examWithAssistants(['estado' => Exam::CANCELADO, 'nombre_examen' => 'Cancelado']);
-        $this->service->assign($sooner, $this->mariaId, $this->otraAulaId);
+        $this->service->assign($sooner, $this->mariaId, $this->otraAulaId, $this->docenteId);
 
         $assignments = $this->service->listForAssistant($this->mariaId);
 

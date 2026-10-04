@@ -7,12 +7,10 @@ use App\Exceptions\Exams\ExamOwnershipException;
 use App\Exceptions\Exams\ExamStateException;
 use App\Models\Exam;
 use App\Models\ExamAssistant;
-use App\Services\Academic\SubjectCatalogService;
 use App\Services\Security\AuditLogService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use RuntimeException;
 
 /**
  * Asigna a cada auxiliar habilitado el ambiente del examen donde controlará el ingreso (HU-09).
@@ -26,13 +24,10 @@ class AssistantClassroomService
     /** Estados en los que el auxiliar todavía tiene un examen por controlar. */
     private const ACTIVE_STATES = [Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::EN_CURSO];
 
-    private SubjectCatalogService $subjectCatalog;
-
     private AuditLogService $auditLog;
 
-    public function __construct(SubjectCatalogService $subjectCatalog, AuditLogService $auditLog)
+    public function __construct(AuditLogService $auditLog)
     {
-        $this->subjectCatalog = $subjectCatalog;
         $this->auditLog = $auditLog;
     }
 
@@ -42,9 +37,9 @@ class AssistantClassroomService
      *
      * @return array{estado: string, editable: bool, classrooms: Collection, assistants: Collection}
      */
-    public function listForExam(Exam $exam): array
+    public function listForExam(Exam $exam, string $teacherId): array
     {
-        $this->assertOwnedBy($exam, $this->currentTeacherId());
+        $this->assertOwnedBy($exam, $teacherId);
 
         $assistants = $exam->assistants()
             ->with(['assistant', 'classroom'])
@@ -65,10 +60,8 @@ class AssistantClassroomService
      * docente propietario (403), examen programado (409), auxiliar habilitado (404) y
      * ambiente del examen (422). Si alguna falla, la asignación anterior se conserva.
      */
-    public function assign(Exam $exam, string $userId, int $classroomId): ExamAssistant
+    public function assign(Exam $exam, string $userId, int $classroomId, string $teacherId): ExamAssistant
     {
-        $teacherId = $this->currentTeacherId();
-
         return DB::transaction(function () use ($exam, $userId, $classroomId, $teacherId) {
             // Serializa esta operación con las demás que bloquean el examen (edición y cancelación).
             $exam = Exam::query()->whereKey($exam->id_examen)->lockForUpdate()->firstOrFail();
@@ -116,12 +109,6 @@ class AssistantClassroomService
         });
     }
 
-    /** Exámenes vigentes del auxiliar que usa el sistema. */
-    public function listForCurrentAssistant(): Collection
-    {
-        return $this->listForAssistant($this->currentAssistantId());
-    }
-
     /**
      * Exámenes vigentes del auxiliar con su ambiente, del más próximo al más lejano.
      * Los cancelados y finalizados no se muestran: ya no hay ingreso que controlar.
@@ -137,35 +124,6 @@ class AssistantClassroomService
             ->orderBy('examen.hora_inicio')
             ->with(['exam.subject', 'classroom'])
             ->get();
-    }
-
-    /**
-     * Mientras no haya autenticación, el docente es el de configuración, igual que en
-     * ExamService.
-     */
-    private function currentTeacherId(): string
-    {
-        $teacherId = $this->subjectCatalog->teacherId();
-
-        if ($teacherId === '') {
-            throw new RuntimeException('No hay un docente configurado en SCIEM_DOCENTE_FIJO_ID.');
-        }
-
-        return $teacherId;
-    }
-
-    /**
-     * Mientras no haya autenticación (HU-37), el auxiliar también sale de configuración.
-     */
-    private function currentAssistantId(): string
-    {
-        $assistantId = (string) config('sciem.auxiliar_fijo_id');
-
-        if ($assistantId === '') {
-            throw new RuntimeException('No hay un auxiliar configurado en SCIEM_AUXILIAR_FIJO_ID.');
-        }
-
-        return $assistantId;
     }
 
     private function assertOwnedBy(Exam $exam, string $teacherId): void
