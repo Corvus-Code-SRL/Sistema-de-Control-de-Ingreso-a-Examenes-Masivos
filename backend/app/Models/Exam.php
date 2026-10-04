@@ -90,6 +90,12 @@ class Exam extends Model
             ->using(ExamRoom::class);
     }
 
+    /** Auxiliares habilitados para el examen y su ambiente asignado. */
+    public function assistants(): HasMany
+    {
+        return $this->hasMany(ExamAssistant::class, 'id_examen', 'id_examen');
+    }
+
     public function groups(): BelongsToMany
     {
         return $this->belongsToMany(Group::class, 'grupo_examen', 'id_examen', 'id_grupo')
@@ -132,11 +138,5 @@ class Exam extends Model
         return $this->belongsToMany(Student::class, 'examen_estudiante', 'id_examen', 'id_estudiante')
                     ->using(StudentExam::class)
                     ->withPivot('id_grupo', 'estado_habilitacion', 'estado_ingreso', 'hora_ingreso', 'observacion');
-    }
-
-    /** Auxiliares habilitados para el examen y su ambiente asignado. */
-    public function assistants(): HasMany
-    {
-        return $this->hasMany(ExamAssistant::class, 'id_examen', 'id_examen');
     }
 }

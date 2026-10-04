@@ -16,6 +16,7 @@ class ActionSeeder extends Seeder
             ['operacion' => 'HABILITAR',    'tipo_operacion' => 'UPDATE', 'descripcion' => 'Cambio de estado a ACTIVO'],
             ['operacion' => 'ASIGNAR_ROL',  'tipo_operacion' => 'INSERT', 'descripcion' => 'Asignación de rol a una cuenta'],
             ['operacion' => 'CANCELAR',     'tipo_operacion' => 'UPDATE', 'descripcion' => 'Cancelación de un examen'],
+            ['operacion' => 'INICIO_SESION_FALLIDO', 'tipo_operacion' => 'LOGIN', 'descripcion' => 'Intento fallido de inicio de sesión'],
         ];
 
         foreach ($acciones as $accion) {

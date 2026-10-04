@@ -2,9 +2,11 @@
 
 namespace Tests;
 
+use App\Support\CurrentUser;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use RuntimeException;
+use Tests\Support\FakeCurrentUser;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -31,6 +33,25 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
     }
 
+    /** Fija el docente que actúa en Academic y Exams, sin tocar la configuración. */
+    protected function actAsTeacher(string $teacherId): void
+    {
+        $this->app->instance(CurrentUser::class, $this->fakeCurrentUser()->withTeacherId($teacherId));
+    }
+
+    /** Fija la cuenta que actúa en Security y la bitácora. */
+    protected function actAsUserId(string $userId): void
+    {
+        $this->app->instance(CurrentUser::class, $this->fakeCurrentUser()->withId($userId));
+    }
+
+    private function fakeCurrentUser(): FakeCurrentUser
+    {
+        $current = $this->app->make(CurrentUser::class);
+
+        return $current instanceof FakeCurrentUser ? $current : new FakeCurrentUser();
+    }
+
     private static function loadDatabaseSchema(Application $app): void
     {
         $script = dirname($app->basePath()) . '/docs/database/creation-script.sql';
@@ -49,5 +70,14 @@ abstract class TestCase extends BaseTestCase
 
         $connection->unprepared('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
         $connection->unprepared(file_get_contents($script));
+
+        // Las tablas de Sanctum no forman parte del script de creación: las crean sus migraciones.
+        $app->make(\Illuminate\Contracts\Console\Kernel::class)->call('migrate', [
+            '--path' => [
+                'database/migrations/2019_12_14_000001_create_personal_access_tokens_table.php',
+                'database/migrations/2026_10_02_000000_adapt_personal_access_tokens_for_uuid_users.php',
+            ],
+            '--force' => true,
+        ]);
     }
 }

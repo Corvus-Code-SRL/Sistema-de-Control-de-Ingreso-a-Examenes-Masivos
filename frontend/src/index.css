@@ -52,11 +52,14 @@
   --sciem-ok: #15803D;
   --sciem-ok-soft: #DFF1E7;
   --sciem-ok-fg: #0F5C2C;
+  --sciem-ok-border: #B6DEC6;
+  --sciem-ok-mid: #C5E6D2;
 
   /* Estado: error */
   --sciem-danger: #D92D20;
   --sciem-danger-soft: #FDE2E1;
   --sciem-danger-fg: #A21B12;
+  --sciem-danger-border: #F4B7B1;
 
   /* Estado: advertencia */
   --sciem-warn: #FFCB32;
@@ -68,6 +71,12 @@
   --sciem-info: #1D4E89;
   --sciem-info-soft: #E4EDF9;
   --sciem-info-border: #BDD3EE;
+  --sciem-info-mid: #CFE0F4;
+
+  /* Estado: neutro — algo que no depende de la persona (cuenta inactiva) */
+  --sciem-neutral-soft: #F3F5F5;
+  --sciem-neutral-mid: #E3E7E8;
+  --sciem-neutral-fg: #4F5B62;
 
   /* Deshabilitado */
   --sciem-dis-text: #AAB8BA;
@@ -181,10 +190,13 @@
   --color-ok: var(--sciem-ok);
   --color-ok-soft: var(--sciem-ok-soft);
   --color-ok-fg: var(--sciem-ok-fg);
+  --color-ok-border: var(--sciem-ok-border);
+  --color-ok-mid: var(--sciem-ok-mid);
 
   --color-danger: var(--sciem-danger);
   --color-danger-soft: var(--sciem-danger-soft);
   --color-danger-fg: var(--sciem-danger-fg);
+  --color-danger-border: var(--sciem-danger-border);
 
   --color-warn: var(--sciem-warn);
   --color-warn-soft: var(--sciem-warn-soft);
@@ -194,6 +206,11 @@
   --color-info: var(--sciem-info);
   --color-info-soft: var(--sciem-info-soft);
   --color-info-border: var(--sciem-info-border);
+  --color-info-mid: var(--sciem-info-mid);
+
+  --color-neutral-soft: var(--sciem-neutral-soft);
+  --color-neutral-mid: var(--sciem-neutral-mid);
+  --color-neutral-fg: var(--sciem-neutral-fg);
 
   --color-sb-sub: var(--sciem-sb-sub);
   --color-sb-group: var(--sciem-sb-group);
@@ -201,6 +218,8 @@
   --color-sb-hover: var(--sciem-sb-hover);
 
   --color-dis-text: var(--sciem-dis-text);
+  --color-dis-bg: var(--sciem-dis-bg);
+  --color-dis-border: var(--sciem-dis-border);
 
   /* Nombres que shadcn usa para generar sus utilidades de color. */
   --color-background: var(--background);

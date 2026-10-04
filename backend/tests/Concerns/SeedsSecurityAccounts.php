@@ -4,6 +4,7 @@ namespace Tests\Concerns;
 
 use App\Models\Role;
 use App\Models\User;
+use App\Support\CurrentUser;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\AdministratorAccountSeeder;
 use Database\Seeders\RoleSeeder;
@@ -13,8 +14,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * Catálogo de roles y cuenta administradora para las pruebas de Security.
  *
- * La cuenta de config('sciem.usuario_prueba') actúa como el Administrador que
- * ejecuta las operaciones, igual que en desarrollo mientras no haya sesión real.
+ * La cuenta de CurrentUser::id() actúa como el Administrador que ejecuta las
+ * operaciones, igual que en desarrollo mientras no haya sesión real.
  */
 trait SeedsSecurityAccounts
 {
@@ -29,7 +30,7 @@ trait SeedsSecurityAccounts
             AdministratorAccountSeeder::class,
         ]);
 
-        $this->administratorId = (string) config('sciem.usuario_prueba');
+        $this->administratorId = (string) app(CurrentUser::class)->id();
     }
 
     protected function roleId(string $roleName): int
@@ -50,6 +51,6 @@ trait SeedsSecurityAccounts
     /** Hace que la operación la ejecute otra cuenta distinta del Administrador. */
     protected function actAs(User $user): void
     {
-        config()->set('sciem.usuario_prueba', $user->id_usuario);
+        $this->actAsUserId($user->id_usuario);
     }
 }

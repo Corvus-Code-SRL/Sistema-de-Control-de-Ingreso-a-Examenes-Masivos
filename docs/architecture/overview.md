@@ -141,6 +141,10 @@ Contiene tareas que puedan ser ejecutadas mediante colas.
 
 Contiene las notificaciones generadas por el sistema.
 
+### Usuario actual
+
+Los Services no leen `auth()` ni el resolver `App\Support\CurrentUser`: reciben al usuario como argumento desde el Controller. Detalle y regla del código SIS en [`usuario-actual.md`](usuario-actual.md).
+
 ## 4. Central de Riesgo
 
 SCIEM mantiene dos Centrales de Riesgo independientes.

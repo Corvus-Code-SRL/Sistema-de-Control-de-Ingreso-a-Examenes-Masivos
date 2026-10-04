@@ -4,7 +4,6 @@ namespace App\Services\Exams;
 
 use App\Models\Classroom;
 use App\Services\Security\AuditLogService;
-use App\Services\Security\CurrentUserService;
 use App\Support\RecordStatus;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
@@ -18,12 +17,9 @@ class ClassroomService
 {
     private AuditLogService $auditLog;
 
-    private CurrentUserService $currentUser;
-
-    public function __construct(AuditLogService $auditLog, CurrentUserService $currentUser)
+    public function __construct(AuditLogService $auditLog)
     {
         $this->auditLog = $auditLog;
-        $this->currentUser = $currentUser;
     }
 
     /** Catálogo completo, del más reciente uso al listado alfabético (HU-24 lo consume igual). */
@@ -38,9 +34,9 @@ class ClassroomService
      * Crea el ambiente con estado ACTIVO dentro de una transacción, y deja
      * constancia en bitácora.
      */
-    public function registrar(array $data): Classroom
+    public function registrar(array $data, string $actorId): Classroom
     {
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $actorId) {
             try {
                 $classroom = Classroom::create([
                     'nro_aula' => $data['nro_aula'],
@@ -65,7 +61,7 @@ class ClassroomService
                 'ambiente',
                 null,
                 $classroom->only(['id_ambiente', 'nro_aula', 'capacidad', 'ubicacion', 'estado']),
-                $this->currentUser->id()
+                $actorId
             );
 
             return $classroom;

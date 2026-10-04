@@ -17,9 +17,9 @@ use Illuminate\Validation\ValidationException;
  */
 class SubjectCatalogService
 {
-    public function listSubjectCareers(): array
+    public function listSubjectCareers(string $teacherId): array
     {
-        $pairs = $this->basePairQuery()
+        $pairs = $this->basePairQuery($teacherId)
             ->orderBy('materia.nombre')
             ->orderBy('carrera.nombre')
             ->get();
@@ -40,9 +40,9 @@ class SubjectCatalogService
     /**
      * Resuelve el par que el docente fija como contexto de trabajo: debe existir y estar activo.
      */
-    public function findSelectablePair(int $careerId, int $subjectId): SubjectCareer
+    public function findSelectablePair(int $careerId, int $subjectId, string $teacherId): SubjectCareer
     {
-        $pair = $this->findPairOrFail($careerId, $subjectId);
+        $pair = $this->findPairOrFail($careerId, $subjectId, $teacherId);
 
         $this->assertPairIsSelectable($pair);
 
@@ -54,18 +54,13 @@ class SubjectCatalogService
         return (int) config('sciem.periodo_activo_id');
     }
 
-    public function teacherId(): string
-    {
-        return (string) config('sciem.docente_fijo_id');
-    }
-
-    private function basePairQuery(): Builder
+    private function basePairQuery(string $teacherId): Builder
     {
         return SubjectCareer::query()
             ->join('materia', 'materia.id_materia', '=', 'materia_carrera.id_materia')
             ->join('carrera', 'carrera.id_carrera', '=', 'materia_carrera.id_carrera')
             ->select('materia_carrera.*')
-            ->selectSub($this->teacherGroupCountQuery(), 'cantidad_grupos')
+            ->selectSub($this->teacherGroupCountQuery($teacherId), 'cantidad_grupos')
             ->with(['subject', 'career']);
     }
 
@@ -73,20 +68,20 @@ class SubjectCatalogService
      * Subconsulta correlacionada: cuántos grupos dicta el docente en el par de cada fila.
      * Resuelve "mis materias" sin lanzar una consulta por registro.
      */
-    private function teacherGroupCountQuery(): Builder
+    private function teacherGroupCountQuery(string $teacherId): Builder
     {
         return Group::query()
             ->selectRaw('count(*)')
             ->whereColumn('grupo.id_carrera', 'materia_carrera.id_carrera')
             ->whereColumn('grupo.id_materia', 'materia_carrera.id_materia')
-            ->where('grupo.id_usuario_docente', $this->teacherId())
+            ->where('grupo.id_usuario_docente', $teacherId)
             ->where('grupo.id_periodo', $this->activePeriodId())
             ->where('grupo.estado', RecordStatus::ACTIVE);
     }
 
-    private function findPairOrFail(int $careerId, int $subjectId): SubjectCareer
+    private function findPairOrFail(int $careerId, int $subjectId, string $teacherId): SubjectCareer
     {
-        $pair = $this->basePairQuery()
+        $pair = $this->basePairQuery($teacherId)
             ->where('materia_carrera.id_carrera', $careerId)
             ->where('materia_carrera.id_materia', $subjectId)
             ->first();

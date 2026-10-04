@@ -29,7 +29,8 @@ class StudentRosterConfirmationService
 
     public function confirm(
         int $groupId,
-        string $token
+        string $token,
+        string $teacherId
     ): StudentRosterConfirmationResult {
         $preview = $this->previewStore->find($token);
 
@@ -40,11 +41,7 @@ class StudentRosterConfirmationService
             );
         }
 
-        $currentTeacherId = (string) config(
-            'sciem.docente_fijo_id'
-        );
-
-        if ($preview->teacherId() !== $currentTeacherId) {
+        if ($preview->teacherId() !== $teacherId) {
             throw new StudentRosterPreviewUnavailableException(
                 'El preview no pertenece al docente actual.',
                 403
@@ -59,7 +56,8 @@ class StudentRosterConfirmationService
         }
 
         $group = $this->groupAccess->getAvailable(
-            $groupId
+            $groupId,
+            $teacherId
         );
 
         $analysis = $this->analyzer->analyze(

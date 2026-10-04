@@ -9,6 +9,7 @@ use App\Http\Resources\Academic\StudentRosterConfirmationResource;
 use App\Http\Resources\Academic\StudentRosterPreviewResource;
 use App\Services\Academic\Importers\StudentRosterConfirmationService;
 use App\Services\Academic\Importers\StudentRosterPreviewService;
+use App\Support\CurrentUser;
 use RuntimeException;
 
 class StudentRosterController extends Controller
@@ -17,12 +18,16 @@ class StudentRosterController extends Controller
 
     private StudentRosterConfirmationService $confirmationService;
 
+    private CurrentUser $currentUser;
+
     public function __construct(
         StudentRosterPreviewService $previewService,
-        StudentRosterConfirmationService $confirmationService
+        StudentRosterConfirmationService $confirmationService,
+        CurrentUser $currentUser
     ) {
         $this->previewService = $previewService;
         $this->confirmationService = $confirmationService;
+        $this->currentUser = $currentUser;
     }
 
     public function preview(
@@ -42,7 +47,8 @@ class StudentRosterController extends Controller
         $result = $this->previewService->generate(
             $id_grupo,
             $path,
-            $file->getClientOriginalExtension()
+            $file->getClientOriginalExtension(),
+            $this->currentUser->teacherId()
         );
 
         return new StudentRosterPreviewResource(
@@ -58,7 +64,8 @@ class StudentRosterController extends Controller
 
         $result = $this->confirmationService->confirm(
             $id_grupo,
-            (string) $validated['token']
+            (string) $validated['token'],
+            $this->currentUser->teacherId()
         );
 
         return new StudentRosterConfirmationResource(

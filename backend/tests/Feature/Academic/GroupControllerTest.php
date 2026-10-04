@@ -7,6 +7,7 @@ use App\Models\Group;
 use App\Models\Period;
 use App\Models\Subject;
 use App\Models\SubjectCareer;
+use App\Support\CurrentUser;
 use App\Support\RecordStatus;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
@@ -34,7 +35,7 @@ class GroupControllerTest extends TestCase
         $period = Period::factory()->create(['gestion' => $management]);
 
         config(['sciem.periodo_activo_id' => $period->id_periodo]);
-        config(['sciem.docente_fijo_id' => (string) Str::uuid()]);
+        $this->actAsTeacher((string) Str::uuid());
 
         return $period;
     }
@@ -73,7 +74,7 @@ class GroupControllerTest extends TestCase
             'num_grupo' => 'A',
             'gestion' => (string) $period->gestion,
             'estado' => RecordStatus::ACTIVE,
-            'id_usuario_docente' => config('sciem.docente_fijo_id'),
+            'id_usuario_docente' => app(CurrentUser::class)->teacherId(),
             'id_periodo' => $period->id_periodo,
         ]);
 
@@ -116,7 +117,7 @@ class GroupControllerTest extends TestCase
             'num_grupo' => 'A',
             'gestion' => (string) $period->gestion,
             'estado' => RecordStatus::ACTIVE,
-            'id_usuario_docente' => config('sciem.docente_fijo_id'),
+            'id_usuario_docente' => app(CurrentUser::class)->teacherId(),
             'id_periodo' => $period->id_periodo,
         ]);
 
@@ -175,7 +176,7 @@ class GroupControllerTest extends TestCase
             'num_grupo' => 'A',
             'gestion' => (string) $period->gestion,
             'estado' => RecordStatus::ACTIVE,
-            'id_usuario_docente' => config('sciem.docente_fijo_id'),
+            'id_usuario_docente' => app(CurrentUser::class)->teacherId(),
             'id_periodo' => $period->id_periodo,
         ]);
 
@@ -202,7 +203,7 @@ class GroupControllerTest extends TestCase
             'num_grupo' => 'A',
             'gestion' => (string) $period->gestion,
             'estado' => RecordStatus::ACTIVE,
-            'id_usuario_docente' => config('sciem.docente_fijo_id'),
+            'id_usuario_docente' => app(CurrentUser::class)->teacherId(),
             'id_periodo' => $period->id_periodo,
         ]);
 
@@ -247,7 +248,7 @@ class GroupControllerTest extends TestCase
             'num_grupo' => 'A',
             'gestion' => (string) $period->gestion,
             'estado' => RecordStatus::ACTIVE,
-            'id_usuario_docente' => config('sciem.docente_fijo_id'),
+            'id_usuario_docente' => app(CurrentUser::class)->teacherId(),
             'id_periodo' => $period->id_periodo,
         ]);
 
@@ -274,7 +275,7 @@ class GroupControllerTest extends TestCase
             'num_grupo' => 'A',
             'gestion' => (string) $period2026->gestion,
             'estado' => RecordStatus::ACTIVE,
-            'id_usuario_docente' => config('sciem.docente_fijo_id'),
+            'id_usuario_docente' => app(CurrentUser::class)->teacherId(),
             'id_periodo' => $period2026->id_periodo,
         ]);
 

@@ -89,7 +89,7 @@ export interface ExamClassroom {
   capacidad: number
 }
 
-/** Auxiliar habilitado para un examen y el ambiente donde controla el ingreso. */
+/** Auxiliar habilitado para un examen y el ambiente donde controla el ingreso (HU-09). */
 export interface ExamAssistant {
   id_examen: number
   id_usuario: string
@@ -99,7 +99,11 @@ export interface ExamAssistant {
   ambiente: ExamClassroom | null
 }
 
-/** Respuesta de GET /examenes/{id}/auxiliares. */
+/**
+ * Respuesta de GET /examenes/{id}/auxiliares.
+ *
+ * `estado` y `editable` los decide el backend: la vista nunca los deduce de la hora.
+ */
 export interface ExamAssistantsData {
   estado: AssistantExamStatus | 'FINALIZADO' | 'CANCELADO'
   editable: boolean
@@ -107,10 +111,10 @@ export interface ExamAssistantsData {
   auxiliares: ExamAssistant[]
 }
 
-/** Estados en los que un examen todavía aparece al auxiliar. */
+/** Estados en los que un examen todavía aparece al auxiliar: el backend no envía otros. */
 export type AssistantExamStatus = 'PROGRAMADO' | 'EN_INGRESO' | 'EN_CURSO'
 
-/** Examen que controla el auxiliar, con el ambiente asignado. */
+/** Examen que controla el auxiliar, con el ambiente que le asignó el docente (HU-09). */
 export interface AssistantExam {
   id_examen: number
   nombre_examen: string

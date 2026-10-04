@@ -15,14 +15,14 @@ class AuditLogService
         string $tabla,
         ?array $antes,
         ?array $despues,
-        ?string $idUsuario = null
+        string $idUsuario
     ): void {
         AuditLog::create([
             'id_accion'      => $this->resolverAccion($operacion),
             'antiguo_valor'  => $this->limpiar($antes),
             'nuevo_valor'    => $this->limpiar($despues),
             'tabla_afectada' => $tabla,
-            'id_usuario'     => $idUsuario ?? $this->usuarioActual(),
+            'id_usuario'     => $idUsuario,
         ]);
     }
 
@@ -39,10 +39,5 @@ class AuditLogService
         }
 
         return array_diff_key($datos, array_flip(self::CAMPOS_SENSIBLES));
-    }
-
-    private function usuarioActual(): ?string
-    {
-        return auth()->id() ?? config('sciem.usuario_prueba');
     }
 }

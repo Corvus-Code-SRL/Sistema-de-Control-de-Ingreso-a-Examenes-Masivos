@@ -19,27 +19,23 @@ class UserRoleService
 {
     private AuditLogService $auditLog;
 
-    private CurrentUserService $currentUser;
-
     private SubjectCatalogService $subjectCatalog;
 
     public function __construct(
         AuditLogService $auditLog,
-        CurrentUserService $currentUser,
         SubjectCatalogService $subjectCatalog
     ) {
         $this->auditLog = $auditLog;
-        $this->currentUser = $currentUser;
         $this->subjectCatalog = $subjectCatalog;
     }
 
-    public function assignRole(User $user, int $roleId): Role
+    public function assignRole(User $user, int $roleId, string $actorId): Role
     {
-        if ($this->currentUser->id() === $user->id_usuario) {
+        if ($actorId === $user->id_usuario) {
             throw new SelfRoleAssignmentException();
         }
 
-        return DB::transaction(function () use ($user, $roleId) {
+        return DB::transaction(function () use ($user, $roleId, $actorId) {
             /*
              * Se bloquea la fila de la cuenta, no solo la de usuario_rol: cuando la
              * cuenta aún no tiene rol no hay fila que bloquear, y dos peticiones
@@ -82,11 +78,36 @@ class UserRoleService
                     'id_usuario' => $user->id_usuario,
                     'id_rol'     => $newRole->id_rol,
                     'nombre_rol' => $newRole->nombre_rol,
-                ]
+                ],
+                $actorId
             );
 
             return $newRole;
         });
+    }
+
+    /** ¿La cuenta indicada tiene hoy el rol Administrador? Sin cuenta, nunca. */
+    public function isAdministrator(?string $userId): bool
+    {
+        if ($userId === null) {
+            return false;
+        }
+
+        return User::whereKey($userId)
+            ->whereHas('activeRoles', fn ($query) => $query->where('nombre_rol', Role::ADMINISTRADOR))
+            ->exists();
+    }
+
+    /** ¿La cuenta indicada tiene hoy el rol Auxiliar? Sin cuenta, nunca. */
+    public function isAssistant(?string $userId): bool
+    {
+        if ($userId === null) {
+            return false;
+        }
+
+        return User::whereKey($userId)
+            ->whereHas('activeRoles', fn ($query) => $query->where('nombre_rol', Role::AUXILIAR))
+            ->exists();
     }
 
     public function findActiveRole(User $user): ?Role

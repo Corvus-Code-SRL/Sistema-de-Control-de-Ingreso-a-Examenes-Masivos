@@ -28,9 +28,9 @@ class GroupService
         $this->subjectCatalog = $subjectCatalog;
     }
 
-    public function listGroupsForPair(int $careerId, int $subjectId): array
+    public function listGroupsForPair(int $careerId, int $subjectId, string $teacherId): array
     {
-        $pair = $this->subjectCatalog->findSelectablePair($careerId, $subjectId);
+        $pair = $this->subjectCatalog->findSelectablePair($careerId, $subjectId, $teacherId);
 
         $groups = $this->markOwnGroups(
             $this->baseGroupQuery()
@@ -38,7 +38,8 @@ class GroupService
                 ->where('grupo.id_materia', $subjectId)
                 ->where('grupo.id_periodo', $this->subjectCatalog->activePeriodId())
                 ->orderBy('grupo.num_grupo')
-                ->get()
+                ->get(),
+            $teacherId
         );
 
         return [
@@ -69,14 +70,15 @@ class GroupService
      * Arma el detalle de un grupo ya autorizado, con su par materia-carrera y periodo:
      * es la unidad sobre la que después se prepara la información de estudiantes.
      */
-    public function showGroup(Group $group): array
+    public function showGroup(Group $group, string $teacherId): array
     {
         $pair = $this->subjectCatalog->findSelectablePair(
             (int) $group->id_carrera,
-            (int) $group->id_materia
+            (int) $group->id_materia,
+            $teacherId
         );
 
-        $this->markOwnGroup($group, $this->subjectCatalog->teacherId());
+        $this->markOwnGroup($group, $teacherId);
 
         $activePeriodId = $this->subjectCatalog->activePeriodId();
 
@@ -99,11 +101,12 @@ class GroupService
      * previa en el esquema: la pertenencia de un grupo a un docente nace en el
      * propio registro (id_usuario_docente = docente que lo crea).
      */
-    public function storeGroup(array $data): array
+    public function storeGroup(array $data, string $teacherId): array
     {
         $pair = $this->subjectCatalog->findSelectablePair(
             (int) $data['id_carrera'],
-            (int) $data['id_materia']
+            (int) $data['id_materia'],
+            $teacherId
         );
 
         $periodId = (int) ($data['id_periodo'] ?? $this->subjectCatalog->activePeriodId());
@@ -117,7 +120,7 @@ class GroupService
             $periodId
         );
 
-        $group = DB::transaction(function () use ($pair, $data, $period) {
+        $group = DB::transaction(function () use ($pair, $data, $period, $teacherId) {
             try {
                 return Group::create([
                     'id_carrera' => $pair->id_carrera,
@@ -125,7 +128,7 @@ class GroupService
                     'num_grupo' => $data['num_grupo'],
                     'gestion' => $this->groupManagementFor($period),
                     'estado' => RecordStatus::ACTIVE,
-                    'id_usuario_docente' => $this->subjectCatalog->teacherId(),
+                    'id_usuario_docente' => $teacherId,
                     'id_periodo' => $period->id_periodo,
                 ]);
             } catch (QueryException $exception) {
@@ -138,14 +141,14 @@ class GroupService
             }
         });
 
-        return $this->showGroup((int) $group->id_grupo);
+        return $this->showGroup((int) $group->id_grupo, $teacherId);
     }
 
     /**
      * id_carrera, id_materia e id_usuario_docente son inmutables: se leen del
      * propio grupo, nunca del payload recibido, aunque el FormRequest los reciba.
      */
-    public function updateGroup(int $groupId, array $data): array
+    public function updateGroup(int $groupId, array $data, string $teacherId): array
     {
         $group = Group::query()->find($groupId);
 
@@ -153,7 +156,7 @@ class GroupService
             throw new ModelNotFoundException('No existe el grupo indicado.');
         }
 
-        $this->assertGroupBelongsToTeacher($group);
+        $this->assertGroupBelongsToTeacher($group, $teacherId);
 
         $periodId = (int) ($data['id_periodo'] ?? $group->id_periodo);
         $period = $this->findPeriodOrFail($periodId);
@@ -182,7 +185,7 @@ class GroupService
             }
         });
 
-        return $this->showGroup((int) $group->id_grupo);
+        return $this->showGroup((int) $group->id_grupo, $teacherId);
     }
 
     /**
@@ -225,10 +228,8 @@ class GroupService
             ->with('period');
     }
 
-    private function markOwnGroups(Collection $groups): Collection
+    private function markOwnGroups(Collection $groups, string $teacherId): Collection
     {
-        $teacherId = $this->subjectCatalog->teacherId();
-
         return $groups->each(function (Group $group) use ($teacherId): void {
             $this->markOwnGroup($group, $teacherId);
         });
@@ -286,9 +287,9 @@ class GroupService
     /**
      *un docente no opera grupos ajenos.
      */
-    private function assertGroupBelongsToTeacher(Group $group): void
+    private function assertGroupBelongsToTeacher(Group $group, string $teacherId): void
     {
-        if ((string) $group->id_usuario_docente !== $this->subjectCatalog->teacherId()) {
+        if ((string) $group->id_usuario_docente !== $teacherId) {
             throw new AuthorizationException('No tiene permiso sobre este grupo.');
         }
     }

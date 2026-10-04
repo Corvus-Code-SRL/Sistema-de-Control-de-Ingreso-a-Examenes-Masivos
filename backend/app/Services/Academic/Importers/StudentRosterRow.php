@@ -2,6 +2,8 @@
 
 namespace App\Services\Academic\Importers;
 
+use App\Support\SisCode;
+
 final class StudentRosterRow
 {
     private int $rowNumber;
@@ -19,7 +21,7 @@ final class StudentRosterRow
         ?string $firstNames
     ) {
         $this->rowNumber = $rowNumber;
-        $this->sisCode = $sisCode;
+        $this->sisCode = SisCode::normalizeNullable($sisCode);
         $this->lastNames = $lastNames;
         $this->firstNames = $firstNames;
     }

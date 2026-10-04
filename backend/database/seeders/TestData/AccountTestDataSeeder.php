@@ -2,6 +2,7 @@
 
 namespace Database\Seeders\TestData;
 
+use App\Support\SisCode;
 use Database\Seeders\TestData\TestDataIds as Ids;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -79,7 +80,7 @@ class AccountTestDataSeeder extends Seeder
             'apellido_materno' => $maternalSurname,
             'correo' => "{$emailUser}@sciem.test",
             'contrasenia' => Ids::PASSWORD_HASH,
-            'cod_sis' => $sisCode,
+            'cod_sis' => SisCode::normalize($sisCode),
             'estado' => $status,
         ];
     }

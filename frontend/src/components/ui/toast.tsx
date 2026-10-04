@@ -22,6 +22,7 @@ export function Toast({ title, description, duration = 5000, onClose }: ToastPro
       role="status"
       aria-live="polite"
     >
+      {/* Ícono de éxito OK */}
       <svg
         className="size-5 shrink-0 text-[#008A52] mt-0.5"
         width="20"
@@ -37,6 +38,7 @@ export function Toast({ title, description, duration = 5000, onClose }: ToastPro
         <path d="m9 11 3 3L22 4"></path>
       </svg>
 
+      {/* Contenido principal */}
       <div className="flex-1 min-w-0 pr-1">
         <div className="text-sm font-semibold text-[#2C2C2C]">{title}</div>
         <div className="text-xs text-muted-foreground mt-0.5 leading-normal">
@@ -44,6 +46,7 @@ export function Toast({ title, description, duration = 5000, onClose }: ToastPro
         </div>
       </div>
 
+      {/* Botón de cierre */}
       <button
         type="button"
         onClick={onClose}

@@ -7,21 +7,25 @@ use App\Http\Requests\Security\StoreUserRequest;
 use App\Http\Resources\Security\UserResource;
 use App\Services\Security\UserService;
 use App\Support\ApiResponse;
+use App\Support\CurrentUser;
 use Illuminate\Http\JsonResponse;
 
 class UserController extends Controller
 {
     private UserService $service;
 
-    public function __construct(UserService $service)
+    private CurrentUser $currentUser;
+
+    public function __construct(UserService $service, CurrentUser $currentUser)
     {
         $this->service = $service;
+        $this->currentUser = $currentUser;
     }
 
     /** POST /api/usuarios */
     public function store(StoreUserRequest $request): JsonResponse
     {
-        $usuario = $this->service->registrar($request->validated());
+        $usuario = $this->service->registrar($request->validated(), $this->currentUser->id());
 
         // CA 9 — confirmación de registro exitoso
         return ApiResponse::created(
