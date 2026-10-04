@@ -6,6 +6,7 @@ use App\Jobs\FinalizeExpiredExamsJob;
 use App\Models\Action;
 use App\Models\AuditLog;
 use App\Models\Exam;
+use App\Models\Role;
 use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\EntryControl\RoomAssignmentService;
 use App\Services\Exams\ExamLifecycleService;
@@ -73,6 +74,44 @@ class FinalizeExamTest extends TestCase
         ]);
 
         $this->postJson($this->url($exam))->assertForbidden();
+
+        $this->assertSame(Exam::EN_INGRESO, $exam->fresh()->estado);
+        $this->assertSame(0, AuditLog::query()->where('tabla_afectada', 'examen')->count());
+    }
+
+    public function test_un_auxiliar_no_puede_finalizar_ni_estando_habilitado_en_el_examen(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId]);
+        $auxiliaryId = '33333333-3333-4333-8333-000000000099';
+        DB::table('usuario')->insert([
+            'id_usuario' => $auxiliaryId,
+            'nombre' => 'Auxiliar',
+            'apellido_paterno' => 'Habilitado',
+            'correo' => 'auxiliar.habilitado@test.com',
+            'contrasenia' => 'x',
+            'cod_sis' => '202400099',
+            'estado' => 'ACTIVO',
+        ]);
+        $roleId = Role::firstOrCreate(
+            ['nombre_rol' => Role::AUXILIAR],
+            ['descripcion' => 'Auxiliar de docencia', 'estado' => 'ACTIVO']
+        )->id_rol;
+        DB::table('usuario_rol')->insert([
+            'id_usuario' => $auxiliaryId,
+            'id_rol' => $roleId,
+            'fecha_inicio' => now(),
+        ]);
+        DB::table('examen_auxiliar')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_usuario' => $auxiliaryId,
+            'id_usuario_docente_habilita' => $this->docenteId,
+            'id_ambiente' => $this->aulaId,
+        ]);
+        $this->actAsUserId($auxiliaryId);
+
+        $this->postJson($this->url($exam))
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Un auxiliar no puede finalizar un examen.');
 
         $this->assertSame(Exam::EN_INGRESO, $exam->fresh()->estado);
         $this->assertSame(0, AuditLog::query()->where('tabla_afectada', 'examen')->count());

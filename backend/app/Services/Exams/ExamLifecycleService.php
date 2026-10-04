@@ -5,13 +5,11 @@ namespace App\Services\Exams;
 use App\Exceptions\Exams\ExamOwnershipException;
 use App\Exceptions\Exams\ExamStateException;
 use App\Models\Exam;
-use App\Services\Academic\SubjectCatalogService;
 use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\Security\AuditLogService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use RuntimeException;
 use Throwable;
 
 /** Transiciones manuales y automáticas del final del examen. */
@@ -19,29 +17,21 @@ class ExamLifecycleService
 {
     private ExamTimingService $timing;
     private EntryControlSnapshotService $snapshots;
-    private SubjectCatalogService $subjects;
     private AuditLogService $auditLog;
 
     public function __construct(
         ExamTimingService $timing,
         EntryControlSnapshotService $snapshots,
-        SubjectCatalogService $subjects,
         AuditLogService $auditLog
     ) {
         $this->timing = $timing;
         $this->snapshots = $snapshots;
-        $this->subjects = $subjects;
         $this->auditLog = $auditLog;
     }
 
     /** Finaliza inmediatamente un examen activo, únicamente por su docente creador. */
-    public function finishManually(Exam $exam): Exam
+    public function finishManually(Exam $exam, string $teacherId): Exam
     {
-        $teacherId = $this->subjects->teacherId();
-        if ($teacherId === '') {
-            throw new RuntimeException('No hay un docente configurado en SCIEM_DOCENTE_FIJO_ID.');
-        }
-
         $exam = DB::transaction(function () use ($exam, $teacherId): Exam {
             $locked = Exam::query()->whereKey($exam->id_examen)->lockForUpdate()->firstOrFail();
 

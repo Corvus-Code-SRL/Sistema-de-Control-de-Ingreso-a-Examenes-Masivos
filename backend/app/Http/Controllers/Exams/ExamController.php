@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Exams;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Exams\CreateExamRequest;
+use App\Http\Requests\Exams\FinishExamRequest;
 use App\Http\Requests\Exams\UpdateExamRequest;
 use App\Http\Resources\Exams\ClassroomResource;
 use App\Http\Resources\Exams\ExamResource;
@@ -84,9 +85,9 @@ class ExamController extends Controller
     }
 
     /** POST /api/examenes/{exam}/finalizar */
-    public function finish(Exam $exam, ExamLifecycleService $lifecycle): JsonResponse
+    public function finish(FinishExamRequest $request, Exam $exam, ExamLifecycleService $lifecycle): JsonResponse
     {
-        $exam = $lifecycle->finishManually($exam);
+        $exam = $lifecycle->finishManually($exam, $this->currentUser->teacherId());
 
         return ApiResponse::success(new ExamResource($exam), 'Examen finalizado correctamente.');
     }
