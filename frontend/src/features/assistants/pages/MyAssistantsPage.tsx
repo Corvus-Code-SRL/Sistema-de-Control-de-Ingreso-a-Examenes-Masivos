@@ -23,25 +23,17 @@ import { MoveAssistantModal } from '../components/MoveAssistantModal'
 import { RemoveAssistantFromGroupModal } from '../components/RemoveAssistantFromGroupModal'
 import { EnableAssistantExamModal } from '../components/EnableAssistantExamModal'
 import { RemoveAssistantFromExamModal } from '../components/RemoveAssistantFromExamModal'
-import {
-  addAssistantToGroups,
-  enableAssistantForExam,
-  getMyAssistants,
-  getMyGroups,
-  moveAssistantBetweenGroups,
-  removeAssistantFromExam,
-  removeAssistantFromGroup,
-} from '../services/assistantService'
+import { assistantsService } from '../services/assistantsService'
 import type { AssistantWithGroups } from '../types/assistant.types'
 
 export function MyAssistantsPage() {
   const assistantsResource = useAsyncResource<AssistantWithGroups[]>(
-    (signal) => getMyAssistants(signal),
+    (signal) => assistantsService.listMine(signal),
     []
   )
 
   const groupsResource = useAsyncResource(
-    (signal) => getMyGroups(signal),
+    (signal) => assistantsService.listMyGroups(signal),
     []
   )
 
@@ -68,7 +60,7 @@ export function MyAssistantsPage() {
         )
 
   async function handleAssign(userId: string, groupIds: number[]) {
-    await addAssistantToGroups(userId, groupIds)
+    await assistantsService.addToGroups(userId, groupIds)
     setIsAssignOpen(false)
     assistantsResource.reload()
   }
@@ -76,7 +68,7 @@ export function MyAssistantsPage() {
   async function handleMove(sourceGroupId: number, targetGroupId: number) {
     if (!assistantToMove) return
 
-    await moveAssistantBetweenGroups({
+    await assistantsService.moveBetweenGroups({
       id_usuario: assistantToMove.id_usuario,
       id_grupo_origen: sourceGroupId,
       id_grupo_destino: targetGroupId,
@@ -89,7 +81,7 @@ export function MyAssistantsPage() {
   async function handleRemove(groupId: number) {
     if (!assistantToRemove) return
 
-    await removeAssistantFromGroup(groupId, assistantToRemove.id_usuario)
+    await assistantsService.removeFromGroup(groupId, assistantToRemove.id_usuario)
 
     setAssistantToRemove(null)
     assistantsResource.reload()
@@ -98,7 +90,7 @@ export function MyAssistantsPage() {
   async function handleEnableForExam(examId: number) {
     if (!assistantToEnable) return
 
-    await enableAssistantForExam(examId, assistantToEnable.id_usuario)
+    await assistantsService.enableForExam(examId, assistantToEnable.id_usuario)
 
     setAssistantToEnable(null)
     assistantsResource.reload()
@@ -107,7 +99,7 @@ export function MyAssistantsPage() {
   async function handleRemoveFromExam(examId: number) {
     if (!assistantToRemoveExam) return
 
-    await removeAssistantFromExam(examId, assistantToRemoveExam.id_usuario)
+    await assistantsService.removeFromExam(examId, assistantToRemoveExam.id_usuario)
 
     setAssistantToRemoveExam(null)
     assistantsResource.reload()

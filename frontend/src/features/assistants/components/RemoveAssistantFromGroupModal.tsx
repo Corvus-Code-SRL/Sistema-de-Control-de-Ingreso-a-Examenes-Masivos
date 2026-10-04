@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Trash2 } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -15,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ApiError } from '@/lib/api-client'
 import type { AssistantWithGroups } from '../types/assistant.types'
 
 interface RemoveAssistantFromGroupModalProps {
@@ -39,6 +41,7 @@ export function RemoveAssistantFromGroupModal({
 }: RemoveAssistantFromGroupModalProps) {
   const [groupId, setGroupId] = useState<number | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const group = assistant?.grupos.find((g) => g.id_grupo === groupId)
 
@@ -46,8 +49,11 @@ export function RemoveAssistantFromGroupModal({
     if (groupId === null) return
 
     setIsSubmitting(true)
+    setError(null)
     try {
       await onConfirm(groupId)
+    } catch (e) {
+      setError(errorMessage(e))
     } finally {
       setIsSubmitting(false)
     }
@@ -71,7 +77,10 @@ export function RemoveAssistantFromGroupModal({
           <Label>Grupo</Label>
           <Select
             value={groupId !== null ? String(groupId) : undefined}
-            onValueChange={(v) => setGroupId(Number(v))}
+            onValueChange={(v) => {
+              setGroupId(Number(v))
+              setError(null)
+            }}
             disabled={isSubmitting}
           >
             <SelectTrigger>
@@ -99,9 +108,17 @@ export function RemoveAssistantFromGroupModal({
                   {formatDate(group.examen_programado.fecha)})
                 </strong>
                 .
+                {' '}
+                Si era su único grupo vinculado a ese examen, también se le quitará la habilitación.
               </>
             )}
           </p>
+        )}
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
 
         <div className="flex justify-end gap-2 pt-2">
@@ -119,6 +136,15 @@ export function RemoveAssistantFromGroupModal({
       </DialogContent>
     </Dialog>
   )
+}
+
+/** Primer motivo de rechazo del backend, o un mensaje genérico si no hubo respuesta útil. */
+function errorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    return Object.values(error.errors)[0]?.[0] ?? error.message
+  }
+
+  return 'No se pudo quitar al auxiliar del grupo.'
 }
 
 /** Convierte "2026-09-29" en "29/09". */

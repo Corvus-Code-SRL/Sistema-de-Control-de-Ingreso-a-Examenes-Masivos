@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { searchAssistants } from '../services/assistantService'
+import { assistantsService } from '../services/assistantsService'
 import type { Assistant, AssistantWithGroups } from '../types/assistant.types'
 
 interface GroupOption {
@@ -68,7 +68,7 @@ export function AssignAssistantModal({
     setSelectedGroupIds([])
 
     try {
-      const results = await searchAssistants(trimmed)
+      const results = await assistantsService.search(trimmed)
       setResult(results[0] ?? null)
     } catch {
       setResult(null)
