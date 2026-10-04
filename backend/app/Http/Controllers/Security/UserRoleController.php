@@ -10,6 +10,7 @@ use App\Http\Resources\Security\RoleResource;
 use App\Models\User;
 use App\Services\Security\UserRoleService;
 use App\Support\ApiResponse;
+use App\Support\CurrentUser;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -19,9 +20,12 @@ class UserRoleController extends Controller
 {
     private UserRoleService $userRoles;
 
-    public function __construct(UserRoleService $userRoles)
+    private CurrentUser $currentUser;
+
+    public function __construct(UserRoleService $userRoles, CurrentUser $currentUser)
     {
         $this->userRoles = $userRoles;
+        $this->currentUser = $currentUser;
     }
 
     /** GET /api/usuarios/{user}/rol */
@@ -35,7 +39,11 @@ class UserRoleController extends Controller
     /** POST /api/usuarios/{user}/rol */
     public function store(AssignRoleRequest $request, User $user): JsonResponse
     {
-        $role = $this->userRoles->assignRole($user, (int) $request->validated()['id_rol']);
+        $role = $this->userRoles->assignRole(
+            $user,
+            (int) $request->validated()['id_rol'],
+            $this->currentUser->id()
+        );
 
         return ApiResponse::success(new RoleResource($role), 'Rol asignado correctamente.');
     }

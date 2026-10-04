@@ -23,9 +23,9 @@ class SubjectService
             ->get();
     }
 
-    public function create(array $data): Subject
+    public function create(array $data, string $actorId): Subject
     {
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $actorId) {
             $subject = Subject::create([
                 'nombre'      => $data['nombre'],
                 'codigo'      => $data['codigo'],
@@ -38,16 +38,16 @@ class SubjectService
                 'materia',
                 null,
                 $subject->toArray(),
-                auth()->id()
+                $actorId
             );
 
             return $subject;
         });
     }
 
-    public function update(Subject $subject, array $data): Subject
+    public function update(Subject $subject, array $data, string $actorId): Subject
     {
-        return DB::transaction(function () use ($subject, $data) {
+        return DB::transaction(function () use ($subject, $data, $actorId) {
             $before = [];
             $after = [];
 
@@ -70,7 +70,7 @@ class SubjectService
                 'materia',
                 $before,
                 $after,
-                auth()->id()
+                $actorId
             );
 
             return $subject->fresh();

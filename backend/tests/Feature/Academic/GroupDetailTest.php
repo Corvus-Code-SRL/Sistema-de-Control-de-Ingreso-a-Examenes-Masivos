@@ -63,7 +63,7 @@ class GroupDetailTest extends TestCase
     {
         $this->seedAcademicCatalog();
 
-        config()->set('sciem.docente_fijo_id', $this->otroDocenteId);
+        $this->actAsTeacher($this->otroDocenteId);
 
         $this->getJson($this->groupUrl($this->grupoAjenoId))
             ->assertOk()
@@ -91,7 +91,7 @@ class GroupDetailTest extends TestCase
         $this->seedAcademicCatalog();
 
         // El grupo lo dicta el otro docente: se consulta como él para llegar a la regla del par.
-        config()->set('sciem.docente_fijo_id', $this->otroDocenteId);
+        $this->actAsTeacher($this->otroDocenteId);
 
         $this->getJson($this->groupUrl($this->grupoParInactivoId))
             ->assertStatus(422)

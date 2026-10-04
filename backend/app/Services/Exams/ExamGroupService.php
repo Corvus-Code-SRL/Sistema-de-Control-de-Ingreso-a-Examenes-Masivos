@@ -30,20 +30,20 @@ class ExamGroupService
     /**
      * Solo el creador puede modificar grupos mientras el examen siga PROGRAMADO.
      */
-    public function assignGroups(Exam $exam, array $groupIds): Exam
+    public function assignGroups(Exam $exam, array $groupIds, string $teacherId): Exam
     {
-        return DB::transaction(function () use ($exam, $groupIds) {
+        return DB::transaction(function () use ($exam, $groupIds, $teacherId) {
             $exam = Exam::query()
                 ->whereKey($exam->id_examen)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $this->assertExamCanBeConfigured($exam);
+            $this->assertExamCanBeConfigured($exam, $teacherId);
 
             $groupIds = array_values(array_unique(array_map('intval', $groupIds)));
             $groups = $this->lockGroups($groupIds);
 
-            $this->assertGroupsMatchExam($exam, $groups, $groupIds);
+            $this->assertGroupsMatchExam($exam, $groups, $groupIds, $teacherId);
 
             $enrollments = $this->enrollments($groupIds);
             $this->assertEveryGroupHasRoster($groups, $enrollments);
@@ -56,8 +56,6 @@ class ExamGroupService
              * lista del otro. Hoy assertExamCanBeConfigured ya limita quién puede llamar
              * este método al docente dueño del examen.
              */
-            $teacherId = $this->subjectCatalog->teacherId();
-
             $previousOwnGroupIds = $exam->groups()
                 ->where('id_usuario_docente', $teacherId)
                 ->pluck('grupo.id_grupo')
@@ -76,9 +74,9 @@ class ExamGroupService
         });
     }
 
-    private function assertExamCanBeConfigured(Exam $exam): void
+    private function assertExamCanBeConfigured(Exam $exam, string $teacherId): void
     {
-        if ((string) $exam->id_usuario_docente !== $this->subjectCatalog->teacherId()) {
+        if ((string) $exam->id_usuario_docente !== $teacherId) {
             throw new ExamOwnershipException();
         }
 
@@ -98,7 +96,7 @@ class ExamGroupService
             ->get();
     }
 
-    private function assertGroupsMatchExam(Exam $exam, Collection $groups, array $groupIds): void
+    private function assertGroupsMatchExam(Exam $exam, Collection $groups, array $groupIds, string $teacherId): void
     {
         if ($groups->count() !== count($groupIds)) {
             throw ValidationException::withMessages([
@@ -106,7 +104,6 @@ class ExamGroupService
             ]);
         }
 
-        $teacherId = $this->subjectCatalog->teacherId();
         $activePeriodId = $this->subjectCatalog->activePeriodId();
 
         foreach ($groups as $group) {

@@ -1,38 +1,28 @@
-import { render, screen, waitForElementToBeRemoved } from '@testing-library/react'
-import { MemoryRouter, useLocation } from 'react-router-dom'
+import { screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { CurrentUserProvider, type Area } from '@/features/auth'
-import { mockApiOnce } from '@/test/http'
-import { AppRouter } from './AppRouter'
+import { mockApiWith } from '@/test/http'
+import { TOKEN_STORAGE_KEY, meBody, type AccountKey } from '@/test/authFixtures'
+import { renderApp } from '@/test/renderApp'
 
 /**
- * Misma clave de `localStorage` que usa `CurrentUserProvider` para recordar el
- * área elegida en el selector de desarrollo (HU-37 la reemplaza por la sesión
- * real). No hay otra forma de fijar el área antes de montar sin exportar algo
- * nuevo del feature `auth` solo para pruebas.
+ * Las áreas salen del rol de la sesión. Sin sesión, la app es el área Docente, como siempre.
  */
-const AREA_STORAGE_KEY = 'sciem.dev.area'
+function stubBackend(session: AccountKey | null) {
+  if (session) {
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, 'tok')
+  }
 
-function LocationSpy({ onChange }: { onChange: (pathname: string) => void }) {
-  onChange(useLocation().pathname)
-  return null
-}
+  return mockApiWith(({ url }) => {
+    if (url.endsWith('/auth/yo')) {
+      return session ? { body: meBody(session) } : { status: 401, body: { message: 'Unauthenticated.' } }
+    }
 
-function renderAppRouterAt(area: Area, route: string) {
-  window.localStorage.setItem(AREA_STORAGE_KEY, area)
+    if (url.endsWith('/materias')) {
+      return { body: { data: [], meta: { total: 0, total_mias: 0, id_periodo_activo: 1 } } }
+    }
 
-  let pathname = ''
-
-  render(
-    <MemoryRouter initialEntries={[route]}>
-      <CurrentUserProvider>
-        <AppRouter />
-        <LocationSpy onChange={(value) => (pathname = value)} />
-      </CurrentUserProvider>
-    </MemoryRouter>
-  )
-
-  return { get pathname() { return pathname } }
+    return { body: { data: [] } }
+  })
 }
 
 describe('AppRouter — acceso a /ambientes por área', () => {
@@ -41,35 +31,35 @@ describe('AppRouter — acceso a /ambientes por área', () => {
   })
 
   it('un Administrador entra a Ambientes', async () => {
-    mockApiOnce({ body: { data: [] } })
+    stubBackend('administrador')
 
-    const location = renderAppRouterAt('administrador', '/ambientes')
+    const app = renderApp('/ambientes')
 
-    await waitForElementToBeRemoved(() => screen.queryByRole('status'))
-
-    expect(screen.getByRole('heading', { name: 'Registrar ambiente' })).toBeInTheDocument()
-    expect(location.pathname).toBe('/ambientes')
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Registrar ambiente' })).toBeInTheDocument()
+    )
+    expect(app.pathname).toBe('/ambientes')
   })
 
   it('un Docente que navega a /ambientes es redirigido a la home de su área', async () => {
-    mockApiOnce({ body: { data: [] } })
+    stubBackend('docente')
 
-    const location = renderAppRouterAt('docente', '/ambientes')
+    const app = renderApp('/ambientes')
 
+    await waitFor(() => expect(app.pathname).toBe('/materias'))
     expect(
       screen.queryByRole('heading', { name: 'Registrar ambiente' })
     ).not.toBeInTheDocument()
-    expect(location.pathname).toBe('/materias')
 
-    await waitForElementToBeRemoved(() => screen.queryByRole('status'))
   })
 
-  it('un Auxiliar que navega a /ambientes es redirigido a Mis exámenes', async () => {
-    mockApiOnce({ body: { data: [] } })
+  it('sin sesión la app es el área Docente y no exige iniciar sesión', async () => {
+    stubBackend(null)
 
-    const location = renderAppRouterAt('auxiliar', '/ambientes')
+    const app = renderApp('/ambientes')
 
-    expect(location.pathname).toBe('/mis-examenes')
-    expect(await screen.findByText('No tiene exámenes por controlar')).toBeVisible()
+    await waitFor(() => expect(app.pathname).toBe('/materias'))
+    expect(screen.queryByRole('heading', { name: 'Iniciar sesión' })).not.toBeInTheDocument()
+
   })
 })

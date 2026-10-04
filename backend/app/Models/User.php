@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Support\SisCode;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\HasApiTokens;
 
 /**
  * Mapea public.usuario.
@@ -23,7 +25,7 @@ use Illuminate\Support\Str;
  */
 class User extends Authenticatable
 {
-    use HasFactory;
+    use HasApiTokens, HasFactory;
 
     public const ESTADO_ACTIVO   = 'ACTIVO';
     public const ESTADO_INACTIVO = 'INACTIVO';
@@ -62,6 +64,12 @@ class User extends Authenticatable
                 $user->id_usuario = (string) Str::uuid();
             }
         });
+    }
+
+    /** El SIS se guarda siempre en su forma canónica (ver SisCode). */
+    public function setCodSisAttribute($value): void
+    {
+        $this->attributes['cod_sis'] = is_string($value) ? SisCode::normalize($value) : $value;
     }
 
     /** Permite usar {user} en las rutas resolviendo por id_usuario. */
