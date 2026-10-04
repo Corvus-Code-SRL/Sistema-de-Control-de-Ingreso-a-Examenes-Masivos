@@ -2,20 +2,15 @@
 
 namespace App\Http\Requests\Academic;
 
-use Illuminate\Foundation\Http\FormRequest;
-
-class AddAssistantToGroupsRequest extends FormRequest
+class AddAssistantToGroupsRequest extends AssistantManagementRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
+    private const MAX_ID = 2147483647;
 
     public function rules(): array
     {
         return [
             'grupos' => ['required', 'array', 'min:1'],
-            'grupos.*' => ['integer', 'min:1'],
+            'grupos.*' => ['integer', 'min:1', 'max:' . self::MAX_ID, 'distinct'],
         ];
     }
 
@@ -27,6 +22,8 @@ class AddAssistantToGroupsRequest extends FormRequest
             'grupos.min' => 'Debe seleccionar al menos un grupo.',
             'grupos.*.integer' => 'Cada grupo debe ser un identificador numérico.',
             'grupos.*.min' => 'El identificador del grupo no es válido.',
+            'grupos.*.max' => 'El identificador del grupo no es válido.',
+            'grupos.*.distinct' => 'No se puede repetir un grupo en la selección.',
         ];
     }
 }

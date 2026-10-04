@@ -43,21 +43,25 @@ Route::post(
     [StudentRosterController::class, 'confirm']
 );
 
-// HU-08: auxiliares del docente
+// HU-08: auxiliares del docente. {id_grupo} y {id_examen} son enteros; {id_usuario} es un uuid.
 Route::prefix('docente')->group(function () {
     Route::get('auxiliares', [AssistantController::class, 'index']);
-    Route::get('auxiliares/buscar', [AssistantController::class, 'buscar']);
+    Route::get('auxiliares/buscar', [AssistantController::class, 'search']);
 
     Route::get('grupos', [MyGroupsController::class, 'index']);
 
-    Route::post(
-        'auxiliares/{id_usuario}/grupos',
-        [AssistantController::class, 'anadirAVariosGrupos']
-    );
+    Route::post('auxiliares/{id_usuario}/grupos', [AssistantController::class, 'addToGroups'])
+        ->whereUuid('id_usuario');
 
-    Route::post('grupos/{id_grupo}/auxiliares', [AssistantController::class, 'anadirAGrupo']);
-    Route::post('examenes/{id_examen}/auxiliares', [AssistantController::class, 'habilitarParaExamen']);
+    Route::post('grupos/{id_grupo}/auxiliares', [AssistantController::class, 'addToGroup'])
+        ->whereNumber('id_grupo');
+    Route::post('examenes/{id_examen}/auxiliares', [AssistantController::class, 'enableForExam'])
+        ->whereNumber('id_examen');
 
-    Route::delete('grupos/{id_grupo}/auxiliares/{id_usuario}', [AssistantController::class, 'quitarDeGrupo']);
-    Route::delete('examenes/{id_examen}/auxiliares/{id_usuario}', [AssistantController::class, 'quitarDeExamen']);
+    Route::delete('grupos/{id_grupo}/auxiliares/{id_usuario}', [AssistantController::class, 'removeFromGroup'])
+        ->whereNumber('id_grupo')
+        ->whereUuid('id_usuario');
+    Route::delete('examenes/{id_examen}/auxiliares/{id_usuario}', [AssistantController::class, 'removeFromExam'])
+        ->whereNumber('id_examen')
+        ->whereUuid('id_usuario');
 });
