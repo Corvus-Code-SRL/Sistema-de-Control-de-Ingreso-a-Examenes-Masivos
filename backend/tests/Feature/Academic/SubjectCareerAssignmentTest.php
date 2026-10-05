@@ -316,4 +316,40 @@ class SubjectCareerAssignmentTest extends TestCase
             )
             ->assertForbidden();
     }
+
+    public function test_rechaza_carrera_no_numerica_con_404(): void
+    {
+        $this->actingAs($this->adminUser)
+            ->postJson('/api/administracion/carreras/abc/materias', [
+                'id_materia' => $this->subject->id_materia,
+            ])
+            ->assertNotFound();
+
+        $this->assertDatabaseMissing('materia_carrera', [
+            'id_materia' => $this->subject->id_materia,
+        ]);
+    }
+
+    public function test_rechaza_carrera_fuera_de_rango_con_404(): void
+    {
+        $this->actingAs($this->adminUser)
+            ->getJson(
+                '/api/administracion/carreras/99999999999/materias-asignables'
+            )
+            ->assertNotFound();
+    }
+
+    public function test_rechaza_id_materia_fuera_de_rango(): void
+    {
+        $this->actingAs($this->adminUser)
+            ->postJson($this->assignmentUrl(), [
+                'id_materia' => 99999999999,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('id_materia');
+
+        $this->assertDatabaseMissing('log', [
+            'tabla_afectada' => 'materia_carrera',
+        ]);
+    }
 }

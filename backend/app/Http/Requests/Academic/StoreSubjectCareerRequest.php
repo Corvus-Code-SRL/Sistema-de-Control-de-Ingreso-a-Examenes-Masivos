@@ -18,6 +18,7 @@ class StoreSubjectCareerRequest extends FormRequest
             'id_materia' => [
                 'required',
                 'integer',
+                'max:2147483647',
                 'exists:materia,id_materia',
             ],
         ];
@@ -33,6 +34,7 @@ class StoreSubjectCareerRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'id_materia.max' => 'El identificador de la materia no es válido.',
             'id_materia.exists' => 'La materia seleccionada no existe.',
         ];
     }

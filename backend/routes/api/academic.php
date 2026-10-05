@@ -18,7 +18,8 @@ Route::get('materias/administracion', [SubjectController::class, 'adminIndex'])
     ->middleware('auth:sanctum');
 
 Route::get('periodos', [PeriodController::class, 'index']);
-// Nuestra nueva ruta de la HU-006 protegida para que solo Administradores autenticados puedan crear
+
+// Endpoint legado de registro de materias.
 Route::post('materias', [SubjectController::class, 'store'])->middleware('auth:sanctum');
 
 Route::put('materias/{subject}', [SubjectController::class, 'update'])
@@ -29,6 +30,7 @@ Route::get(
     [SubjectGroupController::class, 'index']
 );
 
+// HU-06: asignar una materia existente a una carrera.
 Route::middleware('auth:sanctum')
     ->prefix('administracion')
     ->group(function () {
@@ -40,12 +42,16 @@ Route::middleware('auth:sanctum')
         Route::get(
             'carreras/{career}/materias-asignables',
             [SubjectCareerAssignmentController::class, 'assignableSubjects']
-        );
+        )
+            ->whereNumber('career')
+            ->where('career', '[0-9]{1,10}');
 
         Route::post(
             'carreras/{career}/materias',
             [SubjectCareerAssignmentController::class, 'store']
-        );
+        )
+            ->whereNumber('career')
+            ->where('career', '[0-9]{1,10}');
     });
 
 Route::get('grupos/{id_grupo}', [GroupController::class, 'show']);
