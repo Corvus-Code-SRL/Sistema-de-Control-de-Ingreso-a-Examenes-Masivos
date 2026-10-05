@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react'
-import { AlertOctagon, Upload } from 'lucide-react'
+import { AlertOctagon } from 'lucide-react'
 import { ReadOnlyField } from '@/components/common/ReadOnlyField'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -209,17 +209,6 @@ export function RegistrarGrupoForm({
           </div>
         </div>
 
-        {/* Nómina de estudiantes (placeholder visual - HU-021) */}
-        <div className="flex flex-col gap-1">
-          <Label className="text-xs font-medium text-foreground">
-            Nómina de estudiantes <span className="text-muted-foreground font-normal">(opcional)</span>
-          </Label>
-          <RosterDropzonePlaceholder />
-          <p className="text-xs text-muted-foreground leading-normal">
-            CSV o XLSX, hasta 5 MB. Si no la adjunta ahora, el grupo queda «Sin nómina cargada».
-          </p>
-        </div>
-
         <div className="flex justify-end gap-2 pt-3 border-t mt-1">
           <Button type="button" variant="secondary" size="sm" disabled={isSubmitting} onClick={onCancel} className="text-xs">
             Cancelar
@@ -229,20 +218,6 @@ export function RegistrarGrupoForm({
           </Button>
         </div>
       </form>
-    </div>
-  )
-}
-
-function RosterDropzonePlaceholder() {
-  return (
-    <div
-      className="flex items-center justify-center gap-2 rounded-md border border-dashed border-input px-4 py-3 text-xs text-muted-foreground bg-muted/20"
-      aria-disabled="true"
-    >
-      <Upload className="size-3.5 text-brand" aria-hidden="true" />
-      <span className="text-xs">
-        <span className="text-brand font-medium underline underline-offset-2 cursor-pointer">Seleccionar archivo</span> o arrastrarlo aquí
-      </span>
     </div>
   )
 }

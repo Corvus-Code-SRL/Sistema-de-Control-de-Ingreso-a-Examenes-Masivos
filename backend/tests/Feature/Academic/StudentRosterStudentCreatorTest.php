@@ -28,20 +28,10 @@ class StudentRosterStudentCreatorTest extends TestCase
             'JOSE DIEGO'
         );
 
-        $student = $this->creator()->create($row);
+        $created = $this->creator()->createMany([$row]);
 
-        $this->assertNotNull($student->id_estudiante);
-        $this->assertSame('20200240', $student->cod_sis);
-        $this->assertSame('JOSE DIEGO', $student->nombre);
-        $this->assertSame('ACUÑA QUISPE', $student->apellido_paterno);
-        $this->assertNull($student->apellido_materno);
-        $this->assertNull($student->correo_institucional);
-        $this->assertNull($student->telefono);
-        $this->assertNull($student->ci);
-        $this->assertSame(RecordStatus::ACTIVE, $student->estado);
-
+        $this->assertSame(1, $created);
         $this->assertDatabaseHas('estudiante', [
-            'id_estudiante' => $student->id_estudiante,
             'cod_sis' => '20200240',
             'ci' => null,
             'nombre' => 'JOSE DIEGO',
@@ -53,32 +43,74 @@ class StudentRosterStudentCreatorTest extends TestCase
         ]);
     }
 
-    public function test_crea_solamente_un_estudiante_y_sin_consultas_de_ci(): void
+    public function test_crea_todos_los_estudiantes_con_una_sola_consulta_y_sin_consultas_de_ci(): void
     {
-        $row = new StudentRosterRow(9, '00123456', 'PEREZ ROJAS', 'ANA');
+        $rows = [];
+
+        for ($i = 1; $i <= 50; $i++) {
+            $rows[] = new StudentRosterRow($i + 1, (string) (300000000 + $i), 'PEREZ ROJAS', 'ANA ' . $i);
+        }
 
         $before = DB::table('estudiante')->count();
 
         DB::enableQueryLog();
         DB::flushQueryLog();
 
-        $this->creator()->create($row);
+        $created = $this->creator()->createMany($rows);
 
         $queries = DB::getQueryLog();
         DB::disableQueryLog();
 
-        $this->assertSame($before + 1, DB::table('estudiante')->count());
+        $this->assertSame(50, $created);
+        $this->assertSame($before + 50, DB::table('estudiante')->count());
         $this->assertCount(1, $queries);
     }
 
     public function test_permite_varios_estudiantes_sin_ci(): void
     {
-        $this->creator()->create(new StudentRosterRow(2, '202400001', 'PEREZ ROJAS', 'ANA'));
-        $this->creator()->create(new StudentRosterRow(3, '202400002', 'ROJAS FLORES', 'LUIS'));
+        $this->creator()->createMany([
+            new StudentRosterRow(2, '202400001', 'PEREZ ROJAS', 'ANA'),
+            new StudentRosterRow(3, '202400002', 'ROJAS FLORES', 'LUIS'),
+        ]);
 
         $this->assertSame(
             2,
             DB::table('estudiante')->whereIn('cod_sis', ['202400001', '202400002'])->whereNull('ci')->count()
         );
+    }
+
+    public function test_un_cod_sis_que_ya_existe_se_reutiliza_sin_fallar_ni_duplicar(): void
+    {
+        DB::table('estudiante')->insert([
+            'cod_sis' => '202400001',
+            'ci' => '1234567',
+            'nombre' => 'PREVIO',
+            'apellido_paterno' => 'EXISTENTE',
+            'estado' => RecordStatus::ACTIVE,
+        ]);
+
+        $created = $this->creator()->createMany([
+            new StudentRosterRow(2, '202400001', 'PEREZ ROJAS', 'ANA'),
+            new StudentRosterRow(3, '202400002', 'ROJAS FLORES', 'LUIS'),
+        ]);
+
+        $this->assertSame(1, $created);
+        $this->assertSame(1, DB::table('estudiante')->where('cod_sis', '202400001')->count());
+        $this->assertSame('PREVIO', DB::table('estudiante')->where('cod_sis', '202400001')->value('nombre'));
+        $this->assertSame('1234567', DB::table('estudiante')->where('cod_sis', '202400001')->value('ci'));
+    }
+
+    public function test_sin_filas_no_ejecuta_ninguna_consulta(): void
+    {
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+
+        $created = $this->creator()->createMany([]);
+
+        $queries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        $this->assertSame(0, $created);
+        $this->assertCount(0, $queries);
     }
 }

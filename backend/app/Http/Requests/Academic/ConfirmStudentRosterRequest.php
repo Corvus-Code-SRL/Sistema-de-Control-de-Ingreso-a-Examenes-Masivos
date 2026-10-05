@@ -2,23 +2,12 @@
 
 namespace App\Http\Requests\Academic;
 
-use Illuminate\Foundation\Http\FormRequest;
-
-class ConfirmStudentRosterRequest extends FormRequest
+class ConfirmStudentRosterRequest extends RosterManagementRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
-
     public function rules(): array
     {
         return [
-            'id_grupo' => [
-                'required',
-                'integer',
-                'min:1',
-            ],
+            'id_grupo' => $this->groupIdRules(),
             'token' => [
                 'required',
                 'string',
@@ -28,20 +17,9 @@ class ConfirmStudentRosterRequest extends FormRequest
         ];
     }
 
-    public function validationData(): array
-    {
-        return array_merge(
-            parent::validationData(),
-            $this->route()->parameters()
-        );
-    }
-
     public function messages(): array
     {
-        return [
-            'id_grupo.required' => 'Debe indicarse el grupo.',
-            'id_grupo.integer' => 'El identificador del grupo debe ser numérico.',
-            'id_grupo.min' => 'El identificador del grupo no es válido.',
+        return $this->groupIdMessages() + [
             'token.required' => 'Debe indicarse el token del preview.',
             'token.string' => 'El token del preview no es válido.',
             'token.size' => 'El token del preview no es válido.',

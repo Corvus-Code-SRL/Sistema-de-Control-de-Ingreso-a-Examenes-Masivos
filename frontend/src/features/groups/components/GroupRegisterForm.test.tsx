@@ -81,6 +81,15 @@ describe('RegistrarGrupoForm (HU-018)', () => {
     expect(screen.queryByText('Paola Careaga')).not.toBeInTheDocument()
   })
 
+  it('no ofrece cargar la nómina dentro del registro: eso se hace después, en el grupo', () => {
+    const { container } = renderForm()
+
+    expect(container.querySelector('input[type="file"]')).toBeNull()
+    expect(screen.queryByText(/Seleccionar archivo/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Sin nómina cargada/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Nómina de estudiantes/i)).not.toBeInTheDocument()
+  })
+
   it('no ofrece el campo Auxiliares (corresponde a HU-005)', () => {
     renderForm()
 

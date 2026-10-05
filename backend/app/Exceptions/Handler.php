@@ -2,7 +2,10 @@
 
 namespace App\Exceptions;
 
+use App\Support\ApiResponse;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Http\Exceptions\PostTooLargeException;
+use Illuminate\Http\Request;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -36,6 +39,13 @@ class Handler extends ExceptionHandler
     {
         $this->reportable(function (Throwable $e) {
             //
+        });
+
+        // El cuerpo superó post_max_size (16 MB): PHP lo descarta y Laravel responde sin mensaje.
+        $this->renderable(function (PostTooLargeException $e, Request $request) {
+            if ($request->is('api/grupos/*/nomina/*')) {
+                return ApiResponse::error('La nómina no puede superar los 10 MB.', 413);
+            }
         });
     }
 }
