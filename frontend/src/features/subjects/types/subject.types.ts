@@ -57,28 +57,6 @@ export function subjectCareerKey(pair: Pick<SubjectCareer, 'id_carrera' | 'id_ma
   return `${pair.id_carrera}-${pair.id_materia}`
 }
 
-//HU-006 (Registrar Materia)
-export interface CarreraSeleccionada {
-  id_carrera: number;
-  nombre: string;
-  nivel_semestre: string;
-  obligatoria: boolean;
-}
-
-export interface MateriaFormState {
-  codigo: string;
-  nombre: string;
-  descripcion: string;
-  carreras: CarreraSeleccionada[];
-}
-
-export interface FormErrors {
-  global?: string;
-  codigo?: string;
-  nombre?: string;
-  carreras?: string;
-}
-
 // HU-007 (Editar Materia)
 
 export interface AdminSubjectSummary {
@@ -98,6 +76,31 @@ export interface SubjectData {
   codigo: string
   descripcion: string | null
   estado: string
+}
+
+export interface SubjectCareerAssignmentPayload {
+  id_materia: number
+}
+
+export interface SubjectCareerAssignment {
+  id_carrera: number
+  id_materia: number
+  estado: string
+  carrera: Career
+  materia: SubjectData
+}
+
+export interface SubjectCareerAssignmentResponse {
+  data: SubjectCareerAssignment
+  mensaje: string
+}
+
+export interface AdminCareersResponse {
+  data: Career[]
+}
+
+export interface AssignableSubjectsResponse {
+  data: SubjectData[]
 }
 
 export interface UpdateSubjectResponse {

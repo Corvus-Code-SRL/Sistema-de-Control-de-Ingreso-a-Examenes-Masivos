@@ -7,6 +7,7 @@ use App\Http\Controllers\Academic\PeriodController;
 use App\Http\Controllers\Academic\StudentRosterController;
 use App\Http\Controllers\Academic\SubjectController;
 use App\Http\Controllers\Academic\SubjectGroupController;
+use App\Http\Controllers\Academic\SubjectCareerAssignmentController;
 use Illuminate\Support\Facades\Route;
 
 // Rutas del módulo: academic
@@ -17,7 +18,8 @@ Route::get('materias/administracion', [SubjectController::class, 'adminIndex'])
     ->middleware('auth:sanctum');
 
 Route::get('periodos', [PeriodController::class, 'index']);
-// Nuestra nueva ruta de la HU-006 protegida para que solo Administradores autenticados puedan crear
+
+// Endpoint legado de registro de materias.
 Route::post('materias', [SubjectController::class, 'store'])->middleware('auth:sanctum');
 
 Route::put('materias/{subject}', [SubjectController::class, 'update'])
@@ -27,6 +29,29 @@ Route::get(
     'carreras/{id_carrera}/materias/{id_materia}/grupos',
     [SubjectGroupController::class, 'index']
 );
+
+// HU-06: asignar una materia existente a una carrera.
+Route::middleware('auth:sanctum')
+    ->prefix('administracion')
+    ->group(function () {
+        Route::get(
+            'carreras',
+            [SubjectCareerAssignmentController::class, 'careers']
+        );
+
+        // {career} admite hasta 9 dígitos para que nunca exceda el rango de int4 de la base.
+        Route::get(
+            'carreras/{career}/materias-asignables',
+            [SubjectCareerAssignmentController::class, 'assignableSubjects']
+        )
+            ->where('career', '[0-9]{1,9}');
+
+        Route::post(
+            'carreras/{career}/materias',
+            [SubjectCareerAssignmentController::class, 'store']
+        )
+            ->where('career', '[0-9]{1,9}');
+    });
 
 Route::get('grupos/{id_grupo}', [GroupController::class, 'show']);
 Route::post('grupos', [GroupController::class, 'store']);

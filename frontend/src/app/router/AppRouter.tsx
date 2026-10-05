@@ -16,7 +16,12 @@ import { EntryControlPage, OpenEntryControlsPage } from '@/features/entry-contro
 import { CreateExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
 import { CourseDetailPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
 import { ClassroomsPage } from '@/features/classrooms'
-import { AdminSubjectsPage, EditarMateriaPage, SubjectsPage } from '@/features/subjects'
+import {
+  AdminSubjectsPage,
+  EditarMateriaPage,
+  SubjectCareerAssignmentPage,
+  SubjectsPage,
+} from '@/features/subjects'
 import { CuentaDetallePage, CuentasPage } from '@/features/users'
 
 /** Envuelve una pantalla con la capacidad que exige. Sin sesión deja pasar (ver ProtectedRoute). */
@@ -99,6 +104,10 @@ function AdministradorRoutes() {
       <Route
         path="/materias"
         element={guarded('administracion.gestionar', <AdminSubjectsPage />)}
+      />
+      <Route
+        path="/materias/asignar"
+        element={guarded('administracion.gestionar', <SubjectCareerAssignmentPage />)}
       />
       <Route
         path="/materias/:idMateria/editar"

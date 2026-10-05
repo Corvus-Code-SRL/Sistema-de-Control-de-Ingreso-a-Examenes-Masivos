@@ -1,8 +1,11 @@
-import { apiClient, apiPut } from '@/lib/api-client'
+import { apiClient, apiPost, apiPut } from '@/lib/api-client'
 import type { PageRequest } from '@/types/api.types'
 import type {
+  AdminCareersResponse,
   AdminSubjectSummary,
-  MateriaFormState,
+  AssignableSubjectsResponse,
+  SubjectCareerAssignmentPayload,
+  SubjectCareerAssignmentResponse,
   SubjectCatalogPage,
   SubjectCatalogResponse,
   UpdateSubjectPayload,
@@ -79,30 +82,51 @@ export async function getAdminSubjects(
 }
 
 /* ==========================================================================
-    HU-006 (Registrar Materia)
+   HU-06 (Asignar Materia a Carrera)
    ========================================================================== */
 
 /**
- * Envía el formulario para registrar una nueva materia en el catálogo.
+ * Obtiene las carreras activas disponibles para Administración.
  */
-export async function registrarMateria(data: MateriaFormState) {
-  // Como el apiClient actual solo está tipado para GET, usamos fetch nativo.
-  const response = await fetch('/api/materias', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
+export async function getAdminCareers(
+  signal?: AbortSignal
+): Promise<AdminCareersResponse['data']> {
+  const response = await apiClient<AdminCareersResponse>(
+    '/administracion/carreras',
+    { signal }
+  )
 
-  if (!response.ok) {
-    // Si Laravel devuelve error de validación (422), lo lanzamos para que la UI lo atrape
-    const errorData = await response.json();
-    throw errorData;
-  }
+  return response.data
+}
 
-  return response.json();
+/**
+ * Obtiene las materias activas que todavía no están vinculadas a la carrera.
+ */
+export async function getAssignableSubjects(
+  careerId: number,
+  signal?: AbortSignal
+): Promise<AssignableSubjectsResponse['data']> {
+  const response = await apiClient<AssignableSubjectsResponse>(
+    `/administracion/carreras/${careerId}/materias-asignables`,
+    { signal }
+  )
+
+  return response.data
+}
+
+/**
+ * Asigna una materia existente a una carrera.
+ */
+export async function assignSubjectToCareer(
+  careerId: number,
+  payload: SubjectCareerAssignmentPayload,
+  signal?: AbortSignal
+): Promise<SubjectCareerAssignmentResponse> {
+  return apiPost<SubjectCareerAssignmentResponse>(
+    `/administracion/carreras/${careerId}/materias`,
+    payload,
+    { signal }
+  )
 }
 
 /* ==========================================================================

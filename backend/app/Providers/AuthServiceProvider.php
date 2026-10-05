@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Models\Group;
 use App\Models\Subject;
+use App\Models\SubjectCareer;
+use App\Policies\SubjectCareerPolicy;
 use App\Policies\Academic\GroupPolicy;
 use App\Policies\SubjectPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
@@ -18,6 +20,7 @@ class AuthServiceProvider extends ServiceProvider
     protected $policies = [
         Group::class => GroupPolicy::class,
         Subject::class => SubjectPolicy::class,
+        SubjectCareer::class => SubjectCareerPolicy::class,
     ];
 
     /**
