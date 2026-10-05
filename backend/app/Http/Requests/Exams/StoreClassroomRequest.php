@@ -36,7 +36,7 @@ class StoreClassroomRequest extends FormRequest
             'nro_aula' => [
                 'required',
                 'string',
-                'max:50',
+                'max:10',
                 function (string $attribute, mixed $value, \Closure $fail): void {
                     // Compara sin distinguir mayúsculas ni espacios, contra filas activas e
                     // inactivas por igual: la constraint UNIQUE(nro_aula) de la base hace lo mismo.
@@ -49,7 +49,7 @@ class StoreClassroomRequest extends FormRequest
                     }
                 },
             ],
-            'capacidad' => ['required', 'integer', 'min:1'],
+            'capacidad' => ['required', 'integer', 'min:1', 'max:2147483647'],
             'ubicacion' => ['required', 'string', 'max:255'],
         ];
     }
@@ -57,7 +57,10 @@ class StoreClassroomRequest extends FormRequest
     public function messages(): array
     {
         return [
+            // ambiente.nro_aula es varchar(10) y ambiente.capacidad es integer (int4).
+            'nro_aula.max' => 'El nombre del ambiente no puede superar los 10 caracteres.',
             'capacidad.min' => 'La capacidad debe ser mayor a cero.',
+            'capacidad.max' => 'La capacidad no puede superar 2147483647.',
         ];
     }
 }

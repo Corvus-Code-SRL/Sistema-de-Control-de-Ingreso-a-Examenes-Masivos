@@ -65,4 +65,40 @@ describe('ClassroomForm', () => {
       ).toBeInTheDocument()
     )
   })
+
+  it('limita el nombre del ambiente a 10 caracteres, como la columna de la base', async () => {
+    const user = userEvent.setup()
+
+    render(<ClassroomForm onCreated={vi.fn()} />)
+
+    const nombre = screen.getByLabelText(/Nombre del ambiente/i)
+    expect(nombre).toHaveAttribute('maxlength', '10')
+
+    await user.type(nombre, 'Auditorio12')
+
+    expect(nombre).toHaveValue('Auditorio1')
+  })
+
+  it('muestra el error del backend cuando la capacidad excede el máximo', async () => {
+    const user = userEvent.setup()
+
+    mockApiOnce({
+      status: 422,
+      body: {
+        message: 'Los datos proporcionados no son válidos.',
+        errors: { capacidad: ['La capacidad no puede superar 2147483647.'] }
+      }
+    })
+
+    render(<ClassroomForm onCreated={vi.fn()} />)
+
+    await user.type(screen.getByLabelText(/Nombre del ambiente/i), 'Aula 101')
+    await user.type(screen.getByLabelText(/Capacidad/i), '99999999999')
+    await user.type(screen.getByLabelText(/Ubicación/i), 'Modulo A')
+    await user.click(screen.getByRole('button', { name: /Registrar ambiente/i }))
+
+    expect(
+      await screen.findByText('La capacidad no puede superar 2147483647.')
+    ).toBeInTheDocument()
+  })
 })
