@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { ApiError } from '@/lib/api-client';
 import { registerUser, verifySisCode } from '../services/usersService';
-import type { SisPerson } from '../types/users.types';
+import type { SisPerson, UserAccount } from '../types/users.types';
 
 interface RegistrarCuentaModalProps {
   isOpen: boolean;
@@ -24,11 +24,22 @@ function toFormErrors(error: ApiError): Record<string, string> {
   return Object.keys(fieldErrors).length > 0 ? fieldErrors : { general: error.message };
 }
 
+function currentTime(): string {
+  return new Intl.DateTimeFormat('es-BO', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date());
+}
+
 export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [paso, setPaso] = useState<1 | 2 | 'success'>(1);
   const [codSis, setCodSis] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [sisData, setSisData] = useState<SisPerson | null>(null);
+  const [verifiedAt, setVerifiedAt] = useState<string | null>(null);
+  const [registeredAt, setRegisteredAt] = useState<string | null>(null);
+  const [registeredAccount, setRegisteredAccount] = useState<UserAccount | null>(null);
   // Una verificación en curso se aborta al cancelar: su respuesta no debe revivir el registro.
   const verification = useRef<AbortController | null>(null);
   const [errorType, setErrorType] = useState<ErrorType>(null);
@@ -51,7 +62,10 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
     verification.current = controller;
 
     try {
-      setSisData(await verifySisCode(codSis, controller.signal));
+      const person = await verifySisCode(codSis, controller.signal);
+
+      setSisData(person);
+      setVerifiedAt(currentTime());
     } catch (error) {
       if (controller.signal.aborted) return;
 
@@ -94,13 +108,16 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
 
     try {
       // Solo los campos que declara StoreUserRequest: teléfono, tipo y facultad no se persisten.
-      await registerUser({
+      const account = await registerUser({
         cod_sis: codSis,
         nombre: sisData.nombre,
         apellido_paterno: sisData.paterno,
         apellido_materno: sisData.materno,
         correo,
       });
+
+      setRegisteredAccount(account);
+      setRegisteredAt(currentTime());
       setPaso('success');
     } catch (error) {
       setFormErrors(
@@ -129,6 +146,9 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
     setPaso(1);
     setCodSis('');
     setSisData(null);
+    setVerifiedAt(null);
+    setRegisteredAt(null);
+    setRegisteredAccount(null);
     setErrorType(null);
     setBackendErrorMsg('');
     setCorreo('');
@@ -181,7 +201,9 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
           <div className="flex-1 min-w-0">
             <h2 className="text-[18px] leading-[26px] font-semibold text-text">Registrar cuenta</h2>
             <p className="text-[13px] text-muted-foreground leading-[19px] mt-0.5">
-              {paso === 1 ? 'Paso 1 de 2' : paso === 2 ? 'Paso 2 de 2' : 'Registrada a las 09:14 · queda en la bitácora'}
+              {paso === 1 ? 'Paso 1 de 2' : paso === 2 ? 'Paso 2 de 2' : registeredAt
+                ? `Registrada a las ${registeredAt} (hora de este equipo)`
+                : 'Registro confirmado · queda en la bitácora'}
             </p>
           </div>
           <button onClick={handleCerrar} disabled={isSubmitting} aria-label="Cancelar registro" className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:bg-bg-app rounded-[8px] transition-colors">
@@ -269,13 +291,19 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
 
                   {!hasInputError && (
                     <div className="text-[13px] text-muted-foreground leading-[18px]">
-                      {sisData ? 'Verificado a las 09:14.' : 'Se consulta en la fuente institucional antes de continuar.'}
+                      {sisData && verifiedAt
+                        ? `Verificado a las ${verifiedAt}.`
+                        : 'Se consulta en la fuente institucional antes de continuar.'}
                     </div>
                   )}
                 </div>
 
                 {sisData ? (
-                  <button onClick={() => { setSisData(null); setCodSis(''); }} className="mt-7 w-full md:w-auto h-10 px-4 flex items-center justify-center gap-2 rounded-[10px] text-brand text-[14px] font-semibold hover:bg-bg-app transition-colors shrink-0">
+                  <button onClick={() => {
+                    setSisData(null);
+                    setCodSis('');
+                    setVerifiedAt(null);
+                  }} className="mt-7 w-full md:w-auto h-10 px-4 flex items-center justify-center gap-2 rounded-[10px] text-brand text-[14px] font-semibold hover:bg-bg-app transition-colors shrink-0">
                     <Pencil className="w-4 h-4" /> Cambiar
                   </button>
                 ) : (
@@ -406,7 +434,9 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
                   {formErrors.correo ? (
                     <div className="text-[13px] text-danger font-medium flex gap-1.5 mt-0.5"><AlertCircle className="w-[18px] h-[18px] shrink-0" /> <span>{formErrors.correo}</span></div>
                   ) : (
-                    <div className="text-[13px] text-muted-foreground">Ahí recibirá sus credenciales de acceso.</div>
+                    <div className="text-[13px] text-muted-foreground">
+                      Este correo quedará asociado a la cuenta.
+                    </div>
                   )}
                 </div>
                 
@@ -459,6 +489,11 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
                 <p className="text-[14px] text-muted-foreground">
                   {sisData?.nombre} {sisData?.paterno} {sisData?.materno} · SIS {codSis} · sin rol
                 </p>
+                {registeredAccount && (
+                  <p className="text-[13px] text-muted-foreground">
+                    {registeredAccount.correo}
+                  </p>
+                )}
               </div>
               
               <div className="w-full flex gap-3 p-4 rounded-[12px] bg-warn-soft border border-warn-border text-warn-fg text-left">
@@ -518,7 +553,16 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
           {paso === 'success' && (
             <>
               <button 
-                onClick={() => { setPaso(1); setCodSis(''); setSisData(null); setCorreo(''); setTelefono(''); }} 
+                onClick={() => {
+                  setPaso(1);
+                  setCodSis('');
+                  setSisData(null);
+                  setCorreo('');
+                  setTelefono('');
+                  setVerifiedAt(null);
+                  setRegisteredAt(null);
+                  setRegisteredAccount(null);
+                }}
                 className="hidden md:flex w-full md:w-auto h-10 px-4 items-center justify-center gap-2 rounded-[10px] text-brand text-[14px] font-semibold hover:bg-bg-app transition-colors"
               >
                 Registrar otra
