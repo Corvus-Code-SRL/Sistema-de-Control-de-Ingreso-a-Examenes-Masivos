@@ -39,19 +39,18 @@ Route::middleware('auth:sanctum')
             [SubjectCareerAssignmentController::class, 'careers']
         );
 
+        // {career} admite hasta 9 dígitos para que nunca exceda el rango de int4 de la base.
         Route::get(
             'carreras/{career}/materias-asignables',
             [SubjectCareerAssignmentController::class, 'assignableSubjects']
         )
-            ->whereNumber('career')
-            ->where('career', '[0-9]{1,10}');
+            ->where('career', '[0-9]{1,9}');
 
         Route::post(
             'carreras/{career}/materias',
             [SubjectCareerAssignmentController::class, 'store']
         )
-            ->whereNumber('career')
-            ->where('career', '[0-9]{1,10}');
+            ->where('career', '[0-9]{1,9}');
     });
 
 Route::get('grupos/{id_grupo}', [GroupController::class, 'show']);

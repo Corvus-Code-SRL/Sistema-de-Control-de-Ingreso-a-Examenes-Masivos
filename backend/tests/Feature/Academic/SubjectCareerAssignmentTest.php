@@ -13,6 +13,7 @@ use Database\Seeders\ActionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class SubjectCareerAssignmentTest extends TestCase
@@ -347,6 +348,109 @@ class SubjectCareerAssignmentTest extends TestCase
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors('id_materia');
+
+        $this->assertDatabaseMissing('log', [
+            'tabla_afectada' => 'materia_carrera',
+        ]);
+    }
+
+    /**
+     * @dataProvider outOfRangeCareerIds
+     */
+    public function test_rechaza_carrera_fuera_de_int4_en_materias_asignables(string $careerId): void
+    {
+        $this->actingAs($this->adminUser)
+            ->getJson("/api/administracion/carreras/{$careerId}/materias-asignables")
+            ->assertNotFound();
+    }
+
+    /**
+     * @dataProvider outOfRangeCareerIds
+     */
+    public function test_rechaza_carrera_fuera_de_int4_al_asignar(string $careerId): void
+    {
+        $this->actingAs($this->adminUser)
+            ->postJson("/api/administracion/carreras/{$careerId}/materias", [
+                'id_materia' => $this->subject->id_materia,
+            ])
+            ->assertNotFound();
+
+        $this->assertNoAssignmentWritten();
+    }
+
+    /**
+     * @dataProvider assignmentRoutes
+     */
+    public function test_rutas_de_asignacion_exigen_token(string $method, string $uri): void
+    {
+        $this->callAssignmentRoute($method, $uri)
+            ->assertUnauthorized();
+
+        $this->assertNoAssignmentWritten();
+    }
+
+    /**
+     * @dataProvider assignmentRoutes
+     */
+    public function test_auxiliar_no_puede_usar_rutas_de_asignacion(string $method, string $uri): void
+    {
+        $assistantRole = Role::where('nombre_rol', Role::AUXILIAR)->firstOrFail();
+
+        $assistant = User::factory()->create();
+        $assistant->roles()->attach(
+            $assistantRole->id_rol,
+            ['fecha_inicio' => now()]
+        );
+
+        $this->actingAs($assistant);
+
+        $this->callAssignmentRoute($method, $uri)
+            ->assertForbidden();
+
+        $this->assertNoAssignmentWritten();
+    }
+
+    public function outOfRangeCareerIds(): array
+    {
+        return [
+            'primer valor sobre int4' => ['2147483648'],
+            'diez nueves' => ['9999999999'],
+        ];
+    }
+
+    public function assignmentRoutes(): array
+    {
+        return [
+            'listar carreras' => ['GET', '/api/administracion/carreras'],
+            'listar materias asignables' => [
+                'GET',
+                '/api/administracion/carreras/{career}/materias-asignables',
+            ],
+            'asignar materia' => [
+                'POST',
+                '/api/administracion/carreras/{career}/materias',
+            ],
+        ];
+    }
+
+    private function callAssignmentRoute(string $method, string $uri): TestResponse
+    {
+        $payload = $method === 'POST'
+            ? ['id_materia' => $this->subject->id_materia]
+            : [];
+
+        return $this->json(
+            $method,
+            str_replace('{career}', (string) $this->career->id_carrera, $uri),
+            $payload
+        );
+    }
+
+    private function assertNoAssignmentWritten(): void
+    {
+        $this->assertDatabaseMissing('materia_carrera', [
+            'id_materia' => $this->subject->id_materia,
+        ]);
 
         $this->assertDatabaseMissing('log', [
             'tabla_afectada' => 'materia_carrera',
