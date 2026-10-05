@@ -4,6 +4,7 @@ namespace App\Services\Academic;
 
 use App\Models\Group;
 use App\Models\Period;
+use App\Models\User;
 use App\Support\RecordStatus;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
@@ -49,6 +50,7 @@ class GroupService
                 'total' => $groups->count(),
                 'total_mios' => $groups->where('es_mio', true)->count(),
                 'id_periodo_activo' => $this->subjectCatalog->activePeriodId(),
+                'docente' => ['nombre_completo' => $this->teacherName($teacherId)],
             ],
         ];
     }
@@ -187,6 +189,21 @@ class GroupService
         });
 
         return $this->showGroup($this->findGroup((int) $group->id_grupo), $teacherId);
+    }
+
+    /**
+     * Nombre del docente que actúa: es el "Docente" que el formulario de registro muestra
+     * como dato de solo lectura, y el dueño que tendrá el grupo al crearlo.
+     */
+    private function teacherName(string $teacherId): ?string
+    {
+        if ($teacherId === '') {
+            return null;
+        }
+
+        $teacher = User::query()->find($teacherId);
+
+        return $teacher === null ? null : $teacher->nombre_completo;
     }
 
     private function findPeriodOrFail(int $periodId): Period
