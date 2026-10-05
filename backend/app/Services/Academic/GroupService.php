@@ -9,7 +9,6 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -29,9 +28,9 @@ class GroupService
         $this->subjectCatalog = $subjectCatalog;
     }
 
-    public function listGroupsForPair(int $careerId, int $subjectId): array
+    public function listGroupsForPair(int $careerId, int $subjectId, string $teacherId): array
     {
-        $pair = $this->subjectCatalog->findSelectablePair($careerId, $subjectId);
+        $pair = $this->subjectCatalog->findSelectablePair($careerId, $subjectId, $teacherId);
 
         $groups = $this->markOwnGroups(
             $this->baseGroupQuery()
@@ -39,7 +38,8 @@ class GroupService
                 ->where('grupo.id_materia', $subjectId)
                 ->where('grupo.id_periodo', $this->subjectCatalog->activePeriodId())
                 ->orderBy('grupo.num_grupo')
-                ->get()
+                ->get(),
+            $teacherId
         );
 
         return [
@@ -70,18 +70,15 @@ class GroupService
      * Arma el detalle de un grupo ya autorizado, con su par materia-carrera y periodo:
      * es la unidad sobre la que después se prepara la información de estudiantes.
      */
-    public function showGroup(Group|int $group): array
+    public function showGroup(Group $group, string $teacherId): array
     {
-        if (is_int($group)) {
-            $group = $this->findGroup($group);
-        }
-
         $pair = $this->subjectCatalog->findSelectablePair(
             (int) $group->id_carrera,
-            (int) $group->id_materia
+            (int) $group->id_materia,
+            $teacherId
         );
 
-        $this->markOwnGroup($group, $this->subjectCatalog->teacherId());
+        $this->markOwnGroup($group, $teacherId);
 
         $activePeriodId = $this->subjectCatalog->activePeriodId();
 
@@ -103,11 +100,12 @@ class GroupService
      * registrar el primer grupo es justamente lo que incorpora la materia a
      * "Mis materias", así que no se exige ningún grupo previo.
      */
-    public function storeGroup(array $data): array
+    public function storeGroup(array $data, string $teacherId): array
     {
         $pair = $this->subjectCatalog->findSelectablePair(
             (int) $data['id_carrera'],
-            (int) $data['id_materia']
+            (int) $data['id_materia'],
+            $teacherId
         );
 
         $periodId = (int) ($data['id_periodo'] ?? $this->subjectCatalog->activePeriodId());
@@ -121,7 +119,7 @@ class GroupService
             $periodId
         );
 
-        $group = DB::transaction(function () use ($pair, $data, $period) {
+        $group = DB::transaction(function () use ($pair, $data, $period, $teacherId) {
             try {
                 return Group::create([
                     'id_carrera' => $pair->id_carrera,
@@ -129,7 +127,7 @@ class GroupService
                     'num_grupo' => $data['num_grupo'],
                     'gestion' => $this->groupManagementFor($period),
                     'estado' => RecordStatus::ACTIVE,
-                    'id_usuario_docente' => $this->subjectCatalog->teacherId(),
+                    'id_usuario_docente' => $teacherId,
                     'id_periodo' => $period->id_periodo,
                 ]);
             } catch (QueryException $exception) {
@@ -142,23 +140,23 @@ class GroupService
             }
         });
 
-        return $this->showGroup((int) $group->id_grupo);
+        return $this->showGroup($this->findGroup((int) $group->id_grupo), $teacherId);
     }
 
     /**
      * id_carrera, id_materia e id_usuario_docente son inmutables: se leen del
      * propio grupo, nunca del payload recibido, aunque el FormRequest los reciba.
      */
-    public function updateGroup(int $groupId, array $data): array
+    public function updateGroup(int $groupId, array $data, string $teacherId): array
     {
-        $group = DB::transaction(function () use ($groupId, $data) {
+        $group = DB::transaction(function () use ($groupId, $data, $teacherId) {
             $group = Group::query()->lockForUpdate()->find($groupId);
 
             if ($group === null) {
                 throw new ModelNotFoundException('No existe el grupo indicado.');
             }
 
-            $this->assertGroupBelongsToTeacher($group);
+            $this->assertGroupBelongsToTeacher($group, $teacherId);
 
             $periodId = (int) ($data['id_periodo'] ?? $group->id_periodo);
             $period = $this->findPeriodOrFail($periodId);
@@ -188,7 +186,7 @@ class GroupService
             return $group;
         });
 
-        return $this->showGroup($group);
+        return $this->showGroup($this->findGroup((int) $group->id_grupo), $teacherId);
     }
 
     private function findPeriodOrFail(int $periodId): Period
@@ -220,32 +218,18 @@ class GroupService
     private function baseGroupQuery(): Builder
     {
         return Group::query()
+            ->withStudentCount()
             ->join('usuario', 'usuario.id_usuario', '=', 'grupo.id_usuario_docente')
-            ->select('grupo.*')
             ->addSelect([
                 'usuario.nombre as docente_nombre',
                 'usuario.apellido_paterno as docente_apellido_paterno',
                 'usuario.apellido_materno as docente_apellido_materno',
             ])
-            ->selectSub($this->activeStudentCountQuery(), 'cantidad_estudiantes')
             ->with('period');
     }
 
-    /**
-     * Solo cuentan las inscripciones ACTIVAS: un retiro deja la fila en INACTIVO.
-     */
-    private function activeStudentCountQuery(): QueryBuilder
+    private function markOwnGroups(Collection $groups, string $teacherId): Collection
     {
-        return DB::table('grupo_estudiante')
-            ->selectRaw('count(*)')
-            ->whereColumn('grupo_estudiante.id_grupo', 'grupo.id_grupo')
-            ->where('grupo_estudiante.estado', RecordStatus::ACTIVE);
-    }
-
-    private function markOwnGroups(Collection $groups): Collection
-    {
-        $teacherId = $this->subjectCatalog->teacherId();
-
         return $groups->each(function (Group $group) use ($teacherId): void {
             $this->markOwnGroup($group, $teacherId);
         });
@@ -303,9 +287,9 @@ class GroupService
     /**
      * Un docente no opera grupos ajenos.
      */
-    private function assertGroupBelongsToTeacher(Group $group): void
+    private function assertGroupBelongsToTeacher(Group $group, string $teacherId): void
     {
-        if ((string) $group->id_usuario_docente !== $this->subjectCatalog->teacherId()) {
+        if ((string) $group->id_usuario_docente !== $teacherId) {
             throw new AuthorizationException('No tiene permiso sobre este grupo.');
         }
     }

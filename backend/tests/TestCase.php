@@ -2,18 +2,17 @@
 
 namespace Tests;
 
+use App\Support\CurrentUser;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use RuntimeException;
+use Tests\Support\FakeCurrentUser;
 
 abstract class TestCase extends BaseTestCase
 {
     use CreatesApplication;
 
-    /**
-     * El esquema no lo definen migraciones sino el script de creación del proyecto,
-     * que es la única fuente de verdad. Se carga una sola vez por corrida.
-     */
+    /** El esquema de pruebas se reconstruye desde la migración base y las posteriores. */
     private static bool $schemaLoaded = false;
 
     protected function setUp(): void
@@ -31,14 +30,27 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
     }
 
+    /** Fija el docente que actúa en Academic y Exams, sin tocar la configuración. */
+    protected function actAsTeacher(string $teacherId): void
+    {
+        $this->app->instance(CurrentUser::class, $this->fakeCurrentUser()->withTeacherId($teacherId));
+    }
+
+    /** Fija la cuenta que actúa en Security y la bitácora. */
+    protected function actAsUserId(string $userId): void
+    {
+        $this->app->instance(CurrentUser::class, $this->fakeCurrentUser()->withId($userId));
+    }
+
+    private function fakeCurrentUser(): FakeCurrentUser
+    {
+        $current = $this->app->make(CurrentUser::class);
+
+        return $current instanceof FakeCurrentUser ? $current : new FakeCurrentUser();
+    }
+
     private static function loadDatabaseSchema(Application $app): void
     {
-        $script = dirname($app->basePath()) . '/docs/database/creation-script.sql';
-
-        if (! is_file($script)) {
-            throw new RuntimeException("No se encontró el script de creación: {$script}");
-        }
-
         $connection = $app->make('db')->connection();
 
         if ($connection->getDatabaseName() !== 'sciem_test') {
@@ -48,6 +60,6 @@ abstract class TestCase extends BaseTestCase
         }
 
         $connection->unprepared('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
-        $connection->unprepared(file_get_contents($script));
+        $app->make(\Illuminate\Contracts\Console\Kernel::class)->call('migrate', ['--force' => true]);
     }
 }

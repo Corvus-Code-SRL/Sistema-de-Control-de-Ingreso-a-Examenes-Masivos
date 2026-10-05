@@ -13,13 +13,6 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class UserQueryService
 {
-    private CurrentUserService $currentUser;
-
-    public function __construct(CurrentUserService $currentUser)
-    {
-        $this->currentUser = $currentUser;
-    }
-
     public function listUsers(): Collection
     {
         return User::query()
@@ -39,8 +32,8 @@ class UserQueryService
         ]);
     }
 
-    public function meta(): array
+    public function meta(?string $currentUserId): array
     {
-        return ['id_usuario_actual' => $this->currentUser->id()];
+        return ['id_usuario_actual' => $currentUserId];
     }
 }

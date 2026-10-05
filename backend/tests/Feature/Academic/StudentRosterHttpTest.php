@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\Academic;
 
+use App\Models\Exam;
 use App\Models\Group;
 use App\Models\Student;
 use App\Services\Academic\Importers\StudentRosterDatabaseMatch;
 use App\Services\Academic\Importers\StudentRosterPreviewResult;
+use App\Services\Exams\ExamParticipantService;
 use App\Support\RecordStatus;
 use Illuminate\Cache\ArrayStore;
 use Illuminate\Cache\Repository;
@@ -13,7 +15,7 @@ use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Tests\Concerns\SeedsAcademicCatalog;
+use Tests\Concerns\SeedsExamCatalog;
 use Tests\TestCase;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -21,7 +23,7 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 class StudentRosterHttpTest extends TestCase
 {
     use DatabaseTransactions;
-    use SeedsAcademicCatalog;
+    use SeedsExamCatalog;
 
     protected function setUp(): void
     {
@@ -156,7 +158,6 @@ class StudentRosterHttpTest extends TestCase
                 'estudiantes_creados' => 1,
                 'estudiantes_inscritos' => 2,
                 'ya_inscritos' => 0,
-                'inscripciones_inactivas' => 0,
             ],
         ]);
 
@@ -601,69 +602,39 @@ class StudentRosterHttpTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_mantiene_estados_de_inscripcion_al_confirmar_por_http(): void
+    public function test_reenviar_la_misma_nomina_no_duplica_inscripciones_por_http(): void
     {
         $this->seedAcademicCatalog();
 
         $group = $this->ownActiveGroup();
 
-        $alreadyEnrolledStudent = Student::create([
-            'cod_sis' => '20261001',
-            'ci' => '14000001',
-            'nombre' => 'ANA',
-            'apellido_paterno' => 'PEREZ',
-            'apellido_materno' => null,
-            'correo_institucional' => null,
-            'telefono' => null,
-            'estado' => RecordStatus::ACTIVE,
-        ]);
+        $students = [];
 
-        $inactiveStudent = Student::create([
-            'cod_sis' => '20261002',
-            'ci' => '14000002',
-            'nombre' => 'LUIS',
-            'apellido_paterno' => 'ROJAS',
-            'apellido_materno' => null,
-            'correo_institucional' => null,
-            'telefono' => null,
-            'estado' => RecordStatus::ACTIVE,
-        ]);
-
-        DB::table('grupo_estudiante')->insert([
-            [
-                'id_grupo' => $group->id_grupo,
-                'id_estudiante' => $alreadyEnrolledStudent->id_estudiante,
-                'fecha_inscripcion' => '2026-08-01',
+        foreach ([['20261001', '14000001', 'ANA', 'PEREZ'], ['20261002', '14000002', 'LUIS', 'ROJAS']] as $index => $data) {
+            $students[$index] = Student::create([
+                'cod_sis' => $data[0],
+                'ci' => $data[1],
+                'nombre' => $data[2],
+                'apellido_paterno' => $data[3],
+                'apellido_materno' => null,
+                'correo_institucional' => null,
+                'telefono' => null,
                 'estado' => RecordStatus::ACTIVE,
-            ],
-            [
-                'id_grupo' => $group->id_grupo,
-                'id_estudiante' => $inactiveStudent->id_estudiante,
-                'fecha_inscripcion' => '2026-08-02',
-                'estado' => RecordStatus::INACTIVE,
-            ],
-        ]);
+            ]);
 
-        $csv = implode(PHP_EOL, [
+            DB::table('grupo_estudiante')->insert([
+                'id_grupo' => $group->id_grupo,
+                'id_estudiante' => $students[$index]->id_estudiante,
+                'fecha_inscripcion' => '2026-08-0' . ($index + 1),
+                'estado' => RecordStatus::ACTIVE,
+            ]);
+        }
+
+        $previewResponse = $this->previewCsv($group->id_grupo, implode(PHP_EOL, [
             'Estudiante,Apellidos,Nombres',
             '20261001,PEREZ,ANA',
             '20261002,ROJAS,LUIS',
-        ]);
-
-        $file = UploadedFile::fake()->createWithContent(
-            'nomina.csv',
-            $csv
-        );
-
-        $previewResponse = $this->post(
-            '/api/grupos/' . $group->id_grupo . '/nomina/preview',
-            [
-                'archivo' => $file,
-            ],
-            [
-                'Accept' => 'application/json',
-            ]
-        );
+        ]));
 
         $previewResponse
             ->assertOk()
@@ -679,21 +650,15 @@ class StudentRosterHttpTest extends TestCase
                         ],
                         [
                             'codigo_sis' => '20261002',
-                            'estado' => StudentRosterDatabaseMatch::INACTIVE_ENROLLMENT,
+                            'estado' => StudentRosterDatabaseMatch::ALREADY_ENROLLED,
                         ],
                     ],
                 ],
             ]);
 
-        $token = $previewResponse->json('data.token');
-
-        $this->assertIsString($token);
-
         $confirmationResponse = $this->postJson(
             '/api/grupos/' . $group->id_grupo . '/nomina/confirm',
-            [
-                'token' => $token,
-            ]
+            ['token' => $previewResponse->json('data.token')]
         );
 
         $confirmationResponse
@@ -704,58 +669,267 @@ class StudentRosterHttpTest extends TestCase
                     'filas_inconsistentes' => 0,
                     'estudiantes_creados' => 0,
                     'estudiantes_inscritos' => 0,
-                    'ya_inscritos' => 1,
-                    'inscripciones_inactivas' => 1,
+                    'ya_inscritos' => 2,
                 ],
             ]);
 
-        /*
-        * La inscripción activa sigue activa y no se duplica.
-        */
+        $this->assertArrayNotHasKey(
+            'inscripciones_inactivas',
+            $confirmationResponse->json('data')
+        );
+
         $this->assertSame(
-            1,
-            DB::table('grupo_estudiante')
-                ->where('id_grupo', $group->id_grupo)
-                ->where(
-                    'id_estudiante',
-                    $alreadyEnrolledStudent->id_estudiante
-                )
-                ->count()
+            2,
+            DB::table('grupo_estudiante')->where('id_grupo', $group->id_grupo)->count()
         );
 
         $this->assertDatabaseHas('grupo_estudiante', [
             'id_grupo' => $group->id_grupo,
-            'id_estudiante' => $alreadyEnrolledStudent->id_estudiante,
+            'id_estudiante' => $students[0]->id_estudiante,
             'fecha_inscripcion' => '2026-08-01',
             'estado' => RecordStatus::ACTIVE,
         ]);
 
-        /*
-        * La inscripción inactiva NO se reactiva automáticamente.
-        */
-        $this->assertDatabaseHas('grupo_estudiante', [
+        $this->assertSame(1, Student::query()->where('cod_sis', '20261001')->count());
+        $this->assertSame(1, Student::query()->where('cod_sis', '20261002')->count());
+    }
+
+    public function test_el_preview_no_ofrece_ningun_estado_de_inscripcion_inactiva(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $group = $this->ownActiveGroup();
+
+        $response = $this->previewCsv($group->id_grupo, implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres',
+            '20261001,PEREZ,ANA',
+        ]));
+
+        $response->assertOk();
+
+        $this->assertNotContains(
+            'inactive_enrollment',
+            array_column($response->json('data.filas'), 'estado')
+        );
+    }
+
+    public function test_los_estudiantes_creados_desde_la_nomina_quedan_sin_ci(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $group = $this->ownActiveGroup();
+
+        $previewResponse = $this->previewCsv($group->id_grupo, implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres',
+            '20261001,PEREZ ROJAS,ANA',
+            '20261002,VARGAS PINTO,LUIS',
+        ]));
+
+        $this->postJson(
+            '/api/grupos/' . $group->id_grupo . '/nomina/confirm',
+            ['token' => $previewResponse->json('data.token')]
+        )->assertOk()->assertJsonPath('data.estudiantes_creados', 2);
+
+        $this->assertSame(
+            2,
+            Student::query()->whereIn('cod_sis', ['20261001', '20261002'])->whereNull('ci')->count()
+        );
+    }
+
+    public function test_reporta_los_codigos_sis_invalidos_con_su_numero_de_fila(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $group = $this->ownActiveGroup();
+
+        $response = $this->previewCsv($group->id_grupo, implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres',
+            '20261001,PEREZ,ANA',
+            'A1234567,ROJAS,LUIS',
+            '1234567,VARGAS,MARIA',
+            '1234567890123,PINTO,JOSE',
+        ]));
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('data.filas_validas', 1)
+            ->assertJsonPath('data.filas_inconsistentes', 3)
+            ->assertJsonPath('data.filas.1.numero_fila', 3)
+            ->assertJsonPath('data.filas.1.estado', StudentRosterPreviewResult::INCONSISTENT)
+            ->assertJsonPath('data.filas.1.errores', ['sis_code_not_numeric'])
+            ->assertJsonPath('data.filas.2.numero_fila', 4)
+            ->assertJsonPath('data.filas.2.errores', ['sis_code_invalid_length'])
+            ->assertJsonPath('data.filas.3.numero_fila', 5)
+            ->assertJsonPath('data.filas.3.errores', ['sis_code_invalid_length']);
+    }
+
+    public function test_importa_una_vez_los_duplicados_identicos_y_reporta_las_filas_extra(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $group = $this->ownActiveGroup();
+
+        $previewResponse = $this->previewCsv($group->id_grupo, implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres',
+            '20261001,PEREZ,ANA',
+            '20261002,ROJAS,LUIS',
+            '20261001,PEREZ,ANA',
+        ]));
+
+        $previewResponse
+            ->assertOk()
+            ->assertJsonPath('data.filas_validas', 2)
+            ->assertJsonPath('data.filas_inconsistentes', 1)
+            ->assertJsonPath('data.filas.0.errores', [])
+            ->assertJsonPath('data.filas.2.numero_fila', 4)
+            ->assertJsonPath('data.filas.2.errores', ['duplicate_row_in_file']);
+
+        $this->postJson(
+            '/api/grupos/' . $group->id_grupo . '/nomina/confirm',
+            ['token' => $previewResponse->json('data.token')]
+        )
+            ->assertOk()
+            ->assertJsonPath('data.estudiantes_creados', 2)
+            ->assertJsonPath('data.filas_inconsistentes', 1);
+
+        $this->assertSame(1, Student::query()->where('cod_sis', '20261001')->count());
+        $this->assertSame(
+            2,
+            DB::table('grupo_estudiante')->where('id_grupo', $group->id_grupo)->count()
+        );
+    }
+
+    public function test_no_importa_ninguna_de_las_filas_duplicadas_que_difieren(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $group = $this->ownActiveGroup();
+
+        $previewResponse = $this->previewCsv($group->id_grupo, implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres',
+            '20261001,PEREZ,ANA',
+            '20261002,ROJAS,LUIS',
+            '20261001,PEREZ,ANA MARIA',
+        ]));
+
+        $previewResponse
+            ->assertOk()
+            ->assertJsonPath('data.filas_validas', 1)
+            ->assertJsonPath('data.filas_inconsistentes', 2)
+            ->assertJsonPath('data.filas.0.errores', ['conflicting_duplicate_in_file'])
+            ->assertJsonPath('data.filas.2.errores', ['conflicting_duplicate_in_file']);
+
+        $this->postJson(
+            '/api/grupos/' . $group->id_grupo . '/nomina/confirm',
+            ['token' => $previewResponse->json('data.token')]
+        )->assertOk()->assertJsonPath('data.estudiantes_creados', 1);
+
+        $this->assertDatabaseMissing('estudiante', ['cod_sis' => '20261001']);
+        $this->assertDatabaseHas('estudiante', ['cod_sis' => '20261002']);
+    }
+
+    /**
+     * @dataProvider lockingExamStates
+     */
+    public function test_rechaza_el_preview_si_un_examen_del_grupo_esta_en_ingreso_o_en_curso(string $state): void
+    {
+        $this->seedExamCatalog();
+
+        $group = $this->ownActiveGroup();
+        $this->linkExam($group, $state);
+
+        $response = $this->previewCsv($group->id_grupo, implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres',
+            '20261001,PEREZ,ANA',
+        ]));
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonPath(
+                'message',
+                'La nómina no puede modificarse mientras un examen del grupo está en ingreso o en curso.'
+            );
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    public function lockingExamStates(): array
+    {
+        return [
+            'EN_INGRESO' => [Exam::EN_INGRESO],
+            'EN_CURSO' => [Exam::EN_CURSO],
+        ];
+    }
+
+    public function test_rechaza_la_confirmacion_si_el_examen_pasa_a_ingreso_tras_el_preview(): void
+    {
+        $this->seedExamCatalog();
+
+        $group = $this->ownActiveGroup();
+        $exam = $this->linkExam($group, Exam::PROGRAMADO);
+
+        $previewResponse = $this->previewCsv($group->id_grupo, implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres',
+            '20261001,PEREZ,ANA',
+        ]))->assertOk();
+
+        $exam->estado = Exam::EN_INGRESO;
+        $exam->save();
+
+        $this->postJson(
+            '/api/grupos/' . $group->id_grupo . '/nomina/confirm',
+            ['token' => $previewResponse->json('data.token')]
+        )->assertStatus(422);
+
+        $this->assertDatabaseMissing('estudiante', ['cod_sis' => '20261001']);
+    }
+
+    public function test_la_nomina_cambia_libremente_mientras_el_examen_esta_programado(): void
+    {
+        $this->seedExamCatalog();
+
+        $group = $this->ownActiveGroup();
+        $exam = $this->linkExam($group, Exam::PROGRAMADO);
+
+        $before = app(ExamParticipantService::class)->counts($exam->id_examen);
+
+        $previewResponse = $this->previewCsv($group->id_grupo, implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres',
+            '20261001,PEREZ,ANA',
+            '20261002,ROJAS,LUIS',
+        ]))->assertOk();
+
+        $this->postJson(
+            '/api/grupos/' . $group->id_grupo . '/nomina/confirm',
+            ['token' => $previewResponse->json('data.token')]
+        )->assertOk();
+
+        $after = app(ExamParticipantService::class)->counts($exam->id_examen);
+
+        $this->assertSame($before['esperados'] + 2, $after['esperados']);
+        $this->assertSame(0, $after['ingresados']);
+    }
+
+    private function previewCsv(int $groupId, string $csv)
+    {
+        return $this->post(
+            '/api/grupos/' . $groupId . '/nomina/preview',
+            ['archivo' => UploadedFile::fake()->createWithContent('nomina.csv', $csv)],
+            ['Accept' => 'application/json']
+        );
+    }
+
+    private function linkExam(Group $group, string $state): Exam
+    {
+        $exam = $this->createExam(['estado' => $state]);
+
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $exam->id_examen,
             'id_grupo' => $group->id_grupo,
-            'id_estudiante' => $inactiveStudent->id_estudiante,
-            'fecha_inscripcion' => '2026-08-02',
-            'estado' => RecordStatus::INACTIVE,
         ]);
 
-        /*
-        * Tampoco se crean estudiantes duplicados.
-        */
-        $this->assertSame(
-            1,
-            Student::query()
-                ->where('cod_sis', '20261001')
-                ->count()
-        );
-
-        $this->assertSame(
-            1,
-            Student::query()
-                ->where('cod_sis', '20261002')
-                ->count()
-        );
+        return $exam;
     }
 
     public function test_rechaza_nomina_sin_estudiantes(): void

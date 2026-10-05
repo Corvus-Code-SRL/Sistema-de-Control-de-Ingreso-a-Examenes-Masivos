@@ -14,12 +14,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { AlertTriangle, Ban, Loader2, Save, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, Ban, DoorOpen, Loader2, Save, ShieldAlert } from 'lucide-react';
 import { useExamDetail } from '../hooks/useExamDetail';
 import { ExamForm } from '../components/ExamForm';
 import { AssignGroupsForm } from '../components/AssignGroupsForm';
 import { ExamStatusBadge } from '../components/ExamStatusBadge';
 import { validateExamForm, validateGroupsStep } from '../utils/examValidators';
+import { assistantSectionKey } from '../utils/assistantSectionKey';
+import { AssistantClassroomSection } from '@/features/assistants';
 
 /**
  * Detalle de un examen: edición de su información general, gestión de grupos
@@ -105,15 +107,21 @@ export function ExamDetailPage() {
         backLabel="Volver a Programados"
         subtitle={exam && <ExamStatusBadge status={exam.estado} />}
         actions={
-          exam && isProgramado && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowCancelDialog(true)}
-              className="border-danger/30 text-danger hover:bg-danger-soft"
-            >
-              <Ban className="size-4" aria-hidden="true" /> Cancelar examen
-            </Button>
+          exam && (
+            isProgramado ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowCancelDialog(true)}
+                className="border-danger/30 text-danger hover:bg-danger-soft"
+              >
+                <Ban className="size-4" aria-hidden="true" /> Cancelar examen
+              </Button>
+            ) : exam.estado === 'EN_INGRESO' ? (
+              <Button onClick={() => navigate(`/examenes/${id}/control-ingreso`)}>
+                <DoorOpen className="size-4" /> Controlar ingreso
+              </Button>
+            ) : null
           )
         }
       />
@@ -244,6 +252,8 @@ export function ExamDetailPage() {
               </div>
             </div>
           )}
+
+          <AssistantClassroomSection key={assistantSectionKey(exam)} examId={exam.id_examen} />
         </div>
       )}
 

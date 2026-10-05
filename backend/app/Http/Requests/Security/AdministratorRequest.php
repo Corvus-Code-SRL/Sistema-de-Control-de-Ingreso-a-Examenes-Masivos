@@ -2,7 +2,8 @@
 
 namespace App\Http\Requests\Security;
 
-use App\Services\Security\CurrentUserService;
+use App\Services\Security\UserRoleService;
+use App\Support\CurrentUser;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -14,9 +15,9 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 abstract class AdministratorRequest extends FormRequest
 {
-    public function authorize(CurrentUserService $currentUser): bool
+    public function authorize(CurrentUser $currentUser, UserRoleService $roles): bool
     {
-        return $currentUser->isAdministrator();
+        return $roles->isAdministrator($currentUser->id());
     }
 
     public function rules(): array

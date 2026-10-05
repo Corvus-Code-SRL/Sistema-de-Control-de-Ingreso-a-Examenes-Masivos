@@ -7,6 +7,7 @@ use App\Exceptions\Security\SisNoDisponibleException;
 use App\Exceptions\Security\SisNoValidoException;
 use App\Models\User;
 use App\Services\Security\Contracts\SisGateway;
+use App\Support\SisCode;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -28,11 +29,13 @@ class UserService
      * La cuenta se crea SIN rol asignado (CA 5): la asignación de rol
      * es responsabilidad de la HU-004.
      */
-    public function registrar(array $datos): User
+    public function registrar(array $datos, string $actorId): User
     {
+        $datos['cod_sis'] = SisCode::normalize($datos['cod_sis']);
+
         $this->validarContraSis($datos['cod_sis']);
 
-        return DB::transaction(function () use ($datos) {
+        return DB::transaction(function () use ($datos, $actorId) {
             $usuario = User::create([
                 'nombre'           => $datos['nombre'],
                 'apellido_paterno' => $datos['apellido_paterno'],
@@ -50,7 +53,8 @@ class UserService
                 'CREAR',
                 'usuario',
                 null,
-                $usuario->toArray()   // AuditLogService filtra 'contrasenia'
+                $usuario->toArray(),   // AuditLogService filtra 'contrasenia'
+                $actorId
             );
 
             return $usuario;
@@ -66,6 +70,8 @@ class UserService
      */
     public function verifySisCode(string $codSis): array
     {
+        $codSis = SisCode::normalize($codSis);
+
         $this->assertSisAvailable();
 
         $existing = User::where('cod_sis', $codSis)->first();

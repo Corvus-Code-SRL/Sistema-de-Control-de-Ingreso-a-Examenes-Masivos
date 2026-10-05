@@ -10,6 +10,7 @@ use App\Http\Resources\Academic\GroupResource;
 use App\Http\Resources\Academic\SubjectCareerResource;
 use App\Services\Academic\GroupService;
 use App\Support\ApiResponse;
+use App\Support\CurrentUser;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -19,18 +20,23 @@ class GroupController extends Controller
 {
     private GroupService $groupService;
 
-    public function __construct(GroupService $groupService)
+    private CurrentUser $currentUser;
+
+    public function __construct(GroupService $groupService, CurrentUser $currentUser)
     {
         $this->groupService = $groupService;
+        $this->currentUser = $currentUser;
     }
 
     public function show(ShowGroupRequest $request): JsonResponse
     {
         $group = $this->groupService->findGroup((int) $request->validated()['id_grupo']);
 
-        $this->authorize('view', $group);
+        $teacherId = $this->currentUser->teacherId();
 
-        $result = $this->groupService->showGroup($group);
+        $this->authorize('view', [$group, $teacherId]);
+
+        $result = $this->groupService->showGroup($group, $teacherId);
 
         return $this->groupResponse($result);
     }
@@ -40,7 +46,7 @@ class GroupController extends Controller
      */
     public function store(StoreGroupRequest $request): JsonResponse
     {
-        $result = $this->groupService->storeGroup($request->validated());
+        $result = $this->groupService->storeGroup($request->validated(), $this->currentUser->teacherId());
 
         return ApiResponse::created(
             $this->groupPayload($result),
@@ -54,9 +60,12 @@ class GroupController extends Controller
     public function update(UpdateGroupRequest $request, int $id_grupo): JsonResponse
     {
         $group = $this->groupService->findGroup($id_grupo);
-        $this->authorize('update', $group);
 
-        $result = $this->groupService->updateGroup($id_grupo, $request->validated());
+        $teacherId = $this->currentUser->teacherId();
+
+        $this->authorize('update', [$group, $teacherId]);
+
+        $result = $this->groupService->updateGroup($id_grupo, $request->validated(), $teacherId);
 
         return ApiResponse::success(
             $this->groupPayload($result),

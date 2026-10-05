@@ -379,7 +379,7 @@ class GroupControllerTest extends TestCase
 
     public function test_actualizar_un_grupo_no_afecta_a_otros_grupos_ni_estudiantes(): void
     {
-        $this->enrollStudents($this->grupoPropioId, 3, 1);
+        $this->enrollStudents($this->grupoPropioId, 4);
 
         $estudianteId = DB::table('grupo_estudiante')
             ->where('id_grupo', $this->grupoPropioId)

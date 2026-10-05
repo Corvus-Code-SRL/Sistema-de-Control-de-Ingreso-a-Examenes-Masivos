@@ -14,8 +14,8 @@ use App\Services\Academic\Importers\StudentRosterRow;
 use App\Services\Academic\Importers\StudentRosterRowValidator;
 use App\Services\Academic\Importers\StudentRosterStudentCreator;
 use App\Services\Academic\Importers\StudentRosterStudentMapper;
-use App\Services\Academic\Importers\TemporaryStudentCiGenerator;
 use App\Services\Academic\StudentRosterGroupAccess;
+use App\Services\Exams\ExamRosterLockService;
 use App\Support\RecordStatus;
 use Illuminate\Cache\ArrayStore;
 use Illuminate\Cache\Repository;
@@ -73,7 +73,8 @@ class StudentRosterConfirmationServiceTest extends TestCase
             $store
         )->confirm(
             (int) $group->id_grupo,
-            $token
+            $token,
+            $this->docenteId
         );
 
         $this->assertSame(1, $result->totalRows());
@@ -81,7 +82,6 @@ class StudentRosterConfirmationServiceTest extends TestCase
         $this->assertSame(0, $result->createdStudents());
         $this->assertSame(0, $result->enrolledStudents());
         $this->assertSame(1, $result->alreadyEnrolled());
-        $this->assertSame(0, $result->inactiveEnrollments());
 
         $this->assertSame(
             1,
@@ -117,7 +117,8 @@ class StudentRosterConfirmationServiceTest extends TestCase
         try {
             $this->confirmationService($store)->confirm(
                 (int) $group->id_grupo,
-                str_repeat('a', 64)
+                str_repeat('a', 64),
+                $this->docenteId
             );
 
             $this->fail(
@@ -162,7 +163,8 @@ class StudentRosterConfirmationServiceTest extends TestCase
         try {
             $this->confirmationService($store)->confirm(
                 (int) $group->id_grupo,
-                $token
+                $token,
+                $this->docenteId
             );
 
             $this->fail(
@@ -224,7 +226,7 @@ class StudentRosterConfirmationServiceTest extends TestCase
 
         $service = new StudentRosterConfirmationService(
             $store,
-            new StudentRosterGroupAccess(),
+            new StudentRosterGroupAccess(new ExamRosterLockService()),
             new StudentRosterAnalyzer(
                 new StudentRosterRowValidator()
             ),
@@ -234,7 +236,8 @@ class StudentRosterConfirmationServiceTest extends TestCase
         try {
             $service->confirm(
                 (int) $group->id_grupo,
-                $token
+                $token,
+                $this->docenteId
             );
 
             $this->fail(
@@ -299,7 +302,8 @@ class StudentRosterConfirmationServiceTest extends TestCase
         try {
             $this->confirmationService($store)->confirm(
                 (int) $requestedGroup->id_grupo,
-                $token
+                $token,
+                $this->docenteId
             );
 
             $this->fail(
@@ -333,14 +337,13 @@ class StudentRosterConfirmationServiceTest extends TestCase
     ): StudentRosterConfirmationService {
         return new StudentRosterConfirmationService(
             $store,
-            new StudentRosterGroupAccess(),
+            new StudentRosterGroupAccess(new ExamRosterLockService()),
             new StudentRosterAnalyzer(
                 new StudentRosterRowValidator()
             ),
             new StudentRosterConfirmer(
                 new StudentRosterDatabaseMatcher(),
                 new StudentRosterStudentCreator(
-                    new TemporaryStudentCiGenerator(),
                     new StudentRosterStudentMapper()
                 )
             )

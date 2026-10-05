@@ -4,7 +4,6 @@ namespace App\Policies\Academic;
 
 use App\Models\Group;
 use App\Models\User;
-use App\Services\Academic\SubjectCatalogService;
 use Illuminate\Auth\Access\Response;
 
 /**
@@ -14,28 +13,25 @@ use Illuminate\Auth\Access\Response;
  */
 class GroupPolicy
 {
-    private SubjectCatalogService $subjectCatalog;
-
-    public function __construct(SubjectCatalogService $subjectCatalog)
-    {
-        $this->subjectCatalog = $subjectCatalog;
-    }
-
     /**
-     * Sin autenticación real no hay usuario en sesión, así que el parámetro es opcional
-     * y el docente se resuelve desde configuración, igual que en el resto del módulo.
+     * Sin autenticación real no hay usuario en sesión, así que el parámetro es opcional y el
+     * Controller entrega el id del docente actuante: authorize('view', [$group, $teacherId]).
      */
-    public function view(?User $user, Group $group): Response
+    public function view(?User $user, Group $group, string $teacherId): Response
     {
-        if ((string) $group->id_usuario_docente === $this->subjectCatalog->teacherId()) {
+        if ((string) $group->id_usuario_docente === $teacherId) {
             return Response::allow();
         }
 
         return Response::deny('Solo el docente que dicta el grupo puede ver su detalle.');
     }
 
-    public function update(?User $user, Group $group): Response
+    public function update(?User $user, Group $group, string $teacherId): Response
     {
-        return $this->view($user, $group);
+        if ((string) $group->id_usuario_docente === $teacherId) {
+            return Response::allow();
+        }
+
+        return Response::deny('Solo el docente que dicta el grupo puede modificarlo.');
     }
 }

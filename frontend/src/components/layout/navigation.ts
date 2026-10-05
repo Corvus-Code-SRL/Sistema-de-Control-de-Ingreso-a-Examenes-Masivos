@@ -13,7 +13,7 @@ import {
   ScrollText,
   ShieldCheck,
   SquarePen,
-  Users,
+  Users
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Area } from '@/features/auth'
@@ -45,7 +45,7 @@ const navegacionDocente: NavGroup[] = [
     items: [
       { label: 'Materias', icon: BookOpen, to: '/materias' },
       { label: 'Mis cursos', icon: GraduationCap, to: '/mis-cursos' },
-      { label: 'Mis auxiliares', icon: Users },
+      { label: 'Mis auxiliares', icon: Users, to: '/mis-auxiliares' },
     ],
   },
   {
@@ -53,19 +53,33 @@ const navegacionDocente: NavGroup[] = [
     items: [
       { label: 'Nuevo examen', icon: SquarePen, to: '/examenes/nuevo' },
       { label: 'Programados', icon: CalendarClock, to: '/examenes/programados' },
-      { label: 'Control de ingreso', icon: DoorOpen },
+      { label: 'Control de ingreso', icon: DoorOpen, to: '/control-ingreso' },
       { label: 'En curso', icon: PlaySquare },
       { label: 'Incidencias', icon: AlertTriangle, badge: 3 },
-      { label: 'Historial', icon: History },
-    ],
+      { label: 'Historial', icon: History }
+    ]
   },
   {
     label: 'Central de riesgo',
     items: [
       { label: 'Verificar antecedentes', icon: FileSearch },
-      { label: 'Registros', icon: ClipboardList },
-    ],
-  },
+      { label: 'Registros', icon: ClipboardList }
+    ]
+  }
+]
+
+/**
+ * Navegación lateral del auxiliar: consulta los exámenes que controla (HU-09) y
+ * registra el ingreso de los estudiantes (HU-11).
+ */
+const navegacionAuxiliar: NavGroup[] = [
+  {
+    label: 'Exámenes',
+    items: [
+      { label: 'Mis exámenes', icon: CalendarClock, to: '/mis-examenes' },
+      { label: 'Control de ingreso', icon: DoorOpen, to: '/control-ingreso' },
+    ]
+  }
 ]
 
 /**
@@ -82,15 +96,17 @@ const navegacionAdministrador: NavGroup[] = [
       { label: 'Cuentas', icon: Users, to: '/cuentas' },
       { label: 'Materias', icon: BookOpen, to: '/materias' },
       { label: 'Facultades', icon: Building2 },
+      { label: 'Ambientes', icon: DoorOpen, to: '/ambientes' },
       { label: 'Carreras', icon: GraduationCap },
-      { label: 'Bitácora', icon: ScrollText },
-    ],
-  },
+      { label: 'Bitácora', icon: ScrollText }
+    ]
+  }
 ]
 
 export const navigationByArea: Record<Area, NavGroup[]> = {
   docente: navegacionDocente,
-  administrador: navegacionAdministrador,
+  auxiliar: navegacionAuxiliar,
+  administrador: navegacionAdministrador
 }
 
 export const shieldIcon = ShieldCheck

@@ -2,6 +2,8 @@
 
 namespace Database\Seeders\TestData;
 
+use App\Support\SisCode;
+use Database\Seeders\Support\LocalDatabaseGuard;
 use Database\Seeders\TestData\TestDataIds as Ids;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +20,8 @@ class AccountTestDataSeeder extends Seeder
 {
     public function run()
     {
+        LocalDatabaseGuard::assertLocal(static::class);
+
         DB::table('usuario')->upsert([
             $this->user(Ids::ADMINISTRATOR, 'Valeria', 'Montaño', 'Ríos', 'ADM0001', 'valeria.montano'),
             $this->user(Ids::TEACHER_FIXED, 'Marcelo', 'Quiroga', 'Andrade', '10452', 'marcelo.quiroga'),
@@ -79,7 +83,7 @@ class AccountTestDataSeeder extends Seeder
             'apellido_materno' => $maternalSurname,
             'correo' => "{$emailUser}@sciem.test",
             'contrasenia' => Ids::PASSWORD_HASH,
-            'cod_sis' => $sisCode,
+            'cod_sis' => SisCode::normalize($sisCode),
             'estado' => $status,
         ];
     }

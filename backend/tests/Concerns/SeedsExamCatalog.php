@@ -13,7 +13,7 @@ use Database\Seeders\ExamTypeSeeder;
 /**
  * Catálogos que usan las pruebas de exámenes, sobre el catálogo académico.
  *
- * El docente de config('sciem.docente_fijo_id') es quien crea los exámenes, y el par
+ * El docente de CurrentUser::teacherId() es quien crea los exámenes, y el par
  * (Sistemas, Cálculo II) es el que dicta en el periodo activo.
  */
 trait SeedsExamCatalog
@@ -35,8 +35,8 @@ trait SeedsExamCatalog
         $this->otraAulaId = $this->createClassroom('692B', RecordStatus::ACTIVE);
         $this->aulaInactivaId = $this->createClassroom('OLD-1', RecordStatus::INACTIVE);
 
-        // Dos estudiantes activos y uno retirado: solo los activos rinden el examen.
-        $this->enrollStudents($this->grupoPropioId, 2, 1);
+        // Dos estudiantes inscritos en el grupo propio.
+        $this->enrollStudents($this->grupoPropioId, 2);
     }
 
     /** Una fecha segura en el futuro, en el formato que espera la API. */

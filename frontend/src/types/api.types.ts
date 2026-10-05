@@ -22,6 +22,8 @@ export interface ResourceResponse<TData, TMeta> {
 export interface ApiErrorBody {
   message?: string
   errors?: Record<string, string[]>
+  /** Código estable de los rechazos de autenticación. */
+  motivo?: string
 }
 
 /**

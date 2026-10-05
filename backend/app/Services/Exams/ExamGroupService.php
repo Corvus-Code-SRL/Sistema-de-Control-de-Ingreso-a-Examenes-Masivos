@@ -12,7 +12,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Vincula grupos válidos con un examen y genera su nómina habilitada.
+ * Vincula grupos válidos con un examen.
+ *
+ * Solo escribe el vínculo grupo-examen. Los participantes no se copian: se derivan de
+ * grupo_estudiante (ver ExamParticipantService) y examen_estudiante solo registra
+ * ingresos reales, así que la nómina puede cambiar mientras el examen esté programado.
  */
 class ExamGroupService
 {
@@ -26,22 +30,22 @@ class ExamGroupService
     /**
      * Solo el creador puede modificar grupos mientras el examen siga PROGRAMADO.
      */
-    public function assignGroups(Exam $exam, array $groupIds): Exam
+    public function assignGroups(Exam $exam, array $groupIds, string $teacherId): Exam
     {
-        return DB::transaction(function () use ($exam, $groupIds) {
+        return DB::transaction(function () use ($exam, $groupIds, $teacherId) {
             $exam = Exam::query()
                 ->whereKey($exam->id_examen)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $this->assertExamCanBeConfigured($exam);
+            $this->assertExamCanBeConfigured($exam, $teacherId);
 
             $groupIds = array_values(array_unique(array_map('intval', $groupIds)));
             $groups = $this->lockGroups($groupIds);
 
-            $this->assertGroupsMatchExam($exam, $groups, $groupIds);
+            $this->assertGroupsMatchExam($exam, $groups, $groupIds, $teacherId);
 
-            $enrollments = $this->activeEnrollments($groupIds);
+            $enrollments = $this->enrollments($groupIds);
             $this->assertEveryGroupHasRoster($groups, $enrollments);
             $this->assertStudentsAreNotRepeated($enrollments);
 
@@ -52,45 +56,38 @@ class ExamGroupService
              * lista del otro. Hoy assertExamCanBeConfigured ya limita quién puede llamar
              * este método al docente dueño del examen.
              */
-            $teacherId = $this->subjectCatalog->teacherId();
-
             $previousOwnGroupIds = $exam->groups()
                 ->where('id_usuario_docente', $teacherId)
                 ->pluck('grupo.id_grupo')
+                ->map(fn ($groupId) => (int) $groupId)
                 ->all();
 
-            // examen_estudiante referencia grupo_examen: se retira antes de reasignar.
-            DB::table('examen_estudiante')
-                ->where('id_examen', $exam->id_examen)
-                ->whereIn('id_grupo', $previousOwnGroupIds)
-                ->delete();
+            $groupsToDetach = array_values(array_diff($previousOwnGroupIds, $groupIds));
+            $groupsToAttach = array_values(array_diff($groupIds, $previousOwnGroupIds));
 
-            $exam->groups()->detach($previousOwnGroupIds);
-            $exam->groups()->attach($groupIds);
+            $this->assertRemovedGroupsHaveNoEntries($exam, $groupsToDetach);
 
-            DB::table('examen_estudiante')->insert(
-                $enrollments->map(fn ($enrollment) => [
-                    'id_examen' => $exam->id_examen,
-                    'id_estudiante' => $enrollment->id_estudiante,
-                    'id_grupo' => $enrollment->id_grupo,
-                    'estado_habilitacion' => 'HABILITADO',
-                    'estado_ingreso' => 'NO_INGRESO',
-                ])->all()
-            );
+            if ($groupsToDetach !== []) {
+                $exam->groups()->detach($groupsToDetach);
+            }
+
+            if ($groupsToAttach !== []) {
+                $exam->groups()->attach($groupsToAttach);
+            }
 
             return $exam->fresh([
                 'examType',
                 'subject',
                 'career',
                 'classrooms',
-                'groups' => fn ($query) => $query->withActiveStudentCount(),
+                'groups' => fn ($query) => $query->withStudentCount(),
             ]);
         });
     }
 
-    private function assertExamCanBeConfigured(Exam $exam): void
+    private function assertExamCanBeConfigured(Exam $exam, string $teacherId): void
     {
-        if ((string) $exam->id_usuario_docente !== $this->subjectCatalog->teacherId()) {
+        if ((string) $exam->id_usuario_docente !== $teacherId) {
             throw new ExamOwnershipException();
         }
 
@@ -110,7 +107,7 @@ class ExamGroupService
             ->get();
     }
 
-    private function assertGroupsMatchExam(Exam $exam, Collection $groups, array $groupIds): void
+    private function assertGroupsMatchExam(Exam $exam, Collection $groups, array $groupIds, string $teacherId): void
     {
         if ($groups->count() !== count($groupIds)) {
             throw ValidationException::withMessages([
@@ -118,7 +115,6 @@ class ExamGroupService
             ]);
         }
 
-        $teacherId = $this->subjectCatalog->teacherId();
         $activePeriodId = $this->subjectCatalog->activePeriodId();
 
         foreach ($groups as $group) {
@@ -139,11 +135,13 @@ class ExamGroupService
         }
     }
 
-    private function activeEnrollments(array $groupIds): Collection
+    /**
+     * Nómina cargada es tener filas en grupo_estudiante; su estado no se consulta.
+     */
+    private function enrollments(array $groupIds): Collection
     {
         return DB::table('grupo_estudiante')
             ->whereIn('id_grupo', $groupIds)
-            ->where('estado', RecordStatus::ACTIVE)
             ->orderBy('id_grupo')
             ->orderBy('id_estudiante')
             ->get(['id_grupo', 'id_estudiante']);
@@ -160,7 +158,27 @@ class ExamGroupService
         if ($withoutRoster !== null) {
             throw ValidationException::withMessages([
                 'grupos' => [
-                    "El grupo {$withoutRoster->num_grupo} no tiene una nómina activa cargada.",
+                    "El grupo {$withoutRoster->num_grupo} no tiene nómina cargada.",
+                ],
+            ]);
+        }
+    }
+
+    private function assertRemovedGroupsHaveNoEntries(Exam $exam, array $groupIds): void
+    {
+        if ($groupIds === []) {
+            return;
+        }
+
+        $hasEntries = DB::table('examen_estudiante')
+            ->where('id_examen', $exam->id_examen)
+            ->whereIn('id_grupo', $groupIds)
+            ->exists();
+
+        if ($hasEntries) {
+            throw ValidationException::withMessages([
+                'grupos' => [
+                    'No se puede retirar un grupo que ya tiene registros de estudiantes en el examen.',
                 ],
             ]);
         }

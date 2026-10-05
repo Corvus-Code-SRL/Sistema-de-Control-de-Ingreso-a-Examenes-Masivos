@@ -9,6 +9,7 @@ return [
     |
     | Mientras la autenticación no esté implementada, el docente se resuelve
     | desde configuración. Corresponde a public.usuario.id_usuario, que es uuid.
+    | Solo lo lee App\Support\CurrentUser (ver docs/architecture/usuario-actual.md).
     |
     */
 
@@ -36,6 +37,7 @@ return [
     | la bitácora necesita un autor: este uuid lo provee y UserSeeder siembra
     | la fila correspondiente. Lleva valor por defecto para que la aplicación
     | funcione sin tocar el .env. Se elimina al implementar la autenticación.
+    | Solo lo lee App\Support\CurrentUser (ver docs/architecture/usuario-actual.md).
     |
     */
 
@@ -53,5 +55,33 @@ return [
     */
 
     'zona_horaria' => env('SCIEM_ZONA_HORARIA', 'America/La_Paz'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Almacén del control de ingreso
+    |--------------------------------------------------------------------------
+    |
+    | Solo el snapshot temporal de control de ingreso utiliza Redis. El resto
+    | de la aplicación conserva el almacén definido por CACHE_DRIVER.
+    |
+    */
+
+    'entry_control_cache_store' => env('ENTRY_CONTROL_CACHE_STORE', 'redis'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Código SIS de estudiante (carga de nómina)
+    |--------------------------------------------------------------------------
+    |
+    | Los códigos SIS de estudiante son solo dígitos: 9 hoy, 8 antes del 2000. Esta
+    | regla es solo de la nómina de estudiantes. Docentes y administradores tienen
+    | códigos más cortos y alfanuméricos: no reutilizarla en el registro de cuentas.
+    |
+    */
+
+    'estudiante_cod_sis' => [
+        'min_length' => (int) env('SCIEM_ESTUDIANTE_COD_SIS_MIN', 8),
+        'max_length' => (int) env('SCIEM_ESTUDIANTE_COD_SIS_MAX', 12),
+    ],
 
 ];
