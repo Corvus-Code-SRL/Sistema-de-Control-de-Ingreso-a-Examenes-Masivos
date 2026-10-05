@@ -202,7 +202,7 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
             <h2 className="text-[18px] leading-[26px] font-semibold text-text">Registrar cuenta</h2>
             <p className="text-[13px] text-muted-foreground leading-[19px] mt-0.5">
               {paso === 1 ? 'Paso 1 de 2' : paso === 2 ? 'Paso 2 de 2' : registeredAt
-                ? `Registrada a las ${registeredAt} · queda en la bitácora`
+                ? `Registrada a las ${registeredAt} (hora de este equipo)`
                 : 'Registro confirmado · queda en la bitácora'}
             </p>
           </div>

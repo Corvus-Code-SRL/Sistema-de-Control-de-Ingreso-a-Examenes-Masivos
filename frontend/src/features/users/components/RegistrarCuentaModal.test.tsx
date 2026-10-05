@@ -164,7 +164,9 @@ describe('RegistrarCuentaModal', () => {
     })
   })
 
-  it('confirma el registro con horas reales, correo devuelto y campos declarados', async () => {
+  it('confirma el registro con hora del equipo, correo devuelto y campos declarados', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 9, 5, 14, 37, 0))
     mockApi([
       { matches: userMatchers.sisVerification, body: { data: sisPerson } },
       {
@@ -184,7 +186,7 @@ describe('RegistrarCuentaModal', () => {
     await verifyCode()
 
     expect(await screen.findByText('Persona reconocida por el SIS')).toBeInTheDocument()
-    expect(screen.getByText(/^Verificado a las \d{2}:\d{2}\.$/i)).toBeInTheDocument()
+    expect(screen.getByText('Verificado a las 14:37.')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: /continuar/i }))
 
@@ -199,7 +201,7 @@ describe('RegistrarCuentaModal', () => {
     expect(screen.getByText(/laura mendoza rivas · sis 202312345 · sin rol/i)).toBeInTheDocument()
 
     expect(
-      screen.getByText(/^Registrada a las \d{2}:\d{2} · queda en la bitácora$/i)
+      screen.getByText('Registrada a las 14:37 (hora de este equipo)')
     ).toBeInTheDocument()
 
     expect(screen.getByText('laura.mendoza@umss.edu')).toBeInTheDocument()
@@ -216,6 +218,7 @@ describe('RegistrarCuentaModal', () => {
         }),
       },
     ])
+    vi.useRealTimers()
   })
 
   describe('mensajes específicos de la verificación', () => {
