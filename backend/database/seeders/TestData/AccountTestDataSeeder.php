@@ -55,7 +55,7 @@ class AccountTestDataSeeder extends Seeder
 
         DB::table('usuario_rol')->insert([
             $this->role(Ids::ADMINISTRATOR, $roles['Administrador'], '2026-02-02 08:00:00-04'),
-            // El docente fijo fue auxiliar antes: su detalle muestra un historial de dos tramos.
+            // El docente 10452 fue auxiliar antes: su detalle muestra un historial de dos tramos.
             $this->role(Ids::TEACHER_FIXED, $roles['Auxiliar'], '2025-08-04 08:00:00-04', '2026-01-30 18:00:00-04'),
             $this->role(Ids::TEACHER_FIXED, $roles['Docente'], '2026-02-02 08:00:00-04'),
             $this->role(Ids::TEACHER_2, $roles['Docente'], '2026-02-02 08:00:00-04'),

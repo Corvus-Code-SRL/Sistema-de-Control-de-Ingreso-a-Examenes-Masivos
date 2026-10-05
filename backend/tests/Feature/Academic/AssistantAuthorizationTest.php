@@ -68,7 +68,7 @@ class AssistantAuthorizationTest extends TestCase
         foreach ($this->endpoints() as $label => [$method, $url]) {
             $this->json($method, $url, $this->bodyFor($method, $url))
                 ->assertForbidden()
-                ->assertJsonPath('message', 'Un auxiliar no puede gestionar auxiliares.');
+                ->assertJsonPath('message', 'Solo un docente puede gestionar auxiliares.');
         }
 
         // Ninguna de las llamadas cambió datos.

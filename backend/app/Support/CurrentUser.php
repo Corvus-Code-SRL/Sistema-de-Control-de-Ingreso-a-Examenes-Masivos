@@ -3,32 +3,38 @@
 namespace App\Support;
 
 /**
- * Único punto que responde "quién ejecuta la operación".
+ * Único punto que responde "quién ejecuta la operación": la cuenta autenticada por el token
+ * de Sanctum. No hay respaldo ni usuario por defecto: sin sesión devuelve null (o ''), y como
+ * todas las rutas de la API pasan por `auth:sanctum`, un Controller solo lo ve vacío si alguien
+ * sacó la ruta del grupo autenticado (lo vigila RoutesRequireAuthenticationTest).
  *
- * REGLA: los Services NO leen este resolver ni auth(). El Controller (o el comando, o el
- * seeder) lo consulta y entrega el usuario al Service como argumento explícito
- * (`$service->create($data, $currentUser->teacherId())`). Así una prueba decide quién actúa
- * pasando un id, sin depender de la sesión ni de la configuración. Los Form Requests y las
- * Policies, que son capa HTTP, también pueden usarlo para autorizar.
+ * REGLA: los Services NO leen este resolver ni auth(). El Controller lo consulta y entrega el
+ * usuario al Service como argumento explícito (`$service->create($data, $currentUser->teacherId())`).
+ * Así una prueba decide quién actúa pasando un id, sin depender de la sesión. Los Form Requests y
+ * las Policies, que son capa HTTP, también pueden usarlo para autorizar.
  *
- * Mientras no haya autenticación real hay dos actores fijos, porque hoy el sistema simula
- * dos personas distintas: el docente de config('sciem.docente_fijo_id') para Academic y
- * Exams, y la cuenta de config('sciem.usuario_prueba') para Security y la bitácora. Cuando
- * llegue la autenticación, el cambio es el cuerpo de estos dos métodos, y solo ahí.
+ * Los seeders y comandos no tienen sesión: usan App\Support\SystemActor, nunca este resolver.
  *
- * Las pruebas reemplazan este resolver con Tests\Support\FakeCurrentUser.
+ * Las pruebas deciden quién actúa con Sanctum::actingAs (ver TestCase::actAsUserId()).
  */
 class CurrentUser
 {
-    /** Id de la cuenta que actúa como usuario general (Administrador, bitácora). */
+    /** Id de la cuenta autenticada; null si no hay sesión. */
     public function id(): ?string
     {
-        return auth()->id() ?? config('sciem.usuario_prueba');
+        $id = auth()->id();
+
+        return $id === null ? null : (string) $id;
     }
 
-    /** Id del docente que actúa en los módulos Academic y Exams; '' si no está configurado. */
+    /**
+     * Id de la cuenta que actúa como docente en Academic y Exams; '' si no hay sesión.
+     *
+     * Es la misma cuenta que id(): que sea Docente lo comprueba cada Form Request con
+     * UserRoleService::isTeacher(), no este resolver.
+     */
     public function teacherId(): string
     {
-        return (string) config('sciem.docente_fijo_id');
+        return (string) $this->id();
     }
 }

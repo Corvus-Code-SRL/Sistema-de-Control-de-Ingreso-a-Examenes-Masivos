@@ -40,15 +40,9 @@ Route::get('/usuarios/{user}/asignaciones', [UserRoleController::class, 'assignm
      ->whereUuid('user')
      ->name('usuarios.asignaciones');
 
-// RNF-02 fase 1 — el login queda fuera de auth:sanctum; el resto exige el token.
+// RNF-02 — el login es la única ruta pública y se declara en routes/api.php.
 Route::prefix('auth')->name('auth.')->group(function () {
-    Route::post('/login', [AuthController::class, 'login'])
-         ->middleware('throttle:5,1')
-         ->name('login');
-
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-        Route::get('/yo', [AuthController::class, 'me'])->name('yo');
-        Route::post('/confirmar-password', [AuthController::class, 'confirmPassword'])->name('confirmar-password');
-    });
+    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+    Route::get('/yo', [AuthController::class, 'me'])->name('yo');
+    Route::post('/confirmar-password', [AuthController::class, 'confirmPassword'])->name('confirmar-password');
 });

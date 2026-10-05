@@ -13,9 +13,9 @@ Convenciones: prefijo `/api`, cabecera `Accept: application/json`. Las respuesta
 
 ## Quién puede cargar la nómina
 
-- Solo el **docente que dicta el grupo**. Una cuenta con rol **Auxiliar** nunca puede, aunque el grupo figure a nombre del docente.
+- Solo el **docente activo que dicta el grupo**. Un Auxiliar, un Administrador o una cuenta sin rol o deshabilitada nunca pueden, aunque el grupo figure a nombre del docente.
 - El grupo debe estar **activo**, ser del **período activo** y no tener un examen **en ingreso o en curso** (con el examen programado la nómina cambia libremente: los participantes se derivan de la nómina y nunca se copian).
-- El docente que actúa lo resuelve `CurrentUser::teacherId()`; los Services lo reciben por argumento.
+- El docente que actúa es la cuenta autenticada (`CurrentUser::teacherId()`); los Services lo reciben por argumento.
 
 ## Formato del archivo
 
@@ -100,7 +100,7 @@ El token **vive 15 minutos**, es de **un solo uso**, y queda atado al docente y 
 | 422 | `La nómina no contiene estudiantes.` | Solo hay encabezado |
 | 422 | `La nómina supera el máximo de 2000 filas por archivo.` | Más filas que el tope |
 | 422 | `El identificador del grupo no es válido.` y afines | `id_grupo` no numérico, menor que 1 o mayor que 2147483647 |
-| 403 | `Un auxiliar no puede cargar la nómina de un grupo.` | Cuenta con rol Auxiliar |
+| 403 | `Solo un docente puede cargar la nómina de un grupo.` | Cuenta que no es Docente activo (Auxiliar, Administrador, sin rol o inactiva) |
 | 403 | `Solo el docente que dicta el grupo puede cargar su nómina.` | Grupo de otro docente |
 | 404 | `No existe el grupo indicado.` | El grupo no existe |
 | 422 | `El grupo no está activo.` | Grupo inactivo |

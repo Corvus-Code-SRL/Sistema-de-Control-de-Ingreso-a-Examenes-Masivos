@@ -7,8 +7,8 @@ use Illuminate\Auth\Access\AuthorizationException;
 /**
  * Base de las peticiones de carga de nómina (HU-21).
  *
- * Cargar la nómina es gestionar el grupo: una cuenta con rol Auxiliar no puede, con la misma
- * regla que GroupManagementRequest. Que el grupo sea del docente lo decide GroupPolicy
+ * Cargar la nómina es gestionar el grupo: solo un docente activo, con la misma regla que
+ * GroupManagementRequest. Que el grupo sea del docente lo decide GroupPolicy
  * (manageRoster) y que esté activo, sea del período vigente y no esté congelado por un examen,
  * StudentRosterGroupAccess.
  */
@@ -16,7 +16,7 @@ abstract class RosterManagementRequest extends GroupManagementRequest
 {
     protected function failedAuthorization(): void
     {
-        throw new AuthorizationException('Un auxiliar no puede cargar la nómina de un grupo.');
+        throw new AuthorizationException('Solo un docente puede cargar la nómina de un grupo.');
     }
 
     /** @return array<int, string> */

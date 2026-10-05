@@ -2,6 +2,9 @@
 
 namespace App\Http\Requests\Exams;
 
+use App\Services\Security\UserRoleService;
+use App\Support\CurrentUser;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -12,9 +15,14 @@ class AssignGroupsRequest extends FormRequest
 {
     private const MAX_ID = 2147483647;
 
-    public function authorize(): bool
+    public function authorize(CurrentUser $currentUser, UserRoleService $roles): bool
     {
-        return true;
+        return $roles->isTeacher($currentUser->id());
+    }
+
+    protected function failedAuthorization(): void
+    {
+        throw new AuthorizationException('Solo un docente puede asignar grupos a un examen.');
     }
 
     public function rules(): array

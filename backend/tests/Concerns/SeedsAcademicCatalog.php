@@ -5,9 +5,11 @@ namespace Tests\Concerns;
 use App\Models\Career;
 use App\Models\Group;
 use App\Models\Period;
+use App\Models\Role;
 use App\Models\Subject;
 use App\Models\SubjectCareer;
 use App\Support\RecordStatus;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -203,6 +205,8 @@ trait SeedsAcademicCatalog
 
     private function seedTeachers(): void
     {
+        $this->seed(RoleSeeder::class);
+
         DB::table('usuario')->insert([
             [
                 'id_usuario' => $this->docenteId,
@@ -223,6 +227,17 @@ trait SeedsAcademicCatalog
                 'estado' => RecordStatus::ACTIVE,
             ],
         ]);
+
+        // Los endpoints de docente exigen el rol Docente vigente.
+        $teacherRoleId = Role::where('nombre_rol', Role::DOCENTE)->value('id_rol');
+
+        foreach ([$this->docenteId, $this->otroDocenteId] as $teacherId) {
+            DB::table('usuario_rol')->insert([
+                'id_usuario' => $teacherId,
+                'id_rol' => $teacherRoleId,
+                'fecha_inicio' => '2026-01-10 08:00:00',
+            ]);
+        }
     }
 
     private function createPair(int $careerId, int $subjectId, string $status): void

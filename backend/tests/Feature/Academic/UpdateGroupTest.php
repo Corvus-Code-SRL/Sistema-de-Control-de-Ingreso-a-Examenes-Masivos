@@ -101,7 +101,7 @@ class UpdateGroupTest extends TestCase
 
         $this->putJson($this->url(), ['num_grupo' => 'REN'])
             ->assertForbidden()
-            ->assertJsonPath('message', 'Un auxiliar no puede gestionar grupos.');
+            ->assertJsonPath('message', 'Solo un docente puede gestionar grupos.');
 
         $this->assertDatabaseHas('grupo', ['id_grupo' => $this->grupoPropioId, 'num_grupo' => '1']);
     }

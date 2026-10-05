@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Security;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Security\StoreUserRequest;
+use App\Http\Requests\Security\VerifySisRequest;
 use App\Http\Resources\Security\UserResource;
 use App\Services\Security\UserService;
 use App\Support\ApiResponse;
@@ -35,7 +36,7 @@ class UserController extends Controller
     }
 
     /** GET /api/sis/verificar/{cod_sis} */
-    public function verificarSis(string $codSis): JsonResponse
+    public function verificarSis(VerifySisRequest $request, string $codSis): JsonResponse
     {
         return ApiResponse::success($this->service->verifySisCode($codSis));
     }

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Academic;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\SeedsAcademicCatalog;
@@ -14,6 +15,8 @@ class SubjectCatalogTest extends TestCase
 
     public function test_catalogo_vacio_responde_con_mensaje(): void
     {
+        $this->actingAs(User::factory()->create());
+
         $response = $this->getJson('/api/materias');
 
         $response->assertOk()
@@ -81,7 +84,7 @@ class SubjectCatalogTest extends TestCase
     public function test_un_docente_sin_grupos_igual_puede_consultar_el_catalogo(): void
     {
         $this->seedAcademicCatalog();
-        $this->actAsTeacher('33333333-3333-4333-8333-333333333333');
+        $this->actingAs(User::factory()->create(['id_usuario' => '33333333-3333-4333-8333-333333333333']));
 
         $response = $this->getJson('/api/materias');
 

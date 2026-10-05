@@ -1,17 +1,23 @@
-# Usuario actual y código SIS (RNF-02, fase 0)
+# Usuario actual y código SIS (RNF-02)
 
-Esta página fija dos decisiones que la autenticación real (RNF-02, fases 1 a 3) da por hechas.
+Esta página fija dos decisiones de la autenticación real (RNF-02).
 
 ## 1. Quién ejecuta la operación
 
-Hay **un solo punto** que responde «¿quién es el usuario actual?»: `App\Support\CurrentUser`.
+Hay **un solo punto** que responde «¿quién ejecuta la operación?» en la API: `App\Support\CurrentUser`, que devuelve **la cuenta autenticada por el token de Sanctum**. No hay respaldo: sin sesión devuelve `null` (`id()`) o `''` (`teacherId()`), y como toda ruta salvo el login exige `auth:sanctum`, un Controller nunca lo ve vacío.
 
-| Método | Devuelve hoy | Lo usan |
+| Método | Devuelve | Lo usan |
 |---|---|---|
-| `id()` | `auth()->id()` y, si no hay sesión, `sciem.usuario_prueba` | Security, bitácora, Administrador |
-| `teacherId()` | `sciem.docente_fijo_id` | Academic, Exams |
+| `id()` | `auth()->id()` (o `null`) | Security, bitácora, Administrador |
+| `teacherId()` | lo mismo, como `string` | Academic, Exams |
 
-Son dos métodos porque hoy el sistema simula **dos personas distintas** (la cuenta de prueba y el docente fijo). Cuando llegue la autenticación, el cambio es el cuerpo de esos dos métodos y nada más: `config('sciem.docente_fijo_id')` y `config('sciem.usuario_prueba')` no se leen en ningún otro lugar del código.
+Son la misma cuenta; el rol lo comprueba cada Form Request con `UserRoleService::isTeacher()` / `isAdministrator()` (rol vigente **y** cuenta ACTIVA), no este resolver.
+
+### Seeders y comandos: `SystemActor`
+
+Sin sesión no hay a quién atribuir una escritura, pero `log.id_usuario` es NOT NULL. Los seeders y comandos usan `App\Support\SystemActor` (la cuenta de `config('sciem.usuario_prueba')`, que `UserSeeder` siembra). **Solo ellos**: `SystemActorOnlyForSeedersTest` falla si un Controller, Request, Policy o Service lo usa, o si un seeder usa `CurrentUser`.
+
+> **Riesgo conocido (Sprint 3):** esa cuenta se siembra con SIS `000000000`, contraseña `password` y rol Administrador. Mientras exista, es una puerta de entrada conocida en cualquier entorno compartido.
 
 ### Regla: los Services no resuelven al usuario
 
@@ -29,22 +35,22 @@ public function create(array $data, string $teacherId): Exam
 
 | Capa | ¿Puede usar `CurrentUser`? |
 |---|---|
-| Controller, comando de consola, seeder | Sí |
+| Controller | Sí |
+| Comando de consola, seeder | No: usan `SystemActor` |
 | Form Request y Policy (capa HTTP, autorizan antes del Controller) | Sí |
 | **Service** (`app/Services/**`) | **No** — recibe el id por parámetro |
 | Modelo, Resource, `app/Support/**` | No |
 
-La regla la vigila `tests/Unit/Architecture/ServicesDoNotResolveCurrentUserTest.php`: falla si un archivo de `app/Services/` contiene `auth(`, `Auth::`, `->user()`, `CurrentUser` o las dos claves de configuración.
+La regla la vigila `tests/Unit/Architecture/ServicesDoNotResolveCurrentUserTest.php`: falla si un archivo de `app/Services/` contiene `auth(`, `Auth::`, `->user()`, `CurrentUser`, `SystemActor` o `sciem.usuario_prueba`.
 
 ### Cómo controlan las pruebas quién actúa
 
 - Llamar al Service directamente: pasar el id (`$service->create($data, $this->docenteId)`).
-- Pasar por HTTP: `$this->actAsTeacher($id)` (docente) o `$this->actAsUserId($id)` (cuenta general). Instalan `Tests\Support\FakeCurrentUser` en el contenedor; lo que la prueba no fija lo sigue resolviendo el resolver real, así que `actingAs()` convive con ellos.
-- **No** usar `config()->set('sciem.docente_fijo_id', ...)` ni `config()->set('sciem.usuario_prueba', ...)` en las pruebas.
+- Pasar por HTTP: `$this->actAsTeacher($id)` o `$this->actAsUserId($id)` (y `actingAs()`), que autentican con `Sanctum::actingAs` como un token real. La cuenta debe existir y tener en la base el rol que el endpoint exige (`seedAcademicCatalog()` da el rol Docente a sus dos docentes; `seedSecurityAccounts()` deja al Administrador como actor). `actAsGuest()` descarta la sesión para probar el 401.
 
 ### Bitácora
 
-`AuditLogService::registrar()` exige el id del autor (último parámetro, obligatorio). Ya no existe un respaldo silencioso a la cuenta de prueba: el Controller decide quién firma el registro.
+`AuditLogService::registrar()` exige el id del autor (último parámetro, obligatorio). No hay respaldo silencioso: el Controller firma con la cuenta autenticada y los seeders con `SystemActor`.
 
 ## 2. Código SIS: una sola forma canónica
 

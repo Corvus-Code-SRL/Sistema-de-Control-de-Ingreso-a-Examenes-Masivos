@@ -2,11 +2,12 @@
 
 namespace Tests;
 
-use App\Support\CurrentUser;
+use App\Models\User;
+use Illuminate\Contracts\Auth\Authenticatable as UserContract;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Laravel\Sanctum\Sanctum;
 use RuntimeException;
-use Tests\Support\FakeCurrentUser;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -30,23 +31,40 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
     }
 
-    /** Fija el docente que actúa en Academic y Exams, sin tocar la configuración. */
-    protected function actAsTeacher(string $teacherId): void
+    /**
+     * Toda autenticación de las pruebas pasa por Sanctum::actingAs, como un token real: así
+     * actingAs() y actAsUserId() no pueden quedar con usuarios distintos en guards distintos.
+     */
+    public function actingAs(UserContract $user, $guard = null)
     {
-        $this->app->instance(CurrentUser::class, $this->fakeCurrentUser()->withTeacherId($teacherId));
+        Sanctum::actingAs($user);
+
+        return $this;
     }
 
-    /** Fija la cuenta que actúa en Security y la bitácora. */
-    protected function actAsUserId(string $userId): void
+    /**
+     * Autentica la petición como la cuenta indicada y devuelve la cuenta. Los roles son los que la
+     * cuenta tenga en la base: la prueba debe dárselos.
+     */
+    protected function actAsUserId(string $userId): User
     {
-        $this->app->instance(CurrentUser::class, $this->fakeCurrentUser()->withId($userId));
+        $user = User::findOrFail($userId);
+
+        $this->actingAs($user);
+
+        return $user;
     }
 
-    private function fakeCurrentUser(): FakeCurrentUser
+    /** Descarta la sesión: la siguiente petición llega sin token. */
+    protected function actAsGuest(): void
     {
-        $current = $this->app->make(CurrentUser::class);
+        $this->app['auth']->forgetGuards();
+    }
 
-        return $current instanceof FakeCurrentUser ? $current : new FakeCurrentUser();
+    /** Autentica como un docente; la prueba lo creó con rol Docente (seedAcademicCatalog() lo hace). */
+    protected function actAsTeacher(string $teacherId): User
+    {
+        return $this->actAsUserId($teacherId);
     }
 
     private static function loadDatabaseSchema(Application $app): void

@@ -257,7 +257,7 @@ describe('RosterUploadPanel · recorrido de la carga', () => {
     [422, 'La nómina supera el máximo de 2000 filas por archivo.', { message: 'La nómina supera el máximo de 2000 filas por archivo.' }],
     [422, 'El archivo CSV no es un archivo de texto.', { message: 'El archivo CSV no es un archivo de texto. Guárdelo como CSV con codificación UTF-8 y vuelva a cargarlo.' }],
     [413, 'La nómina no puede superar los 10 MB.', { message: 'La nómina no puede superar los 10 MB.' }],
-    [403, 'Un auxiliar no puede cargar la nómina de un grupo.', { message: 'Un auxiliar no puede cargar la nómina de un grupo.' }],
+    [403, 'Solo un docente puede cargar la nómina de un grupo.', { message: 'Solo un docente puede cargar la nómina de un grupo.' }],
   ])('CA 15: el error %i del servidor se muestra tal cual, en el paso del archivo', async (status, text, body) => {
     const api = stubRosterApi()
     renderPanel()

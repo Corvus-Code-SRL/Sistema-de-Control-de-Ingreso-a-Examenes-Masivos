@@ -2,8 +2,11 @@
 
 namespace App\Http\Requests\Exams;
 
+use App\Services\Security\UserRoleService;
+use App\Support\CurrentUser;
 use App\Support\RecordStatus;
 use Carbon\Carbon;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -22,9 +25,14 @@ abstract class ExamRequest extends FormRequest
     /** Límite de las columnas integer de PostgreSQL: un id mayor rompería la consulta. */
     private const MAX_ID = 2147483647;
 
-    public function authorize(): bool
+    public function authorize(CurrentUser $currentUser, UserRoleService $roles): bool
     {
-        return true;
+        return $roles->isTeacher($currentUser->id());
+    }
+
+    protected function failedAuthorization(): void
+    {
+        throw new AuthorizationException('Solo un docente puede registrar o modificar exámenes.');
     }
 
     public function rules(): array

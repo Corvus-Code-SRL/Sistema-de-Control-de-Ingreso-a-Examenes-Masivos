@@ -212,7 +212,7 @@ class ExamService
     private function assertTeacherGiven(string $teacherId): void
     {
         if ($teacherId === '') {
-            throw new RuntimeException('No hay un docente configurado en SCIEM_DOCENTE_FIJO_ID.');
+            throw new RuntimeException('No hay un docente autenticado que ejecute la operación.');
         }
     }
 

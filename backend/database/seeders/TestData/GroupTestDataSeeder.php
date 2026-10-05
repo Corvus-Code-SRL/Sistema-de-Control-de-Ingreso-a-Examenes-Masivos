@@ -87,7 +87,7 @@ class GroupTestDataSeeder extends Seeder
         [$fixed, $teacher2, $teacher3] = [Ids::TEACHER_FIXED, Ids::TEACHER_2, Ids::TEACHER_3];
 
         DB::table('grupo')->upsert([
-            // Mismo par (Sistemas, Cálculo I): grupo 1 del docente fijo, grupo 2 de otro docente.
+            // Mismo par (Sistemas, Cálculo I): grupo 1 del docente 10452, grupo 2 de otro docente.
             $this->group(Ids::GROUP_CALCULUS_SYS_1, $sys, Ids::SUBJECT_CALCULUS, '1', $fixed),
             $this->group(Ids::GROUP_CALCULUS_SYS_2, $sys, Ids::SUBJECT_CALCULUS, '2', $teacher2),
             // Grupo 1 de Cálculo I también en Economía (otra facultad): convive con el de Sistemas.
@@ -97,7 +97,7 @@ class GroupTestDataSeeder extends Seeder
             $this->group(Ids::GROUP_PROGRAMMING_SYS_1, $sys, Ids::SUBJECT_PROGRAMMING, '1', $teacher2),
             $this->group(Ids::GROUP_PROGRAMMING_SYS_2, $sys, Ids::SUBJECT_PROGRAMMING, '2', $fixed),
             $this->group(Ids::GROUP_STATISTICS_ECO_1, $eco, Ids::SUBJECT_STATISTICS, '1', $teacher3),
-            // Grupo del docente fijo en un par INACTIVO: existe, pero su detalle responde 422.
+            // Grupo del docente 10452 en un par INACTIVO: existe, pero su detalle responde 422.
             $this->group(Ids::GROUP_DATABASES_INF_1, $inf, Ids::SUBJECT_DATABASES, '1', $fixed),
             // Mismo par y número que GROUP_CALCULUS_SYS_1, pero de un periodo anterior.
             $this->group(
@@ -108,7 +108,7 @@ class GroupTestDataSeeder extends Seeder
                 $fixed,
                 Ids::PERIOD_2026_1
             ),
-            // Par donde el docente fijo no dicta ningún grupo.
+            // Par donde el docente 10452 no dicta ningún grupo.
             $this->group(Ids::GROUP_ACCOUNTING_ADM_1, $adm, Ids::SUBJECT_ACCOUNTING, '1', $teacher2),
         ], ['id_grupo']);
 

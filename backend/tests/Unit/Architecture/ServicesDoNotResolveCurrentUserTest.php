@@ -17,7 +17,7 @@ class ServicesDoNotResolveCurrentUserTest extends TestCase
         'auth(' => 'auth()',
         'Auth::' => 'la fachada Auth',
         'CurrentUser' => 'el resolver CurrentUser',
-        'sciem.docente_fijo_id' => 'config(sciem.docente_fijo_id)',
+        'SystemActor' => 'la cuenta de sistema SystemActor',
         'sciem.usuario_prueba' => 'config(sciem.usuario_prueba)',
         '->user()' => 'el usuario de la petición',
     ];

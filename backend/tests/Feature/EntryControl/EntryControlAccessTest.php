@@ -80,6 +80,8 @@ class EntryControlAccessTest extends TestCase
 
     public function test_sin_sesion_todas_las_rutas_responden_401(): void
     {
+        $this->actAsGuest();
+
         $this->getJson('/api/control-ingreso/examenes')->assertUnauthorized();
         $this->getJson($this->url($this->exam, 'contexto'))->assertUnauthorized();
         $this->getJson($this->url($this->exam, 'buscar') . '?nombre=Estudiante')->assertUnauthorized();

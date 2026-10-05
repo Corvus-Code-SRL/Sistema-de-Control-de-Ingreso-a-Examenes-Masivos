@@ -4,10 +4,9 @@ namespace Tests\Feature\Security;
 
 use App\Models\User;
 use App\Services\Security\Contracts\SisGateway;
-use Database\Seeders\ActionSeeder;
-use Database\Seeders\UserSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Mockery;
+use Tests\Concerns\SeedsSecurityAccounts;
 use Tests\TestCase;
 
 /**
@@ -16,12 +15,12 @@ use Tests\TestCase;
 class VerifySisTest extends TestCase
 {
     use DatabaseTransactions;
+    use SeedsSecurityAccounts;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(UserSeeder::class);
-        $this->seed(ActionSeeder::class);
+        $this->seedSecurityAccounts();
     }
 
     /** @test */

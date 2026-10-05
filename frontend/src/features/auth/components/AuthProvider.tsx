@@ -5,18 +5,18 @@ import { clearStoredToken, readStoredToken, storeToken } from '../services/token
 import type { AuthState, SessionRole } from '../types/auth.types'
 
 /**
- * Sesión de la aplicación (RNF-02, fase 2a).
+ * Sesión de la aplicación (RNF-02).
  *
- * La sesión es ADITIVA: sin ella la app funciona exactamente como antes, atribuida al usuario
- * fijo del backend. Nada aquí obliga a iniciar sesión; eso llega con la fase 3.
+ * Todas las rutas del backend (salvo el login) exigen token: sin sesión, ProtectedRoute manda al
+ * login y recuerda la ruta para volver a ella al entrar.
  *
  * Estados (`estado`):
  * - `verificando`: hay un token guardado y se comprueba con GET /auth/yo antes de pintar las
  *   rutas, para no mostrar un instante la pantalla equivocada en cada recarga.
  * - `anonimo`: sin sesión.
  * - `autenticado`: sesión vigente.
- * - `expirada`: una petición con token recibió 401. El token ya no sirve y la pantalla se
- *   bloquea (SessionExpiredOverlay) hasta que el usuario vuelva a entrar.
+ * - `expirada`: una petición con token recibió 401. El token ya no sirve: ProtectedRoute redirige
+ *   al login, que muestra «Su sesión expiró», y tras entrar se vuelve a la ruta en la que estaba.
  */
 
 export interface IniciarSesionOptions {

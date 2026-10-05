@@ -6,7 +6,6 @@ import {
   LOGIN_REDIRECT_KEY,
   LoginPage,
   ProtectedRoute,
-  SessionExpiredOverlay,
   resolveDestination,
   useAuth,
   useCurrentUser,
@@ -24,7 +23,7 @@ import {
 } from '@/features/subjects'
 import { CuentaDetallePage, CuentasPage } from '@/features/users'
 
-/** Envuelve una pantalla con la capacidad que exige. Sin sesión deja pasar (ver ProtectedRoute). */
+/** Envuelve una pantalla con la capacidad que exige. Sin sesión redirige al login (ver ProtectedRoute). */
 function guarded(capability: Capability, element: ReactElement) {
   return <ProtectedRoute capability={capability}>{element}</ProtectedRoute>
 }
@@ -160,19 +159,10 @@ export function AppRouter() {
     return <LoadingState rows={3} label="Verificando la sesión" />
   }
 
-  const blocked = estado === 'expirada'
-
   return (
-    <>
-      {/* `inert` saca la pantalla de la tabulación y de los lectores mientras el aviso la bloquea. */}
-      <div {...(blocked ? { inert: '' } : {})}>
-        <Routes>
-          <Route path="/login" element={<LoginRoute />} />
-          <Route path="/*" element={<AreaRoutes />} />
-        </Routes>
-      </div>
-
-      <SessionExpiredOverlay />
-    </>
+    <Routes>
+      <Route path="/login" element={<LoginRoute />} />
+      <Route path="/*" element={<AreaRoutes />} />
+    </Routes>
   )
 }

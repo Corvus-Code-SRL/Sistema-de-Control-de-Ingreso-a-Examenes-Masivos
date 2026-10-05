@@ -13,7 +13,7 @@ use Database\Seeders\ExamTypeSeeder;
 /**
  * Catálogos que usan las pruebas de exámenes, sobre el catálogo académico.
  *
- * El docente de CurrentUser::teacherId() es quien crea los exámenes, y el par
+ * El docente autenticado ($docenteId) es quien crea los exámenes, y el par
  * (Sistemas, Cálculo II) es el que dicta en el periodo activo.
  */
 trait SeedsExamCatalog

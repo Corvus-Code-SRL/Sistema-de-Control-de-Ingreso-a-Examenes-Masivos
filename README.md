@@ -251,17 +251,16 @@ Todo el equipo trabaja con los mismos registros: cada valor está escrito a mano
 ### Cómo cargarlos
 
 1. Partir de una base creada con `docs/database/creation-script.sql`. Si la base ya tiene datos armados a mano con los mismos códigos (por ejemplo la carrera `SIS` o el periodo `2-2026` con otro id), el seeder se detiene sin escribir nada y lo explica.
-2. En `backend/.env`, `APP_ENV=local` (o `development`) y estos tres valores, que ya trae `.env.example`:
+2. En `backend/.env`, `APP_ENV=local` (o `development`) y estos dos valores, que ya trae `.env.example`:
 
     ```dotenv
-    SCIEM_DOCENTE_FIJO_ID=00000000-0000-4000-8000-000000000011
     SCIEM_PERIODO_ACTIVO_ID=9303
     SCIEM_USUARIO_PRUEBA=00000000-0000-4000-8000-000000000001
     ```
 
     `SCIEM_PERIODO_ACTIVO_ID` es obligatorio: sin él, los endpoints que necesitan el periodo activo responden 500 con un mensaje que lo indica (`GET /api/periodos` sigue funcionando, con `id_periodo_activo` en `null`). El seeder crea el periodo `9303` que ese valor referencia.
 
-    > `SCIEM_DOCENTE_FIJO_ID` y `SCIEM_USUARIO_PRUEBA` desaparecen con **RNF-02 (autenticación)**: a partir de ese momento el usuario actual es el usuario autenticado. Mientras RNF-02 esté en curso, ningún código nuevo debe leer esas variables — el usuario actual se obtiene del resolver documentado en `app/Support/`.
+    > `SCIEM_DOCENTE_FIJO_ID` **ya no existe** (RNF-02): el usuario que actúa es el autenticado con su token. Un `.env` anterior que todavía la tenga no se rompe: la variable se ignora. `SCIEM_USUARIO_PRUEBA` queda solo para los seeders (`SystemActor`, ver `docs/architecture/usuario-actual.md`).
 
 3. Ejecutar:
 
@@ -277,7 +276,7 @@ El seeder no está registrado en `DatabaseSeeder`, así que `php artisan db:seed
 
 ### Comprobar qué datos ve el frontend
 
-Cambiar `.env.example` no modifica un `.env` existente. La API debe usar el docente `…0011`, el periodo `9303` y la misma base donde se ejecutó el seeder. Después de modificar su `.env`, limpiar la configuración y reiniciar el servidor PHP. Si PHP corre en Docker, ejecutar estos pasos **en el contenedor que atiende el puerto 8000**; un contenedor sin el repositorio montado conserva su propia copia del código y de `.env`.
+Cambiar `.env.example` no modifica un `.env` existente. La API debe usar el periodo `9303` y la misma base donde se ejecutó el seeder; el docente es quien inicie sesión (por ejemplo `10452`, uuid `…0011`). Después de modificar su `.env`, limpiar la configuración y reiniciar el servidor PHP. Si PHP corre en Docker, ejecutar estos pasos **en el contenedor que atiende el puerto 8000**; un contenedor sin el repositorio montado conserva su propia copia del código y de `.env`.
 
 Para trabajar contra una base propia en lugar de la compartida, crear una base local vacía (por ejemplo `sciem_demo`), cargar en ella `docs/database/creation-script.sql` y seleccionar `DB_DATABASE=sciem_demo` antes de sembrar. No ejecutar el script de creación sobre tablas existentes. El esquema de exámenes debe incluir los cambios de HU-06; el seeder lo comprueba antes de escribir.
 
@@ -289,12 +288,12 @@ La verificación de la carga debe mostrar 8 materias, 15 pares materia-carrera, 
 
 ### Cuentas
 
-Todas tienen la contraseña `password` (hash bcrypt fijo). El inicio de sesión se implementa en **RNF-02**; mientras no esté, la aplicación actúa como el Docente fijo y el Administrador de prueba que indica `.env`.
+Todas tienen la contraseña `password` (hash bcrypt fijo). Se entra con `POST /api/auth/login` (o la pantalla de ingreso): toda la API, salvo el login, exige el token.
 
 | Cuenta | uuid (`usuario.id_usuario`) | cod_sis | Correo | Rol vigente |
 | --- | --- | --- | --- | --- |
-| Valeria Montaño Ríos | `00000000-0000-4000-8000-000000000001` | `ADM0001` | valeria.montano@sciem.test | Administrador (`SCIEM_USUARIO_PRUEBA`) |
-| Marcelo Quiroga Andrade | `00000000-0000-4000-8000-000000000011` | `10452` | marcelo.quiroga@sciem.test | Docente (`SCIEM_DOCENTE_FIJO_ID`); antes Auxiliar |
+| Valeria Montaño Ríos | `00000000-0000-4000-8000-000000000001` | `ADM0001` | valeria.montano@sciem.test | Administrador (uuid de `SCIEM_USUARIO_PRUEBA`, la cuenta de sistema de los seeders) |
+| Marcelo Quiroga Andrade | `00000000-0000-4000-8000-000000000011` | `10452` | marcelo.quiroga@sciem.test | Docente; antes Auxiliar |
 | Rosario Salazar Vidal | `00000000-0000-4000-8000-000000000012` | `10487` | rosario.salazar@sciem.test | Docente |
 | Gustavo Rocha | `00000000-0000-4000-8000-000000000013` | `10533` | gustavo.rocha@sciem.test | Docente (sin apellido materno) |
 | Daniela Ferrufino Soliz | `00000000-0000-4000-8000-000000000021` | `201800451` | daniela.ferrufino@sciem.test | Auxiliar |
@@ -311,10 +310,10 @@ Los códigos SIS siguen el formato de cada tipo de cuenta: el Administrador es a
 | Materia compartida por carreras de facultades distintas | Cálculo I en Sistemas, Informática (FCYT) y Economía (FCE) | HU-03 |
 | Materia INACTIVA con par activo | Taller de Sistemas Operativos en Sistemas | HU-03 |
 | Par INACTIVO con materia activa | Base de Datos I en Informática; su grupo 1 (9409) responde 422 en el detalle | HU-03 |
-| Par sin grupos del docente fijo | Contabilidad General en Administración (solo Rosario Salazar) | HU-03 |
+| Par sin grupos del docente 10452 | Contabilidad General en Administración (solo Rosario Salazar) | HU-03 |
 | Par sin ningún grupo | Microeconomía en Economía | HU-03 |
 | Mismo número de grupo, misma materia, otra carrera | Grupo 1 de Cálculo I en Sistemas (9401) y en Economía (9403) | HU-03 |
-| Grupos de otro docente en el mismo par | Cálculo I en Sistemas: grupo 1 del docente fijo y grupo 2 de Rosario Salazar (9402), abierto en el listado y con 403 en el detalle | HU-03 |
+| Grupos de otro docente en el mismo par | Cálculo I en Sistemas: grupo 1 del docente 10452 y grupo 2 de Rosario Salazar (9402), abierto en el listado y con 403 en el detalle | HU-03 |
 | Grupo sin nómina | Base de Datos I en Sistemas, grupo 1 (9404) | HU-03 |
 | Estudiante existente que no está en la nómina de un grupo | Gabriela Guzmán (`202150007`) respecto del grupo 9401: al cargarla se inscribe sin crear otro estudiante | HU-05 |
 | Grupo de un periodo anterior | Cálculo I en Sistemas, grupo 1 del periodo 1-2026 (9410) | HU-03 |
@@ -337,7 +336,7 @@ Periodos: `2-2025` (9301), `1-2026` (9302) y `2-2026` (9303, el activo). Hay 24 
 
 ### Cómo retirarlos
 
-Todos los ids numéricos de prueba están en el rango 9000–9999 y todos los uuid empiezan con `00000000-0000-4000-8000-`. Para retirar los datos, recrear la base desde el script de creación y borrar `backend/database/seeders/TestData/`, esta sección y los tres valores de `.env.example`.
+Todos los ids numéricos de prueba están en el rango 9000–9999 y todos los uuid empiezan con `00000000-0000-4000-8000-`. Para retirar los datos, recrear la base desde el script de creación y borrar `backend/database/seeders/TestData/`, esta sección y los valores de datos de prueba de `.env.example`.
 
 ### Seeders: para qué sirve cada uno
 
@@ -346,7 +345,7 @@ Todos los ids numéricos de prueba están en el rango 9000–9999 y todos los uu
 | `ActionSeeder` | Catálogo `accion`: las 12 acciones de la bitácora, en MAYÚSCULAS. `updateOrInsert` por `operacion`. | **Sí**, siempre con `--class` |
 | `IncidentTypeSeeder` | Catálogo `tipo_falta`: 4 tipos de falta. Solo inserta los que faltan y nunca actualiza: una fila existente con otra descripción se deja como está. | **Sí**, siempre con `--class` |
 | `RoleSeeder`, `ExamTypeSeeder` | Catálogos `rol` y `tipo_examen`. Usan `updateOrInsert`: reescriben la descripción o la categoría si cambiaron. | Ya aplicados; no repetir sin necesidad |
-| `UserSeeder`, `AdministratorAccountSeeder` | La cuenta de prueba que actúa en la bitácora (`SCIEM_USUARIO_PRUEBA`). `UserSeeder` sobrescribe su nombre, SIS y contraseña. | Solo local |
+| `UserSeeder`, `AdministratorAccountSeeder` | La cuenta de sistema que firma la bitácora de seeders y comandos (`SCIEM_USUARIO_PRUEBA`, vía `SystemActor`). `UserSeeder` sobrescribe su nombre, SIS (`000000000`) y contraseña (`password`); queda con rol Administrador: **riesgo conocido**, se resuelve en el Sprint 3. | Solo local |
 | `TestData\*` | Datos temporales con ids fijos y *upsert* por clave primaria (ver arriba). | Solo local: se niegan a correr si el host no es local |
 | `DatabaseSeeder` (`php artisan db:seed` a secas) | Llama a `UserSeeder`, `RoleSeeder`, `ActionSeeder`, `AdministratorAccountSeeder`, `ExamTypeSeeder` e `IncidentTypeSeeder`. No carga `TestData`. | Solo local: **nunca** sobre la compartida |
 

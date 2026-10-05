@@ -50,7 +50,7 @@ class StudentRosterAuthorizationTest extends TestCase
 
         $this->previewRoster($this->csvFile($this->rosterRows(2)), $this->grupoPropioId)
             ->assertForbidden()
-            ->assertJsonPath('message', 'Un auxiliar no puede cargar la nómina de un grupo.');
+            ->assertJsonPath('message', 'Solo un docente puede cargar la nómina de un grupo.');
 
         $this->assertSame($before, $this->writes());
     }
@@ -64,7 +64,7 @@ class StudentRosterAuthorizationTest extends TestCase
 
         $this->confirmRoster($token, $this->grupoPropioId)
             ->assertForbidden()
-            ->assertJsonPath('message', 'Un auxiliar no puede cargar la nómina de un grupo.');
+            ->assertJsonPath('message', 'Solo un docente puede cargar la nómina de un grupo.');
 
         $this->assertSame($before, $this->writes());
         $this->assertSame(0, DB::table('grupo_estudiante')->where('id_grupo', $this->grupoPropioId)->count());

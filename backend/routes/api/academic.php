@@ -14,16 +14,14 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('materias', [SubjectController::class, 'index']);
 
-Route::get('materias/administracion', [SubjectController::class, 'adminIndex'])
-    ->middleware('auth:sanctum');
+Route::get('materias/administracion', [SubjectController::class, 'adminIndex']);
 
 Route::get('periodos', [PeriodController::class, 'index']);
 
 // Endpoint legado de registro de materias.
-Route::post('materias', [SubjectController::class, 'store'])->middleware('auth:sanctum');
+Route::post('materias', [SubjectController::class, 'store']);
 
-Route::put('materias/{subject}', [SubjectController::class, 'update'])
-    ->middleware('auth:sanctum');
+Route::put('materias/{subject}', [SubjectController::class, 'update']);
 
 Route::get(
     'carreras/{id_carrera}/materias/{id_materia}/grupos',
@@ -31,8 +29,7 @@ Route::get(
 );
 
 // HU-06: asignar una materia existente a una carrera.
-Route::middleware('auth:sanctum')
-    ->prefix('administracion')
+Route::prefix('administracion')
     ->group(function () {
         Route::get(
             'carreras',

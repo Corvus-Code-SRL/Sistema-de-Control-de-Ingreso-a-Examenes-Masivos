@@ -10,9 +10,9 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * Base de las peticiones que registran o modifican grupos (HU-18, HU-19).
  *
- * Quien gestiona grupos es el docente: una cuenta con rol Auxiliar no puede. Es el mismo
- * patrón de HU-08 y HU-09 (se rechaza al Auxiliar, no se exige Docente). Que el grupo sea
- * del docente lo decide GroupPolicy; que el par materia-carrera esté activo, GroupService.
+ * Quien gestiona grupos es un docente activo: un Auxiliar, un Administrador o una cuenta sin
+ * rol o inactiva reciben 403. Que el grupo sea del docente lo decide GroupPolicy; que el par
+ * materia-carrera esté activo, GroupService.
  */
 abstract class GroupManagementRequest extends FormRequest
 {
@@ -21,11 +21,11 @@ abstract class GroupManagementRequest extends FormRequest
 
     public function authorize(CurrentUser $currentUser, UserRoleService $roles): bool
     {
-        return ! $roles->isAssistant($currentUser->id());
+        return $roles->isTeacher($currentUser->id());
     }
 
     protected function failedAuthorization(): void
     {
-        throw new AuthorizationException('Un auxiliar no puede gestionar grupos.');
+        throw new AuthorizationException('Solo un docente puede gestionar grupos.');
     }
 }

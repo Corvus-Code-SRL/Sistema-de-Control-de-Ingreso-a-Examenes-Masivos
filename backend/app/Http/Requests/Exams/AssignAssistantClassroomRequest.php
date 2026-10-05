@@ -18,17 +18,17 @@ class AssignAssistantClassroomRequest extends FormRequest
     private const MAX_ID = 2147483647;
 
     /**
-     * Quien asigna es el docente: una cuenta con rol Auxiliar no puede, aunque esté habilitada
-     * en el examen. Sin sesión se actúa como el docente fijo, igual que en el resto de Exams.
+     * Quien asigna es un docente activo: un Auxiliar (aunque esté habilitado en el examen), un
+     * Administrador o una cuenta sin rol o inactiva reciben 403.
      */
     public function authorize(CurrentUser $currentUser, UserRoleService $roles): bool
     {
-        return ! $roles->isAssistant($currentUser->id());
+        return $roles->isTeacher($currentUser->id());
     }
 
     protected function failedAuthorization(): void
     {
-        throw new AuthorizationException('Un auxiliar no puede asignar ambientes a otros auxiliares.');
+        throw new AuthorizationException('Solo un docente puede asignar ambientes a los auxiliares.');
     }
 
     public function rules(): array

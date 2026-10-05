@@ -2,14 +2,22 @@
 
 namespace App\Http\Requests\Security;
 
+use App\Services\Security\UserRoleService;
+use App\Support\CurrentUser;
 use App\Support\SisCode;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreUserRequest extends FormRequest
 {
-    public function authorize(): bool
+    public function authorize(CurrentUser $currentUser, UserRoleService $roles): bool
     {
-        return true;   // Sprint 1: sin autenticación real
+        return $roles->isAdministrator($currentUser->id());
+    }
+
+    protected function failedAuthorization(): void
+    {
+        throw new AuthorizationException('Solo un Administrador puede registrar cuentas.');
     }
 
     /** El SIS se normaliza antes de validar para que 'unique' compare la forma canónica. */
