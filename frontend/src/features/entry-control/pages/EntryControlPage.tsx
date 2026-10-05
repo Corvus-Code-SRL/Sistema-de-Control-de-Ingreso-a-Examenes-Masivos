@@ -32,9 +32,9 @@ function EntryControlContent({ examId }: { examId: number }) {
   const open = context?.estado === 'EN_INGRESO'
   const hasRoom = roomId !== null && context?.ambientes.some((room) => room.id_ambiente === roomId)
 
-  return <AppShell mobileTitle="Control de ingreso" mobileSubtitle={context?.nombre_examen} breadcrumbs={[{ label: 'Exámenes', to: '/examenes/programados' }, { label: 'Control de ingreso' }]}>
+  return <AppShell mobileTitle="Control de ingreso" mobileSubtitle={context?.nombre_examen} breadcrumbs={[{ label: 'Control de ingreso', to: '/control-ingreso' }, { label: context?.nombre_examen ?? 'Examen' }]}>
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><Link to="/examenes/programados" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-brand-deep"><ArrowLeft className="size-4" />Exámenes</Link><h1 className="sciem-h1 mt-1">Control de ingreso</h1></div>
+      <div><Link to="/control-ingreso" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-brand-deep"><ArrowLeft className="size-4" />Control de ingreso</Link><h1 className="sciem-h1 mt-1">Control de ingreso</h1></div>
       <Button type="button" variant="outline" size="sm" onClick={() => void reload()} disabled={!context}><RefreshCw className="size-4" />Actualizar</Button>
     </div>
 

@@ -105,4 +105,13 @@ describe('examsService', () => {
     expect(String(url)).toContain('/examenes/7/cancelar')
     expect(options).toMatchObject({ method: 'POST' })
   })
+
+  it('la vista Programados pide al backend solo los exámenes vigentes', async () => {
+    mockApiOnce({ body: { data: [exam] } })
+
+    await expect(examsService.listScheduledExams()).resolves.toEqual([exam])
+
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(String(url)).toContain('/examenes?vista=programados')
+  })
 })

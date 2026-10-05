@@ -124,4 +124,9 @@ export interface AssistantExam {
   estado: AssistantExamStatus
   materia: string | null
   ambiente: ExamClassroom | null
+  /**
+   * `true` cuando el docente no le asignó ambiente y el examen tiene uno solo: el backend aplica la
+   * misma regla del control de ingreso y entrega ese ambiente.
+   */
+  ambiente_por_defecto: boolean
 }

@@ -23,6 +23,16 @@ export const examsService = {
     return response.data;
   },
 
+  /**
+   * Vista Programados: solo los exámenes vigentes (PROGRAMADO o EN_INGRESO del período activo,
+   * incluido el recién creado que aún no tiene grupos), del más próximo al más lejano. Lo decide
+   * el backend con `?vista=programados`.
+   */
+  async listScheduledExams(signal?: AbortSignal): Promise<Exam[]> {
+    const response = await apiClient<DataResponse<Exam[]>>('/examenes?vista=programados', { signal });
+    return response.data;
+  },
+
   async getExam(examId: number, signal?: AbortSignal): Promise<Exam> {
     const response = await apiClient<DataResponse<Exam>>(`/examenes/${examId}`, { signal });
     return response.data;
