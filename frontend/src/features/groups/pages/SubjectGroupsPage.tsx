@@ -32,10 +32,8 @@ export function SubjectGroupsPage() {
   const careerId = Number(params.idCarrera)
   const subjectId = Number(params.idMateria)
 
-  const { subject, groups, isLoading, isEmpty, hasNoOwnGroups, error, reload } = useSubjectGroups(
-    careerId,
-    subjectId
-  )
+  const { subject, groups, teacherName, isLoading, isEmpty, hasNoOwnGroups, error, reload } =
+    useSubjectGroups(careerId, subjectId)
 
   const [isCreateOpen, setIsCreateOpen] = useState(false)
 
@@ -165,7 +163,7 @@ export function SubjectGroupsPage() {
             careerId={careerId}
             subjectId={subjectId}
             subjectName={subject?.nombre ?? ''}
-            teacherName={groups[0]?.docente.nombre_completo ?? 'Docente'}
+            teacherName={teacherName}
             subjectCareerLabel={subjectCareerLabel}
             onCancel={() => setIsCreateOpen(false)}
             onRegistered={handleGroupRegistered}

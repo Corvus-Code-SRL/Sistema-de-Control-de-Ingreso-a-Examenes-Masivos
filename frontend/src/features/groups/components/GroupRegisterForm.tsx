@@ -24,7 +24,7 @@ export interface RegistrarGrupoFormProps {
   /** "Bases de Datos I": nombre corto de la materia, para el subtítulo del modal. */
   subjectName: string
   /** Nombre del docente actual, para el campo de solo lectura "Docente". */
-  teacherName: string
+  teacherName: string | null
   onCancel: () => void
   onRegistered: (group: GroupMutationResponse['data']) => void
 }
@@ -133,7 +133,7 @@ export function RegistrarGrupoForm({
 
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           <ReadOnlyField label="Materia y carrera" value={subjectCareerLabel} />
-          <ReadOnlyField label="Docente" value={teacherName} />
+          <ReadOnlyField label="Docente" value={teacherName ?? 'No disponible'} />
         </div>
 
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
@@ -162,7 +162,7 @@ export function RegistrarGrupoForm({
               </p>
             ) : (
               <p className="text-xs text-muted-foreground leading-normal">
-                Debe ser único dentro de la materia, la carrera y el período.
+                Debe ser único dentro de la materia, la carrera, la gestión y el período.
               </p>
             )}
           </div>

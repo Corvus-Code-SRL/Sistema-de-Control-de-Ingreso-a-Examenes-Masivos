@@ -38,6 +38,8 @@ export interface SubjectGroupsMeta {
   total: number
   total_mios: number
   id_periodo_activo: number
+  /** Docente que actúa; `null` si el backend no lo puede resolver. */
+  docente: { nombre_completo: string | null }
 }
 
 /** Respuesta de `GET /carreras/{id_carrera}/materias/{id_materia}/grupos`. */
