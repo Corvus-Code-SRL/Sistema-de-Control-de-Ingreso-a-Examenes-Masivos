@@ -12,10 +12,7 @@ abstract class TestCase extends BaseTestCase
 {
     use CreatesApplication;
 
-    /**
-     * El esquema no lo definen migraciones sino el script de creación del proyecto,
-     * que es la única fuente de verdad. Se carga una sola vez por corrida.
-     */
+    /** El esquema de pruebas se reconstruye desde la migración base y las posteriores. */
     private static bool $schemaLoaded = false;
 
     protected function setUp(): void
@@ -54,12 +51,6 @@ abstract class TestCase extends BaseTestCase
 
     private static function loadDatabaseSchema(Application $app): void
     {
-        $script = dirname($app->basePath()) . '/docs/database/creation-script.sql';
-
-        if (! is_file($script)) {
-            throw new RuntimeException("No se encontró el script de creación: {$script}");
-        }
-
         $connection = $app->make('db')->connection();
 
         if ($connection->getDatabaseName() !== 'sciem_test') {
@@ -69,15 +60,6 @@ abstract class TestCase extends BaseTestCase
         }
 
         $connection->unprepared('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
-        $connection->unprepared(file_get_contents($script));
-
-        // Las tablas de Sanctum no forman parte del script de creación: las crean sus migraciones.
-        $app->make(\Illuminate\Contracts\Console\Kernel::class)->call('migrate', [
-            '--path' => [
-                'database/migrations/2019_12_14_000001_create_personal_access_tokens_table.php',
-                'database/migrations/2026_10_02_000000_adapt_personal_access_tokens_for_uuid_users.php',
-            ],
-            '--force' => true,
-        ]);
+        $app->make(\Illuminate\Contracts\Console\Kernel::class)->call('migrate', ['--force' => true]);
     }
 }

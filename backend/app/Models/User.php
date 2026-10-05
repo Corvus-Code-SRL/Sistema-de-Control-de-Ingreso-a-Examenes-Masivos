@@ -192,9 +192,24 @@ class User extends Authenticatable
         return $this->contrasenia;
     }
 
+    /** Habilitaciones del usuario como auxiliar de exámenes, con su ambiente (HU-09). */
+    public function assistantAssignments(): HasMany
+    {
+        return $this->hasMany(ExamAssistant::class, 'id_usuario', 'id_usuario');
+    }
+
     /** Historial: identificar una asignación por usuario, rol y fecha_inicio. */
     public function roleAssignments(): HasMany
     {
         return $this->hasMany(UserRole::class, 'id_usuario', 'id_usuario');
+    }
+    /* =========================================================================
+    * 7. AUXILIAR: grupos y exámenes donde participa (N:M)
+    * ========================================================================= */
+    public function assistantGroups(): BelongsToMany
+    {
+        return $this->belongsToMany(Group::class, 'grupo_auxiliar', 'id_usuario', 'id_grupo')
+                    ->using(GroupAssistant::class)
+                    ->withPivot('fecha_incorporacion', 'estado');
     }
 }

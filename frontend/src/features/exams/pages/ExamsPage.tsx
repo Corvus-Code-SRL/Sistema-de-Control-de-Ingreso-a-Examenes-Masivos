@@ -1,3 +1,4 @@
+import { DoorOpen } from 'lucide-react';
 import { CalendarPlus, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
@@ -115,9 +116,16 @@ export function ExamsPage() {
                   </TableCell>
 
                   <TableCell className="text-right">
-                    <Button variant="outline" size="sm" onClick={() => navigate(`/examenes/${exam.id_examen}`)}>
-                      {exam.estado === 'PROGRAMADO' ? 'Configurar' : 'Ver detalle'}
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      {exam.estado === 'EN_INGRESO' && (
+                        <Button size="sm" onClick={() => navigate(`/examenes/${exam.id_examen}/control-ingreso`)}>
+                          <DoorOpen className="size-4" /> Controlar ingreso
+                        </Button>
+                      )}
+                      <Button variant="outline" size="sm" onClick={() => navigate(`/examenes/${exam.id_examen}`)}>
+                        {exam.estado === 'PROGRAMADO' ? 'Configurar' : 'Ver detalle'}
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

@@ -2,6 +2,7 @@
 
 namespace App\Services\Academic;
 
+use App\Exceptions\Academic\ActivePeriodNotConfiguredException;
 use App\Models\Group;
 use App\Models\SubjectCareer;
 use App\Support\RecordStatus;
@@ -51,7 +52,13 @@ class SubjectCatalogService
 
     public function activePeriodId(): int
     {
-        return (int) config('sciem.periodo_activo_id');
+        $id = (int) config('sciem.periodo_activo_id');
+
+        if ($id <= 0) {
+            throw new ActivePeriodNotConfiguredException();
+        }
+
+        return $id;
     }
 
     private function basePairQuery(string $teacherId): Builder

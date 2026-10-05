@@ -58,6 +58,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Almacén del control de ingreso
+    |--------------------------------------------------------------------------
+    |
+    | Solo el snapshot temporal de control de ingreso utiliza Redis. El resto
+    | de la aplicación conserva el almacén definido por CACHE_DRIVER.
+    |
+    */
+
+    'entry_control_cache_store' => env('ENTRY_CONTROL_CACHE_STORE', 'redis'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Código SIS de estudiante (carga de nómina)
     |--------------------------------------------------------------------------
     |

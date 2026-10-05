@@ -25,4 +25,13 @@ class GroupPolicy
 
         return Response::deny('Solo el docente que dicta el grupo puede ver su detalle.');
     }
+
+    public function update(?User $user, Group $group, string $teacherId): Response
+    {
+        if ((string) $group->id_usuario_docente === $teacherId) {
+            return Response::allow();
+        }
+
+        return Response::deny('Solo el docente que dicta el grupo puede modificarlo.');
+    }
 }

@@ -194,15 +194,52 @@ class DatabaseSchemaTest extends TestCase
         $this->assertRejected(fn () => DB::table('grupo_auxiliar')->insert($row));
     }
 
-    public function testBaselineMigrationSchemaIsIdenticalToTheCreationScript(): void
+    public function testCreationScriptStartsWithTheUntouchedBaseline(): void
     {
         $normalize = fn (string $path) => str_replace("\r\n", "\n", file_get_contents($path));
+        $baseline = $normalize(database_path('schema/baseline.sql'));
+        $script = $normalize(base_path('../docs/database/creation-script.sql'));
 
-        $this->assertSame(
-            $normalize(base_path('../docs/database/creation-script.sql')),
-            $normalize(database_path('schema/baseline.sql')),
-            'database/schema/baseline.sql debe ser copia exacta de docs/database/creation-script.sql.'
+        $this->assertStringStartsWith(
+            $baseline,
+            $script,
+            'docs/database/creation-script.sql debe empezar con una copia exacta de '
+            . 'database/schema/baseline.sql; los cambios posteriores se agregan al final.'
         );
+    }
+
+    /**
+     * El script es el esquema final: lo que agregan las migraciones posteriores a la base debe
+     * estar en él. Se comprueba contra la base que acaban de armar las migraciones.
+     */
+    public function testCreationScriptDeclaresWhatLaterMigrationsAdd(): void
+    {
+        $script = file_get_contents(base_path('../docs/database/creation-script.sql'));
+
+        $this->assertTrue(Schema::hasTable('intento_ingreso'));
+        $this->assertTrue(Schema::hasColumns('examen_estudiante', [
+            'id_ambiente',
+            'id_usuario_controlador',
+            'registrado_en',
+        ]));
+
+        $constraints = collect(DB::select(
+            "select conname from pg_constraint
+             where conrelid in ('public.examen_estudiante'::regclass, 'public.intento_ingreso'::regclass)
+               and conname !~ '^(pk_|examen_estudiante_)'"
+        ))->pluck('conname');
+        $indexes = collect(DB::select(
+            "select indexname from pg_indexes
+             where schemaname = 'public' and indexname in ('idx_ingreso_examen_registrado', 'idx_intento_examen_registrado')"
+        ))->pluck('indexname');
+
+        $objects = $constraints->merge($indexes)->merge(['intento_ingreso', 'registrado_en', 'id_usuario_controlador']);
+
+        $this->assertGreaterThanOrEqual(8, $objects->count());
+
+        foreach ($objects as $name) {
+            $this->assertStringContainsString($name, $script, "El script no declara {$name}.");
+        }
     }
 
     /** Corre la operación en un savepoint: la base debe rechazarla sin abortar la transacción del test. */

@@ -43,6 +43,7 @@ class Exam extends Model
     protected $casts = [
         'fecha' => 'date',
         'duracion' => 'integer',
+        'minutos_apertura' => 'integer',
         'id_tipo_examen' => 'integer',
         'id_carrera' => 'integer',
         'id_materia' => 'integer',
@@ -88,6 +89,12 @@ class Exam extends Model
     {
         return $this->belongsToMany(Classroom::class, 'examen_ambiente', 'id_examen', 'id_ambiente')
             ->using(ExamRoom::class);
+    }
+
+    /** Auxiliares habilitados para el examen y su ambiente asignado. */
+    public function assistants(): HasMany
+    {
+        return $this->hasMany(ExamAssistant::class, 'id_examen', 'id_examen');
     }
 
     public function groups(): BelongsToMany

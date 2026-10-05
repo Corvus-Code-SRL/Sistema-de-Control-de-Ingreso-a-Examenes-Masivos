@@ -1,2 +1,2 @@
-// API pública del feature entry-control
-export {};
+export { EntryControlPage } from './pages/EntryControlPage'
+export { OpenEntryControlsPage } from './pages/OpenEntryControlsPage'

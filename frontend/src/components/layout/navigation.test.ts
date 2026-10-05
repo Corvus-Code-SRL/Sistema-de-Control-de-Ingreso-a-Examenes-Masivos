@@ -10,4 +10,8 @@ describe('navigationByArea', () => {
     expect(labelsOf('administrador')).toContain('Ambientes')
     expect(labelsOf('docente')).not.toContain('Ambientes')
   })
+
+  it('el auxiliar ve Mis exámenes y el control de ingreso', () => {
+    expect(labelsOf('auxiliar')).toEqual(['Mis exámenes', 'Control de ingreso'])
+  })
 })

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Exams;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Exams\CreateExamRequest;
+use App\Http\Requests\Exams\FinishExamRequest;
 use App\Http\Requests\Exams\UpdateExamRequest;
 use App\Http\Resources\Exams\ClassroomResource;
 use App\Http\Resources\Exams\ExamResource;
@@ -11,6 +12,7 @@ use App\Http\Resources\Exams\GroupResource;
 use App\Http\Resources\Exams\SubjectResource;
 use App\Models\Exam;
 use App\Services\Exams\ExamService;
+use App\Services\Exams\ExamLifecycleService;
 use App\Support\ApiResponse;
 use App\Support\CurrentUser;
 use Illuminate\Http\JsonResponse;
@@ -80,5 +82,13 @@ class ExamController extends Controller
         $exam = $this->examService->cancel($exam, $this->currentUser->teacherId());
 
         return ApiResponse::success(new ExamResource($exam), 'Examen cancelado correctamente.');
+    }
+
+    /** POST /api/examenes/{exam}/finalizar */
+    public function finish(FinishExamRequest $request, Exam $exam, ExamLifecycleService $lifecycle): JsonResponse
+    {
+        $exam = $lifecycle->finishManually($exam, $this->currentUser->teacherId());
+
+        return ApiResponse::success(new ExamResource($exam), 'Examen finalizado correctamente.');
     }
 }

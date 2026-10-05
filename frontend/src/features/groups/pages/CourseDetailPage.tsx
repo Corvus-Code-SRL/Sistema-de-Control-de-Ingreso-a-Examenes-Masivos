@@ -16,6 +16,7 @@ import { CourseTabsShell } from '../components/CourseTabsShell'
 import { ActualizarGrupoForm } from '../components/GroupUpdateForm'
 import { useGroupDetail } from '../hooks/useGroupDetail'
 import { courseTitle } from '../types/group.types'
+import { Toast } from '@/components/ui/toast'
 
 /**
  * Detalle de un curso con navegación de pestañas y contenido de nómina.
@@ -33,8 +34,14 @@ export function CourseDetailPage() {
     reload,
   } = useGroupDetail(groupId)
 
+  const [toast, setToast] = useState<{ show: boolean; title: string; description: string }>({
+    show: false,
+    title: '',
+    description: '',
+  })
+
   const [isEditOpen, setIsEditOpen] = useState(false)
-  
+
   const title =
     detail && !isForbidden
       ? courseTitle(detail.subject, detail.group)
@@ -92,6 +99,14 @@ export function CourseDetailPage() {
           )
         }
       />
+
+      {toast.show && (
+        <Toast
+          title={toast.title}
+          description={toast.description}
+          onClose={() => setToast((prev) => ({ ...prev, show: false }))}
+        />
+      )}
 
       {isLoading && (
         <Card className="p-0">
@@ -155,11 +170,17 @@ export function CourseDetailPage() {
             <ActualizarGrupoForm
               group={detail.group}
               subjectCareerLabel={subjectCareerLabel}
-              studentCount={(detail as any).total_estudiantes ?? 0}
+              studentCount={detail.group.cantidad_estudiantes ?? 0}
+              teacherName={detail.group.docente.nombre_completo}
               onCancel={() => setIsEditOpen(false)}
               onUpdated={() => {
                 setIsEditOpen(false)
                 reload()
+                setToast({
+                  show: true,
+                  title: 'Grupo actualizado',
+                  description: 'Los cambios se guardaron correctamente.',
+                })
               }}
             />
           )}

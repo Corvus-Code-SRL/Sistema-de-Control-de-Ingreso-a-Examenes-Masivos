@@ -98,6 +98,18 @@ class UserRoleService
             ->exists();
     }
 
+    /** ¿La cuenta indicada tiene hoy el rol Auxiliar? Sin cuenta, nunca. */
+    public function isAssistant(?string $userId): bool
+    {
+        if ($userId === null) {
+            return false;
+        }
+
+        return User::whereKey($userId)
+            ->whereHas('activeRoles', fn ($query) => $query->where('nombre_rol', Role::AUXILIAR))
+            ->exists();
+    }
+
     public function findActiveRole(User $user): ?Role
     {
         return $user->rolActivo();

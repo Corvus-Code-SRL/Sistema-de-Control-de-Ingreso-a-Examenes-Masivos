@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Layers, Plus } from 'lucide-react'
+import { Info, Layers, Plus } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -16,6 +16,7 @@ import { RegistrarGrupoForm } from '../components/GroupRegisterForm'
 import { SubjectFilterChip } from '../components/SubjectFilterChip'
 import { useSubjectGroups } from '../hooks/useSubjectGroups'
 import { Toast } from '@/components/ui/toast'
+import type { GroupMutationResponse } from '../types/group.types'
 
 /**
  * Grupos de un par materia-carrera (artboards 1.4 y 1.5).
@@ -31,10 +32,8 @@ export function SubjectGroupsPage() {
   const careerId = Number(params.idCarrera)
   const subjectId = Number(params.idMateria)
 
-  const { subject, groups, isLoading, isEmpty, hasNoOwnGroups, error, reload } = useSubjectGroups(
-    careerId,
-    subjectId
-  )
+  const { subject, groups, teacherName, isLoading, isEmpty, hasNoOwnGroups, error, reload } =
+    useSubjectGroups(careerId, subjectId)
 
   const [isCreateOpen, setIsCreateOpen] = useState(false)
 
@@ -52,14 +51,14 @@ export function SubjectGroupsPage() {
   const title = subject?.nombre ?? 'Grupos de la materia'
   const subjectCareerLabel = subject ? `${subject.nombre} · ${subject.carrera.nombre}` : ''
 
-  const handleGroupRegistered = (registeredGroup: any) => {
+  const handleGroupRegistered = (result: GroupMutationResponse['data']) => {
     setIsCreateOpen(false)
     reload()
 
     setToastNotification({
       show: true,
-      title: `Grupo ${registeredGroup?.num_grupo ?? ''} registrado`,
-      description: '61 estudiantes asociados. 3 filas quedaron fuera por inconsistencias.',
+      title: `Grupo ${result.grupo.num_grupo} registrado`,
+      description: 'El grupo se registró correctamente en el período seleccionado.',
     })
   }
 
@@ -109,11 +108,7 @@ export function SubjectGroupsPage() {
       */}
       {!isLoading && !error && !isEmpty && hasNoOwnGroups && (
         <Alert variant="info" className="mb-4">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M12 16v-4"></path>
-            <path d="M12 8h.01"></path>
-          </svg>
+          <Info aria-hidden="true" />
           <AlertTitle>Usted no tiene grupos en esta materia</AlertTitle>
           <AlertDescription>
             La materia figura entre sus asignaciones, pero todavía no registró grupos. Puede seguir consultando el catálogo o registrar el primer grupo.
@@ -168,7 +163,7 @@ export function SubjectGroupsPage() {
             careerId={careerId}
             subjectId={subjectId}
             subjectName={subject?.nombre ?? ''}
-            teacherName="P. Careaga"
+            teacherName={teacherName}
             subjectCareerLabel={subjectCareerLabel}
             onCancel={() => setIsCreateOpen(false)}
             onRegistered={handleGroupRegistered}

@@ -1493,3 +1493,59 @@ CREATE INDEX idx_examen_auxiliar_examen_ambiente
 
 CREATE INDEX idx_examen_auxiliar_docente_habilita
     ON public.examen_auxiliar(id_usuario_docente_habilita);
+
+---------------------------------------------------
+-- CAMBIOS POSTERIORES A LA BASE (V5)
+---------------------------------------------------
+-- Cada bloque es el SQL equivalente de una migración posterior a
+-- 2026_09_25_000000_create_baseline_schema. Hasta aquí el archivo es idéntico a
+-- backend/database/schema/baseline.sql (que nunca se edita); lo que sigue refleja el
+-- esquema que queda después de correr todas las migraciones. DatabaseSchemaTest verifica
+-- ambas cosas.
+--
+-- Versión 6: HU-11 (2026_09_29_000001_add_student_entry_audit_and_attempts)
+--   * examen_estudiante registra el ambiente, el controlador y el instante del ingreso.
+--   * intento_ingreso guarda los intentos rechazados del control de ingreso.
+
+ALTER TABLE public.examen_estudiante
+    ADD COLUMN id_ambiente integer,
+    ADD COLUMN id_usuario_controlador uuid,
+    ADD COLUMN registrado_en timestamp(0) with time zone;
+
+CREATE INDEX idx_ingreso_examen_registrado
+    ON public.examen_estudiante(id_examen, registrado_en);
+
+ALTER TABLE public.examen_estudiante
+    ADD CONSTRAINT fk_ingreso_examen_ambiente
+        FOREIGN KEY (id_examen, id_ambiente) REFERENCES public.examen_ambiente(id_examen, id_ambiente);
+
+ALTER TABLE public.examen_estudiante
+    ADD CONSTRAINT fk_ingreso_controlador
+        FOREIGN KEY (id_usuario_controlador) REFERENCES public.usuario(id_usuario);
+
+CREATE TABLE public.intento_ingreso (
+    id_intento bigserial NOT NULL,
+    id_examen integer NOT NULL,
+    id_estudiante integer,
+    cod_sis varchar(15),
+    ci_presentado varchar(10),
+    id_ambiente integer NOT NULL,
+    id_usuario_controlador uuid NOT NULL,
+    motivo varchar(40) NOT NULL,
+    observacion text,
+    registrado_en timestamp(0) with time zone NOT NULL,
+
+    CONSTRAINT intento_ingreso_pkey
+        PRIMARY KEY (id_intento),
+    CONSTRAINT intento_ingreso_id_examen_foreign
+        FOREIGN KEY (id_examen) REFERENCES public.examen(id_examen),
+    CONSTRAINT intento_ingreso_id_estudiante_foreign
+        FOREIGN KEY (id_estudiante) REFERENCES public.estudiante(id_estudiante),
+    CONSTRAINT intento_ingreso_id_usuario_controlador_foreign
+        FOREIGN KEY (id_usuario_controlador) REFERENCES public.usuario(id_usuario),
+    CONSTRAINT fk_intento_examen_ambiente
+        FOREIGN KEY (id_examen, id_ambiente) REFERENCES public.examen_ambiente(id_examen, id_ambiente)
+);
+
+CREATE INDEX idx_intento_examen_registrado
+    ON public.intento_ingreso(id_examen, registrado_en);
