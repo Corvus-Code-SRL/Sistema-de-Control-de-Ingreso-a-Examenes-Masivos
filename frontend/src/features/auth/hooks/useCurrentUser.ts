@@ -8,7 +8,7 @@ export interface CurrentUserValue {
   area: Area
 }
 
-/** Qué se muestra mientras no hay sesión: la app sigue operando como el usuario fijo del backend. */
+/** Qué se muestra mientras no hay sesión (el instante previo a la redirección al login). */
 const ANONYMOUS_USER: CurrentUser = { nombre: 'Sin sesión', iniciales: '?', area: 'docente' }
 
 /**

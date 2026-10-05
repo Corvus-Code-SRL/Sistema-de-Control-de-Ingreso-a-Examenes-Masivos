@@ -6,6 +6,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
+import { useAuth } from '../hooks/useAuth'
 import { LOGIN_FIELD_IDS, type UseLoginFormResult } from '../hooks/useLoginForm'
 import { supportMailto } from '../lib/support'
 import { LINK_CLASSNAME, SupportFooter } from './SupportFooter'
@@ -31,6 +32,7 @@ interface LoginFormProps {
  */
 export function LoginForm({ form, keyboardOpen }: LoginFormProps) {
   const { failure, fieldErrors, isReadOnly, isSubmitting, throttleRemaining } = form
+  const sessionExpired = useAuth().estado === 'expirada'
 
   const isThrottled = throttleRemaining > 0
   const credentialsFailed = failure?.kind === 'credenciales'
@@ -60,6 +62,20 @@ export function LoginForm({ form, keyboardOpen }: LoginFormProps) {
         </p>
       </div>
 
+      {sessionExpired && (
+        <Alert
+          role="status"
+          className="border-warn-border bg-warn-soft text-sm text-warn-fg"
+          data-notice="sesion-expirada"
+        >
+          <TriangleAlert aria-hidden="true" />
+          <AlertTitle>Su sesión expiró</AlertTitle>
+          <AlertDescription className="text-[13px] leading-[19px]">
+            Inicie sesión de nuevo para continuar. Volverá a la pantalla en la que estaba.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {form.bothEmpty && (
         <Alert
           className="border-danger-border bg-danger-soft text-sm text-danger-fg"
@@ -79,7 +95,7 @@ export function LoginForm({ form, keyboardOpen }: LoginFormProps) {
           <CircleAlert aria-hidden="true" />
           <AlertTitle>Código SIS o contraseña incorrectos</AlertTitle>
           <AlertDescription className="text-[13px] leading-[19px]">
-            Revise los datos e intente de nuevo. Después de 5 intentos deberá esperar un minuto.
+            Revise los datos e intente de nuevo. Después de 10 intentos deberá esperar un minuto.
           </AlertDescription>
         </Alert>
       )}

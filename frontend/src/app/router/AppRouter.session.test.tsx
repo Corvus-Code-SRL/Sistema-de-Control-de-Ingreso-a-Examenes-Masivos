@@ -13,8 +13,8 @@ import {
 import { renderApp } from '@/test/renderApp'
 
 /**
- * La sesión dentro de la aplicación completa: bloqueo por sesión expirada, regreso a la ruta
- * anterior, acceso por capacidad y cierre de sesión desde el sidebar.
+ * La sesión dentro de la aplicación completa: redirección al login por sesión expirada, regreso a la
+ * ruta anterior, acceso por capacidad y cierre de sesión desde el sidebar.
  */
 
 /** Botón que hace una petición cualquiera con la sesión actual, como lo haría una pantalla. */
@@ -74,22 +74,25 @@ function afterEachCleanup() {
 }
 
 describe('sesión expirada', () => {
-  it('un 401 en otro endpoint bloquea la pantalla con un aviso y un botón para volver a entrar', async () => {
+  it('un 401 en otro endpoint lleva al login con el aviso «Su sesión expiró»', async () => {
     const user = userEvent.setup()
     stubBackend({ session: 'docente', probe: { status: 401, body: { message: 'Unauthenticated.' } } })
 
-    renderApp('/examenes/programados', <DeadSessionProbe />)
+    const app = renderApp('/examenes/programados', <DeadSessionProbe />)
     await screen.findByRole('heading', { name: /exámenes programados|programados/i })
 
     await user.click(screen.getByRole('button', { name: 'consultar' }))
 
-    const dialog = await screen.findByRole('alertdialog', { name: 'Su sesión expiró' })
+    await waitFor(() => expect(app.pathname).toBe('/login'))
 
-    expect(dialog).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Iniciar sesión' })).toBeInTheDocument()
-    // El token muerto se descarta y la pantalla de fondo queda inerte.
+    const notice = await screen.findByRole('status')
+
+    expect(notice).toHaveAttribute('data-notice', 'sesion-expirada')
+    expect(notice).toHaveTextContent('Su sesión expiró')
+    // Ya no hay diálogo que bloquee: se redirige, y el token muerto se descarta.
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(document.querySelector('[inert]')).toBeNull()
     expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
-    expect(document.querySelector('[inert]')).not.toBeNull()
   })
 
   it('tras volver a entrar, regresa a la ruta en la que estaba', async () => {
@@ -100,23 +103,19 @@ describe('sesión expirada', () => {
     await screen.findByRole('heading', { name: /programados/i })
     await user.click(screen.getByRole('button', { name: 'consultar' }))
 
-    await user.click(await screen.findByRole('button', { name: 'Iniciar sesión' }))
-
     await screen.findByRole('heading', { name: 'Ingresar' })
     expect(app.pathname).toBe('/login')
-    // En el propio login el aviso no bloquea: es donde se resuelve.
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
 
     await user.type(screen.getByLabelText(/^Código SIS/), '10452')
     await user.type(screen.getByLabelText(/^Contraseña/), 'password')
     await user.click(screen.getByRole('button', { name: 'Ingresar' }))
 
     await waitFor(() => expect(app.pathname).toBe('/examenes/programados'))
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.queryByText('Su sesión expiró')).not.toBeInTheDocument()
     expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBe('tok-nuevo')
   })
 
-  it('un 401 del login (credenciales incorrectas) no bloquea nada ni cambia de ruta', async () => {
+  it('un 401 del login (credenciales incorrectas) no cambia de ruta ni anuncia una sesión expirada', async () => {
     const user = userEvent.setup()
     stubBackend({ session: null, onLogin: () => loginErrors.credentials })
 
@@ -128,21 +127,27 @@ describe('sesión expirada', () => {
 
     await screen.findByText('Código SIS o contraseña incorrectos')
 
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.queryByText('Su sesión expiró')).not.toBeInTheDocument()
     expect(app.pathname).toBe('/login')
-    expect(document.querySelector('[inert]')).toBeNull()
   })
 
-  it('un 401 sin sesión no bloquea la app: sin sesión todo sigue funcionando', async () => {
+  it('sin sesión, una ruta protegida lleva al login sin aviso de expiración y recuerda la ruta', async () => {
     const user = userEvent.setup()
-    stubBackend({ session: null, probe: { status: 401, body: { message: 'Unauthenticated.' } } })
+    // El servidor aceptará el login y /yo responderá; pero no hay token guardado: la app arranca anónima.
+    stubBackend({ session: 'docente' })
+    window.localStorage.removeItem(TOKEN_STORAGE_KEY)
 
-    renderApp('/examenes/programados', <DeadSessionProbe />)
-    await screen.findByRole('heading', { name: /programados/i })
+    const app = renderApp('/examenes/programados')
 
-    await user.click(screen.getByRole('button', { name: 'consultar' }))
+    await screen.findByRole('heading', { name: 'Ingresar' })
+    expect(app.pathname).toBe('/login')
+    expect(screen.queryByText('Su sesión expiró')).not.toBeInTheDocument()
 
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    await user.type(screen.getByLabelText(/^Código SIS/), '10452')
+    await user.type(screen.getByLabelText(/^Contraseña/), 'password')
+    await user.click(screen.getByRole('button', { name: 'Ingresar' }))
+
+    await waitFor(() => expect(app.pathname).toBe('/examenes/programados'))
   })
 
   it('un 403 se muestra como permiso negado en su lugar y no cierra la sesión', async () => {
@@ -161,12 +166,12 @@ describe('sesión expirada', () => {
 })
 
 describe('acceso por capacidad', () => {
-  it('sin sesión deja pasar a todas las pantallas del área Docente', async () => {
+  it('sin sesión ninguna pantalla del área Docente se abre: todas llevan al login', async () => {
     stubBackend({ session: null })
 
     const app = renderApp('/examenes/nuevo')
 
-    await waitFor(() => expect(app.pathname).toBe('/examenes/nuevo'))
+    await waitFor(() => expect(app.pathname).toBe('/login'))
     expect(screen.queryByText('Sin permiso')).not.toBeInTheDocument()
   })
 
@@ -200,14 +205,14 @@ describe('acceso por capacidad', () => {
 })
 
 describe('cuenta en el sidebar', () => {
-  it('sin sesión ofrece iniciar sesión, no cerrarla', async () => {
+  it('sin sesión no hay sidebar: solo el formulario de ingreso', async () => {
     stubBackend({ session: null })
 
     renderApp('/examenes/programados')
-    await screen.findByRole('heading', { name: /programados/i })
+    await screen.findByRole('heading', { name: 'Ingresar' })
 
-    expect(screen.getAllByRole('link', { name: 'Iniciar sesión' }).length).toBeGreaterThan(0)
     expect(screen.queryByRole('button', { name: 'Cerrar sesión' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
   })
 
   it('cerrar sesión llama al logout con el token, limpia la sesión y lleva al login', async () => {
@@ -229,7 +234,7 @@ describe('cuenta en el sidebar', () => {
   })
 
   it('no queda ningún selector de rol de desarrollo', async () => {
-    stubBackend({ session: null })
+    stubBackend({ session: 'docente' })
 
     renderApp('/examenes/programados')
     await screen.findByRole('heading', { name: /programados/i })

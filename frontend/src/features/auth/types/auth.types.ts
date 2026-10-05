@@ -95,9 +95,9 @@ export interface ConfirmPasswordResponse {
 
 /**
  * - `verificando`: hay un token guardado y se está comprobando con GET /auth/yo.
- * - `anonimo`: sin sesión; la app funciona igual (usuario fijo del backend).
+ * - `anonimo`: sin sesión; toda ruta protegida redirige al login.
  * - `autenticado`: sesión vigente.
- * - `expirada`: una petición con token recibió 401; la pantalla se bloquea hasta volver a entrar.
+ * - `expirada`: una petición con token recibió 401; se redirige al login con el aviso «Su sesión expiró».
  */
 export type AuthStatus = 'verificando' | 'anonimo' | 'autenticado' | 'expirada'
 

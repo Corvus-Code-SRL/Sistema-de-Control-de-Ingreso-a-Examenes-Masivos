@@ -5,7 +5,7 @@ import { TOKEN_STORAGE_KEY, meBody, type AccountKey } from '@/test/authFixtures'
 import { renderApp } from '@/test/renderApp'
 
 /**
- * Las áreas salen del rol de la sesión. Sin sesión, la app es el área Docente, como siempre.
+ * Las áreas salen del rol de la sesión. Sin sesión, toda ruta protegida redirige al login.
  */
 function stubBackend(session: AccountKey | null) {
   if (session) {
@@ -53,14 +53,13 @@ describe('AppRouter — acceso a /ambientes por área', () => {
 
   })
 
-  it('sin sesión la app es el área Docente y no exige iniciar sesión', async () => {
+  it('sin sesión cualquier ruta protegida lleva al login', async () => {
     stubBackend(null)
 
     const app = renderApp('/ambientes')
 
-    await waitFor(() => expect(app.pathname).toBe('/materias'))
-    expect(screen.queryByRole('heading', { name: 'Iniciar sesión' })).not.toBeInTheDocument()
-
+    await waitFor(() => expect(app.pathname).toBe('/login'))
+    expect(await screen.findByRole('heading', { name: 'Ingresar' })).toBeInTheDocument()
   })
 })
 

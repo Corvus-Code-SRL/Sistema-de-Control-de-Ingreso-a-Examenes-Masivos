@@ -7,6 +7,8 @@
  * - Docente → /materias (la home de su área).
  * - Auxiliar → «/»: el router del área Auxiliar lo lleva a /mis-examenes, su home (HU-09).
  */
+export const LOGIN_PATH = '/login'
+
 const HOME_BY_ROLE: Record<string, string> = {
   Administrador: '/cuentas',
   Docente: '/materias',

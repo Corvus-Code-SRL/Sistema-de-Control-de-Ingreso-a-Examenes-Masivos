@@ -286,7 +286,7 @@ describe('LoginPage — los resultados, elegidos por `motivo` y no por el mensaj
     expect(alert).toHaveAttribute('data-failure-kind', 'credenciales')
     expect(alert).toHaveTextContent('Código SIS o contraseña incorrectos')
     expect(alert).toHaveTextContent(
-      'Revise los datos e intente de nuevo. Después de 5 intentos deberá esperar un minuto.'
+      'Revise los datos e intente de nuevo. Después de 10 intentos deberá esperar un minuto.'
     )
     // No dice cuál de los dos campos falló: ninguno se marca como inválido.
     expect(sisField()).not.toHaveAttribute('aria-invalid')
