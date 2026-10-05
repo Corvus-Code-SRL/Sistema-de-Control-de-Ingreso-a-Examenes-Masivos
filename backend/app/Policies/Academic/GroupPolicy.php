@@ -7,7 +7,7 @@ use App\Models\User;
 use Illuminate\Auth\Access\Response;
 
 /**
- * Acceso al detalle de un grupo académico: solo lo abre el docente que lo dicta.
+ * Acceso a un grupo académico: solo lo opera el docente que lo dicta.
  *
  * El listado de grupos del par no pasa por aquí: sigue abierto a todos los docentes.
  */
@@ -19,19 +19,30 @@ class GroupPolicy
      */
     public function view(?User $user, Group $group, string $teacherId): Response
     {
-        if ((string) $group->id_usuario_docente === $teacherId) {
-            return Response::allow();
-        }
-
-        return Response::deny('Solo el docente que dicta el grupo puede ver su detalle.');
+        return $this->allowOnlyOwner($group, $teacherId, 'Solo el docente que dicta el grupo puede ver su detalle.');
     }
 
     public function update(?User $user, Group $group, string $teacherId): Response
+    {
+        return $this->allowOnlyOwner($group, $teacherId, 'Solo el docente que dicta el grupo puede modificarlo.');
+    }
+
+    /** HU-21: cargar la nómina de estudiantes del grupo. */
+    public function manageRoster(?User $user, Group $group, string $teacherId): Response
+    {
+        return $this->allowOnlyOwner(
+            $group,
+            $teacherId,
+            'Solo el docente que dicta el grupo puede cargar su nómina.'
+        );
+    }
+
+    private function allowOnlyOwner(Group $group, string $teacherId, string $denyMessage): Response
     {
         if ((string) $group->id_usuario_docente === $teacherId) {
             return Response::allow();
         }
 
-        return Response::deny('Solo el docente que dicta el grupo puede modificarlo.');
+        return Response::deny($denyMessage);
     }
 }

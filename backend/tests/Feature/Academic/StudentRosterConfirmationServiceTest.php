@@ -15,6 +15,7 @@ use App\Services\Academic\Importers\StudentRosterRowValidator;
 use App\Services\Academic\Importers\StudentRosterStudentCreator;
 use App\Services\Academic\Importers\StudentRosterStudentMapper;
 use App\Services\Academic\StudentRosterGroupAccess;
+use App\Services\Academic\SubjectCatalogService;
 use App\Services\Exams\ExamRosterLockService;
 use App\Support\RecordStatus;
 use Illuminate\Cache\ArrayStore;
@@ -226,7 +227,7 @@ class StudentRosterConfirmationServiceTest extends TestCase
 
         $service = new StudentRosterConfirmationService(
             $store,
-            new StudentRosterGroupAccess(new ExamRosterLockService()),
+            new StudentRosterGroupAccess(new ExamRosterLockService(), new SubjectCatalogService()),
             new StudentRosterAnalyzer(
                 new StudentRosterRowValidator()
             ),
@@ -337,7 +338,7 @@ class StudentRosterConfirmationServiceTest extends TestCase
     ): StudentRosterConfirmationService {
         return new StudentRosterConfirmationService(
             $store,
-            new StudentRosterGroupAccess(new ExamRosterLockService()),
+            new StudentRosterGroupAccess(new ExamRosterLockService(), new SubjectCatalogService()),
             new StudentRosterAnalyzer(
                 new StudentRosterRowValidator()
             ),

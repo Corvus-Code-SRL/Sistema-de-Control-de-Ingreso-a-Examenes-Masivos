@@ -15,6 +15,7 @@ use App\Services\Academic\Importers\StudentRosterReaderResolver;
 use App\Services\Academic\Importers\StudentRosterRowValidator;
 use App\Services\Academic\Importers\XlsxStudentRosterReader;
 use App\Services\Academic\StudentRosterGroupAccess;
+use App\Services\Academic\SubjectCatalogService;
 use App\Services\Exams\ExamRosterLockService;
 use App\Support\RecordStatus;
 use Illuminate\Cache\ArrayStore;
@@ -215,7 +216,7 @@ class StudentRosterPreviewServiceTest extends TestCase
         );
 
         $service = new StudentRosterPreviewService(
-            new StudentRosterGroupAccess(new ExamRosterLockService()),
+            new StudentRosterGroupAccess(new ExamRosterLockService(), new SubjectCatalogService()),
             new StudentRosterReaderResolver(
                 new CsvStudentRosterReader(),
                 new XlsxStudentRosterReader()
