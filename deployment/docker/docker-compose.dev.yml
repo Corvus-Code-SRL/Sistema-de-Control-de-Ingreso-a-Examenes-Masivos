@@ -11,10 +11,45 @@ services:
     working_dir: /var/www/sciem/backend
     command: php artisan serve --host=0.0.0.0 --port=8000
     volumes:
-      # Repo completo: los tests leen docs/database/creation-script.sql.
+      # Repo completo: DatabaseSchemaTest lee docs/database/creation-script.sql y database/schema/baseline.sql.
       - ../..:/var/www/sciem
+    environment:
+      CACHE_DRIVER: file
+      ENTRY_CONTROL_CACHE_STORE: redis
+      REDIS_CLIENT: phpredis
+      REDIS_HOST: redis
     ports:
       - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Perfil opcional: `up -d` NO lo inicia. Se levanta a propósito con
+  #   docker compose -f deployment/docker/docker-compose.dev.yml --profile scheduler up -d scheduler
+  # Mueve exámenes reales de estado, así que nunca debe correr contra la base compartida: por eso
+  # las variables DB_* van fijas a la PostgreSQL local y pisan lo que diga backend/.env.
+  # Pasos completos en deployment/docker/README.md (Apertura automática de ingreso).
+  scheduler:
+    profiles: ["scheduler"]
+    image: sciem-php:dev
+    working_dir: /var/www/sciem/backend
+    command: php artisan schedule:work
+    volumes:
+      - ../..:/var/www/sciem
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: sciem_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: sciem_dev
+      DB_SSLMODE: prefer
+      CACHE_DRIVER: file
+      ENTRY_CONTROL_CACHE_STORE: redis
+      REDIS_CLIENT: phpredis
+      REDIS_HOST: redis
     depends_on:
       postgres:
         condition: service_healthy
@@ -43,6 +78,8 @@ services:
 
   redis:
     image: redis:7.4.3
+    ports:
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

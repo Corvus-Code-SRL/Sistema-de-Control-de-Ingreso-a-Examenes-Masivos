@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
             ActionSeeder::class,
             AdministratorAccountSeeder::class,
             ExamTypeSeeder::class,
+            IncidentTypeSeeder::class,
         ]);
     }
 }

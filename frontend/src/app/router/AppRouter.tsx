@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { LoadingState } from '@/components/common/LoadingState'
+import { MyAssignmentsPage, MyAssistantsPage } from '@/features/assistants'
 import {
   LOGIN_REDIRECT_KEY,
   LoginPage,
@@ -11,6 +12,7 @@ import {
   useCurrentUser,
   type Capability,
 } from '@/features/auth'
+import { EntryControlPage, OpenEntryControlsPage } from '@/features/entry-control'
 import { CreateExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
 import { CourseDetailPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
 import { ClassroomsPage } from '@/features/classrooms'
@@ -43,6 +45,10 @@ function DocenteRoutes() {
         element={guarded('grupos.gestionar', <SubjectGroupsPage />)}
       />
       <Route path="/mis-cursos" element={guarded('grupos.gestionar', <MyCoursesPage />)} />
+      <Route
+        path="/mis-auxiliares"
+        element={guarded('auxiliares.gestionar', <MyAssistantsPage />)}
+      />
       <Route path="/cursos/:idGrupo" element={guarded('grupos.gestionar', <CourseDetailPage />)} />
       <Route path="/examenes/nuevo" element={guarded('examenes.gestionar', <CreateExamPage />)} />
       <Route
@@ -50,7 +56,31 @@ function DocenteRoutes() {
         element={guarded('examenes.gestionar', <ExamsPage />)}
       />
       <Route path="/examenes/:examId" element={guarded('examenes.gestionar', <ExamDetailPage />)} />
+      <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
+      <Route
+        path="/examenes/:examId/control-ingreso"
+        element={guarded('ingreso.operar', <EntryControlPage />)}
+      />
       <Route path="*" element={<Navigate to="/materias" replace />} />
+    </Routes>
+  )
+}
+
+/**
+ * Rutas del auxiliar: la consulta de sus exámenes y del ambiente que el docente le asignó (HU-09)
+ * y el control de ingreso de los exámenes donde está habilitado (HU-11).
+ */
+function AuxiliarRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/mis-examenes" replace />} />
+      <Route path="/mis-examenes" element={guarded('ingreso.operar', <MyAssignmentsPage />)} />
+      <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
+      <Route
+        path="/examenes/:examId/control-ingreso"
+        element={guarded('ingreso.operar', <EntryControlPage />)}
+      />
+      <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
     </Routes>
   )
 }
@@ -108,14 +138,17 @@ function LoginRoute() {
 /**
  * Cada área tiene su propio juego de rutas, incluido su destino por defecto.
  *
- * El área sale del rol de la sesión (Administrador → administrador; Docente y Auxiliar →
+ * El área sale del rol de la sesión (Administrador → administrador; Auxiliar → auxiliar; Docente →
  * docente; sin sesión → docente). Separarlas evita que una URL de un área caiga en la pantalla
  * de la otra.
  */
 function AreaRoutes() {
   const { area } = useCurrentUser()
 
-  return area === 'administrador' ? <AdministradorRoutes /> : <DocenteRoutes />
+  if (area === 'administrador') return <AdministradorRoutes />
+  if (area === 'auxiliar') return <AuxiliarRoutes />
+
+  return <DocenteRoutes />
 }
 
 export function AppRouter() {

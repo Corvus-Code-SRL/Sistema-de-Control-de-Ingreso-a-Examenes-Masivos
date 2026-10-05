@@ -2,6 +2,7 @@
 
 namespace Database\Seeders\TestData;
 
+use Database\Seeders\Support\LocalDatabaseGuard;
 use Database\Seeders\TestData\TestDataIds as Ids;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,8 @@ class CatalogTestDataSeeder extends Seeder
 {
     public function run()
     {
+        LocalDatabaseGuard::assertLocal(static::class);
+
         DB::table('facultad')->upsert([
             $this->faculty(Ids::FACULTY_SCIENCE, 'Facultad de Ciencias y Tecnología', 'FCYT'),
             $this->faculty(Ids::FACULTY_ECONOMICS, 'Facultad de Ciencias Económicas', 'FCE'),

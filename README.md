@@ -198,6 +198,8 @@ php artisan serve        # http://localhost:8000
 
 **No ejecutar `php artisan migrate` a ciegas contra la base compartida.** El esquema ya está cargado; las migraciones nuevas se aplican después de un `git pull` y coordinando con el equipo.
 
+**Control de ingreso (HU-10 y HU-11).** Todas sus rutas exigen iniciar sesión: no hay usuario de desarrollo implícito. Un examen pasa a `EN_INGRESO` solo por el planificador de Laravel (`php artisan schedule:work`), que abre el control según `minutos_apertura` de cada examen (10 minutos por defecto). **Nunca ejecutes el planificador con el `.env` de la base compartida**: movería exámenes reales de estado. Los pasos para correrlo contra una base local están en [`deployment/docker/README.md`](deployment/docker/README.md#apertura-automática-de-ingreso). El servicio `scheduler` de Docker no arranca con `up -d`: pertenece al perfil opcional `scheduler`.
+
 > Usar `composer install`, **nunca** `composer update`, para respetar las versiones de `composer.lock`.
 
 ### 3. Frontend
@@ -257,6 +259,8 @@ Todo el equipo trabaja con los mismos registros: cada valor está escrito a mano
     SCIEM_USUARIO_PRUEBA=00000000-0000-4000-8000-000000000001
     ```
 
+    `SCIEM_PERIODO_ACTIVO_ID` es obligatorio: sin él, los endpoints que necesitan el periodo activo responden 500 con un mensaje que lo indica (`GET /api/periodos` sigue funcionando, con `id_periodo_activo` en `null`). El seeder crea el periodo `9303` que ese valor referencia.
+
     > `SCIEM_DOCENTE_FIJO_ID` y `SCIEM_USUARIO_PRUEBA` desaparecen con **RNF-02 (autenticación)**: a partir de ese momento el usuario actual es el usuario autenticado. Mientras RNF-02 esté en curso, ningún código nuevo debe leer esas variables — el usuario actual se obtiene del resolver documentado en `app/Support/`.
 
 3. Ejecutar:
@@ -269,7 +273,7 @@ Todo el equipo trabaja con los mismos registros: cada valor está escrito a mano
 
 El seeder no está registrado en `DatabaseSeeder`, así que `php artisan db:seed` a secas no lo carga. Se niega a correr con cualquier `APP_ENV` que no sea `local` o `development` y rechaza expresamente la base `sciem_test`, incluso en entorno local. La suite construye su propio esquema y nunca usa estos datos. También ejecuta `RoleSeeder`, `ActionSeeder` y `ExamTypeSeeder`, que son idempotentes.
 
-**Antes de sembrar la base compartida, coordinar en el canal del equipo.** Una inserción masiva sin avisar deja a los demás preguntándose de dónde salieron los registros.
+**Estos seeders ya no se pueden ejecutar contra la base compartida:** escriben ids fijos con *upsert* y se niegan a correr si `DB_HOST` no es `postgres`, `127.0.0.1` ni `localhost` (ver «Seeders: para qué sirve cada uno»). Si hay que cargarlos en un servidor remoto, el cambio de la guarda se decide primero con el equipo.
 
 ### Comprobar qué datos ve el frontend
 
@@ -335,6 +339,60 @@ Periodos: `2-2025` (9301), `1-2026` (9302) y `2-2026` (9303, el activo). Hay 24 
 
 Todos los ids numéricos de prueba están en el rango 9000–9999 y todos los uuid empiezan con `00000000-0000-4000-8000-`. Para retirar los datos, recrear la base desde el script de creación y borrar `backend/database/seeders/TestData/`, esta sección y los tres valores de `.env.example`.
 
+### Seeders: para qué sirve cada uno
+
+| Seeder | Qué hace | ¿Base compartida? |
+| --- | --- | --- |
+| `ActionSeeder` | Catálogo `accion`: las 12 acciones de la bitácora, en MAYÚSCULAS. `updateOrInsert` por `operacion`. | **Sí**, siempre con `--class` |
+| `IncidentTypeSeeder` | Catálogo `tipo_falta`: 4 tipos de falta. Solo inserta los que faltan y nunca actualiza: una fila existente con otra descripción se deja como está. | **Sí**, siempre con `--class` |
+| `RoleSeeder`, `ExamTypeSeeder` | Catálogos `rol` y `tipo_examen`. Usan `updateOrInsert`: reescriben la descripción o la categoría si cambiaron. | Ya aplicados; no repetir sin necesidad |
+| `UserSeeder`, `AdministratorAccountSeeder` | La cuenta de prueba que actúa en la bitácora (`SCIEM_USUARIO_PRUEBA`). `UserSeeder` sobrescribe su nombre, SIS y contraseña. | Solo local |
+| `TestData\*` | Datos temporales con ids fijos y *upsert* por clave primaria (ver arriba). | Solo local: se niegan a correr si el host no es local |
+| `DatabaseSeeder` (`php artisan db:seed` a secas) | Llama a `UserSeeder`, `RoleSeeder`, `ActionSeeder`, `AdministratorAccountSeeder`, `ExamTypeSeeder` e `IncidentTypeSeeder`. No carga `TestData`. | Solo local: **nunca** sobre la compartida |
+
+Sobre la base compartida solo se ejecutan los dos seguros, y **siempre por clase**, nunca con `db:seed` a secas:
+
+```bash
+php artisan db:seed --class="Database\Seeders\ActionSeeder"
+php artisan db:seed --class="Database\Seeders\IncidentTypeSeeder"
+```
+
+**Guarda de host.** `TestDataSeeder` y los cuatro seeders que llama (`CatalogTestDataSeeder`, `AccountTestDataSeeder`, `GroupTestDataSeeder`, `ExamTestDataSeeder`) llaman a `Database\Seeders\Support\LocalDatabaseGuard` como primera instrucción: si `DB_HOST` de la conexión por defecto no es `postgres`, `127.0.0.1` ni `localhost`, se detienen con un error claro y sin escribir nada, incluso si se ejecutan con `--class` por separado. Con un `.env` que apunte a Supabase, estos seeders no pueden correr.
+
+### Eliminar las acciones heredadas de `accion` (Supabase)
+
+La migración `2026_10_04_000000_delete_legacy_accion_rows` borra del catálogo `accion` las cuatro filas que se insertaron a mano antes de que existiera `ActionSeeder` (`Crear`, `Actualizar`, `Leer` y `Desactivar`, ids 1 a 4). Ningún código las usa. Las busca por el texto exacto de `operacion`, no hace nada si no existen y **aborta sin borrar nada** si alguna fila de `log` las referencia. Pasos, desde `backend` y con el `.env` compartido, **coordinando antes con el equipo**:
+
+1. `php artisan migrate:status`: las cinco migraciones anteriores en `Yes` y `2026_10_04_000000_delete_legacy_accion_rows` en `No`.
+2. Verificación previa, solo lectura (consola SQL de Supabase):
+
+    ```sql
+    select id_accion, operacion, tipo_operacion from accion
+     where operacion in ('Crear', 'Actualizar', 'Leer', 'Desactivar') order by id_accion;
+
+    select a.operacion, count(*) as filas_de_log from log l
+      join accion a on a.id_accion = l.id_accion
+     where a.operacion in ('Crear', 'Actualizar', 'Leer', 'Desactivar') group by a.operacion;
+    ```
+
+    Esperado: la primera devuelve 4 filas (ids 1 a 4) y la segunda ninguna. Si la segunda devuelve filas, la migración abortará sin borrar nada: avisar al equipo antes de seguir.
+3. `php artisan migrate --pretend`. En este modo Laravel no ejecuta las consultas, así que la selección vuelve vacía y **no se ve el `DELETE`**. La salida esperada es exactamente esta línea:
+
+    ```text
+    DeleteLegacyAccionRows: select "id_accion" from "accion" where "operacion" in (?, ?, ?, ?)
+    ```
+4. `php artisan migrate`.
+5. Verificación:
+
+    ```sql
+    select count(*) from accion;                                             -- 12
+    select min(id_accion), max(id_accion) from accion;                       -- 5 y 16
+    select count(*) from accion
+     where operacion in ('Crear', 'Actualizar', 'Leer', 'Desactivar');       -- 0
+    ```
+
+    Y `php artisan migrate:status` con las seis en `Yes`.
+
 ---
 
 ## Pruebas
@@ -395,7 +453,7 @@ Detalle completo (idioma, PSR-12, naming, capas) en [`.claude/rules/code-style-b
 ## Flujo de trabajo
 
 - `develop` es la rama de integración; `main` representa versiones estables. No se desarrolla directamente sobre ninguna de las dos.
-- Cada ítem del backlog se desarrolla en una rama propia creada desde `develop`, siguiendo el formato y los tipos definidos en [`.claude/rules/git-branches.md`](.claude/rules/git-branches.md):
+- Cada ítem del backlog se desarrolla en una rama propia creada desde `develop`, siguiendo el formato y los tipos definidos en [`.claude/skills/git-branches/SKILL.md`](.claude/skills/git-branches/SKILL.md):
 
 | Tipo | Uso | Ejemplo |
 |---|---|---|
@@ -425,7 +483,7 @@ Detalle completo (idioma, PSR-12, naming, capas) en [`.claude/rules/code-style-b
 | [`deployment/docker/README.md`](deployment/docker/README.md) | Entorno de desarrollo con Docker (PHP, PostgreSQL y Redis) |
 | [`docs/architecture/decisions/`](docs/architecture/decisions/) | Registro de decisiones de arquitectura (ADR) |
 | [`docs/architecture/decisions/0001-actualizacion-en-tiempo-real-por-consulta-periodica.md`](docs/architecture/decisions/0001-actualizacion-en-tiempo-real-por-consulta-periodica.md) | ADR 0001 — por qué la actualización en tiempo real es por consulta periódica |
-| [`.claude/rules/git-branches.md`](.claude/rules/git-branches.md) | Convención de nombres de ramas |
+| [`.claude/skills/git-branches/SKILL.md`](.claude/skills/git-branches/SKILL.md) | Convención de nombres de ramas |
 | [`.claude/rules/git-commits.md`](.claude/rules/git-commits.md) | Convención de mensajes de commit |
 | [`.claude/rules/code-style-backend.md`](.claude/rules/code-style-backend.md) | Estándares de código del backend |
 

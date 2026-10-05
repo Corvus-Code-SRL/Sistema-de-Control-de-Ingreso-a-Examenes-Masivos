@@ -9,6 +9,8 @@ export interface UseSubjectGroupsResult {
   subject: SubjectCareer | null
   /** Todos los grupos del par, también los de otros docentes. */
   groups: Group[]
+  /** Docente que actúa, tal como lo resuelve el backend; es el dueño del grupo que se registre. */
+  teacherName: string | null
   isLoading: boolean
   /** El par existe y está activo, pero todavía no tiene grupos. */
   isEmpty: boolean
@@ -38,6 +40,7 @@ export function useSubjectGroups(careerId: number, subjectId: number): UseSubjec
   return {
     subject: resource.data?.subject ?? null,
     groups: resource.data?.groups ?? [],
+    teacherName: resource.data?.meta.docente.nombre_completo ?? null,
     isLoading: resource.status === 'loading',
     isEmpty: loaded && resource.data!.meta.total === 0,
     hasNoOwnGroups: loaded && resource.data!.meta.total_mios === 0,

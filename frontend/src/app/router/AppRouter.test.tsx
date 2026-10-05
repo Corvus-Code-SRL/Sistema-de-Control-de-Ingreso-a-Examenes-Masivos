@@ -117,3 +117,38 @@ describe('AppRouter — asignación de materias a carreras', () => {
     ).not.toBeInTheDocument()
   })
 })
+
+describe('AppRouter — control de ingreso por área', () => {
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  it.each([
+    ['un Docente', 'docente'],
+    ['un Auxiliar', 'auxiliar'],
+  ] as const)('%s entra a Control de ingreso', async (_label, account) => {
+    stubBackend(account)
+
+    const app = renderApp('/control-ingreso')
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { name: 'Control de ingreso' })
+      ).toBeInTheDocument()
+    )
+
+    expect(app.pathname).toBe('/control-ingreso')
+  })
+
+  it('un Administrador que navega a /control-ingreso es redirigido a la home de su área', async () => {
+    stubBackend('administrador')
+
+    const app = renderApp('/control-ingreso')
+
+    await waitFor(() => expect(app.pathname).toBe('/cuentas'))
+
+    expect(
+      screen.queryByRole('heading', { name: 'Control de ingreso' })
+    ).not.toBeInTheDocument()
+  })
+})

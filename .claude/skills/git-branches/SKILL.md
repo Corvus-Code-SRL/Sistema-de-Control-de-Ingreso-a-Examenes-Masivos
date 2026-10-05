@@ -1,3 +1,8 @@
+---
+name: git-branches
+description: Convención de nombres de ramas Git de SCIEM (tipos feature/tech/fix/refactor/release/hotfix, identificadores HU/RNF, flujo GitFlow). Usar antes de crear, nombrar o fusionar una rama.
+---
+
 # Estándares para nombrar ramas en Git — Proyecto SCIEM
 
 Para mantener un historial de ramas organizado, trazable hacia el Product Backlog y fácil de mantener entre varios integrantes, todo el equipo Corvus Code deberá seguir las siguientes convenciones al crear ramas en el repositorio. Esta convención complementa el estándar de commits ya definido y sigue el flujo de trabajo GitFlow tradicional (`main`, `develop`, `feature/*`, `release/*`, `hotfix/*`), con la adición de `tech/*`, `fix/*` y `refactor/*`.

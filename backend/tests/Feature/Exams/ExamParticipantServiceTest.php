@@ -136,6 +136,24 @@ class ExamParticipantServiceTest extends TestCase
         $this->assertSame(1, $this->service()->counts($this->exam->id_examen)['pendientes']);
     }
 
+    public function test_una_fila_no_ingreso_sigue_pendiente(): void
+    {
+        [$first] = $this->rosterStudentIds($this->grupoPropioId);
+        DB::table('examen_estudiante')->insert([
+            'id_examen' => $this->exam->id_examen,
+            'id_estudiante' => $first,
+            'id_grupo' => $this->grupoPropioId,
+            'estado_habilitacion' => 'HABILITADO',
+            'estado_ingreso' => 'NO_INGRESO',
+            'hora_ingreso' => null,
+        ]);
+
+        $this->assertSame(
+            ['esperados' => 2, 'ingresados' => 0, 'pendientes' => 2],
+            $this->service()->counts($this->exam->id_examen)
+        );
+    }
+
     public function test_la_nomina_que_cambia_se_refleja_sin_ninguna_copia(): void
     {
         $this->enrollStudents($this->grupoPropioId, 3);

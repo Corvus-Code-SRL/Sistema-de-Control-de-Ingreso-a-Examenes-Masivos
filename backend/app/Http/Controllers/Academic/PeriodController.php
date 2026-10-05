@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Academic;
 
+use App\Exceptions\Academic\ActivePeriodNotConfiguredException;
 use App\Http\Controllers\Controller;
 use App\Models\Period;
 use App\Services\Academic\SubjectCatalogService;
@@ -27,7 +28,12 @@ class PeriodController extends Controller
     {
         $periods = Period::query()->orderByDesc('gestion')->orderByDesc('nombre_periodo')->get();
 
-        $activePeriodId = $this->subjectCatalog->activePeriodId();
+        // El selector debe poder listar períodos aunque el activo no esté configurado.
+        try {
+            $activePeriodId = $this->subjectCatalog->activePeriodId();
+        } catch (ActivePeriodNotConfiguredException $exception) {
+            $activePeriodId = null;
+        }
 
         return response()->json([
             'data' => $periods->map(fn (Period $period) => [
@@ -36,7 +42,7 @@ class PeriodController extends Controller
                 'gestion' => (int) $period->gestion,
             ]),
             'meta' => [
-                'id_periodo_activo' => $activePeriodId > 0 ? $activePeriodId : null,
+                'id_periodo_activo' => $activePeriodId,
             ],
         ]);
     }

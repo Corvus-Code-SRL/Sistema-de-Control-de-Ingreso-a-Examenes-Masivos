@@ -2,6 +2,7 @@
 
 namespace Database\Seeders\TestData;
 
+use Database\Seeders\Support\LocalDatabaseGuard;
 use Database\Seeders\TestData\TestDataIds as Ids;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -11,6 +12,8 @@ class ExamTestDataSeeder extends Seeder
 {
     public function run()
     {
+        LocalDatabaseGuard::assertLocal(static::class);
+
         DB::table('examen')->upsert([
             $this->exam(9801, 'Parcial Cálculo SIS', '2026-10-15', '08:00:00', '09:30:00', 90,
                 Ids::CAREER_SYSTEMS, Ids::SUBJECT_CALCULUS, Ids::TEACHER_FIXED, 'PROGRAMADO'),

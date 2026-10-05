@@ -11,6 +11,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { useCurrentUser } from '@/features/auth'
 import { cn } from '@/lib/utils'
 import { AppSidebar } from './AppSidebar'
 
@@ -42,6 +43,7 @@ export function AppShell({
   period,
   children,
 }: AppShellProps) {
+  const { user } = useCurrentUser()
   const [menuOpen, setMenuOpen] = useState(false)
 
   return (
@@ -108,7 +110,7 @@ export function AppShell({
           )}
 
           <Avatar className="size-8 shrink-0 lg:hidden">
-            <AvatarFallback className="text-xs">PC</AvatarFallback>
+            <AvatarFallback className="text-xs">{user.iniciales}</AvatarFallback>
           </Avatar>
         </header>
 

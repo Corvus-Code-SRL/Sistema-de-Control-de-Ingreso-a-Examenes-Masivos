@@ -46,15 +46,15 @@ const navegacionDocente: NavGroup[] = [
     items: [
       { label: 'Materias', icon: BookOpen, to: '/materias' },
       { label: 'Mis cursos', icon: GraduationCap, to: '/mis-cursos' },
-      { label: 'Mis auxiliares', icon: Users }
-    ]
+      { label: 'Mis auxiliares', icon: Users, to: '/mis-auxiliares' },
+    ],
   },
   {
     label: 'Exámenes',
     items: [
       { label: 'Nuevo examen', icon: SquarePen, to: '/examenes/nuevo' },
       { label: 'Programados', icon: CalendarClock, to: '/examenes/programados' },
-      { label: 'Control de ingreso', icon: DoorOpen },
+      { label: 'Control de ingreso', icon: DoorOpen, to: '/control-ingreso' },
       { label: 'En curso', icon: PlaySquare },
       { label: 'Incidencias', icon: AlertTriangle, badge: 3 },
       { label: 'Historial', icon: History }
@@ -65,6 +65,20 @@ const navegacionDocente: NavGroup[] = [
     items: [
       { label: 'Verificar antecedentes', icon: FileSearch },
       { label: 'Registros', icon: ClipboardList }
+    ]
+  }
+]
+
+/**
+ * Navegación lateral del auxiliar: consulta los exámenes que controla (HU-09) y
+ * registra el ingreso de los estudiantes (HU-11).
+ */
+const navegacionAuxiliar: NavGroup[] = [
+  {
+    label: 'Exámenes',
+    items: [
+      { label: 'Mis exámenes', icon: CalendarClock, to: '/mis-examenes' },
+      { label: 'Control de ingreso', icon: DoorOpen, to: '/control-ingreso' },
     ]
   }
 ]
@@ -94,6 +108,7 @@ const navegacionAdministrador: NavGroup[] = [
 
 export const navigationByArea: Record<Area, NavGroup[]> = {
   docente: navegacionDocente,
+  auxiliar: navegacionAuxiliar,
   administrador: navegacionAdministrador
 }
 
