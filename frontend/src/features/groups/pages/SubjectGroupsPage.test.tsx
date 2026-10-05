@@ -163,6 +163,48 @@ describe('SubjectGroupsPage', () => {
     expect(screen.queryByText(/filas quedaron fuera/i)).not.toBeInTheDocument()
   })
 
+  async function registerGroup(createdGroup: ReturnType<typeof makeGroup>) {
+    mockApi([
+      { matches: (url) => matchers.groupsOfPair(url), body: subjectGroupsResponse(materia, [makeGroup()]) },
+      { matches: (url) => url.includes('/periodos'), body: periodsResponse() },
+      {
+        matches: (url) => /\/grupos$/.test(url) && !url.includes('/carreras/'),
+        status: 201,
+        body: { data: { grupo: createdGroup, materia }, mensaje: 'Grupo registrado correctamente.' },
+      },
+    ])
+
+    renderPage()
+    await waitForLoad()
+    await userEvent.click(screen.getByRole('button', { name: /añadir grupo/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.type(within(dialog).getByLabelText(/N° de grupo/i), 'A')
+    await userEvent.click(within(dialog).getByRole('button', { name: /registrar grupo/i }))
+
+    await screen.findByText(/Grupo .* registrado/)
+  }
+
+  it('al registrar un grupo del período activo, el aviso ofrece «Cargar nómina» hacia el grupo', async () => {
+    await registerGroup(makeGroup({ id_grupo: 321, num_grupo: 'A' }))
+
+    const action = screen.getByRole('link', { name: 'Cargar nómina' })
+
+    expect(action).toHaveAttribute('href', '/cursos/321')
+  })
+
+  it('si el grupo no es del período activo, el aviso no ofrece cargar la nómina', async () => {
+    await registerGroup(
+      makeGroup({
+        id_grupo: 322,
+        num_grupo: 'A',
+        periodo: { id_periodo: 2, nombre_periodo: '1-2026', gestion: 2026 },
+      })
+    )
+
+    expect(screen.queryByRole('link', { name: 'Cargar nómina' })).not.toBeInTheDocument()
+  })
+
   it('muestra el mensaje del servidor cuando el par está inactivo', async () => {
     mockApiOnce({
       status: 422,
