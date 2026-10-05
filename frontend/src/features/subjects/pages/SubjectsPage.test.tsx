@@ -46,7 +46,7 @@ describe('SubjectsPage', () => {
     expect(screen.getAllByText('Ingenieria Informatica').length).toBeGreaterThan(0)
   })
 
-  it('solo ofrece «Ver grupos» sobre las materias propias y activas', async () => {
+  it('ofrece «Ver grupos» en los pares propios, «Registrar grupo» en los activos sin grupos y nada en los inactivos', async () => {
     mockApiOnce({
       body: subjectCatalogResponse([
         makeSubject({ id_materia: 1 }),
@@ -60,8 +60,32 @@ describe('SubjectsPage', () => {
 
     // Una entrada por variante de escritorio y móvil, ambas del mismo par propio.
     expect(screen.getAllByRole('link', { name: /ver grupos/i })).toHaveLength(2)
-    expect(screen.getAllByText('Sin grupos a su cargo').length).toBeGreaterThan(0)
+    // El par activo sin grupos propios también se abre: su página ofrece registrar el primero.
+    expect(screen.getAllByRole('link', { name: /registrar grupo/i })).toHaveLength(2)
+    expect(screen.queryByText('Sin grupos a su cargo')).not.toBeInTheDocument()
     expect(screen.getAllByText('No seleccionable').length).toBeGreaterThan(0)
+  })
+
+  it('muestra el nombre del período activo y no su identificador', async () => {
+    mockApiOnce({ body: subjectCatalogResponse([makeSubject()]) })
+
+    renderWithRouter(<SubjectsPage />, { route: '/materias' })
+    await waitForLoad()
+
+    expect(screen.getByText('Período 2-2026')).toBeInTheDocument()
+    expect(screen.queryByText('Período 3')).not.toBeInTheDocument()
+  })
+
+  it('sin nombre de período no inventa uno a partir del identificador', async () => {
+    const response = subjectCatalogResponse([makeSubject()])
+    mockApiOnce({
+      body: { ...response, meta: { ...response.meta, nombre_periodo_activo: null } },
+    })
+
+    renderWithRouter(<SubjectsPage />, { route: '/materias' })
+    await waitForLoad()
+
+    expect(screen.queryByText(/^Período /)).not.toBeInTheDocument()
   })
 
   it('muestra el mensaje del servidor cuando el catálogo está vacío', async () => {

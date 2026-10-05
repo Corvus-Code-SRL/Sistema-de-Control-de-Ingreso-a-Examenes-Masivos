@@ -1,4 +1,4 @@
-import { ChevronRight, FolderOpen } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import type { SubjectCareer } from '../types/subject.types'
@@ -12,8 +12,9 @@ interface SubjectGroupsActionProps {
 /**
  * Punto de entrada a los grupos de un par materia-carrera.
  *
- * Solo se ofrece sobre materias propias y activas. Una materia ajena se lista
- * igual —el catálogo es institucional— pero sin acción, y la razón se escribe
+ * Se ofrece sobre todo par activo, tenga o no grupos el docente: sin grupos propios la acción es
+ * «Registrar grupo» y lleva a la misma página, donde está «Registrar el primer grupo». Un par
+ * inactivo se lista igual —el catálogo es institucional— pero sin acción, y la razón se escribe
  * con texto: un color apagado no la comunica por sí solo.
  */
 export function SubjectGroupsAction({ subject, compact = false }: SubjectGroupsActionProps) {
@@ -23,17 +24,10 @@ export function SubjectGroupsAction({ subject, compact = false }: SubjectGroupsA
     )
   }
 
-  if (!subject.es_mia) {
-    return (
-      <span className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground">
-        <FolderOpen className="size-3.5 shrink-0" aria-hidden="true" />
-        Sin grupos a su cargo
-      </span>
-    )
-  }
-
   const to = `/carreras/${subject.id_carrera}/materias/${subject.id_materia}/grupos`
-  const label = `Ver grupos de ${subject.nombre} en ${subject.carrera.nombre}`
+  // Sin grupos propios el par igual se abre: su página de grupos ofrece «Registrar el primer grupo».
+  const verb = subject.es_mia ? 'Ver grupos' : 'Registrar grupo'
+  const label = `${verb} de ${subject.nombre} en ${subject.carrera.nombre}`
 
   if (compact) {
     return (
@@ -48,7 +42,7 @@ export function SubjectGroupsAction({ subject, compact = false }: SubjectGroupsA
   return (
     <Button variant="outline" size="sm" asChild>
       <Link to={to} aria-label={label}>
-        Ver grupos
+        {verb}
         <ChevronRight className="size-4" />
       </Link>
     </Button>

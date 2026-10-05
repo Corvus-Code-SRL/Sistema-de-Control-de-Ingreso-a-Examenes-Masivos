@@ -94,6 +94,7 @@ export function subjectCatalogResponse(subjects: SubjectCareer[], mensaje: strin
       total: subjects.length,
       total_mias: subjects.filter((subject) => subject.es_mia).length,
       id_periodo_activo: periodoActivo.id_periodo,
+      nombre_periodo_activo: periodoActivo.nombre_periodo,
     },
     mensaje,
   }

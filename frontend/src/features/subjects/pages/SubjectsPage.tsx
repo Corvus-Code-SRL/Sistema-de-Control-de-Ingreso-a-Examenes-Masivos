@@ -25,7 +25,7 @@ export function SubjectsPage() {
     <AppShell
       mobileTitle="Materias"
       breadcrumbs={[{ label: 'Gestión académica' }, { label: 'Materias' }]}
-      period={page?.meta.id_periodo_activo ? String(page.meta.id_periodo_activo) : undefined}
+      period={page?.meta.nombre_periodo_activo ?? undefined}
     >
       <PageHeader
         title="Materias"

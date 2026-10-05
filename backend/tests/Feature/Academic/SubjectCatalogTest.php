@@ -35,7 +35,8 @@ class SubjectCatalogTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('meta.total', 5)
             ->assertJsonPath('meta.total_mias', 1)
-            ->assertJsonPath('meta.id_periodo_activo', $this->periodoActivoId);
+            ->assertJsonPath('meta.id_periodo_activo', $this->periodoActivoId)
+            ->assertJsonPath('meta.nombre_periodo_activo', '2026-1');
 
         $propia = $this->findPair($response->json('data'), $this->sistemasId, $this->calculoId);
         $ajena = $this->findPair($response->json('data'), $this->sistemasId, $this->basesDatosId);
@@ -135,7 +136,7 @@ class SubjectCatalogTest extends TestCase
                         'carrera' => ['id_carrera', 'nombre', 'codigo', 'id_facultad'],
                     ],
                 ],
-                'meta' => ['total', 'total_mias', 'id_periodo_activo'],
+                'meta' => ['total', 'total_mias', 'id_periodo_activo', 'nombre_periodo_activo'],
             ]);
     }
 
