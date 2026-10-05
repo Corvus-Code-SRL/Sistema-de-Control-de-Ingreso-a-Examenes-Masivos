@@ -154,7 +154,7 @@ export function ActualizarGrupoForm({
               </p>
             ) : (
               <p className="text-xs text-muted-foreground leading-normal">
-                Debe ser único dentro de la materia, la carrera y el período.
+                Debe ser único dentro de la materia, la carrera, la gestión y el período.
               </p>
             )}
           </div>

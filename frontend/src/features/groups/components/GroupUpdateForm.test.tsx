@@ -124,11 +124,11 @@ describe('ActualizarGrupoForm (HU-019)', () => {
     expect(screen.getByText(/Ya existe un grupo con esta identificación/i)).toBeInTheDocument()
   })
 
-  it('aclara que la unicidad es por materia, carrera y período', () => {
+  it('aclara que la unicidad es por materia, carrera, gestión y período', () => {
     renderForm()
 
     expect(
-      screen.getByText('Debe ser único dentro de la materia, la carrera y el período.')
+      screen.getByText('Debe ser único dentro de la materia, la carrera, la gestión y el período.')
     ).toBeInTheDocument()
   })
 
