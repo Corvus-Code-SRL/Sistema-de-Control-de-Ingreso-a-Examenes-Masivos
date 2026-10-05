@@ -38,6 +38,18 @@ class AssistantExamResourceTest extends TestCase
         $this->assertSame('691A', $data['ambiente']['nro_aula']);
     }
 
+    public function test_marca_el_ambiente_por_defecto_solo_cuando_se_resolvio_sin_asignacion(): void
+    {
+        $assignment = $this->assignment([]);
+        $assignment->setRelation('classroom', new Classroom(['nro_aula' => '691A']));
+
+        $this->assertFalse($this->serialize($assignment)['ambiente_por_defecto']);
+
+        $assignment->setAttribute('ambiente_por_defecto', true);
+
+        $this->assertTrue($this->serialize($assignment)['ambiente_por_defecto']);
+    }
+
     public function test_los_datos_que_faltan_llegan_como_null(): void
     {
         $assignment = $this->assignment(['fecha' => null, 'hora_inicio' => null, 'hora_fin' => null]);

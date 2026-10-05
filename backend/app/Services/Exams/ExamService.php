@@ -91,10 +91,52 @@ class ExamService
         $this->assertTeacherGiven($teacherId);
 
         return Exam::query()
-            ->with(['examType', 'subject', 'career'])
+            ->with($this->listRelations())
             ->where('id_usuario_docente', $teacherId)
             ->orderBy('fecha')
             ->orderBy('hora_inicio')
+            ->get();
+    }
+
+    /** Lo que muestra cada fila del listado: materia, ambientes y grupos con su cantidad de estudiantes. */
+    private function listRelations(): array
+    {
+        return [
+            'examType',
+            'subject',
+            'career',
+            'classrooms',
+            'groups' => fn ($query) => $query->withStudentCount(),
+        ];
+    }
+
+    /**
+     * Exámenes vigentes del docente (vista Programados): PROGRAMADO o EN_INGRESO, del más
+     * próximo al más lejano.
+     *
+     * El examen no guarda su período: lo da el período de sus grupos. Entra el que tiene al
+     * menos un grupo del período activo y también el que aún no tiene grupos asignados, para que
+     * un examen recién creado aparezca en la vista antes de vincularle sus grupos.
+     */
+    public function listScheduledForTeacher(string $teacherId): Collection
+    {
+        $this->assertTeacherGiven($teacherId);
+
+        $activePeriodId = $this->subjectCatalog->activePeriodId();
+
+        return Exam::query()
+            ->with($this->listRelations())
+            ->where('id_usuario_docente', $teacherId)
+            ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_INGRESO])
+            ->where(function (Builder $query) use ($activePeriodId) {
+                $query->whereDoesntHave('groups')
+                    ->orWhereHas('groups', function (Builder $groups) use ($activePeriodId) {
+                        $groups->where('grupo.id_periodo', $activePeriodId);
+                    });
+            })
+            ->orderBy('fecha')
+            ->orderBy('hora_inicio')
+            ->orderBy('id_examen')
             ->get();
     }
 

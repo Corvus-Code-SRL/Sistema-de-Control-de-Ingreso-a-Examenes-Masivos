@@ -5,8 +5,9 @@ namespace App\Http\Resources\Exams;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Examen que controla un auxiliar y el ambiente que el docente le asignó (HU-09).
- * `ambiente` es null mientras el docente no le asigne uno.
+ * Examen que controla un auxiliar y el ambiente donde controla (HU-09).
+ * `ambiente` es null mientras el docente no le asigne uno y el examen tenga varios. Si el examen tiene
+ * un solo ambiente, ese es el ambiente y `ambiente_por_defecto` es true (no lo asignó el docente).
  */
 class AssistantExamResource extends JsonResource
 {
@@ -23,6 +24,7 @@ class AssistantExamResource extends JsonResource
             'estado'        => $exam->estado,
             'materia'       => $exam->subject ? $exam->subject->nombre : null,
             'ambiente'      => $this->classroom ? new ClassroomResource($this->classroom) : null,
+            'ambiente_por_defecto' => (bool) $this->getAttribute('ambiente_por_defecto'),
         ];
     }
 
