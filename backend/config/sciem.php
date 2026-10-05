@@ -84,4 +84,17 @@ return [
         'max_length' => (int) env('SCIEM_ESTUDIANTE_COD_SIS_MAX', 12),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Tope de filas de la nómina (carga CSV o XLSX)
+    |--------------------------------------------------------------------------
+    |
+    | Máximo de filas de datos por archivo, sin contar el encabezado. Acota el
+    | tiempo y la memoria de la lectura: un XLSX se carga entero en memoria y el
+    | preview devuelve todas las filas. Un curso real tiene cientos de estudiantes.
+    |
+    */
+
+    'nomina_max_filas' => (int) env('SCIEM_NOMINA_MAX_FILAS', 2000),
+
 ];

@@ -4,6 +4,7 @@ namespace App\Services\Academic\Importers;
 
 use App\Exceptions\Academic\StudentRosterFileException;
 use PhpOffice\PhpSpreadsheet\Reader\Exception as ReaderException;
+use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
 use RuntimeException;
 
@@ -15,6 +16,16 @@ class XlsxStudentRosterReader implements StudentRosterReader
         'nombres',
     ];
 
+    /** Valor por defecto cuando no hay aplicación (pruebas unitarias); el contenedor inyecta la configuración. */
+    private const DEFAULT_MAX_ROWS = 2000;
+
+    private int $maxRows;
+
+    public function __construct(?int $maxRows = null)
+    {
+        $this->maxRows = $maxRows ?? self::DEFAULT_MAX_ROWS;
+    }
+
     public function read(string $path): iterable
     {
         if (!is_file($path) || !is_readable($path)) {
@@ -25,7 +36,17 @@ class XlsxStudentRosterReader implements StudentRosterReader
 
         $reader = new Xlsx();
 
+        /*
+         * Un XLSX se carga entero en memoria, así que el tope se comprueba antes de cargar:
+         * listWorksheetInfo recorre el XML en streaming y no construye la hoja. Se mira la hoja
+         * con más filas, porque la activa solo se conoce después de cargar. Como segunda defensa,
+         * el filtro deja pasar solo el encabezado y las filas hasta el tope. No se usa
+         * setReadDataOnly: perdería el formato numérico que conserva los ceros del código SIS.
+         */
+        $reader->setReadFilter($this->rowLimitFilter($this->maxRows + 1));
+
         try {
+            $this->assertWithinRowLimit($reader->listWorksheetInfo($path));
             $spreadsheet = $reader->load($path);
         } catch (ReaderException $exception) {
             throw new StudentRosterFileException(
@@ -96,6 +117,43 @@ class XlsxStudentRosterReader implements StudentRosterReader
             $spreadsheet->disconnectWorksheets();
             unset($spreadsheet);
         }
+    }
+
+    /**
+     * El total de filas de una hoja es el de su última fila declarada, sin contar el encabezado.
+     *
+     * @param array<int, array<string, mixed>> $sheetsInfo
+     */
+    private function assertWithinRowLimit(array $sheetsInfo): void
+    {
+        $totalRows = 0;
+
+        foreach ($sheetsInfo as $sheetInfo) {
+            $totalRows = max($totalRows, (int) ($sheetInfo['totalRows'] ?? 0));
+        }
+
+        if ($totalRows - 1 > $this->maxRows) {
+            throw new StudentRosterFileException(
+                "La nómina supera el máximo de {$this->maxRows} filas por archivo."
+            );
+        }
+    }
+
+    private function rowLimitFilter(int $lastRow): IReadFilter
+    {
+        return new class ($lastRow) implements IReadFilter {
+            private int $lastRow;
+
+            public function __construct(int $lastRow)
+            {
+                $this->lastRow = $lastRow;
+            }
+
+            public function readCell($columnAddress, $row, $worksheetName = '')
+            {
+                return $row <= $this->lastRow;
+            }
+        };
     }
 
     /**

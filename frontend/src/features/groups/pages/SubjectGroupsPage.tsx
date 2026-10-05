@@ -32,8 +32,17 @@ export function SubjectGroupsPage() {
   const careerId = Number(params.idCarrera)
   const subjectId = Number(params.idMateria)
 
-  const { subject, groups, teacherName, isLoading, isEmpty, hasNoOwnGroups, error, reload } =
-    useSubjectGroups(careerId, subjectId)
+  const {
+    subject,
+    groups,
+    teacherName,
+    activePeriodId,
+    isLoading,
+    isEmpty,
+    hasNoOwnGroups,
+    error,
+    reload,
+  } = useSubjectGroups(careerId, subjectId)
 
   const [isCreateOpen, setIsCreateOpen] = useState(false)
 
@@ -42,6 +51,8 @@ export function SubjectGroupsPage() {
     show: boolean
     title: string
     description: string
+    /** Ruta a la que lleva «Cargar nómina»; solo si el grupo admite nómina. */
+    rosterTo?: string
   }>({
     show: false,
     title: '',
@@ -55,10 +66,17 @@ export function SubjectGroupsPage() {
     setIsCreateOpen(false)
     reload()
 
+    // Misma regla que la pestaña Nómina (canUploadRoster): grupo propio, activo y del período activo.
+    const canUploadRoster =
+      result.grupo.es_mio &&
+      result.grupo.activo &&
+      result.grupo.periodo.id_periodo === activePeriodId
+
     setToastNotification({
       show: true,
       title: `Grupo ${result.grupo.num_grupo} registrado`,
       description: 'El grupo se registró correctamente en el período seleccionado.',
+      rosterTo: canUploadRoster ? `/cursos/${result.grupo.id_grupo}` : undefined,
     })
   }
 
@@ -73,6 +91,12 @@ export function SubjectGroupsPage() {
         <Toast
           title={toastNotification.title}
           description={toastNotification.description}
+          duration={toastNotification.rosterTo ? 12000 : undefined}
+          action={
+            toastNotification.rosterTo
+              ? { label: 'Cargar nómina', to: toastNotification.rosterTo }
+              : undefined
+          }
           onClose={() => setToastNotification((prev) => ({ ...prev, show: false }))}
         />
       )}

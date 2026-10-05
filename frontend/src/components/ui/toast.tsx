@@ -1,13 +1,22 @@
 import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
+
+export interface ToastAction {
+  label: string
+  /** Ruta interna a la que lleva la acción. */
+  to: string
+}
 
 export interface ToastProps {
   title: string
   description: string
   duration?: number
+  /** Acción siguiente que ofrece el aviso, como «Cargar nómina». */
+  action?: ToastAction
   onClose: () => void
 }
 
-export function Toast({ title, description, duration = 5000, onClose }: ToastProps) {
+export function Toast({ title, description, duration = 5000, action, onClose }: ToastProps) {
   useEffect(() => {
     const timer = setTimeout(() => {
       onClose()
@@ -44,6 +53,15 @@ export function Toast({ title, description, duration = 5000, onClose }: ToastPro
         <div className="text-xs text-muted-foreground mt-0.5 leading-normal">
           {description}
         </div>
+        {action && (
+          <Link
+            to={action.to}
+            onClick={onClose}
+            className="mt-2 inline-flex text-xs font-medium text-brand underline underline-offset-2 hover:text-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {action.label}
+          </Link>
+        )}
       </div>
 
       {/* Botón de cierre */}

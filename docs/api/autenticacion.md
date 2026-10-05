@@ -139,6 +139,14 @@ Cuerpo: `{ "password": "…" }`
 
 Contraseña incorrecta: **422** con error de validación en `password` (no 401, para que el cliente no cierre la sesión). El momento se guarda en `personal_access_tokens.password_confirmado_en`, también al iniciar sesión.
 
+## Contraseña inicial de cuentas registradas
+
+La HU-001 registra la cuenta de usuario, pero no define todavía el mecanismo de entrega o establecimiento de la contraseña inicial.
+
+Actualmente el backend genera una clave aleatoria para cumplir la restricción `NOT NULL` de `usuario.contrasenia` y almacena únicamente su hash. Esa clave no se devuelve en la API ni se envía por correo desde la HU-001.
+
+La definición del flujo de primer acceso —por ejemplo, entrega segura de una credencial temporal o establecimiento de una nueva contraseña por el usuario— queda pendiente del flujo de autenticación/RNF correspondiente. Hasta que ese mecanismo sea definido, la interfaz de registro no debe indicar que las credenciales serán enviadas por correo.
+
 ## Esquema y puesta en marcha
 
 - `personal_access_tokens` no está en `creation-script.sql`; la crea la migración de Laravel/Sanctum. Su `tokenable_id` era `bigint` y `usuario.id_usuario` es `uuid`, así que la migración `2026_10_02_000000_adapt_personal_access_tokens_for_uuid_users` lo pasa a `uuid` (descartando los tokens previos, que no podían apuntar a nadie) y agrega `password_confirmado_en`.

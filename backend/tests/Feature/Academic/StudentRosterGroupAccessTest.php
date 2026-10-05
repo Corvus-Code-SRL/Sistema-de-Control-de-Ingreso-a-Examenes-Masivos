@@ -6,6 +6,7 @@ use App\Exceptions\Academic\StudentRosterGroupAccessException;
 use App\Models\Exam;
 use App\Models\Group;
 use App\Services\Academic\StudentRosterGroupAccess;
+use App\Services\Academic\SubjectCatalogService;
 use App\Services\Exams\ExamRosterLockService;
 use App\Support\RecordStatus;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -203,7 +204,7 @@ class StudentRosterGroupAccessTest extends TestCase
 
     private function access(): StudentRosterGroupAccess
     {
-        return new StudentRosterGroupAccess(new ExamRosterLockService());
+        return new StudentRosterGroupAccess(new ExamRosterLockService(), new SubjectCatalogService());
     }
 
     private function ownActiveGroup(): Group

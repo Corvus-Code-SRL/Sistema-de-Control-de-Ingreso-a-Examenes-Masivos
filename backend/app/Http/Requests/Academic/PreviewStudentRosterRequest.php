@@ -2,23 +2,12 @@
 
 namespace App\Http\Requests\Academic;
 
-use Illuminate\Foundation\Http\FormRequest;
-
-class PreviewStudentRosterRequest extends FormRequest
+class PreviewStudentRosterRequest extends RosterManagementRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
-
     public function rules(): array
     {
         return [
-            'id_grupo' => [
-                'required',
-                'integer',
-                'min:1',
-            ],
+            'id_grupo' => $this->groupIdRules(),
             'archivo' => [
                 'bail',
                 'required',
@@ -48,23 +37,15 @@ class PreviewStudentRosterRequest extends FormRequest
         ];
     }
 
-    public function validationData(): array
-    {
-        return array_merge(
-            parent::validationData(),
-            $this->route()->parameters()
-        );
-    }
-
     public function messages(): array
     {
-        return [
-            'id_grupo.required' => 'Debe indicarse el grupo.',
-            'id_grupo.integer' => 'El identificador del grupo debe ser numérico.',
-            'id_grupo.min' => 'El identificador del grupo no es válido.',
+        return $this->groupIdMessages() + [
             'archivo.required' => 'Debe seleccionar una nómina.',
             'archivo.file' => 'La nómina debe enviarse como archivo.',
             'archivo.max' => 'La nómina no puede superar los 10 MB.',
+            // PHP descarta el archivo antes de Laravel si pasa de upload_max_filesize (12 MB).
+            'archivo.uploaded' => 'No se pudo recibir la nómina. Verifique que no supere los 10 MB '
+                . 'y vuelva a intentarlo.',
         ];
     }
 }

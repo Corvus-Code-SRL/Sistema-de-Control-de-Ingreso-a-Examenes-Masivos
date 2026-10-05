@@ -164,24 +164,48 @@ describe('RegistrarCuentaModal', () => {
     })
   })
 
-  it('confirma el registro y envía solo los campos que el backend declara', async () => {
+  it('confirma el registro con hora del equipo, correo devuelto y campos declarados', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 9, 5, 14, 37, 0))
     mockApi([
       { matches: userMatchers.sisVerification, body: { data: sisPerson } },
       {
         matches: userMatchers.accounts,
         status: 201,
-        body: { data: makeAccount({ cod_sis: COD_SIS }), mensaje: 'Cuenta creada correctamente.' },
+        body: {
+          data: makeAccount({
+            cod_sis: COD_SIS,
+            correo: 'laura.mendoza@umss.edu',
+          }),
+          mensaje: 'Cuenta creada correctamente.',
+        },
       },
     ])
     renderModal()
 
-    await goToAccountData()
+    await verifyCode()
+
+    expect(await screen.findByText('Persona reconocida por el SIS')).toBeInTheDocument()
+    expect(screen.getByText('Verificado a las 14:37.')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /continuar/i }))
+
+    expect(screen.getByText('Este correo quedará asociado a la cuenta.')).toBeInTheDocument()
+    expect(screen.queryByText(/recibirá sus credenciales de acceso/i)).not.toBeInTheDocument()
+
     await userEvent.type(screen.getByLabelText(/correo institucional/i), 'l.mendoza@umss.edu')
     await userEvent.type(screen.getByLabelText(/teléfono/i), '71234567')
     await userEvent.click(screen.getByRole('button', { name: 'Registrar cuenta' }))
 
     expect(await screen.findByText('Cuenta creada')).toBeInTheDocument()
     expect(screen.getByText(/laura mendoza rivas · sis 202312345 · sin rol/i)).toBeInTheDocument()
+
+    expect(
+      screen.getByText('Registrada a las 14:37 (hora de este equipo)')
+    ).toBeInTheDocument()
+
+    expect(screen.getByText('laura.mendoza@umss.edu')).toBeInTheDocument()
+
     expect(registrations()).toEqual([
       {
         method: 'POST',
@@ -194,6 +218,7 @@ describe('RegistrarCuentaModal', () => {
         }),
       },
     ])
+    vi.useRealTimers()
   })
 
   describe('mensajes específicos de la verificación', () => {

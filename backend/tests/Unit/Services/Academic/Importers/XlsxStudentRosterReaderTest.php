@@ -239,6 +239,50 @@ class XlsxStudentRosterReaderTest extends TestCase
         (new XlsxStudentRosterReader())->read($path);
     }
 
+    public function test_acepta_exactamente_el_tope_de_filas(): void
+    {
+        $path = $this->saveSpreadsheet($this->spreadsheetWithRows(5));
+
+        $rows = (new XlsxStudentRosterReader(5))->read($path);
+
+        $this->assertCount(5, $rows);
+    }
+
+    public function test_rechaza_mas_filas_que_el_tope_con_un_mensaje_que_dice_el_limite(): void
+    {
+        $path = $this->saveSpreadsheet($this->spreadsheetWithRows(6));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('La nómina supera el máximo de 5 filas por archivo.');
+
+        (new XlsxStudentRosterReader(5))->read($path);
+    }
+
+    public function test_conserva_el_cero_inicial_del_codigo_sis_con_el_filtro_de_filas(): void
+    {
+        $spreadsheet = $this->spreadsheetWithRows(3);
+        $spreadsheet->getActiveSheet()->setCellValue('A2', 12345);
+        $spreadsheet->getActiveSheet()->getStyle('A2')->getNumberFormat()->setFormatCode('00000000');
+
+        $rows = (new XlsxStudentRosterReader(5))->read($this->saveSpreadsheet($spreadsheet));
+
+        $this->assertSame('00012345', $rows[0]->sisCode());
+    }
+
+    private function spreadsheetWithRows(int $count): Spreadsheet
+    {
+        $spreadsheet = new Spreadsheet();
+        $rows = [['Estudiante', 'Apellidos', 'Nombres']];
+
+        for ($i = 1; $i <= $count; $i++) {
+            $rows[] = [(string) (20230000 + $i), "APELLIDO {$i}", "NOMBRE {$i}"];
+        }
+
+        $spreadsheet->getActiveSheet()->fromArray($rows);
+
+        return $spreadsheet;
+    }
+
     /**
      * @return array<int, \App\Services\Academic\Importers\StudentRosterRow>
      */
