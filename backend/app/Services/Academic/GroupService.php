@@ -4,6 +4,7 @@ namespace App\Services\Academic;
 
 use App\Models\Group;
 use App\Models\Period;
+use App\Models\User;
 use App\Support\RecordStatus;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
@@ -49,6 +50,7 @@ class GroupService
                 'total' => $groups->count(),
                 'total_mios' => $groups->where('es_mio', true)->count(),
                 'id_periodo_activo' => $this->subjectCatalog->activePeriodId(),
+                'docente' => ['nombre_completo' => $this->teacherName($teacherId)],
             ],
         ];
     }
@@ -95,11 +97,10 @@ class GroupService
     /**
      * Registra un nuevo grupo dentro de un par materia-carrera (HU-18).
      *
-     * "El docente tiene permiso sobre la materia" (CA 7) se resuelve igual que en
-     * el resto del módulo: el par debe existir y estar activo en el catálogo
-     * institucional (findSelectablePair). No existe una asignación docente-materia
-     * previa en el esquema: la pertenencia de un grupo a un docente nace en el
-     * propio registro (id_usuario_docente = docente que lo crea).
+     * La única restricción de acceso (CA 7) es la de HU-16: el par debe existir y
+     * estar activo (findSelectablePair). No hay vínculo docente-materia en el esquema;
+     * registrar el primer grupo es justamente lo que incorpora la materia a
+     * "Mis materias", así que no se exige ningún grupo previo.
      */
     public function storeGroup(array $data, string $teacherId): array
     {
@@ -141,7 +142,7 @@ class GroupService
             }
         });
 
-        return $this->showGroup((int) $group->id_grupo, $teacherId);
+        return $this->showGroup($this->findGroup((int) $group->id_grupo), $teacherId);
     }
 
     /**
@@ -150,27 +151,27 @@ class GroupService
      */
     public function updateGroup(int $groupId, array $data, string $teacherId): array
     {
-        $group = Group::query()->find($groupId);
+        $group = DB::transaction(function () use ($groupId, $data, $teacherId) {
+            $group = Group::query()->lockForUpdate()->find($groupId);
 
-        if ($group === null) {
-            throw new ModelNotFoundException('No existe el grupo indicado.');
-        }
+            if ($group === null) {
+                throw new ModelNotFoundException('No existe el grupo indicado.');
+            }
 
-        $this->assertGroupBelongsToTeacher($group, $teacherId);
+            $this->assertGroupBelongsToTeacher($group, $teacherId);
 
-        $periodId = (int) ($data['id_periodo'] ?? $group->id_periodo);
-        $period = $this->findPeriodOrFail($periodId);
+            $periodId = (int) ($data['id_periodo'] ?? $group->id_periodo);
+            $period = $this->findPeriodOrFail($periodId);
 
-        $this->assertNoDuplicateGroup(
-            (int) $group->id_carrera,
-            (int) $group->id_materia,
-            $data['num_grupo'],
-            $this->groupManagementFor($period),
-            $periodId,
-            (int) $group->id_grupo
-        );
+            $this->assertNoDuplicateGroup(
+                (int) $group->id_carrera,
+                (int) $group->id_materia,
+                $data['num_grupo'],
+                $this->groupManagementFor($period),
+                $periodId,
+                (int) $group->id_grupo
+            );
 
-        DB::transaction(function () use ($group, $data, $period) {
             try {
                 $group->fill([
                     'num_grupo' => $data['num_grupo'],
@@ -183,16 +184,28 @@ class GroupService
                     ? $this->duplicateGroupException()
                     : $exception;
             }
+
+            return $group;
         });
 
-        return $this->showGroup((int) $group->id_grupo, $teacherId);
+        return $this->showGroup($this->findGroup((int) $group->id_grupo), $teacherId);
     }
 
     /**
-     * El mockup de "Nuevo grupo" (02-materias.html) solo pide N° de grupo y
-     * Período académico: no hay un input de "Gestión" independiente. grupo.gestion
-     * (varchar) se deriva del periodo.gestion (smallint) del período elegido.
+     * Nombre del docente que actúa: es el "Docente" que el formulario de registro muestra
+     * como dato de solo lectura, y el dueño que tendrá el grupo al crearlo.
      */
+    private function teacherName(string $teacherId): ?string
+    {
+        if ($teacherId === '') {
+            return null;
+        }
+
+        $teacher = User::query()->find($teacherId);
+
+        return $teacher === null ? null : $teacher->nombre_completo;
+    }
+
     private function findPeriodOrFail(int $periodId): Period
     {
         $period = Period::query()->find($periodId);
@@ -206,6 +219,10 @@ class GroupService
         return $period;
     }
 
+    /**
+     * El formulario solo pide N° de grupo y período: no hay un input de "Gestión".
+     * grupo.gestion (varchar) se deriva del periodo.gestion (smallint) elegido.
+     */
     private function groupManagementFor(Period $period): string
     {
         return (string) $period->gestion;
@@ -285,7 +302,7 @@ class GroupService
     }
 
     /**
-     *un docente no opera grupos ajenos.
+     * Un docente no opera grupos ajenos.
      */
     private function assertGroupBelongsToTeacher(Group $group, string $teacherId): void
     {

@@ -1,4 +1,4 @@
-import { render, screen, waitForElementToBeRemoved } from '@testing-library/react'
+import { render, screen, waitForElementToBeRemoved, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
@@ -8,9 +8,10 @@ import {
   makeGroup,
   makeGroupWithoutRoster,
   makeSubject,
+  periodsResponse,
   subjectGroupsResponse,
 } from '@/test/fixtures'
-import { mockApiOnce } from '@/test/http'
+import { matchers, mockApi, mockApiOnce } from '@/test/http'
 import { renderWithRouter } from '@/test/render'
 
 const ROUTE = '/carreras/1/materias/10/grupos'
@@ -114,6 +115,52 @@ describe('SubjectGroupsPage', () => {
     await userEvent.click(removeFilter)
 
     expect(screen.getByText('Selección de materias')).toBeInTheDocument()
+  })
+
+  it('el formulario de registro muestra el docente del backend y no el de otro grupo del listado', async () => {
+    mockApi([
+      { matches: matchers.groupsOfPair, body: subjectGroupsResponse(materia, [makeForeignGroup()]) },
+      { matches: (url) => url.includes('/periodos'), body: periodsResponse() },
+    ])
+
+    renderPage()
+    await waitForLoad()
+    await userEvent.click(screen.getByRole('button', { name: /añadir grupo/i }))
+
+    const dialog = await screen.findByRole('dialog')
+
+    expect(within(dialog).getByText('Paola Careaga')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Victor Perez')).not.toBeInTheDocument()
+  })
+
+  it('al registrar, el aviso no inventa cifras de estudiantes', async () => {
+    mockApi([
+      {
+        matches: (url) => matchers.groupsOfPair(url),
+        body: subjectGroupsResponse(materia, [makeGroup()]),
+      },
+      { matches: (url) => url.includes('/periodos'), body: periodsResponse() },
+      {
+        matches: (url) => /\/grupos$/.test(url) && !url.includes('/carreras/'),
+        status: 201,
+        body: {
+          data: { grupo: makeGroup({ num_grupo: 'A' }), materia },
+          mensaje: 'Grupo registrado correctamente.',
+        },
+      },
+    ])
+
+    renderPage()
+    await waitForLoad()
+    await userEvent.click(screen.getByRole('button', { name: /añadir grupo/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.type(within(dialog).getByLabelText(/N° de grupo/i), 'A')
+    await userEvent.click(within(dialog).getByRole('button', { name: /registrar grupo/i }))
+
+    expect(await screen.findByText('Grupo A registrado')).toBeInTheDocument()
+    expect(screen.queryByText(/61 estudiantes/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/filas quedaron fuera/i)).not.toBeInTheDocument()
   })
 
   it('muestra el mensaje del servidor cuando el par está inactivo', async () => {

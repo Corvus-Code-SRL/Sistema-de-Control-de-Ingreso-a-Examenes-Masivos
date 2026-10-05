@@ -14,7 +14,7 @@ use App\Support\CurrentUser;
 use Illuminate\Http\JsonResponse;
 
 /**
- * Expone un grupo académico al docente que lo dicta, junto con el par al que pertenece.
+ * Expone, registra y actualiza grupos académicos dentro de su par materia-carrera.
  */
 class GroupController extends Controller
 {
@@ -55,11 +55,17 @@ class GroupController extends Controller
     }
 
     /**
-     * actualiza los datos habilitados de un grupo existente.
+     * HU-19: actualiza los datos habilitados de un grupo propio (número y período).
      */
     public function update(UpdateGroupRequest $request, int $id_grupo): JsonResponse
     {
-        $result = $this->groupService->updateGroup($id_grupo, $request->validated(), $this->currentUser->teacherId());
+        $group = $this->groupService->findGroup($id_grupo);
+
+        $teacherId = $this->currentUser->teacherId();
+
+        $this->authorize('update', [$group, $teacherId]);
+
+        $result = $this->groupService->updateGroup($id_grupo, $request->validated(), $teacherId);
 
         return ApiResponse::success(
             $this->groupPayload($result),

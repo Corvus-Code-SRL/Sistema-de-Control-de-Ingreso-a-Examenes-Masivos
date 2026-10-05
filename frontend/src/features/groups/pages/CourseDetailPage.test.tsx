@@ -1,4 +1,5 @@
-import { screen, waitForElementToBeRemoved } from '@testing-library/react'
+import { screen, waitForElementToBeRemoved, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { CourseDetailPage } from './CourseDetailPage'
 import {
@@ -7,8 +8,9 @@ import {
   makeGroup,
   makeGroupWithoutRoster,
   makeSubject,
+  periodsResponse,
 } from '@/test/fixtures'
-import { mockApiOnce } from '@/test/http'
+import { matchers, mockApi, mockApiOnce } from '@/test/http'
 import { renderWithRouter } from '@/test/render'
 
 function renderPage(groupId = 100) {
@@ -37,6 +39,33 @@ describe('CourseDetailPage', () => {
     expect(screen.getByRole('tab', { name: /exámenes/i })).toBeInTheDocument()
     // El conteo aparece en el resumen y en la pestaña de nómina.
     expect(screen.getAllByText('118')).toHaveLength(2)
+  })
+
+  it('el formulario de edición muestra el docente y los inscritos reales del grupo', async () => {
+    mockApi([
+      {
+        matches: matchers.groupDetail,
+        body: groupDetailResponse(
+          makeGroup({
+            cantidad_estudiantes: 37,
+            docente: { nombre_completo: 'Marcelo Quiroga' },
+          }),
+          materia
+        ),
+      },
+      { matches: (url) => url.includes('/periodos'), body: periodsResponse() },
+    ])
+
+    renderPage()
+    await waitForLoad()
+    await userEvent.click(screen.getByRole('button', { name: /editar grupo/i }))
+
+    const dialog = await screen.findByRole('dialog')
+
+    expect(within(dialog).getByText('Marcelo Quiroga')).toBeInTheDocument()
+    expect(within(dialog).getByText(/Los 37 estudiantes inscritos no se modifican/)).toBeInTheDocument()
+    expect(within(dialog).queryByText(/P\. Careaga/)).not.toBeInTheDocument()
+    expect(within(dialog).queryByText(/118/)).not.toBeInTheDocument()
   })
 
   it('muestra la carga de nómina y mantiene pendientes las otras pestañas', async () => {

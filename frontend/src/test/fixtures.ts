@@ -99,6 +99,14 @@ export function subjectCatalogResponse(subjects: SubjectCareer[], mensaje: strin
   }
 }
 
+/** Respuesta cruda de `GET /periodos`: el período activo y el anterior. */
+export function periodsResponse() {
+  return {
+    data: [periodoActivo, { id_periodo: 2, nombre_periodo: '1-2026', gestion: 2026 }],
+    meta: { id_periodo_activo: periodoActivo.id_periodo },
+  }
+}
+
 /** Respuesta cruda de `GET /carreras/{id}/materias/{id}/grupos`. */
 export function subjectGroupsResponse(subject: SubjectCareer, groups: Group[]) {
   return {
@@ -107,6 +115,7 @@ export function subjectGroupsResponse(subject: SubjectCareer, groups: Group[]) {
       total: groups.length,
       total_mios: groups.filter((group) => group.es_mio).length,
       id_periodo_activo: periodoActivo.id_periodo,
+      docente: { nombre_completo: 'Paola Careaga' },
     },
   }
 }
