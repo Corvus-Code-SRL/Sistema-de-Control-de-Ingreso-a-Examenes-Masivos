@@ -64,6 +64,23 @@ describe('RegistrarGrupoForm (HU-018)', () => {
     expect(screen.getByLabelText(/Período académico/i)).toBeInTheDocument()
   })
 
+  it('CA2: sin docente resuelto por el backend lo dice, sin inventar un nombre', () => {
+    render(
+      <RegistrarGrupoForm
+        careerId={1}
+        subjectId={10}
+        subjectCareerLabel="Bases de Datos I · Ingenieria de Sistemas"
+        subjectName="Bases de Datos I"
+        teacherName={null}
+        onCancel={onCancel}
+        onRegistered={onRegistered}
+      />
+    )
+
+    expect(screen.getByText('No disponible')).toBeInTheDocument()
+    expect(screen.queryByText('Paola Careaga')).not.toBeInTheDocument()
+  })
+
   it('no ofrece el campo Auxiliares (corresponde a HU-005)', () => {
     renderForm()
 
@@ -79,11 +96,41 @@ describe('RegistrarGrupoForm (HU-018)', () => {
     expect(screen.getByText(/Por defecto, el período activo/i)).toBeInTheDocument()
   })
 
-  it('CA3: aclara que la unicidad es por materia, carrera y período', () => {
+  it('CA11: preselecciona el período activo aunque los períodos lleguen después del primer render', () => {
+    mockedUsePeriods.mockReturnValue({
+      periods: [],
+      activePeriodId: null,
+      isLoading: true,
+      error: null,
+    })
+    const { rerender } = renderForm()
+
+    mockedUsePeriods.mockReturnValue({
+      periods: [periodoActivo, periodoAnterior],
+      activePeriodId: periodoActivo.id_periodo,
+      isLoading: false,
+      error: null,
+    })
+    rerender(
+      <RegistrarGrupoForm
+        careerId={1}
+        subjectId={10}
+        subjectCareerLabel="Bases de Datos I · Ingenieria de Sistemas"
+        subjectName="Bases de Datos I"
+        teacherName="Paola Careaga"
+        onCancel={onCancel}
+        onRegistered={onRegistered}
+      />
+    )
+
+    expect(screen.getByRole('combobox', { name: /Período académico/i })).toHaveTextContent('(activo)')
+  })
+
+  it('CA3: aclara que la unicidad es por materia, carrera, gestión y período', () => {
     renderForm()
 
     expect(
-      screen.getByText('Debe ser único dentro de la materia, la carrera y el período.')
+      screen.getByText('Debe ser único dentro de la materia, la carrera, la gestión y el período.')
     ).toBeInTheDocument()
     expect(screen.queryByText('Debe ser único dentro de la materia.')).not.toBeInTheDocument()
   })
