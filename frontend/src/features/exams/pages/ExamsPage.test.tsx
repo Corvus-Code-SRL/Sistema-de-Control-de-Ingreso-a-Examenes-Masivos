@@ -43,6 +43,25 @@ describe('ExamsPage', () => {
     expect(screen.getByText('Programado')).toBeInTheDocument()
   })
 
+  it('pide la vista Programados y conserva el orden que envía el servidor', async () => {
+    mockApiOnce({
+      body: {
+        data: [
+          makeExam({ id_examen: 1, nombre_examen: 'En ingreso hoy', estado: 'EN_INGRESO' }),
+          makeExam({ id_examen: 2, nombre_examen: 'Programado mañana' }),
+        ],
+      },
+    })
+
+    renderWithRouter(<ExamsPage />, { route: '/examenes/programados' })
+    await waitForLoad()
+
+    expect((fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls[0][0]).toContain('vista=programados')
+    const names = screen.getAllByRole('row').slice(1).map((row) => row.textContent ?? '')
+    expect(names[0]).toContain('En ingreso hoy')
+    expect(names[1]).toContain('Programado mañana')
+  })
+
   it('muestra el estado vacío cuando no tiene examenes', async () => {
     mockApiOnce({ body: { data: [] } })
 

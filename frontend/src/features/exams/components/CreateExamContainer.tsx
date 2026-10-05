@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCreateExam } from '../hooks/useCreateExam';
 import { ExamForm } from './ExamForm';
 import { AssignGroupsForm } from './AssignGroupsForm';
@@ -52,16 +52,25 @@ export const CreateExamContainer: React.FC = () => {
           <strong>Programado</strong> para el {createdExam.fecha} de{' '}
           {createdExam.hora_inicio} a {createdExam.hora_fin}.
         </p>
-        <Button
-          type="button"
-          onClick={() => {
-            resetFormData();
-            setCreatedExam(null);
-          }}
-          className="bg-[#005E68] hover:bg-[#00555E] text-white text-xs font-semibold px-6 py-2.5 rounded-lg"
-        >
-          Crear otro examen
-        </Button>
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+          <Button asChild className="bg-[#005E68] hover:bg-[#00555E] text-white text-xs font-semibold px-6 py-2.5 rounded-lg">
+            <Link to={`/examenes/${createdExam.id_examen}`}>Configurar auxiliares y ambientes</Link>
+          </Button>
+          <Button asChild variant="outline" className="text-xs font-semibold px-6 py-2.5 rounded-lg">
+            <Link to="/examenes/programados">Ver en Programados</Link>
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              resetFormData();
+              setCreatedExam(null);
+            }}
+            className="text-xs font-medium px-4 py-2.5 rounded-lg"
+          >
+            Crear otro examen
+          </Button>
+        </div>
       </div>
     );
   }
@@ -136,7 +145,7 @@ export const CreateExamContainer: React.FC = () => {
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/examenes/programados')}
             disabled={submitting}
             className="bg-white border-[#DDDDDD] text-[#2C2C2C] hover:bg-gray-50 text-xs font-medium px-5 py-2.5 rounded-lg"
           >

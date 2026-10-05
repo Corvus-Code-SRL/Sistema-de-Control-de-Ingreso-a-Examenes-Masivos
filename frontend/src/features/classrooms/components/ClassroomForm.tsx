@@ -110,7 +110,7 @@ export function ClassroomForm({ onCreated }: ClassroomFormProps) {
           value={form.nro_aula}
           onChange={(event) => updateField('nro_aula', event.target.value)}
           placeholder="Ej. Aula 101"
-          maxLength={50}
+          maxLength={10}
           disabled={isSubmitting}
           aria-invalid={Boolean(errors.nro_aula)}
         />

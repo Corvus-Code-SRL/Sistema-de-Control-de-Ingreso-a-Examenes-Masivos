@@ -64,8 +64,32 @@ describe('RegistrarCuentaModal', () => {
         expect(screen.getByText(label, { selector: 'label' })).toHaveTextContent('*')
       }
       expect(screen.getByText(/^apellido materno/i, { selector: 'label' })).not.toHaveTextContent('*')
-      expect(screen.getByText(/^teléfono/i, { selector: 'label' })).not.toHaveTextContent('*')
       expect(screen.getByLabelText(/correo institucional/i)).toHaveAttribute('aria-required', 'true')
+    })
+
+    it('no pide teléfono ni tipo institucional: la cuenta no los guarda', async () => {
+      mockApi([{ matches: userMatchers.sisVerification, body: { data: sisPerson } }])
+      renderModal()
+
+      await goToAccountData()
+
+      expect(screen.queryByLabelText(/teléfono/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/teléfono/i)).not.toBeInTheDocument()
+      expect(screen.queryByText('Tipo institucional', { selector: 'label' })).not.toBeInTheDocument()
+      // Los únicos datos que se escriben son los que la cuenta guarda: solo el correo es editable.
+      expect(screen.getAllByRole('textbox')).toHaveLength(1)
+    })
+
+    it('la tarjeta del SIS conserva tipo y facultad como información de solo lectura', async () => {
+      mockApi([{ matches: userMatchers.sisVerification, body: { data: sisPerson } }])
+      renderModal()
+
+      await verifyCode()
+      await screen.findByText('Persona reconocida por el SIS')
+
+      expect(screen.getByText(`Tipo institucional: ${sisPerson.tipo}`)).toBeInTheDocument()
+      expect(screen.getByText(sisPerson.facultad)).toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /facultad|tipo/i })).not.toBeInTheDocument()
     })
 
     it('no deja verificar sin código SIS', () => {
@@ -194,7 +218,6 @@ describe('RegistrarCuentaModal', () => {
     expect(screen.queryByText(/recibirá sus credenciales de acceso/i)).not.toBeInTheDocument()
 
     await userEvent.type(screen.getByLabelText(/correo institucional/i), 'l.mendoza@umss.edu')
-    await userEvent.type(screen.getByLabelText(/teléfono/i), '71234567')
     await userEvent.click(screen.getByRole('button', { name: 'Registrar cuenta' }))
 
     expect(await screen.findByText('Cuenta creada')).toBeInTheDocument()

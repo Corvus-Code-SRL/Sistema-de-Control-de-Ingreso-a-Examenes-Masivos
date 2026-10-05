@@ -55,6 +55,7 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
                   {item.to ? (
                     <NavLink
                       to={item.to}
+                      end={item.end}
                       onClick={onNavigate}
                       className={({ isActive }) =>
                         cn(
@@ -67,11 +68,6 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
                     >
                       <item.icon className="size-4 shrink-0" aria-hidden="true" />
                       <span className="flex-1 truncate">{item.label}</span>
-                      {item.badge !== undefined && (
-                        <span className="rounded-full bg-accent-brand px-1.5 text-xs font-semibold text-brand-deep">
-                          {item.badge}
-                        </span>
-                      )}
                     </NavLink>
                   ) : (
                     <span
@@ -81,11 +77,6 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
                     >
                       <item.icon className="size-4 shrink-0" aria-hidden="true" />
                       <span className="flex-1 truncate">{item.label}</span>
-                      {item.badge !== undefined && (
-                        <span className="rounded-full bg-sb-hover px-1.5 text-xs text-sb-sub">
-                          {item.badge}
-                        </span>
-                      )}
                     </span>
                   )}
                 </li>

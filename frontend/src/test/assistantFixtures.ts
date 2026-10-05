@@ -56,6 +56,7 @@ export const assignedExam: AssistantExam = {
   estado: 'PROGRAMADO',
   materia: 'Bases de Datos I',
   ambiente: auditorio,
+  ambiente_por_defecto: false,
 }
 
 export const unassignedExam: AssistantExam = {

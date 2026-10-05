@@ -25,7 +25,8 @@ function totalStudents(exam: Exam): number {
 }
 
 /**
- * Exámenes del docente actual, ordenados por fecha (HU-24 criterios 10-12).
+ * Exámenes vigentes del docente actual —PROGRAMADO y EN_INGRESO del período activo—, ordenados por
+ * fecha ascendente (HU-24 criterios 10-12). Los finalizados y cancelados no están aquí.
  *
  * Es el punto de entrada para reabrir un examen PROGRAMADO y editarlo o
  * gestionar sus grupos (HU-25 criterio 7).

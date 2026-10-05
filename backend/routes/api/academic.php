@@ -51,6 +51,10 @@ Route::prefix('administracion')
     });
 
 Route::get('grupos/{id_grupo}', [GroupController::class, 'show']);
+// HU-029: auxiliares de un grupo propio (pestaña Auxiliares del curso). El id se valida en el
+// Request, igual que el detalle del grupo: uno inválido responde 422.
+Route::get('grupos/{id_grupo}/auxiliares', [AssistantController::class, 'forGroup']);
+
 Route::post('grupos', [GroupController::class, 'store']);
 
 Route::put('grupos/{id_grupo}', [GroupController::class, 'update']);

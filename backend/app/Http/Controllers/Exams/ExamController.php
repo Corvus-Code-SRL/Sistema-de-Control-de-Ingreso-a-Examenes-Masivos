@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Exams\CancelExamRequest;
 use App\Http\Requests\Exams\CreateExamRequest;
 use App\Http\Requests\Exams\FinishExamRequest;
+use App\Http\Requests\Exams\IndexExamRequest;
 use App\Http\Requests\Exams\UpdateExamRequest;
 use App\Http\Resources\Exams\ClassroomResource;
 use App\Http\Resources\Exams\ExamResource;
@@ -45,10 +46,15 @@ class ExamController extends Controller
         ]);
     }
 
-    /** GET /api/examenes — vista Programados: los exámenes del docente actual. */
-    public function index(): JsonResponse
+    /**
+     * GET /api/examenes — los exámenes del docente actual. Con `?vista=programados` (vista
+     * Programados) solo los vigentes: PROGRAMADO o EN_INGRESO del período activo.
+     */
+    public function index(IndexExamRequest $request): JsonResponse
     {
-        $exams = $this->examService->listForTeacher($this->currentUser->teacherId());
+        $exams = $request->wantsScheduledOnly()
+            ? $this->examService->listScheduledForTeacher($this->currentUser->teacherId())
+            : $this->examService->listForTeacher($this->currentUser->teacherId());
 
         return ApiResponse::success(ExamResource::collection($exams));
     }

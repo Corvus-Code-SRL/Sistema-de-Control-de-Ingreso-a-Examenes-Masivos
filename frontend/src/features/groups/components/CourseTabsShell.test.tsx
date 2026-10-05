@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import {
@@ -6,6 +7,7 @@ import {
   makeGroup,
   periodoActivo,
 } from '@/test/fixtures'
+import { mockApiOnce } from '@/test/http'
 import { renderWithRouter } from '@/test/render'
 
 import { CourseTabsShell } from './CourseTabsShell'
@@ -92,5 +94,53 @@ describe('CourseTabsShell', () => {
 
     // El aviso "Sin nómina cargada" vive dentro del panel o del empty state
     expect(screen.getByText('Cargar nómina')).toBeInTheDocument()
+  })
+
+  it('la pestaña Exámenes carga los exámenes del grupo', async () => {
+    mockApiOnce({
+      body: {
+        data: [
+          {
+            id_examen: 41,
+            nombre_examen: 'Primer parcial',
+            fecha: '2026-10-14',
+            hora_inicio: '08:00',
+            hora_fin: '09:30',
+            estado: 'PROGRAMADO',
+          },
+        ],
+      },
+    })
+
+    renderWithRouter(
+      <CourseTabsShell
+        group={makeGroup({ id_grupo: 100 })}
+        subjectName={subjectName}
+        meta={{ id_periodo_activo: periodoActivo.id_periodo, es_periodo_activo: true }}
+        onReload={vi.fn()}
+      />
+    )
+    await userEvent.click(screen.getByRole('tab', { name: /exámenes/i }))
+
+    expect(await screen.findByRole('link', { name: /primer parcial/i })).toHaveAttribute(
+      'href',
+      '/examenes/41'
+    )
+  })
+
+  it('la pestaña Auxiliares carga los auxiliares del grupo', async () => {
+    mockApiOnce({ body: { data: [] } })
+
+    renderWithRouter(
+      <CourseTabsShell
+        group={makeGroup({ id_grupo: 100 })}
+        subjectName={subjectName}
+        meta={{ id_periodo_activo: periodoActivo.id_periodo, es_periodo_activo: true }}
+        onReload={vi.fn()}
+      />
+    )
+    await userEvent.click(screen.getByRole('tab', { name: /auxiliares/i }))
+
+    expect(await screen.findByText('Este grupo aún no tiene auxiliares')).toBeInTheDocument()
   })
 })

@@ -7,6 +7,7 @@ use App\Exceptions\Exams\ExamOwnershipException;
 use App\Exceptions\Exams\ExamStateException;
 use App\Models\Exam;
 use App\Models\ExamAssistant;
+use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\Security\AuditLogService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -112,18 +113,44 @@ class AssistantClassroomService
     /**
      * Exámenes vigentes del auxiliar con su ambiente, del más próximo al más lejano.
      * Los cancelados y finalizados no se muestran: ya no hay ingreso que controlar.
+     *
+     * Si el docente no le asignó ambiente y el examen tiene uno solo, se muestra ese: es el que
+     * el control de ingreso ya le da (EntryControlSnapshotService::controlRoomOf). Se resuelve
+     * en memoria y se marca con `ambiente_por_defecto`; nunca se escribe en examen_auxiliar.
      */
     public function listForAssistant(string $userId): Collection
     {
-        return ExamAssistant::query()
+        $assignments = ExamAssistant::query()
             ->select('examen_auxiliar.*')
             ->join('examen', 'examen.id_examen', '=', 'examen_auxiliar.id_examen')
             ->where('examen_auxiliar.id_usuario', $userId)
             ->whereIn('examen.estado', self::ACTIVE_STATES)
             ->orderBy('examen.fecha')
             ->orderBy('examen.hora_inicio')
-            ->with(['exam.subject', 'classroom'])
+            ->with(['exam.subject', 'exam.classrooms', 'classroom'])
             ->get();
+
+        return $assignments->each(fn (ExamAssistant $assignment) => $this->applyDefaultClassroom($assignment));
+    }
+
+    private function applyDefaultClassroom(ExamAssistant $assignment): void
+    {
+        if ($assignment->id_ambiente !== null) {
+            return;
+        }
+
+        $rooms = $assignment->exam->classrooms;
+        $roomId = EntryControlSnapshotService::controlRoomOf(
+            null,
+            $rooms->map(fn ($room) => ['id_ambiente' => (int) $room->id_ambiente])->all()
+        );
+
+        if ($roomId === null) {
+            return;
+        }
+
+        $assignment->setRelation('classroom', $rooms->firstWhere('id_ambiente', $roomId));
+        $assignment->setAttribute('ambiente_por_defecto', true);
     }
 
     private function assertOwnedBy(Exam $exam, string $teacherId): void

@@ -8,9 +8,12 @@ use App\Http\Requests\Academic\AddAssistantToGroupsRequest;
 use App\Http\Requests\Academic\EnableAssistantForExamRequest;
 use App\Http\Requests\Academic\ManageAssistantsRequest;
 use App\Http\Requests\Academic\SearchAssistantRequest;
+use App\Http\Requests\Academic\ShowGroupAssistantsRequest;
 use App\Http\Resources\Academic\AssistantResource;
 use App\Http\Resources\Academic\AssistantWithGroupsResource;
+use App\Http\Resources\Academic\GroupAssistantResource;
 use App\Services\Academic\AssistantService;
+use App\Services\Academic\GroupService;
 use App\Support\ApiResponse;
 use App\Support\CurrentUser;
 use Illuminate\Http\JsonResponse;
@@ -25,11 +28,17 @@ class AssistantController extends Controller
 {
     private AssistantService $assistantService;
 
+    private GroupService $groupService;
+
     private CurrentUser $currentUser;
 
-    public function __construct(AssistantService $assistantService, CurrentUser $currentUser)
-    {
+    public function __construct(
+        AssistantService $assistantService,
+        GroupService $groupService,
+        CurrentUser $currentUser
+    ) {
         $this->assistantService = $assistantService;
+        $this->groupService = $groupService;
         $this->currentUser = $currentUser;
     }
 
@@ -38,6 +47,18 @@ class AssistantController extends Controller
         $assistants = $this->assistantService->listForTeacher($this->currentUser->teacherId());
 
         return ApiResponse::success(AssistantWithGroupsResource::collection($assistants));
+    }
+
+    /** GET /api/grupos/{id_grupo}/auxiliares — pestaña Auxiliares del curso (solo lectura). */
+    public function forGroup(ShowGroupAssistantsRequest $request): JsonResponse
+    {
+        $group = $this->groupService->findGroup((int) $request->validated()['id_grupo']);
+
+        $this->authorize('view', [$group, $this->currentUser->teacherId()]);
+
+        return ApiResponse::success(GroupAssistantResource::collection(
+            $this->assistantService->listForGroup($group)
+        ));
     }
 
     public function search(SearchAssistantRequest $request): JsonResponse

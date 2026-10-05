@@ -4,6 +4,7 @@ namespace App\Services\Academic;
 
 use App\Exceptions\Academic\ActivePeriodNotConfiguredException;
 use App\Models\Group;
+use App\Models\Period;
 use App\Models\SubjectCareer;
 use App\Support\RecordStatus;
 use Illuminate\Database\Eloquent\Builder;
@@ -31,6 +32,7 @@ class SubjectCatalogService
                 'total' => $pairs->count(),
                 'total_mias' => $pairs->where('cantidad_grupos', '>', 0)->count(),
                 'id_periodo_activo' => $this->activePeriodId(),
+                'nombre_periodo_activo' => $this->activePeriodName(),
             ],
             'mensaje' => $pairs->isEmpty()
                 ? 'No hay materias disponibles en el catálogo institucional.'
@@ -59,6 +61,12 @@ class SubjectCatalogService
         }
 
         return $id;
+    }
+
+    /** Nombre del período activo («2-2026»); null si el período configurado no existe en el catálogo. */
+    public function activePeriodName(): ?string
+    {
+        return Period::query()->whereKey($this->activePeriodId())->value('nombre_periodo');
     }
 
     private function basePairQuery(string $teacherId): Builder

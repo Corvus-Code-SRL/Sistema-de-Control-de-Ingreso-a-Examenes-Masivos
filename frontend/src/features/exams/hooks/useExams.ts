@@ -3,10 +3,10 @@ import { useAsyncResource } from '@/hooks/useAsyncResource'
 import { examsService } from '../services/examsService'
 import type { Exam } from '../types/exams.types'
 
-/** Exámenes del docente actual (vista Programados). */
+/** Exámenes vigentes del docente actual (vista Programados): PROGRAMADO y EN_INGRESO. */
 export function useExams() {
   const resource = useAsyncResource<Exam[]>(
-    useCallback((signal) => examsService.listExams(signal), []),
+    useCallback((signal) => examsService.listScheduledExams(signal), []),
     []
   )
 

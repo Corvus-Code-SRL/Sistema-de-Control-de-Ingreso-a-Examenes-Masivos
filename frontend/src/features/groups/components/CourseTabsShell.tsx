@@ -13,6 +13,9 @@ import {
 
 import { RosterUploadPanel } from '@/features/students'
 
+import { GroupAssistantsTab } from './GroupAssistantsTab'
+import { GroupExamsTab } from './GroupExamsTab'
+
 import {
   hasRoster,
   type Group,
@@ -31,15 +34,13 @@ interface TabDefinition {
   label: string
   icon: LucideIcon
   count?: number
-  title: string
-  description: string
 }
 
 /**
  * Armazón de pestañas del detalle del curso.
  *
- * HU-021 incorpora la carga de nómina dentro de la pestaña Nómina,
- * respetando las condiciones de grupo y período.
+ * HU-021 incorpora la carga de nómina dentro de la pestaña Nómina, respetando las condiciones
+ * de grupo y período. HU-029 llena las pestañas Auxiliares y Exámenes con los datos del grupo.
  */
 export function CourseTabsShell({
   group,
@@ -47,34 +48,27 @@ export function CourseTabsShell({
   meta,
   onReload,
 }: CourseTabsShellProps) {
+  const rosterTitle = hasRoster(group) ? 'Nómina cargada' : 'Sin nómina cargada'
+  const rosterDescription = hasRoster(group)
+    ? `El grupo tiene ${group.cantidad_estudiantes} inscritos.`
+    : 'Este grupo todavía no tiene estudiantes inscritos.'
+
   const tabs: TabDefinition[] = [
     {
       value: 'nomina',
       label: 'Nómina',
       icon: Users,
       count: group.cantidad_estudiantes,
-      title: hasRoster(group)
-        ? 'Nómina cargada'
-        : 'Sin nómina cargada',
-      description: hasRoster(group)
-        ? `El grupo tiene ${group.cantidad_estudiantes} inscritos.`
-        : 'Este grupo todavía no tiene estudiantes inscritos.',
     },
     {
       value: 'auxiliares',
       label: 'Auxiliares',
       icon: UsersRound,
-      title: 'Auxiliares del grupo',
-      description:
-        'La asignación y consulta de auxiliares se incorpora con la historia correspondiente.',
     },
     {
       value: 'examenes',
       label: 'Exámenes',
       icon: CalendarClock,
-      title: 'Exámenes del grupo',
-      description:
-        'Los exámenes programados y finalizados de este grupo se incorporan con la historia de programación de exámenes.',
     },
   ]
 
@@ -123,28 +117,26 @@ export function CourseTabsShell({
           <Card className="p-0">
             <EmptyState
               icon={tabs[0].icon}
-              title={tabs[0].title}
-              description={tabs[0].description}
+              title={rosterTitle}
+              description={rosterDescription}
             />
           </Card>
         )}
       </TabsContent>
 
-      {tabs.slice(1).map((tab) => (
-        <TabsContent
-          key={tab.value}
-          value={tab.value}
-          className="mt-4"
-        >
-          <Card className="p-0">
-            <EmptyState
-              icon={tab.icon}
-              title={tab.title}
-              description={tab.description}
-            />
-          </Card>
-        </TabsContent>
-      ))}
+      <TabsContent
+        value="auxiliares"
+        className="mt-4"
+      >
+        <GroupAssistantsTab groupId={group.id_grupo} />
+      </TabsContent>
+
+      <TabsContent
+        value="examenes"
+        className="mt-4"
+      >
+        <GroupExamsTab groupId={group.id_grupo} />
+      </TabsContent>
     </Tabs>
   )
 }

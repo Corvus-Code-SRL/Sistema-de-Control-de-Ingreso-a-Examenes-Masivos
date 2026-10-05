@@ -28,13 +28,24 @@ describe('SubjectGroupsAction', () => {
     expect(link).toHaveAccessibleName(/ingenieria informatica/i)
   })
 
-  it('no ofrece acción sobre una materia sin grupos del docente', () => {
+  it('un par activo sin grupos del docente enlaza a la página de grupos para registrarlos', () => {
     renderWithRouter(
       <SubjectGroupsAction subject={makeSubject({ es_mia: false, cantidad_grupos: 0 })} />
     )
 
-    expect(screen.queryByRole('link')).not.toBeInTheDocument()
-    expect(screen.getByText('Sin grupos a su cargo')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /registrar grupo/i })).toHaveAttribute(
+      'href',
+      '/carreras/1/materias/10/grupos'
+    )
+    expect(screen.queryByText('Sin grupos a su cargo')).not.toBeInTheDocument()
+  })
+
+  it('en móvil el par sin grupos propios también enlaza, con el nombre accesible del par', () => {
+    renderWithRouter(
+      <SubjectGroupsAction subject={makeSubject({ es_mia: false, cantidad_grupos: 0 })} compact />
+    )
+
+    expect(screen.getByRole('link')).toHaveAccessibleName(/registrar grupo de bases de datos i/i)
   })
 
   it('no ofrece acción sobre una materia inactiva', () => {
@@ -50,6 +61,15 @@ describe('SubjectGroupsAction', () => {
     )
 
     expect(screen.getByText('No seleccionable')).toBeInTheDocument()
-    expect(screen.queryByText('Sin grupos a su cargo')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('un par inactivo sin grupos propios tampoco enlaza', () => {
+    renderWithRouter(
+      <SubjectGroupsAction subject={makeSubject({ activa: false, es_mia: false, cantidad_grupos: 0 })} />
+    )
+
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    expect(screen.getByText('No seleccionable')).toBeInTheDocument()
   })
 })

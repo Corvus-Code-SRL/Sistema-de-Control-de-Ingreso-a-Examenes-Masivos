@@ -1,9 +1,11 @@
 import { CalendarClock, Clock, DoorOpen } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
+import { Button } from '@/components/ui/button'
 import { useMyAssistantExams } from '../hooks/useMyAssistantExams'
 import type { AssistantExam, AssistantExamStatus } from '../types/assistant.types'
 
@@ -16,7 +18,7 @@ const STATUS_LABELS: Record<AssistantExamStatus, { label: string; className: str
 /**
  * Exámenes que controla el auxiliar y el ambiente que el docente le asignó
  * (HU-09, mockup 9.6). Es de solo lectura: el auxiliar nunca elige ni cambia
- * su ambiente.
+ * su ambiente. Con el ingreso abierto (EN_INGRESO) cada tarjeta lleva al control de ingreso.
  */
 export function MyAssignmentsPage() {
   const { status, data, error, reload } = useMyAssistantExams()
@@ -70,7 +72,10 @@ function AssistantExamCard({ exam }: { exam: AssistantExam }) {
         <p className="flex items-start gap-2 text-sm text-ok-fg">
           <DoorOpen className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
-            Usted controla en <strong>{exam.ambiente.nro_aula}</strong>, asignado por el docente.
+            Usted controla en <strong>{exam.ambiente.nro_aula}</strong>
+            {exam.ambiente_por_defecto
+              ? ', el único ambiente de este examen.'
+              : ', asignado por el docente.'}
           </span>
         </p>
       ) : (
@@ -78,6 +83,15 @@ function AssistantExamCard({ exam }: { exam: AssistantExam }) {
           <Clock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>Aún sin ambiente asignado. El docente lo asignará antes de abrir el control.</span>
         </p>
+      )}
+
+      {exam.estado === 'EN_INGRESO' && (
+        <Button asChild size="sm">
+          <Link to={`/examenes/${exam.id_examen}/control-ingreso`}>
+            <DoorOpen className="size-4" aria-hidden="true" />
+            Controlar ingreso
+          </Link>
+        </Button>
       )}
     </article>
   )

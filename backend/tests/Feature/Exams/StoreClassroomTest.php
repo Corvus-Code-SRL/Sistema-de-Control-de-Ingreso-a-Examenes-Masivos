@@ -189,4 +189,62 @@ class StoreClassroomTest extends TestCase
 
         $this->assertDatabaseCount('ambiente', 3);
     }
+
+    /* ---------------- HU-012: límites del ambiente (varchar(10) e integer) ---------------- */
+
+    /** @test */
+    public function hu_012_acepta_un_nombre_de_exactamente_10_caracteres()
+    {
+        $this->postJson('/api/ambientes', array_merge($this->datosValidos, ['nro_aula' => 'Auditorio1']))
+            ->assertStatus(201)
+            ->assertJsonPath('data.nro_aula', 'Auditorio1');
+
+        $this->assertDatabaseHas('ambiente', ['nro_aula' => 'Auditorio1']);
+    }
+
+    /** @test */
+    public function hu_012_rechaza_un_nombre_de_11_caracteres_en_espanol()
+    {
+        $this->postJson('/api/ambientes', array_merge($this->datosValidos, ['nro_aula' => 'Auditorio12']))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('nro_aula')
+            ->assertJsonPath('errors.nro_aula.0', 'El nombre del ambiente no puede superar los 10 caracteres.');
+
+        $this->assertDatabaseMissing('ambiente', ['nro_aula' => 'Auditorio12']);
+    }
+
+    /** @test */
+    public function hu_012_el_largo_se_mide_sin_los_espacios_de_los_extremos()
+    {
+        $this->postJson('/api/ambientes', array_merge($this->datosValidos, ['nro_aula' => '  Auditorio1  ']))
+            ->assertStatus(201)
+            ->assertJsonPath('data.nro_aula', 'Auditorio1');
+    }
+
+    /** @test */
+    public function hu_012_rechaza_una_capacidad_que_excede_el_integer_de_la_base()
+    {
+        $this->postJson('/api/ambientes', array_merge($this->datosValidos, ['capacidad' => 99999999999]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('capacidad')
+            ->assertJsonPath('errors.capacidad.0', 'La capacidad no puede superar 2147483647.');
+
+        $this->assertDatabaseCount('ambiente', 0);
+    }
+
+    /** @test */
+    public function hu_012_acepta_la_capacidad_maxima_del_integer()
+    {
+        $this->postJson('/api/ambientes', array_merge($this->datosValidos, ['capacidad' => 2147483647]))
+            ->assertStatus(201)
+            ->assertJsonPath('data.capacidad', 2147483647);
+    }
+
+    /** @test */
+    public function hu_012_rechaza_una_capacidad_que_no_es_un_entero()
+    {
+        $this->postJson('/api/ambientes', array_merge($this->datosValidos, ['capacidad' => 30.5]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('capacidad');
+    }
 }

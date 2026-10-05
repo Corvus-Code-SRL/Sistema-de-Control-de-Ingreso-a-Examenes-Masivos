@@ -164,4 +164,27 @@ describe('EntryControlPage', () => {
     expect(screen.queryByRole('button', { name: 'Aceptar ingreso' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Siguiente estudiante' })).toBeInTheDocument()
   })
+
+  it('Volver y la miga de pan llevan a Control de ingreso, no a Programados', async () => {
+    mockApi(routes())
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+    await screen.findByText(/Usted controla en/)
+
+    const links = screen.getAllByRole('link', { name: /control de ingreso/i })
+    const targets = links.map((link) => link.getAttribute('href'))
+
+    // El enlace «Control de ingreso» con flecha, la miga de pan y el ítem del menú lateral.
+    expect(targets.length).toBeGreaterThanOrEqual(2)
+    expect(targets.every((href) => href === '/control-ingreso')).toBe(true)
+    expect(screen.queryByRole('link', { name: /^exámenes$/i })).not.toBeInTheDocument()
+    expect(document.querySelector('a[href="/examenes/programados"][class*="inline-flex"]')).toBeNull()
+  })
+
+  it('la miga de pan termina en el nombre del examen', async () => {
+    mockApi(routes())
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+    await screen.findByText(/Usted controla en/)
+
+    expect(screen.getAllByText('Primer parcial').length).toBeGreaterThan(0)
+  })
 })

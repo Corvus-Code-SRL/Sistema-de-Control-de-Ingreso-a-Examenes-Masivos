@@ -1,8 +1,10 @@
 import { apiClient } from '@/lib/api-client'
 import type {
   CreateGroupPayload,
+  GroupAssistant,
   GroupDetail,
   GroupDetailResponse,
+  GroupExam,
   GroupMutationResponse,
   SubjectGroups,
   SubjectGroupsResponse,
@@ -75,6 +77,25 @@ export async function updateGroup(
   const response = await apiClient<GroupMutationResponse>(`/grupos/${groupId}`, {
     method: 'PUT',
     body: payload,
+    signal,
+  })
+
+  return response.data
+}
+
+/** Exámenes que incluyen el grupo (solo su docente), del más próximo al más lejano. */
+export async function getGroupExams(groupId: number, signal?: AbortSignal): Promise<GroupExam[]> {
+  const response = await apiClient<{ data: GroupExam[] }>(`/grupos/${groupId}/examenes`, { signal })
+
+  return response.data
+}
+
+/** Auxiliares incorporados al grupo y los exámenes del grupo donde están habilitados. */
+export async function getGroupAssistants(
+  groupId: number,
+  signal?: AbortSignal
+): Promise<GroupAssistant[]> {
+  const response = await apiClient<{ data: GroupAssistant[] }>(`/grupos/${groupId}/auxiliares`, {
     signal,
   })
 

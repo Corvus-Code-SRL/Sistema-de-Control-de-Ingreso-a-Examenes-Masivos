@@ -3,6 +3,7 @@
 namespace Tests\Feature\Exams;
 
 use App\Models\Exam;
+use App\Models\ExamAssistant;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
@@ -139,6 +140,57 @@ class AssistantClassroomHttpTest extends TestCase
             ->assertJsonPath('data.0.ambiente.nro_aula', '692B');
     }
 
+    public function test_el_auxiliar_ve_el_unico_ambiente_del_examen_cuando_no_tiene_asignacion(): void
+    {
+        $exam = $this->createExam(['nombre_examen' => 'Un solo ambiente'], [$this->aulaId]);
+        $this->enableAssistant($exam, $this->mariaId);
+        $this->actingAs(User::findOrFail($this->mariaId));
+
+        $this->getJson('/api/auxiliar/examenes')
+            ->assertOk()
+            ->assertJsonPath('data.0.id_examen', $exam->id_examen)
+            ->assertJsonPath('data.0.ambiente.nro_aula', '691A')
+            ->assertJsonPath('data.0.ambiente_por_defecto', true);
+
+        // La regla se resuelve al consultar: no se escribe nada en examen_auxiliar.
+        $this->assertAssignedTo($exam, $this->mariaId, null);
+    }
+
+    public function test_con_varios_ambientes_y_sin_asignacion_el_auxiliar_no_tiene_ambiente(): void
+    {
+        $this->examWithAssistants();
+        $this->actingAs(User::findOrFail($this->mariaId));
+
+        $this->getJson('/api/auxiliar/examenes')
+            ->assertOk()
+            ->assertJsonPath('data.0.ambiente', null)
+            ->assertJsonPath('data.0.ambiente_por_defecto', false);
+    }
+
+    public function test_la_asignacion_explicita_gana_sobre_el_ambiente_por_defecto(): void
+    {
+        $exam = $this->createExam([], [$this->aulaId]);
+        $this->enableAssistant($exam, $this->mariaId, $this->aulaId);
+        $this->actingAs(User::findOrFail($this->mariaId));
+
+        $this->getJson('/api/auxiliar/examenes')
+            ->assertOk()
+            ->assertJsonPath('data.0.ambiente.nro_aula', '691A')
+            ->assertJsonPath('data.0.ambiente_por_defecto', false);
+    }
+
+    public function test_el_ambiente_por_defecto_se_ve_tambien_con_el_ingreso_abierto(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId]);
+        $this->enableAssistant($exam, $this->mariaId);
+        $this->actingAs(User::findOrFail($this->mariaId));
+
+        $this->getJson('/api/auxiliar/examenes')
+            ->assertOk()
+            ->assertJsonPath('data.0.estado', Exam::EN_INGRESO)
+            ->assertJsonPath('data.0.ambiente.nro_aula', '691A');
+    }
+
     public function test_el_auxiliar_no_puede_asignar_ambientes_y_recibe_403(): void
     {
         $exam = $this->examWithAssistants();
@@ -178,6 +230,16 @@ class AssistantClassroomHttpTest extends TestCase
         $this->getJson('/api/auxiliar/examenes')
             ->assertOk()
             ->assertJsonCount(0, 'data');
+    }
+
+    private function enableAssistant(Exam $exam, string $userId, ?int $classroomId = null): void
+    {
+        ExamAssistant::create([
+            'id_examen' => $exam->id_examen,
+            'id_usuario' => $userId,
+            'id_usuario_docente_habilita' => $exam->id_usuario_docente,
+            'id_ambiente' => $classroomId,
+        ]);
     }
 
     private function giveRoleTo(string $userId, string $roleName): void

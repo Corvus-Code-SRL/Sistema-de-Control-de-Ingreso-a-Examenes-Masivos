@@ -46,7 +46,6 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
   const [backendErrorMsg, setBackendErrorMsg] = useState('');
 
   const [correo, setCorreo] = useState('');
-  const [telefono, setTelefono] = useState('');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -94,10 +93,6 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
       newErrors.correo = 'Ingrese un correo válido, por ejemplo nombre@umss.edu.';
     }
     
-    if (telefono && !/^\d{8}$/.test(telefono)) {
-      newErrors.telefono = 'El teléfono debe tener 8 dígitos.';
-    }
-
     if (Object.keys(newErrors).length > 0 || !sisData) {
       setFormErrors(newErrors);
       return;
@@ -107,7 +102,8 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
     setFormErrors({});
 
     try {
-      // Solo los campos que declara StoreUserRequest: teléfono, tipo y facultad no se persisten.
+      // Solo los campos que declara StoreUserRequest. La tabla usuario no guarda teléfono, tipo
+      // ni facultad, así que el formulario no los pide.
       const account = await registerUser({
         cod_sis: codSis,
         nombre: sisData.nombre,
@@ -152,7 +148,6 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
     setErrorType(null);
     setBackendErrorMsg('');
     setCorreo('');
-    setTelefono('');
     setFormErrors({});
     setShowCancelConfirm(false);
     onClose();
@@ -416,7 +411,7 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="registro-correo" className="text-[14px] font-medium text-text flex items-center gap-1">Correo institucional <span aria-hidden="true" className="text-danger">*</span></label>
                   <div className={`flex items-center gap-2 h-10 px-3 rounded-[8px] border bg-surface transition-all ${formErrors.correo ? 'border-danger shadow-[0_0_0_3px_rgba(217,45,32,0.12)] text-danger' : 'border-border-strong focus-within:border-brand focus-within:shadow-[var(--focus-ring)]'}`}>
@@ -438,34 +433,6 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
                       Este correo quedará asociado a la cuenta.
                     </div>
                   )}
-                </div>
-                
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="registro-telefono" className="text-[14px] font-medium text-text flex items-center gap-1">Teléfono <span className="text-muted-foreground font-normal">(opcional)</span></label>
-                  <div className={`flex items-center gap-2 h-10 px-3 rounded-[8px] border bg-surface transition-all ${formErrors.telefono ? 'border-danger shadow-[0_0_0_3px_rgba(217,45,32,0.12)] text-danger' : 'border-border-strong focus-within:border-brand focus-within:shadow-[var(--focus-ring)]'}`}>
-                    <input 
-                      id="registro-telefono"
-                      type="text" 
-                      value={telefono}
-                      onChange={(e) => { setTelefono(e.target.value); setFormErrors(prev => ({...prev, telefono: ''})); }}
-                      placeholder="8 dígitos" 
-                      className="flex-1 w-full bg-transparent outline-none text-[14px] text-text placeholder:text-subtle" 
-                    />
-                  </div>
-                  {formErrors.telefono && (
-                    <div className="text-[13px] text-danger font-medium flex gap-1.5 mt-0.5"><AlertCircle className="w-[18px] h-[18px] shrink-0" /> <span>{formErrors.telefono}</span></div>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[14px] font-medium text-text flex items-center gap-1">Tipo institucional</label>
-                  <div className="flex items-center gap-2 h-10 px-3 rounded-[8px] border border-border-strong bg-bg-app text-muted-foreground select-none">
-                    <Lock className="w-4 h-4 text-subtle" />
-                    <span className="flex-1 truncate text-[14px]">{sisData.tipo}</span>
-                  </div>
-                  <div className="text-[13px] text-muted-foreground">Define los roles posibles.</div>
                 </div>
               </div>
 
@@ -558,7 +525,6 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
                   setCodSis('');
                   setSisData(null);
                   setCorreo('');
-                  setTelefono('');
                   setVerifiedAt(null);
                   setRegisteredAt(null);
                   setRegisteredAccount(null);

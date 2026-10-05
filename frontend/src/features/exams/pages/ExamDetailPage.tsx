@@ -21,6 +21,7 @@ import { AssignGroupsForm } from '../components/AssignGroupsForm';
 import { ExamStatusBadge } from '../components/ExamStatusBadge';
 import { validateExamForm, validateGroupsStep } from '../utils/examValidators';
 import { assistantSectionKey } from '../utils/assistantSectionKey';
+import { examLockedMessage } from '../utils/examLockedMessage';
 import { AssistantClassroomSection } from '@/features/assistants';
 
 /**
@@ -135,10 +136,7 @@ export function ExamDetailPage() {
           {!isProgramado ? (
             <div className="rounded-xl border bg-card p-6 shadow-xs space-y-4">
               <h2 className="sciem-h3">Información general</h2>
-              <p className="text-sm text-muted-foreground">
-                El control de ingreso de este examen ya se inició: la información general y sus
-                grupos quedaron fijos.
-              </p>
+              <p className="text-sm text-muted-foreground">{examLockedMessage(exam.estado)}</p>
               <dl className="grid grid-cols-1 gap-x-8 gap-y-3 text-sm md:grid-cols-2">
                 <div>
                   <dt className="font-medium">Materia</dt>

@@ -66,4 +66,40 @@ describe('MyAssignmentsPage', () => {
     expect(within(enIngreso).getByText('Control de ingreso abierto')).toBeVisible()
     expect(within(enCurso).getByText('En curso')).toBeVisible()
   })
+
+  it('con el ingreso abierto la tarjeta lleva al control de ingreso de ese examen', async () => {
+    listMyExams.mockResolvedValue([{ ...assignedExam, id_examen: 9, estado: 'EN_INGRESO' }])
+
+    renderWithRouter(<MyAssignmentsPage />, { route: '/mis-examenes' })
+
+    await screen.findAllByText('1er Parcial BD I')
+    const [card] = screen.getAllByRole('article')
+    expect(within(card).getByRole('link', { name: /controlar ingreso/i })).toHaveAttribute(
+      'href',
+      '/examenes/9/control-ingreso'
+    )
+  })
+
+  it('no ofrece controlar el ingreso mientras el examen está programado o en curso', async () => {
+    listMyExams.mockResolvedValue([
+      assignedExam,
+      { ...assignedExam, id_examen: 10, estado: 'EN_CURSO' },
+    ])
+
+    renderWithRouter(<MyAssignmentsPage />, { route: '/mis-examenes' })
+
+    await screen.findAllByText('1er Parcial BD I')
+    expect(screen.queryByRole('link', { name: /controlar ingreso/i })).not.toBeInTheDocument()
+  })
+
+  it('un examen de un solo ambiente sin asignación explícita muestra ese ambiente', async () => {
+    listMyExams.mockResolvedValue([{ ...assignedExam, ambiente_por_defecto: true }])
+
+    renderWithRouter(<MyAssignmentsPage />, { route: '/mis-examenes' })
+
+    expect(await screen.findByText('Auditorio FCyT')).toBeVisible()
+    expect(screen.getByText(/el único ambiente de este examen/)).toBeVisible()
+    expect(screen.queryByText(/asignado por el docente/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Aún sin ambiente asignado/)).not.toBeInTheDocument()
+  })
 })
