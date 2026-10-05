@@ -24,7 +24,11 @@ export interface NavItem {
   icon: LucideIcon
   /** Sin `to` el destino aún no existe: el enlace se dibuja deshabilitado. */
   to?: string
-  badge?: number
+  /**
+   * Solo se marca activo con la ruta exacta. Hace falta cuando otro ítem cuelga de la misma ruta
+   * (Materias y Asignar materia del administrador: «/materias» y «/materias/asignar»).
+   */
+  end?: boolean
 }
 
 export interface NavGroup {
@@ -56,7 +60,7 @@ const navegacionDocente: NavGroup[] = [
       { label: 'Programados', icon: CalendarClock, to: '/examenes/programados' },
       { label: 'Control de ingreso', icon: DoorOpen, to: '/control-ingreso' },
       { label: 'En curso', icon: PlaySquare },
-      { label: 'Incidencias', icon: AlertTriangle, badge: 3 },
+      { label: 'Incidencias', icon: AlertTriangle },
       { label: 'Historial', icon: History }
     ]
   },
@@ -96,7 +100,7 @@ const navegacionAdministrador: NavGroup[] = [
     label: 'Administración',
     items: [
       { label: 'Cuentas', icon: Users, to: '/cuentas' },
-      { label: 'Materias', icon: BookOpen, to: '/materias' },
+      { label: 'Materias', icon: BookOpen, to: '/materias', end: true },
       { label: 'Asignar materia', icon: Link2, to: '/materias/asignar' },
       { label: 'Facultades', icon: Building2 },
       { label: 'Ambientes', icon: DoorOpen, to: '/ambientes' },
