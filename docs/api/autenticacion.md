@@ -1,15 +1,30 @@
-# API de autenticación (RNF-02, fase 1)
+# API de autenticación (RNF-02)
 
-Inicio de sesión con **tokens de Sanctum**. En esta fase el login funciona de punta a punta, pero **ninguna ruta existente exige token todavía** y las operaciones siguen atribuidas al usuario fijo (`CurrentUser`). La protección de rutas llega en las fases siguientes.
+Inicio de sesión con **tokens de Sanctum**. **El login es la única ruta pública de la API**: todas las demás exigen `Authorization: Bearer <token>` y, sin él, responden **401** en JSON (aunque el cliente no mande `Accept: application/json`). Cada operación se atribuye a la cuenta autenticada (`CurrentUser`); no existe ya un usuario fijo de respaldo.
 
 Convenciones: prefijo `/api`, JSON, cabecera `Accept: application/json`. Las respuestas correctas llevan `data` (y `mensaje` cuando aplica); los errores llevan `message` y, en los de autenticación, `motivo`. El token viaja en `Authorization: Bearer <token>`.
 
 | Método | Ruta | Autenticación |
 |---|---|---|
-| POST | `/api/auth/login` | No — `throttle:5,1` |
+| POST | `/api/auth/login` | No — `throttle:10,1` |
 | POST | `/api/auth/logout` | Token |
 | GET | `/api/auth/yo` | Token |
 | POST | `/api/auth/confirmar-password` | Token |
+
+## Rutas protegidas y roles
+
+Las rutas de `routes/api/*.php` se cargan dentro de **un solo grupo `auth:sanctum`** (`routes/api.php`); el login se declara fuera de él. `RoutesRequireAuthenticationTest` recorre todas las rutas registradas y falla si alguna queda abierta.
+
+Además del token, cada endpoint comprueba el **rol vigente de una cuenta ACTIVA**. Una cuenta deshabilitada con un token todavía vigente recibe 403:
+
+| Endpoint | Quién puede |
+|---|---|
+| Registrar cuentas, verificar SIS, roles, materias y asignaciones a carreras, ambientes | Administrador activo |
+| Grupos, nómina, exámenes (crear, modificar, cancelar, finalizar, asignar grupos), gestión de auxiliares y sus ambientes | Docente activo (y, además, dueño del grupo o examen) |
+| Control de ingreso | El docente del examen o un auxiliar habilitado (`EntryAccessService`) |
+| `GET /api/auxiliar/examenes` | Cualquier cuenta autenticada; solo devuelve lo que a esa cuenta le habilitaron |
+
+Un Administrador **no** gestiona grupos ni exámenes, y un Docente no administra cuentas: no basta con «no ser auxiliar».
 
 ## Sesión y token
 
@@ -58,7 +73,7 @@ Rechazos. **El contrato es `motivo`, no `message`:** el cliente decide con el c�
 | Cuenta inactiva (con contraseña correcta) | 403 | `cuenta_inactiva` | `Su cuenta está deshabilitada. Contacte al Administrador.` |
 | Sin rol vigente (con contraseña correcta) | 403 | `sin_rol_vigente` | `Su cuenta no tiene un rol vigente. Contacte al Administrador.` |
 | Campos vacíos | 422 | — | errores de validación por campo |
-| Más de 5 intentos por minuto desde la misma IP | 429 | — | `Too Many Attempts.` (sin `motivo`; ver «Límite de intentos») |
+| Más de 10 intentos por minuto desde la misma IP | 429 | — | `Too Many Attempts.` (sin `motivo`; ver «Límite de intentos») |
 
 El estado de la cuenta y su rol solo se revelan cuando la contraseña es correcta.
 
@@ -72,11 +87,11 @@ El estado de la cuenta y su rol solo se revelan cuando la contraseña es correct
 
 ### Límite de intentos (429)
 
-`POST /api/auth/login` admite 5 intentos por minuto y por IP (`throttle:5,1`); el sexto responde 429 con `{ "message": "Too Many Attempts." }` y estas cabeceras:
+`POST /api/auth/login` admite 10 intentos por minuto y por IP (`throttle:10,1`); el undécimo responde 429 con `{ "message": "Too Many Attempts." }` y estas cabeceras:
 
 | Cabecera | Valor |
 |---|---|
-| `Retry-After` | segundos enteros hasta poder reintentar (entre 1 y 60; en las pruebas, `59` al sexto intento inmediato) |
+| `Retry-After` | segundos enteros hasta poder reintentar (entre 1 y 60; en las pruebas, `59` al undécimo intento inmediato) |
 | `X-RateLimit-Limit` | `5` |
 | `X-RateLimit-Remaining` | `0` |
 | `X-RateLimit-Reset` | marca de tiempo Unix en que se libera |

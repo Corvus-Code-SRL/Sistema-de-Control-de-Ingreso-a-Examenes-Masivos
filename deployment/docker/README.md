@@ -171,7 +171,6 @@ DB_USERNAME=postgres
 DB_PASSWORD=sciem_dev
 DB_SSLMODE=prefer
 REDIS_HOST=redis
-SCIEM_DOCENTE_FIJO_ID=00000000-0000-4000-8000-000000000011
 SCIEM_PERIODO_ACTIVO_ID=9303
 ```
 
@@ -197,8 +196,8 @@ $DC logs -f scheduler
 
 Para ver el control de ingreso:
 
-1. Entra a la interfaz con el docente fijo: código SIS **`10452`** y contraseña **`password`** (Marcelo
-   Quiroga; es la cuenta de `SCIEM_DOCENTE_FIJO_ID` y dueña de los exámenes que crea la aplicación). Los
+1. Entra a la interfaz con el docente de prueba: código SIS **`10452`** y contraseña **`password`** (Marcelo
+   Quiroga; dueño de los exámenes que crea con su sesión). Los
    auxiliares sembrados son `201800451` (Daniela Ferrufino) y `201900782` (Iván Choque), con la misma
    contraseña. Las rutas de control de ingreso exigen sesión; no hay usuario de desarrollo implícito.
 2. Crea un examen con grupos que tengan nómina y ambientes con capacidad, y una hora de inicio dentro de

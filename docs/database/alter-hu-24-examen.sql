@@ -48,7 +48,7 @@ ALTER TABLE public.examen
 ---------------------------------------------------
 -- id_usuario_docente es NOT NULL y no hay forma de deducir quién creó los
 -- exámenes existentes. Si la base tiene exámenes de prueba, asígneles un docente
--- descomentando la sentencia siguiente (por ejemplo, el de SCIEM_DOCENTE_FIJO_ID):
+-- descomentando la sentencia siguiente (por ejemplo, el de la cuenta de un docente sembrado):
 --
 -- UPDATE public.examen
 --    SET id_usuario_docente = '00000000-0000-4000-8000-000000000000'
