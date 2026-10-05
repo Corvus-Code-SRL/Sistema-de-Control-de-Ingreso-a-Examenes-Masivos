@@ -1,3 +1,4 @@
+import type { ExamStatus } from '@/features/exams'
 import type { SubjectCareer } from '@/features/subjects'
 import type { ResourceResponse } from '@/types/api.types'
 
@@ -141,4 +142,35 @@ export interface PeriodOption {
   id_periodo: number
   nombre_periodo: string
   gestion: number
+}
+
+
+/** Examen que incluye el grupo: una fila de la pestaña Exámenes del curso. */
+export interface GroupExam {
+  id_examen: number
+  nombre_examen: string
+  /** YYYY-MM-DD, sin zona. */
+  fecha: string
+  hora_inicio: string
+  hora_fin: string | null
+  estado: ExamStatus
+  materia?: { id_materia: number; nombre: string; codigo: string }
+}
+
+/** Examen de ese grupo donde un auxiliar está habilitado. */
+export interface GroupAssistantExam {
+  id_examen: number
+  nombre_examen: string
+  fecha: string
+  estado: ExamStatus
+}
+
+/** Auxiliar incorporado a un grupo: una fila de la pestaña Auxiliares del curso. */
+export interface GroupAssistant {
+  id_usuario: string
+  nombre_completo: string
+  cod_sis: string
+  correo: string
+  fecha_incorporacion: string
+  examenes: GroupAssistantExam[]
 }

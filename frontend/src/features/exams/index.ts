@@ -3,6 +3,7 @@ export * from './pages/CreateExamPage';
 export * from './pages/ExamDetailPage';
 export * from './components/CreateExamContainer';
 export * from './components/ExamForm';
+export * from './components/ExamStatusBadge';
 export * from './hooks/useCreateExam';
 export * from './hooks/useExams';
 export * from './hooks/useExamDetail';

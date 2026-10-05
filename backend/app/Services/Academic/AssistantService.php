@@ -141,6 +141,77 @@ class AssistantService
     }
 
     /**
+     * Auxiliares incorporados (ACTIVOS) a un grupo y los exámenes de ese grupo donde están
+     * habilitados. Solo lectura: añadir y quitar siguen en sus propios métodos.
+     *
+     * Son dos consultas sin importar cuántos auxiliares haya. Los exámenes cancelados no se listan.
+     *
+     * @return array<int, array>
+     */
+    public function listForGroup(Group $group): array
+    {
+        $assistants = DB::table('grupo_auxiliar')
+            ->join('usuario', 'usuario.id_usuario', '=', 'grupo_auxiliar.id_usuario')
+            ->where('grupo_auxiliar.id_grupo', $group->id_grupo)
+            ->where('grupo_auxiliar.estado', RecordStatus::ACTIVE)
+            ->orderBy('usuario.apellido_paterno')
+            ->orderBy('usuario.nombre')
+            ->get([
+                'usuario.id_usuario',
+                'usuario.nombre',
+                'usuario.apellido_paterno',
+                'usuario.apellido_materno',
+                'usuario.cod_sis',
+                'usuario.correo',
+                'grupo_auxiliar.fecha_incorporacion',
+            ]);
+
+        if ($assistants->isEmpty()) {
+            return [];
+        }
+
+        $exams = DB::table('examen_auxiliar')
+            ->join('examen', 'examen.id_examen', '=', 'examen_auxiliar.id_examen')
+            ->join('grupo_examen', 'grupo_examen.id_examen', '=', 'examen.id_examen')
+            ->where('grupo_examen.id_grupo', $group->id_grupo)
+            ->where('examen.estado', '<>', Exam::CANCELADO)
+            ->whereIn('examen_auxiliar.id_usuario', $assistants->pluck('id_usuario')->all())
+            ->orderBy('examen.fecha')
+            ->orderBy('examen.id_examen')
+            ->get([
+                'examen_auxiliar.id_usuario',
+                'examen.id_examen',
+                'examen.nombre_examen',
+                'examen.fecha',
+                'examen.estado',
+            ])
+            ->groupBy('id_usuario');
+
+        return $assistants->map(function ($assistant) use ($exams) {
+            return [
+                'id_usuario' => (string) $assistant->id_usuario,
+                'nombre_completo' => trim(implode(' ', array_filter([
+                    $assistant->nombre,
+                    $assistant->apellido_paterno,
+                    $assistant->apellido_materno,
+                ]))),
+                'cod_sis' => $assistant->cod_sis,
+                'correo' => $assistant->correo,
+                'fecha_incorporacion' => $assistant->fecha_incorporacion,
+                'examenes' => $exams->get($assistant->id_usuario, collect())
+                    ->map(fn ($exam) => [
+                        'id_examen' => (int) $exam->id_examen,
+                        'nombre_examen' => $exam->nombre_examen,
+                        'fecha' => $exam->fecha,
+                        'estado' => $exam->estado,
+                    ])
+                    ->values()
+                    ->all(),
+            ];
+        })->values()->all();
+    }
+
+    /**
      * Grupos del docente en el período activo.
      *
      * Se usa en el frontend para poblar los selectores de "Asignar auxiliar"

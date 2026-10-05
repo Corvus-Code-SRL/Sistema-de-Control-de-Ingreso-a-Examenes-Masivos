@@ -5,8 +5,11 @@ namespace App\Services\Exams;
 use App\Exceptions\Exams\ExamOwnershipException;
 use App\Exceptions\Exams\ExamStateException;
 use App\Models\Exam;
+use App\Models\Group;
 use App\Services\Academic\SubjectCatalogService;
 use App\Support\RecordStatus;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -25,6 +28,38 @@ class ExamGroupService
     public function __construct(SubjectCatalogService $subjectCatalog)
     {
         $this->subjectCatalog = $subjectCatalog;
+    }
+
+    /** Grupo por id para que el Controller pueda autorizarlo con GroupPolicy; 404 si no existe. */
+    public function findGroup(int $groupId): Group
+    {
+        $group = Group::query()->find($groupId);
+
+        if ($group === null) {
+            throw new ModelNotFoundException('No existe el grupo indicado.');
+        }
+
+        return $group;
+    }
+
+    /**
+     * Exámenes que incluyen el grupo, de cualquier estado, del más próximo al más lejano.
+     *
+     * @return EloquentCollection<int, Exam>
+     */
+    public function examsOfGroup(Group $group): EloquentCollection
+    {
+        return Exam::query()
+            ->with(['examType', 'subject', 'career'])
+            ->whereIn('examen.id_examen', function ($query) use ($group) {
+                $query->select('grupo_examen.id_examen')
+                    ->from('grupo_examen')
+                    ->where('grupo_examen.id_grupo', $group->id_grupo);
+            })
+            ->orderBy('fecha')
+            ->orderBy('hora_inicio')
+            ->orderBy('id_examen')
+            ->get();
     }
 
     /**

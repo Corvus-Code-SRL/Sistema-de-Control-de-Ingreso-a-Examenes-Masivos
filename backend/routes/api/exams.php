@@ -3,6 +3,7 @@
 use App\Http\Controllers\Exams\AssistantClassroomController;
 use App\Http\Controllers\Exams\ExamController;
 use App\Http\Controllers\Exams\ExamGroupController;
+use App\Http\Controllers\Exams\GroupExamController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Exams\ClassroomController;
 
@@ -58,6 +59,11 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
          ->whereUuid('user')
          ->name('auxiliares.ambiente');
 });
+
+// HU-029 — exámenes que incluyen un grupo propio (pestaña Exámenes del curso). El id se valida
+// en el Request (como GET /grupos/{id}): uno no numérico o fuera del rango de int4 responde 422.
+Route::get('grupos/{id_grupo}/examenes', [GroupExamController::class, 'index'])
+     ->name('grupos.examenes');
 
 // HU-09 — vista de solo lectura del auxiliar.
 Route::get('auxiliar/examenes', [AssistantClassroomController::class, 'myExams'])

@@ -5,7 +5,12 @@ export { CourseDetailPage } from './pages/CourseDetailPage'
 export { useSubjectGroups } from './hooks/useSubjectGroups'
 export { useMyCourses } from './hooks/useMyCourses'
 export { useGroupDetail } from './hooks/useGroupDetail'
-export { getGroupsByPair, getGroup } from './services/groupsService'
+export {
+  getGroupsByPair,
+  getGroup,
+  getGroupExams,
+  getGroupAssistants,
+} from './services/groupsService'
 export { getMyCourses } from './services/myCoursesService'
 export { hasRoster, groupLabel, courseTitle } from './types/group.types'
 export type {
@@ -13,7 +18,10 @@ export type {
   Group,
   GroupDetail,
   GroupDetailMeta,
+  GroupAssistant,
+  GroupAssistantExam,
   GroupDetailResponse,
+  GroupExam,
   GroupTeacher,
   Period,
   SubjectGroups,
