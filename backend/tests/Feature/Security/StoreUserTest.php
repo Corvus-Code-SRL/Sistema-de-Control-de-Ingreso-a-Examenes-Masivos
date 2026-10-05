@@ -5,15 +5,15 @@ namespace Tests\Feature\Security;
 use App\Models\AuditLog;
 use App\Models\User;
 use App\Services\Security\Contracts\SisGateway;
-use Database\Seeders\ActionSeeder;
-use Database\Seeders\UserSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Mockery;
+use Tests\Concerns\SeedsSecurityAccounts;
 use Tests\TestCase;
 
 class StoreUserTest extends TestCase
 {
     use DatabaseTransactions;
+    use SeedsSecurityAccounts;
 
     private array $datosValidos = [
         'cod_sis'          => '202312345',
@@ -26,8 +26,7 @@ class StoreUserTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(UserSeeder::class);
-        $this->seed(ActionSeeder::class);
+        $this->seedSecurityAccounts();
     }
 
     /** @test */
@@ -47,7 +46,10 @@ class StoreUserTest extends TestCase
         $this->postJson('/api/usuarios', $this->datosValidos)
              ->assertJsonPath('data.rol', null);
 
-        $this->assertDatabaseCount('usuario_rol', 0);
+        $newAccountId = User::where('cod_sis', '202312345')->value('id_usuario');
+
+        $this->assertNotNull($newAccountId);
+        $this->assertDatabaseMissing('usuario_rol', ['id_usuario' => $newAccountId]);
     }
 
         /** @test */

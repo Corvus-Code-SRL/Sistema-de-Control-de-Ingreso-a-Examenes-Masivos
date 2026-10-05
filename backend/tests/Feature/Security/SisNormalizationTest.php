@@ -6,10 +6,9 @@ use App\Models\Student;
 use App\Models\User;
 use App\Services\Academic\Importers\StudentRosterRow;
 use App\Services\Academic\Importers\StudentRosterStudentMapper;
-use Database\Seeders\ActionSeeder;
-use Database\Seeders\UserSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Tests\Concerns\SeedsSecurityAccounts;
 use Tests\TestCase;
 
 /**
@@ -19,11 +18,12 @@ use Tests\TestCase;
 class SisNormalizationTest extends TestCase
 {
     use DatabaseTransactions;
+    use SeedsSecurityAccounts;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed([UserSeeder::class, ActionSeeder::class]);
+        $this->seedSecurityAccounts();
     }
 
     public function test_la_cuenta_se_guarda_con_el_sis_canonico(): void

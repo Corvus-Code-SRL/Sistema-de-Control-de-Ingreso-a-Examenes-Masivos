@@ -290,7 +290,7 @@ class StoreGroupTest extends TestCase
 
         $this->postJson('/api/grupos', $this->payload())
             ->assertForbidden()
-            ->assertJsonPath('message', 'Un auxiliar no puede gestionar grupos.');
+            ->assertJsonPath('message', 'Solo un docente puede gestionar grupos.');
 
         $this->assertSame($antes, Group::count());
     }

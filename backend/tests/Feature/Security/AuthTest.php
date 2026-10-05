@@ -266,9 +266,9 @@ class AuthTest extends TestCase
         $this->postJson('/api/auth/confirmar-password', ['password' => 'password'])->assertStatus(401);
     }
 
-    public function test_el_sexto_intento_fallido_en_un_minuto_se_limita(): void
+    public function test_el_undecimo_intento_fallido_en_un_minuto_se_limita(): void
     {
-        for ($attempt = 1; $attempt <= 5; $attempt++) {
+        for ($attempt = 1; $attempt <= 10; $attempt++) {
             $this->login('10452', 'incorrecta')->assertStatus(401);
         }
 
@@ -277,7 +277,7 @@ class AuthTest extends TestCase
 
     public function test_el_429_trae_retry_after_con_los_segundos_que_faltan(): void
     {
-        for ($attempt = 1; $attempt <= 5; $attempt++) {
+        for ($attempt = 1; $attempt <= 10; $attempt++) {
             $this->login('10452', 'incorrecta')->assertStatus(401);
         }
 
@@ -292,7 +292,7 @@ class AuthTest extends TestCase
 
     public function test_el_navegador_puede_leer_retry_after_entre_origenes(): void
     {
-        for ($attempt = 1; $attempt <= 5; $attempt++) {
+        for ($attempt = 1; $attempt <= 10; $attempt++) {
             $this->login('10452', 'incorrecta');
         }
 
@@ -324,11 +324,15 @@ class AuthTest extends TestCase
         ]);
     }
 
-    public function test_el_login_no_protege_ninguna_ruta_existente(): void
+    public function test_las_rutas_que_antes_estaban_abiertas_ahora_exigen_token(): void
     {
-        // Fase 1: las rutas actuales siguen abiertas y atribuidas al usuario fijo.
-        $this->getJson('/api/periodos')->assertOk();
-        $this->getJson('/api/materias')->assertOk();
+        $this->getJson('/api/periodos')->assertStatus(401);
+        $this->getJson('/api/materias')->assertStatus(401);
+
+        $token = $this->login('10452')->json('data.token');
+
+        $this->asToken($token)->getJson('/api/periodos')->assertOk();
+        $this->asToken($token)->getJson('/api/materias')->assertOk();
     }
 
     /** Cada petición con token resuelve la sesión desde cero, como en producción. */

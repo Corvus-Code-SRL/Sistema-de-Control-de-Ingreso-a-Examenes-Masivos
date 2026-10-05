@@ -3,6 +3,7 @@
 namespace Tests\Unit\Requests;
 
 use App\Http\Requests\Exams\AssignGroupsRequest;
+use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Validator;
 use Tests\Concerns\SeedsAcademicCatalog;
@@ -53,9 +54,13 @@ class AssignGroupsRequestTest extends TestCase
         $this->assertTrue($validator->errors()->has('grupos.0'));
     }
 
-    public function test_autoriza_la_solicitud(): void
+    public function test_autoriza_solo_a_un_docente_activo(): void
     {
-        $this->assertTrue((new AssignGroupsRequest())->authorize());
+        $this->assertTrue(app()->call([new AssignGroupsRequest(), 'authorize']));
+
+        $this->actAsUserId(User::factory()->create()->id_usuario);
+
+        $this->assertFalse(app()->call([new AssignGroupsRequest(), 'authorize']));
     }
 
     private function validator(array $data): \Illuminate\Validation\Validator

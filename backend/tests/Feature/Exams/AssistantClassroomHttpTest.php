@@ -125,9 +125,9 @@ class AssistantClassroomHttpTest extends TestCase
 
     public function test_el_auxiliar_consulta_sus_examenes_con_el_ambiente_asignado(): void
     {
-        $this->actingAs(User::findOrFail($this->mariaId));
         $exam = $this->examWithAssistants(['nombre_examen' => 'Primer parcial', 'hora_inicio' => '08:00']);
         $this->assign($exam, $this->mariaId, $this->otraAulaId);
+        $this->actingAs(User::findOrFail($this->mariaId));
 
         $this->getJson('/api/auxiliar/examenes')
             ->assertOk()
@@ -147,7 +147,7 @@ class AssistantClassroomHttpTest extends TestCase
 
         $this->assign($exam, $this->jorgeId, $this->aulaId)
             ->assertForbidden()
-            ->assertJsonPath('message', 'Un auxiliar no puede asignar ambientes a otros auxiliares.');
+            ->assertJsonPath('message', 'Solo un docente puede asignar ambientes a los auxiliares.');
 
         $this->assertAssignedTo($exam, $this->jorgeId, null);
     }
@@ -164,6 +164,8 @@ class AssistantClassroomHttpTest extends TestCase
 
     public function test_la_consulta_del_auxiliar_sin_sesion_responde_401(): void
     {
+        $this->actAsGuest();
+
         $this->getJson('/api/auxiliar/examenes')->assertUnauthorized();
     }
 

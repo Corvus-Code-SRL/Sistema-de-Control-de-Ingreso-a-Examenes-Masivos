@@ -17,11 +17,13 @@ class SubjectCareerPolicy
         return $this->isAdministrator($user);
     }
 
+    /** Una cuenta INACTIVA no ejerce el rol aunque conserve un token vigente. */
     private function isAdministrator(User $user): bool
     {
         $activeRole = $user->rolActivo();
 
-        return $activeRole !== null
+        return $user->estado === User::ESTADO_ACTIVO
+            && $activeRole !== null
             && $activeRole->nombre_rol === Role::ADMINISTRADOR;
     }
 }

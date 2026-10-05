@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\Academic\SubjectCatalogService;
 use App\Support\RecordStatus;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -50,15 +51,17 @@ class UserRoleService
                 return $previousRole;
             }
 
+            $changedAt = now()->startOfSecond();
+
             if ($previousRole) {
                 DB::table('usuario_rol')
                     ->where('id_usuario', $user->id_usuario)
                     ->where('id_rol', $previousRole->id_rol)
                     ->whereNull('fecha_fin')
-                    ->update(['fecha_fin' => now()]);
+                    ->update(['fecha_fin' => $changedAt]);
             }
 
-            $user->roles()->attach($roleId, ['fecha_inicio' => now()]);
+            $this->openRole($user, $roleId, $changedAt);
 
             // El estado de la cuenta no se toca: asignar rol no habilita una cuenta deshabilitada.
 
@@ -86,27 +89,51 @@ class UserRoleService
         });
     }
 
-    /** ¿La cuenta indicada tiene hoy el rol Administrador? Sin cuenta, nunca. */
-    public function isAdministrator(?string $userId): bool
+    /**
+     * Abre la asignación del rol en $startedAt.
+     *
+     * La clave de usuario_rol incluye fecha_inicio con precisión de segundo: un cambio A→B→A dentro
+     * del mismo segundo volvería a insertar (usuario, A, fecha_inicio) y chocaría con la fila de A
+     * que acaba de cerrarse. Si esa fila ya existe se reabre en lugar de insertar otra.
+     */
+    private function openRole(User $user, int $roleId, Carbon $startedAt): void
     {
-        if ($userId === null) {
-            return false;
-        }
+        $reopened = DB::table('usuario_rol')
+            ->where('id_usuario', $user->id_usuario)
+            ->where('id_rol', $roleId)
+            ->where('fecha_inicio', $startedAt)
+            ->update(['fecha_fin' => null]);
 
-        return User::whereKey($userId)
-            ->whereHas('activeRoles', fn ($query) => $query->where('nombre_rol', Role::ADMINISTRADOR))
-            ->exists();
+        if ($reopened === 0) {
+            $user->roles()->attach($roleId, ['fecha_inicio' => $startedAt]);
+        }
     }
 
-    /** ¿La cuenta indicada tiene hoy el rol Auxiliar? Sin cuenta, nunca. */
-    public function isAssistant(?string $userId): bool
+    /** ¿La cuenta indicada está ACTIVA y tiene hoy el rol Administrador? Sin cuenta, nunca. */
+    public function isAdministrator(?string $userId): bool
+    {
+        return $this->hasActiveRole($userId, Role::ADMINISTRADOR);
+    }
+
+    /** ¿La cuenta indicada está ACTIVA y tiene hoy el rol Docente? Sin cuenta, nunca. */
+    public function isTeacher(?string $userId): bool
+    {
+        return $this->hasActiveRole($userId, Role::DOCENTE);
+    }
+
+    /**
+     * Una cuenta INACTIVA no ejerce su rol aunque conserve un token vigente: el token se emite al
+     * iniciar sesión y la cuenta puede deshabilitarse después.
+     */
+    private function hasActiveRole(?string $userId, string $roleName): bool
     {
         if ($userId === null) {
             return false;
         }
 
         return User::whereKey($userId)
-            ->whereHas('activeRoles', fn ($query) => $query->where('nombre_rol', Role::AUXILIAR))
+            ->activos()
+            ->whereHas('activeRoles', fn ($query) => $query->where('nombre_rol', $roleName))
             ->exists();
     }
 

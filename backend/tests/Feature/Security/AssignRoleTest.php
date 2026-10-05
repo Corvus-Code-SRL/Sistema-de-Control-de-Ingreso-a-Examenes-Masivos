@@ -6,6 +6,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Support\RecordStatus;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\SeedsAcademicCatalog;
@@ -151,6 +152,42 @@ class AssignRoleTest extends TestCase
         ]);
     }
 
+    /**
+     * La clave de usuario_rol incluye fecha_inicio con precisión de segundo: con el reloj
+     * congelado A→B→A cae en un mismo (usuario, rol A, fecha_inicio). Se reabre la fila de A.
+     */
+    public function test_cambiar_a_b_y_volver_a_a_en_el_mismo_segundo_reabre_la_fila_de_a(): void
+    {
+        Carbon::setTestNow('2026-03-01 10:00:00');
+
+        try {
+            $roleA = $this->roleId(Role::DOCENTE);
+            $roleB = $this->roleId(Role::AUXILIAR);
+
+            $this->postJson($this->roleUrl(), ['id_rol' => $roleA])->assertOk();
+            $this->postJson($this->roleUrl(), ['id_rol' => $roleB])->assertOk();
+            $this->postJson($this->roleUrl(), ['id_rol' => $roleA])
+                ->assertOk()
+                ->assertJsonPath('data.nombre_rol', Role::DOCENTE);
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        $this->assertSame(Role::DOCENTE, $this->account->rolActivo()->nombre_rol);
+        $this->assertSame(1, $this->activeRoleCount($this->account));
+
+        // Dos filas: A reabierta y B cerrada; no se insertó una tercera ni se duplicó la clave.
+        $rows = DB::table('usuario_rol')->where('id_usuario', $this->account->id_usuario)->get();
+
+        $this->assertCount(2, $rows);
+        $this->assertNull($rows->firstWhere('id_rol', $roleA)->fecha_fin);
+        $this->assertNotNull($rows->firstWhere('id_rol', $roleB)->fecha_fin);
+
+        // Cada cambio real queda en la bitácora, firmado por el Administrador.
+        $this->assertCount(1, $this->auditEntries('ASIGNAR_ROL'));
+        $this->assertCount(2, $this->auditEntries('MODIFICAR'));
+    }
+
     public function test_el_administrador_no_puede_modificar_su_propio_rol(): void
     {
         $administrator = User::findOrFail($this->administratorId);
@@ -210,6 +247,7 @@ class AssignRoleTest extends TestCase
     public function test_informa_las_asignaciones_activas_de_un_docente(): void
     {
         $this->seedAcademicCatalog();
+        $this->actAsUserId($this->administratorId);
         $teacher = User::findOrFail($this->docenteId);
 
         $examTypeId = DB::table('tipo_examen')->insertGetId([

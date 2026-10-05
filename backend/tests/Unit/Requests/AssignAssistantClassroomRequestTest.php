@@ -3,11 +3,18 @@
 namespace Tests\Unit\Requests;
 
 use App\Http\Requests\Exams\AssignAssistantClassroomRequest;
+use App\Models\Role;
+use App\Models\User;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Validator;
+use Tests\Concerns\SeedsSecurityAccounts;
 use Tests\TestCase;
 
 class AssignAssistantClassroomRequestTest extends TestCase
 {
+    use DatabaseTransactions;
+    use SeedsSecurityAccounts;
+
     private const INVALID_MESSAGE = 'El ambiente seleccionado no es válido.';
 
     public function test_acepta_un_identificador_de_ambiente(): void
@@ -36,9 +43,17 @@ class AssignAssistantClassroomRequestTest extends TestCase
         }
     }
 
-    public function test_autoriza_a_quien_no_es_auxiliar(): void
+    public function test_autoriza_solo_a_un_docente_activo(): void
     {
+        $this->seedSecurityAccounts();
+        $teacher = User::factory()->create();
+        $this->giveRole($teacher, Role::DOCENTE);
+
+        $this->actAs($teacher);
         $this->assertTrue(app()->call([new AssignAssistantClassroomRequest(), 'authorize']));
+
+        $this->actAsUserId($this->administratorId);
+        $this->assertFalse(app()->call([new AssignAssistantClassroomRequest(), 'authorize']));
     }
 
     private function validator(array $data): \Illuminate\Validation\Validator

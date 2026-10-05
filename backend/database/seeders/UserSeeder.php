@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Support\CurrentUser;
 use App\Support\SisCode;
+use App\Support\SystemActor;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -11,15 +11,16 @@ use Illuminate\Support\Facades\Hash;
 class UserSeeder extends Seeder
 {
     /**
-     * Crea la cuenta de prueba usada como "actor" en la bitácora mientras
-     * la autenticación real no exista (Sprint 1). Sin esta fila, cualquier
-     * escritura en la bitácora sin sesión real viola la FK fk_log_usuario,
-     * porque el usuario actual (CurrentUser) apunta a un UUID que antes
-     * no correspondía a ningún usuario insertado.
+     * Crea la cuenta de sistema (SystemActor), la que firma en la bitácora las escrituras sin
+     * sesión (seeders y comandos). Sin esta fila, una escritura de la bitácora sin sesión viola
+     * la FK fk_log_usuario, porque el id de SystemActor no correspondería a ningún usuario.
+     *
+     * Riesgo documentado (Sprint 3): la cuenta queda con SIS 000000000, contraseña `password` y rol
+     * Administrador, así que en un entorno compartido es una puerta de entrada conocida.
      */
     public function run()
     {
-        $id = app(CurrentUser::class)->id();
+        $id = app(SystemActor::class)->id();
 
         if (! $id) {
             return;   // sin UUID configurado, no hay nada que sembrar

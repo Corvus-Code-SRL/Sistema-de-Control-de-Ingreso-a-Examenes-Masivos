@@ -4,19 +4,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Docente fijo
-    |--------------------------------------------------------------------------
-    |
-    | Mientras la autenticación no esté implementada, el docente se resuelve
-    | desde configuración. Corresponde a public.usuario.id_usuario, que es uuid.
-    | Solo lo lee App\Support\CurrentUser (ver docs/architecture/usuario-actual.md).
-    |
-    */
-
-    'docente_fijo_id' => env('SCIEM_DOCENTE_FIJO_ID'),
-
-    /*
-    |--------------------------------------------------------------------------
     | Periodo activo
     |--------------------------------------------------------------------------
     |
@@ -30,14 +17,13 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Usuario de prueba de la bitácora
+    | Cuenta de sistema (seeders y comandos)
     |--------------------------------------------------------------------------
     |
-    | log.id_usuario es NOT NULL y apunta a public.usuario. Sin sesión real,
-    | la bitácora necesita un autor: este uuid lo provee y UserSeeder siembra
-    | la fila correspondiente. Lleva valor por defecto para que la aplicación
-    | funcione sin tocar el .env. Se elimina al implementar la autenticación.
-    | Solo lo lee App\Support\CurrentUser (ver docs/architecture/usuario-actual.md).
+    | log.id_usuario es NOT NULL y apunta a public.usuario. Las escrituras que no
+    | hace ninguna persona con sesión (seeders, comandos) necesitan un autor: este
+    | uuid lo provee y UserSeeder siembra la fila correspondiente. No es un usuario
+    | de la API. Solo lo lee App\Support\SystemActor (ver docs/architecture/usuario-actual.md).
     |
     */
 

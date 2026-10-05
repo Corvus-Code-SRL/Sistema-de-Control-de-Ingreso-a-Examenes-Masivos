@@ -111,7 +111,7 @@ class FinalizeExamTest extends TestCase
 
         $this->postJson($this->url($exam))
             ->assertForbidden()
-            ->assertJsonPath('message', 'Un auxiliar no puede finalizar un examen.');
+            ->assertJsonPath('message', 'Solo un docente puede finalizar un examen.');
 
         $this->assertSame(Exam::EN_INGRESO, $exam->fresh()->estado);
         $this->assertSame(0, AuditLog::query()->where('tabla_afectada', 'examen')->count());

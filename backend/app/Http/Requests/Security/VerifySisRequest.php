@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Requests\Exams;
+namespace App\Http\Requests\Security;
 
 use App\Services\Security\UserRoleService;
 use App\Support\CurrentUser;
@@ -8,21 +8,18 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Finalización manual de un examen (HU-11): solo la hace un docente activo.
- *
- * Aquí solo se valida el rol. Que el examen sea del docente y esté activo lo decide
- * ExamLifecycleService.
+ * Verificación del código SIS antes de registrar una cuenta (HU-001): solo un Administrador activo.
  */
-class FinishExamRequest extends FormRequest
+class VerifySisRequest extends FormRequest
 {
     public function authorize(CurrentUser $currentUser, UserRoleService $roles): bool
     {
-        return $roles->isTeacher($currentUser->id());
+        return $roles->isAdministrator($currentUser->id());
     }
 
     protected function failedAuthorization(): void
     {
-        throw new AuthorizationException('Solo un docente puede finalizar un examen.');
+        throw new AuthorizationException('Solo un Administrador puede verificar códigos SIS.');
     }
 
     public function rules(): array

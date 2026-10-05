@@ -5,10 +5,9 @@ use App\Http\Controllers\EntryControl\StudentEntryController;
 use App\Http\Controllers\EntryControl\StudentVerificationController;
 use Illuminate\Support\Facades\Route;
 
-// Siempre con sesión: el control de ingreso registra QUÉ cuenta verifica cada ingreso,
-// así que no hay usuario de desarrollo implícito. Quién puede controlar cada examen
-// (su docente o un auxiliar habilitado) lo decide EntryAccessService.
-Route::middleware(['auth:sanctum'])->prefix('control-ingreso')->group(function () {
+// El control de ingreso registra QUÉ cuenta verifica cada ingreso. Quién puede controlar cada
+// examen (su docente o un auxiliar habilitado) lo decide EntryAccessService.
+Route::prefix('control-ingreso')->group(function () {
     Route::get('/examenes', [EntryControlStatusController::class, 'openExams'])
         ->name('control-ingreso.examenes.index');
     Route::prefix('examenes/{examen}')->where(['examen' => '[0-9]+'])->group(function () {

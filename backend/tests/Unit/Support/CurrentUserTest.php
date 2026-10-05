@@ -2,43 +2,66 @@
 
 namespace Tests\Unit\Support;
 
+use App\Models\User;
 use App\Support\CurrentUser;
-use Tests\Support\FakeCurrentUser;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class CurrentUserTest extends TestCase
 {
-    public function test_devuelve_los_usuarios_fijos_de_configuracion(): void
+    private const ACCOUNT_ID = '00000000-0000-4000-8000-0000000000b2';
+
+    public function test_sin_sesion_no_hay_usuario_actual(): void
     {
-        config([
-            'sciem.usuario_prueba' => '00000000-0000-4000-8000-0000000000a1',
-            'sciem.docente_fijo_id' => '00000000-0000-4000-8000-0000000000b2',
-        ]);
+        $resolver = $this->app->make(CurrentUser::class);
+
+        $this->assertNull($resolver->id());
+        $this->assertSame('', $resolver->teacherId());
+    }
+
+    public function test_sin_sesion_no_recurre_a_la_cuenta_de_sistema(): void
+    {
+        config(['sciem.usuario_prueba' => '00000000-0000-4000-8000-0000000000a1']);
 
         $resolver = $this->app->make(CurrentUser::class);
 
-        $this->assertSame('00000000-0000-4000-8000-0000000000a1', $resolver->id());
-        $this->assertSame('00000000-0000-4000-8000-0000000000b2', $resolver->teacherId());
+        $this->assertNull($resolver->id());
+        $this->assertSame('', $resolver->teacherId());
     }
 
-    public function test_sin_docente_configurado_devuelve_cadena_vacia(): void
+    /**
+     * Un .env anterior a RNF-02 todavía puede traer SCIEM_DOCENTE_FIJO_ID: la aplicación arranca
+     * igual, la variable ya no figura en la configuración y nadie actúa en nombre de ese docente.
+     */
+    public function test_una_variable_heredada_sciem_docente_fijo_id_no_rompe_ni_se_lee(): void
     {
-        config(['sciem.docente_fijo_id' => null]);
+        $variable = 'SCIEM_DOCENTE_FIJO_ID';
+        $legacyTeacher = '00000000-0000-4000-8000-000000000011';
 
-        $this->assertSame('', $this->app->make(CurrentUser::class)->teacherId());
+        putenv("{$variable}={$legacyTeacher}");
+        $_ENV[$variable] = $_SERVER[$variable] = $legacyTeacher;
+
+        try {
+            $this->refreshApplication();
+
+            $resolver = $this->app->make(CurrentUser::class);
+
+            $this->assertArrayNotHasKey('docente_fijo_id', config('sciem'));
+            $this->assertNull($resolver->id());
+            $this->assertSame('', $resolver->teacherId());
+        } finally {
+            putenv($variable);
+            unset($_ENV[$variable], $_SERVER[$variable]);
+        }
     }
 
-    public function test_las_pruebas_pueden_fijar_quien_actua_sin_tocar_la_configuracion(): void
+    public function test_con_sesion_devuelve_la_cuenta_autenticada(): void
     {
-        config(['sciem.docente_fijo_id' => 'configurado']);
-
-        $this->actAsTeacher('docente-de-la-prueba');
-        $this->actAsUserId('cuenta-de-la-prueba');
+        Sanctum::actingAs(new User(['id_usuario' => self::ACCOUNT_ID]));
 
         $resolver = $this->app->make(CurrentUser::class);
 
-        $this->assertInstanceOf(FakeCurrentUser::class, $resolver);
-        $this->assertSame('docente-de-la-prueba', $resolver->teacherId());
-        $this->assertSame('cuenta-de-la-prueba', $resolver->id());
+        $this->assertSame(self::ACCOUNT_ID, $resolver->id());
+        $this->assertSame(self::ACCOUNT_ID, $resolver->teacherId());
     }
 }

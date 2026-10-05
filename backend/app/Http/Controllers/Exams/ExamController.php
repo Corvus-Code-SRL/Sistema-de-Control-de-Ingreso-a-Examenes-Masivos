@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Exams;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Exams\CancelExamRequest;
 use App\Http\Requests\Exams\CreateExamRequest;
 use App\Http\Requests\Exams\FinishExamRequest;
 use App\Http\Requests\Exams\UpdateExamRequest;
@@ -77,7 +78,7 @@ class ExamController extends Controller
     }
 
     /** POST /api/examenes/{exam}/cancelar */
-    public function cancel(Exam $exam): JsonResponse
+    public function cancel(CancelExamRequest $request, Exam $exam): JsonResponse
     {
         $exam = $this->examService->cancel($exam, $this->currentUser->teacherId());
 

@@ -10,25 +10,26 @@ class SubjectPolicy
 {
     public function viewAny(User $user): bool
     {
-        $activeRole = $user->rolActivo();
-
-        return $activeRole !== null
-            && $activeRole->nombre_rol === Role::ADMINISTRADOR;
+        return $this->isAdministrator($user);
     }
 
     public function create(User $user): bool
     {
-        $activeRole = $user->rolActivo();
-
-        return $activeRole !== null
-            && $activeRole->nombre_rol === Role::ADMINISTRADOR;
+        return $this->isAdministrator($user);
     }
 
     public function update(User $user, Subject $subject): bool
     {
+        return $this->isAdministrator($user);
+    }
+
+    /** Una cuenta INACTIVA no ejerce el rol aunque conserve un token vigente. */
+    private function isAdministrator(User $user): bool
+    {
         $activeRole = $user->rolActivo();
 
-        return $activeRole !== null
+        return $user->estado === User::ESTADO_ACTIVO
+            && $activeRole !== null
             && $activeRole->nombre_rol === Role::ADMINISTRADOR;
     }
 }

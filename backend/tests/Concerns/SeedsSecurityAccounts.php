@@ -4,7 +4,7 @@ namespace Tests\Concerns;
 
 use App\Models\Role;
 use App\Models\User;
-use App\Support\CurrentUser;
+use App\Support\SystemActor;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\AdministratorAccountSeeder;
 use Database\Seeders\RoleSeeder;
@@ -14,8 +14,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * Catálogo de roles y cuenta administradora para las pruebas de Security.
  *
- * La cuenta de CurrentUser::id() actúa como el Administrador que ejecuta las
- * operaciones, igual que en desarrollo mientras no haya sesión real.
+ * Los seeders crean la cuenta de SystemActor con rol Administrador y la prueba actúa como ella
+ * (Sanctum::actingAs). Para actuar como otra cuenta, actAs().
  */
 trait SeedsSecurityAccounts
 {
@@ -30,7 +30,8 @@ trait SeedsSecurityAccounts
             AdministratorAccountSeeder::class,
         ]);
 
-        $this->administratorId = (string) app(CurrentUser::class)->id();
+        $this->administratorId = (string) app(SystemActor::class)->id();
+        $this->actAsUserId($this->administratorId);
     }
 
     protected function roleId(string $roleName): int
@@ -46,6 +47,18 @@ trait SeedsSecurityAccounts
             'id_rol'       => $this->roleId($roleName),
             'fecha_inicio' => $since,
         ]);
+    }
+
+    /** Cuenta nueva (contraseña `password`), con el rol indicado si se da; la cuenta es ACTIVA salvo que se pida otra. */
+    protected function createAccount(?string $roleName = null, string $status = User::ESTADO_ACTIVO): User
+    {
+        $user = User::factory()->create(['estado' => $status]);
+
+        if ($roleName !== null) {
+            $this->giveRole($user, $roleName);
+        }
+
+        return $user;
     }
 
     /** Hace que la operación la ejecute otra cuenta distinta del Administrador. */

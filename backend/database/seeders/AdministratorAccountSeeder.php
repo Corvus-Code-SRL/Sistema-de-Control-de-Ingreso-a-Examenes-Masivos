@@ -3,22 +3,22 @@
 namespace Database\Seeders;
 
 use App\Models\Role;
-use App\Support\CurrentUser;
+use App\Support\SystemActor;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 class AdministratorAccountSeeder extends Seeder
 {
     /**
-     * Da el rol Administrador a la cuenta del usuario actual (CurrentUser).
+     * Da el rol Administrador a la cuenta de sistema (SystemActor).
      *
-     * Sin autenticación real esa cuenta es quien ejecuta las operaciones, y la
-     * gestión de roles exige que sea Administrador. Si ya tiene un rol vigente
-     * no se toca. Requiere haber ejecutado antes UserSeeder y RoleSeeder.
+     * Es la cuenta que firma las escrituras sin sesión y, al tener contraseña, también sirve para
+     * ingresar en desarrollo; la gestión de roles exige que sea Administrador. Si ya tiene un rol
+     * vigente no se toca. Requiere haber ejecutado antes UserSeeder y RoleSeeder.
      */
     public function run()
     {
-        $userId = app(CurrentUser::class)->id();
+        $userId = app(SystemActor::class)->id();
         $roleId = DB::table('rol')->where('nombre_rol', Role::ADMINISTRADOR)->value('id_rol');
 
         if (! $userId || ! $roleId || ! DB::table('usuario')->where('id_usuario', $userId)->exists()) {
