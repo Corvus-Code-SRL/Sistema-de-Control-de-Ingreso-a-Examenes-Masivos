@@ -16,7 +16,12 @@ function stub() {
   return mockApiWith((request) => {
     const careerId = new URL(request.url).searchParams.get('id_carrera')
 
-    return { body: { data: careerId ? pairs.filter((pair) => String(pair.id_carrera) === careerId) : pairs } }
+    return {
+      body: {
+        data: careerId ? pairs.filter((pair) => String(pair.id_carrera) === careerId) : pairs,
+        meta: { carreras: [civil, sistemas] },
+      },
+    }
   })
 }
 
@@ -29,6 +34,7 @@ describe('useSubjectCareerAssignments', () => {
     await waitFor(() => expect(result.current.status).toBe('success'))
 
     expect(result.current.assignments).toEqual(pairs)
+    expect(result.current.careers).toEqual([civil, sistemas])
     expect(api.calls[0].url).toContain('/administracion/asignaciones')
     expect(api.calls[0].url).not.toContain('id_carrera')
   })
@@ -46,6 +52,7 @@ describe('useSubjectCareerAssignments', () => {
 
     expect(result.current.assignments).toEqual([])
     expect(result.current.status).toBe('loading')
+    expect(result.current.careers).toEqual([civil, sistemas])
 
     await waitFor(() => expect(result.current.status).toBe('success'))
     expect(result.current.assignments).toEqual([pairs[1]])
@@ -72,6 +79,7 @@ describe('useSubjectCareerAssignments', () => {
     await waitFor(() => expect(result.current.status).toBe('error'))
 
     expect(result.current.assignments).toEqual([])
+    expect(result.current.careers).toEqual([])
     expect(result.current.error?.status).toBe(500)
   })
 })

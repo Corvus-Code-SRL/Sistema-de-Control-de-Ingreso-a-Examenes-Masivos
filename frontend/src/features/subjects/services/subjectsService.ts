@@ -4,10 +4,10 @@ import type {
   AdminCareersResponse,
   AdminSubjectSummary,
   AssignableSubjectsResponse,
-  SubjectCareerAssignment,
   SubjectCareerAssignmentPayload,
   SubjectCareerAssignmentResponse,
   SubjectCareerAssignmentsResponse,
+  SubjectCareerAssignmentsResult,
   SubjectCatalogPage,
   SubjectCatalogResponse,
 } from '../types/subject.types'
@@ -135,16 +135,17 @@ export async function assignSubjectToCareer(
 
 /**
  * Pares materia-carrera de cualquier estado, ordenados por carrera y materia.
- * Con `careerId` solo trae los de esa carrera.
+ * Con `careerId` el servidor solo devuelve los de esa carrera; `careers` siempre trae
+ * todas las que tienen pares, para armar el selector.
  */
 export async function getSubjectCareerAssignments(
   careerId: number | null = null,
   signal?: AbortSignal
-): Promise<SubjectCareerAssignment[]> {
+): Promise<SubjectCareerAssignmentsResult> {
   const response = await apiClient<SubjectCareerAssignmentsResponse>(
     '/administracion/asignaciones',
     { query: { id_carrera: careerId ?? undefined }, signal }
   )
 
-  return response.data
+  return { assignments: response.data, careers: response.meta.carreras }
 }

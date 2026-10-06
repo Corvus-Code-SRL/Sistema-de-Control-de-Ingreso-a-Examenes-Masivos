@@ -104,4 +104,12 @@ export interface AssignableSubjectsResponse {
 
 export interface SubjectCareerAssignmentsResponse {
   data: SubjectCareerAssignment[]
+  /** `carreras`: las que tienen al menos un par, por nombre, sin importar el filtro pedido. */
+  meta: { carreras: Career[] }
+}
+
+/** Pares de la lista más las carreras que alimentan su selector. */
+export interface SubjectCareerAssignmentsResult {
+  assignments: SubjectCareerAssignment[]
+  careers: Career[]
 }
