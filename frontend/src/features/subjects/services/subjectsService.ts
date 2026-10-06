@@ -4,6 +4,7 @@ import type {
   AdminCareersResponse,
   AdminSubjectSummary,
   AssignableSubjectsResponse,
+  SubjectCareerAssignment,
   SubjectCareerAssignmentPayload,
   SubjectCareerAssignmentResponse,
   SubjectCareerAssignmentsResponse,
