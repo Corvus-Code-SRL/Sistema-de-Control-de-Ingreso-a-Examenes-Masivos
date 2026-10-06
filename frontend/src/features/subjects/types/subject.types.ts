@@ -59,17 +59,14 @@ export function subjectCareerKey(pair: Pick<SubjectCareer, 'id_carrera' | 'id_ma
   return `${pair.id_carrera}-${pair.id_materia}`
 }
 
-// HU-007 (Editar Materia)
+// HU-006 (catálogo de solo lectura y asignaciones)
 
+/** Fila del catálogo administrativo: código, nombre y estado. */
 export interface AdminSubjectSummary {
   id_materia: number
   nombre: string
   codigo: string
-}
-
-export interface UpdateSubjectPayload {
-  nombre: string
-  codigo: string
+  estado: string
 }
 
 export interface SubjectData {
@@ -105,13 +102,6 @@ export interface AssignableSubjectsResponse {
   data: SubjectData[]
 }
 
-export interface UpdateSubjectResponse {
-  data: SubjectData
-  mensaje: string
-}
-
-export interface UpdateSubjectFormErrors {
-  global?: string
-  nombre?: string
-  codigo?: string
+export interface SubjectCareerAssignmentsResponse {
+  data: SubjectCareerAssignment[]
 }

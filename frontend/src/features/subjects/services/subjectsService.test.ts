@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   assignSubjectToCareer,
-  actualizarMateria,
   getAdminCareers,
   getAdminSubjects,
   getAssignableSubjects,
+  getSubjectCareerAssignments,
   getSubjectCatalog,
 } from './subjectsService'
 import { makeSubject, subjectCatalogResponse } from '@/test/fixtures'
@@ -113,6 +113,58 @@ describe('getAdminSubjects', () => {
         codigo: '2008058',
       },
     ])
+    expect(String(url)).not.toContain('q=')
+  })
+
+  it('envía el término de búsqueda sin espacios sobrantes', async () => {
+    mockApiOnce({ body: { data: [] } })
+
+    await getAdminSubjects('  cálculo  ')
+
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+
+    expect(new URL(String(url)).searchParams.get('q')).toBe('cálculo')
+  })
+
+  it('una búsqueda vacía no envía el parámetro q', async () => {
+    mockApiOnce({ body: { data: [] } })
+
+    await getAdminSubjects('   ')
+
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+
+    expect(String(url)).not.toContain('q=')
+  })
+})
+
+describe('getSubjectCareerAssignments', () => {
+  const pair = {
+    id_carrera: 3,
+    id_materia: 10,
+    estado: 'ACTIVO',
+    carrera: { id_carrera: 3, nombre: 'Ingenieria de Sistemas', codigo: 'SIS', id_facultad: 1 },
+    materia: { id_materia: 10, nombre: 'Redes', codigo: '2008001', descripcion: null, estado: 'ACTIVO' },
+  }
+
+  it('consulta todos los pares sin filtro', async () => {
+    mockApiOnce({ body: { data: [pair] } })
+
+    await expect(getSubjectCareerAssignments()).resolves.toEqual([pair])
+
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+
+    expect(String(url)).toContain('/administracion/asignaciones')
+    expect(String(url)).not.toContain('id_carrera')
+  })
+
+  it('filtra por carrera con id_carrera', async () => {
+    mockApiOnce({ body: { data: [pair] } })
+
+    await getSubjectCareerAssignments(3)
+
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+
+    expect(new URL(String(url)).searchParams.get('id_carrera')).toBe('3')
   })
 })
 
@@ -246,63 +298,6 @@ describe('assignSubjectToCareer', () => {
         id_materia: [
           'La materia ya está asignada a la carrera seleccionada.',
         ],
-      },
-    })
-  })
-})
-
-describe('actualizarMateria', () => {
-  it('envia nombre y codigo por PUT a la materia indicada', async () => {
-    mockApiOnce({
-      body: {
-        data: {
-          id_materia: 10,
-          nombre: 'Bases de Datos II',
-          codigo: '2008058',
-          descripcion: null,
-          estado: 'ACTIVO',
-        },
-        mensaje: 'Materia actualizada correctamente.',
-      },
-    })
-
-    await actualizarMateria(10, {
-      nombre: 'Bases de Datos II',
-      codigo: '2008058',
-    })
-
-    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-
-    expect(String(url)).toContain('/materias/10')
-    expect(init.method).toBe('PUT')
-    expect(init.body).toBe(
-      JSON.stringify({
-        nombre: 'Bases de Datos II',
-        codigo: '2008058',
-      })
-    )
-  })
-
-  it('conserva los errores por campo cuando el backend responde 422', async () => {
-    mockApiOnce({
-      status: 422,
-      body: {
-        message: 'The given data was invalid.',
-        errors: {
-          codigo: ['Ya existe una materia registrada con el código 2008058.'],
-        },
-      },
-    })
-
-    await expect(
-      actualizarMateria(10, {
-        nombre: 'Bases de Datos II',
-        codigo: '2008058',
-      })
-    ).rejects.toMatchObject({
-      status: 422,
-      errors: {
-        codigo: ['Ya existe una materia registrada con el código 2008058.'],
       },
     })
   })

@@ -4,14 +4,16 @@ import { getAdminSubjects } from '../services/subjectsService'
 import type { AdminSubjectSummary } from '../types/subject.types'
 
 /**
- * Catálogo institucional visto desde Administración.
+ * Catálogo institucional visto desde Administración (solo lectura).
  *
  * Cada materia aparece una sola vez, aunque esté asociada a varias carreras.
+ * `search` filtra por código o nombre en el servidor; quien llama decide cuándo
+ * lanzarla (por ejemplo, tras un debounce).
  */
-export function useAdminSubjects() {
+export function useAdminSubjects(search = '') {
   const resource = useAsyncResource<AdminSubjectSummary[]>(
-    useCallback((signal) => getAdminSubjects(signal), []),
-    []
+    useCallback((signal) => getAdminSubjects(search, signal), [search]),
+    [search]
   )
 
   return {

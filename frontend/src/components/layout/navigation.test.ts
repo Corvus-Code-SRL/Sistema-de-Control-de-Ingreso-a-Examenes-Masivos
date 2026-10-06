@@ -30,10 +30,12 @@ describe('navigationByArea', () => {
     expect(incidencias?.to).toBeUndefined()
   })
 
-  it('Materias del administrador solo se activa con la ruta exacta', () => {
+  it('el administrador tiene una sola entrada Materias y ninguna de Asignar materia', () => {
     const items = navigationByArea.administrador.flatMap((group) => group.items)
 
-    expect(items.find((item) => item.label === 'Materias')).toMatchObject({ to: '/materias', end: true })
-    expect(items.find((item) => item.label === 'Asignar materia')).toMatchObject({ to: '/materias/asignar' })
+    expect(items.filter((item) => item.label === 'Materias')).toHaveLength(1)
+    expect(items.find((item) => item.label === 'Materias')).toMatchObject({ to: '/materias' })
+    expect(items.find((item) => item.label === 'Asignar materia')).toBeUndefined()
+    expect(items.some((item) => item.to === '/materias/asignar')).toBe(false)
   })
 })

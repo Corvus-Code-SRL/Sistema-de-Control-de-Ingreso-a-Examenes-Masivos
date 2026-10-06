@@ -34,12 +34,18 @@ import {
 import { useAdminCareers } from '../hooks/useAdminCareers'
 import { useAssignableSubjects } from '../hooks/useAssignableSubjects'
 import { useSubjectCareerAssignment } from '../hooks/useSubjectCareerAssignment'
+import type { SubjectCareerAssignment } from '../types/subject.types'
+
+interface SubjectCareerAssignmentFormProps {
+  /** Se llama tras una asignación confirmada con éxito, para que la vista refresque su lista. */
+  onAssigned?: (assignment: SubjectCareerAssignment) => void
+}
 
 /**
  * Formulario administrativo para vincular una materia existente
  * del catálogo institucional con una carrera activa.
  */
-export function SubjectCareerAssignmentForm() {
+export function SubjectCareerAssignmentForm({ onAssigned }: SubjectCareerAssignmentFormProps) {
   const [careerId, setCareerId] = useState<number | null>(null)
   const [subjectId, setSubjectId] = useState<number | null>(null)
   const [confirmationOpen, setConfirmationOpen] = useState(false)
@@ -121,6 +127,7 @@ export function SubjectCareerAssignmentForm() {
 
     assignment.reset()
     reloadSubjects()
+    onAssigned?.(created)
   }
 
   const handleDialogChange = (open: boolean) => {

@@ -63,57 +63,63 @@ describe('AppRouter — acceso a /ambientes por área', () => {
   })
 })
 
-describe('AppRouter — asignación de materias a carreras', () => {
+describe('AppRouter — materias del administrador', () => {
   afterEach(() => {
     window.localStorage.clear()
   })
 
-  it('un Administrador entra a la asignación de materias', async () => {
+  it('un Administrador entra a Materias y abre en la pestaña Catálogo', async () => {
+    stubBackend('administrador')
+
+    const app = renderApp('/materias')
+
+    expect(await screen.findByRole('tab', { name: 'Catálogo' })).toHaveAttribute('aria-selected', 'true')
+    expect(app.pathname).toBe('/materias')
+  })
+
+  it('/materias/asignar redirige a la pestaña Asignaciones', async () => {
     stubBackend('administrador')
 
     const app = renderApp('/materias/asignar')
 
-    expect(
-      await screen.findByRole('heading', {
-        name: 'Asignar materia a carrera',
-      })
-    ).toBeInTheDocument()
-
-    expect(app.pathname).toBe('/materias/asignar')
+    await waitFor(() => expect(app.pathname).toBe('/materias'))
+    expect(await screen.findByRole('tab', { name: 'Asignaciones' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Catálogo' })).toHaveAttribute('aria-selected', 'false')
   })
 
-  it('el Administrador tiene acceso a la asignación desde su navegación', async () => {
+  it('la navegación del Administrador solo enlaza Materias a /materias', async () => {
     stubBackend('administrador')
 
     renderApp('/materias/asignar')
 
-    await screen.findByRole('heading', {
-      name: 'Asignar materia a carrera',
-    })
+    await screen.findByRole('tab', { name: 'Asignaciones' })
 
-    const links = screen.getAllByRole('link', {
-      name: 'Asignar materia',
-    })
+    const hrefs = screen
+      .getAllByRole('link', { name: 'Materias' })
+      .map((link) => link.getAttribute('href'))
+      .filter((href) => href !== null)
 
-    expect(
-      links.some(
-        (link) => link.getAttribute('href') === '/materias/asignar'
-      )
-    ).toBe(true)
+    expect(new Set(hrefs)).toEqual(new Set(['/materias']))
+    expect(screen.queryByRole('link', { name: 'Asignar materia' })).not.toBeInTheDocument()
   })
 
-  it('un Docente no puede entrar a la asignación administrativa', async () => {
+  it('la edición de materias ya no tiene ruta: /materias/:id/editar cae en la home del área', async () => {
+    stubBackend('administrador')
+
+    const app = renderApp('/materias/10/editar')
+
+    await waitFor(() => expect(app.pathname).toBe('/cuentas'))
+    expect(screen.queryByRole('heading', { name: 'Editar materia' })).not.toBeInTheDocument()
+  })
+
+  it('un Docente que navega a /materias/asignar vuelve a su lista de materias', async () => {
     stubBackend('docente')
 
     const app = renderApp('/materias/asignar')
 
     await waitFor(() => expect(app.pathname).toBe('/materias'))
 
-    expect(
-      screen.queryByRole('heading', {
-        name: 'Asignar materia a carrera',
-      })
-    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Asignaciones' })).not.toBeInTheDocument()
   })
 })
 

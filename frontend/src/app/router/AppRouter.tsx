@@ -17,8 +17,6 @@ import { CourseDetailPage, MyCoursesPage, SubjectGroupsPage } from '@/features/g
 import { ClassroomsPage } from '@/features/classrooms'
 import {
   AdminSubjectsPage,
-  EditarMateriaPage,
-  SubjectCareerAssignmentPage,
   SubjectsPage,
 } from '@/features/subjects'
 import { CuentaDetallePage, CuentasPage } from '@/features/users'
@@ -106,11 +104,7 @@ function AdministradorRoutes() {
       />
       <Route
         path="/materias/asignar"
-        element={guarded('administracion.gestionar', <SubjectCareerAssignmentPage />)}
-      />
-      <Route
-        path="/materias/:idMateria/editar"
-        element={guarded('administracion.gestionar', <EditarMateriaPage />)}
+        element={<Navigate to="/materias?tab=asignaciones" replace />}
       />
 
       <Route path="*" element={<Navigate to="/cuentas" replace />} />
