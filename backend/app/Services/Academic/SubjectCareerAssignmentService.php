@@ -42,6 +42,27 @@ class SubjectCareerAssignmentService
             ->get();
     }
 
+    /**
+     * Pares materia-carrera de cualquier estado, ordenados por carrera y materia. La carrera y la
+     * materia viajan con un join y se cargan en dos consultas fijas, sin importar cuántos pares haya.
+     */
+    public function listAssignments(?int $careerId = null): Collection
+    {
+        return SubjectCareer::query()
+            ->join('carrera', 'carrera.id_carrera', '=', 'materia_carrera.id_carrera')
+            ->join('materia', 'materia.id_materia', '=', 'materia_carrera.id_materia')
+            ->select('materia_carrera.*')
+            ->when(
+                $careerId !== null,
+                fn ($query) => $query->where('materia_carrera.id_carrera', $careerId)
+            )
+            ->with(['career', 'subject'])
+            ->orderBy('carrera.nombre')
+            ->orderBy('materia.nombre')
+            ->orderBy('materia_carrera.id_materia')
+            ->get();
+    }
+
     public function assign(Career $career, int $subjectId, string $actorId): SubjectCareer
     {
         return DB::transaction(function () use ($career, $subjectId, $actorId) {

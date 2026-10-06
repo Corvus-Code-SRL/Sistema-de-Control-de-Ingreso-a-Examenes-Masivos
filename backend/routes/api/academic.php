@@ -48,6 +48,12 @@ Route::prefix('administracion')
             [SubjectCareerAssignmentController::class, 'store']
         )
             ->where('career', '[0-9]{1,9}');
+
+        // El filtro id_carrera es un query param: lo valida ListSubjectCareerAssignmentsRequest.
+        Route::get(
+            'asignaciones',
+            [SubjectCareerAssignmentController::class, 'index']
+        );
     });
 
 Route::get('grupos/{id_grupo}', [GroupController::class, 'show']);

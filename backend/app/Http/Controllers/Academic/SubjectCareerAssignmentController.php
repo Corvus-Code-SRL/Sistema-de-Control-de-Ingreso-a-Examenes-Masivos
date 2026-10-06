@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Academic;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Academic\ListSubjectCareerAssignmentsRequest;
 use App\Http\Requests\Academic\StoreSubjectCareerRequest;
 use App\Http\Resources\Academic\CareerResource;
 use App\Http\Resources\Academic\SubjectCareerAssignmentResource;
@@ -43,6 +44,15 @@ class SubjectCareerAssignmentController extends Controller
 
         return SubjectResource::collection(
             $this->service->listAssignableSubjects($career)
+        );
+    }
+
+    public function index(ListSubjectCareerAssignmentsRequest $request): AnonymousResourceCollection
+    {
+        $careerId = $request->validated()['id_carrera'] ?? null;
+
+        return SubjectCareerAssignmentResource::collection(
+            $this->service->listAssignments($careerId === null ? null : (int) $careerId)
         );
     }
 
