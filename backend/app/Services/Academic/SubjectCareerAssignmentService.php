@@ -63,6 +63,19 @@ class SubjectCareerAssignmentService
             ->get();
     }
 
+    /**
+     * Carreras con al menos un par, activas o no, por nombre. No depende del filtro de la lista:
+     * alimenta el selector de carreras de la pestaña Asignaciones.
+     */
+    public function listAssignedCareers(): Collection
+    {
+        return Career::query()
+            ->whereIn('id_carrera', SubjectCareer::query()->select('id_carrera'))
+            ->orderBy('nombre')
+            ->orderBy('id_carrera')
+            ->get();
+    }
+
     public function assign(Career $career, int $subjectId, string $actorId): SubjectCareer
     {
         return DB::transaction(function () use ($career, $subjectId, $actorId) {

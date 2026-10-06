@@ -160,6 +160,98 @@ class SubjectCareerAssignmentListTest extends TestCase
             ->assertJsonCount(0, 'data');
     }
 
+    public function test_meta_carreras_lista_solo_las_carreras_con_pares_ordenadas_por_nombre(): void
+    {
+        $systems = $this->career('Ingenieria de Sistemas', 'SIS');
+        $civil = $this->career('Ingenieria Civil', 'CIV');
+        $this->career('Carrera Sin Pares', 'VAC');
+        $this->pair($systems, 'Redes', '2008010');
+        $this->pair($systems, 'Algebra', '2008011');
+        $this->pair($civil, 'Topografia', '2008012');
+
+        $this->actAsAdministrator();
+
+        $careers = $this->getJson(self::URL)->assertOk()->json('meta.carreras');
+
+        $this->assertSame(
+            ['Ingenieria Civil', 'Ingenieria de Sistemas'],
+            array_column($careers, 'nombre')
+        );
+        $this->assertSame([$civil->id_carrera, $systems->id_carrera], array_column($careers, 'id_carrera'));
+        $this->assertSame(['id_carrera', 'nombre', 'codigo', 'id_facultad'], array_keys($careers[0]));
+    }
+
+    public function test_meta_carreras_incluye_carreras_inactivas_que_tienen_pares(): void
+    {
+        $archived = $this->career('Carrera Archivada', 'ARC', RecordStatus::INACTIVE);
+        $this->pair($archived, 'Historia', '2008020');
+
+        $this->actAsAdministrator();
+
+        $this->assertSame(
+            [$archived->id_carrera],
+            array_column($this->getJson(self::URL)->assertOk()->json('meta.carreras'), 'id_carrera')
+        );
+    }
+
+    public function test_meta_carreras_no_depende_del_filtro_de_la_lista(): void
+    {
+        $systems = $this->career('Ingenieria de Sistemas', 'SIS');
+        $civil = $this->career('Ingenieria Civil', 'CIV');
+        $this->pair($systems, 'Redes', '2008010');
+        $this->pair($civil, 'Topografia', '2008012');
+
+        $this->actAsAdministrator();
+
+        $unfiltered = $this->getJson(self::URL)->assertOk()->json('meta.carreras');
+        $filtered = $this->getJson(self::URL . '?id_carrera=' . $civil->id_carrera)
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->json('meta.carreras');
+
+        $this->assertCount(2, $unfiltered);
+        $this->assertSame($unfiltered, $filtered);
+    }
+
+    public function test_meta_carreras_con_un_filtro_sin_pares_sigue_completa(): void
+    {
+        $systems = $this->career('Ingenieria de Sistemas', 'SIS');
+        $empty = $this->career('Carrera Nueva', 'NEW');
+        $this->pair($systems, 'Redes', '2008010');
+
+        $this->actAsAdministrator();
+
+        $this->getJson(self::URL . '?id_carrera=' . $empty->id_carrera)
+            ->assertOk()
+            ->assertJsonCount(0, 'data')
+            ->assertJsonCount(1, 'meta.carreras')
+            ->assertJsonPath('meta.carreras.0.id_carrera', $systems->id_carrera);
+    }
+
+    public function test_meta_carreras_es_una_lista_vacia_sin_pares(): void
+    {
+        $this->career('Carrera Nueva', 'NEW');
+
+        $this->actAsAdministrator();
+
+        $this->getJson(self::URL)
+            ->assertOk()
+            ->assertJsonPath('data', [])
+            ->assertJsonPath('meta.carreras', []);
+    }
+
+    public function test_meta_carreras_no_se_entrega_a_docente_ni_auxiliar(): void
+    {
+        $career = $this->career('Ingenieria de Sistemas', 'SIS');
+        $this->pair($career, 'Redes', '2008010');
+
+        foreach ([Role::DOCENTE, Role::AUXILIAR] as $roleName) {
+            $this->actingAs($this->accountWithRole($roleName));
+
+            $this->assertNull($this->getJson(self::URL)->assertForbidden()->json('meta'));
+        }
+    }
+
     public function test_el_numero_de_consultas_no_crece_con_la_cantidad_de_pares(): void
     {
         $systems = $this->career('Ingenieria de Sistemas', 'SIS');

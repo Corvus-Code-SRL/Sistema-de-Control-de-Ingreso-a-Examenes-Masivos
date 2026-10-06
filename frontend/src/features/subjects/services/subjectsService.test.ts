@@ -147,9 +147,12 @@ describe('getSubjectCareerAssignments', () => {
   }
 
   it('consulta todos los pares sin filtro', async () => {
-    mockApiOnce({ body: { data: [pair] } })
+    mockApiOnce({ body: { data: [pair], meta: { carreras: [pair.carrera] } } })
 
-    await expect(getSubjectCareerAssignments()).resolves.toEqual([pair])
+    await expect(getSubjectCareerAssignments()).resolves.toEqual({
+      assignments: [pair],
+      careers: [pair.carrera],
+    })
 
     const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
 
@@ -158,7 +161,7 @@ describe('getSubjectCareerAssignments', () => {
   })
 
   it('filtra por carrera con id_carrera', async () => {
-    mockApiOnce({ body: { data: [pair] } })
+    mockApiOnce({ body: { data: [pair], meta: { carreras: [pair.carrera] } } })
 
     await getSubjectCareerAssignments(3)
 
