@@ -1,15 +1,15 @@
-import { apiClient, apiPost, apiPut } from '@/lib/api-client'
+import { apiClient, apiPost } from '@/lib/api-client'
 import type { PageRequest } from '@/types/api.types'
 import type {
   AdminCareersResponse,
   AdminSubjectSummary,
   AssignableSubjectsResponse,
+  SubjectCareerAssignment,
   SubjectCareerAssignmentPayload,
   SubjectCareerAssignmentResponse,
+  SubjectCareerAssignmentsResponse,
   SubjectCatalogPage,
   SubjectCatalogResponse,
-  UpdateSubjectPayload,
-  UpdateSubjectResponse,
 } from '../types/subject.types'
 
 export const DEFAULT_PER_PAGE = 8
@@ -65,17 +65,21 @@ function toPage(
 }
 
 /**
- * Catálogo institucional de materias para Administración.
+ * Catálogo institucional de materias para Administración (solo lectura).
  *
  * El backend consulta directamente `materia`, por lo que cada materia aparece
- * una sola vez aunque todavía no tenga una carrera asociada.
+ * una sola vez aunque todavía no tenga una carrera asociada. `search` filtra por
+ * código o nombre; el servidor ignora mayúsculas y tildes.
  */
 export async function getAdminSubjects(
+  search = '',
   signal?: AbortSignal
 ): Promise<AdminSubjectSummary[]> {
+  const term = search.trim()
+
   const response = await apiClient<{ data: AdminSubjectSummary[] }>(
     '/materias/administracion',
-    { signal }
+    { query: { q: term === '' ? undefined : term }, signal }
   )
 
   return response.data
@@ -129,19 +133,18 @@ export async function assignSubjectToCareer(
   )
 }
 
-/* ==========================================================================
-   HU-007 (Editar Materia)
-   ========================================================================== */
-
 /**
- * Actualiza únicamente el nombre y código de una materia existente.
+ * Pares materia-carrera de cualquier estado, ordenados por carrera y materia.
+ * Con `careerId` solo trae los de esa carrera.
  */
-export async function actualizarMateria(
-  idMateria: number,
-  data: UpdateSubjectPayload
-): Promise<UpdateSubjectResponse> {
-  return apiPut<UpdateSubjectResponse>(
-    `/materias/${idMateria}`,
-    data
+export async function getSubjectCareerAssignments(
+  careerId: number | null = null,
+  signal?: AbortSignal
+): Promise<SubjectCareerAssignment[]> {
+  const response = await apiClient<SubjectCareerAssignmentsResponse>(
+    '/administracion/asignaciones',
+    { query: { id_carrera: careerId ?? undefined }, signal }
   )
+
+  return response.data
 }

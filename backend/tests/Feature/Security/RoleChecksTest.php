@@ -87,7 +87,7 @@ class RoleChecksTest extends TestCase
         $token = $this->loginToken($administrator);
 
         $this->withBearer($token)->getJson('/api/roles')->assertOk();
-        $this->assertNotSame(403, $this->withBearer($token)->postJson('/api/materias', [])->getStatusCode());
+        $this->withBearer($token)->getJson('/api/materias/administracion')->assertOk();
 
         $administrator->forceFill(['estado' => User::ESTADO_INACTIVO])->save();
 
@@ -95,7 +95,6 @@ class RoleChecksTest extends TestCase
         $this->withBearer($token)->getJson('/api/roles')->assertForbidden();
         $this->withBearer($token)->getJson('/api/sis/verificar/202312345')->assertForbidden();
         $this->withBearer($token)->postJson('/api/usuarios', [])->assertForbidden();
-        $this->withBearer($token)->postJson('/api/materias', [])->assertForbidden();
         $this->withBearer($token)->getJson('/api/materias/administracion')->assertForbidden();
     }
 

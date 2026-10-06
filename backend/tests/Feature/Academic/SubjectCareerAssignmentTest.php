@@ -123,6 +123,46 @@ class SubjectCareerAssignmentTest extends TestCase
         );
     }
 
+    public function test_la_bitacora_registra_la_accion_crear_con_el_administrador_autenticado(): void
+    {
+        $this->actingAs($this->adminUser)
+            ->postJson($this->assignmentUrl(), ['id_materia' => $this->subject->id_materia])
+            ->assertCreated();
+
+        $rows = AuditLog::query()->where('tabla_afectada', 'materia_carrera')->get();
+
+        $this->assertCount(1, $rows);
+        $this->assertSame($this->adminUser->id_usuario, $rows[0]->id_usuario);
+        $this->assertSame('CREAR', $rows[0]->accion->operacion);
+        $this->assertNull($rows[0]->antiguo_valor);
+        $this->assertEquals(
+            [
+                'id_carrera' => $this->career->id_carrera,
+                'id_materia' => $this->subject->id_materia,
+                'estado' => RecordStatus::ACTIVE,
+            ],
+            $rows[0]->nuevo_valor
+        );
+    }
+
+    public function test_cada_asignacion_la_registra_otro_administrador_con_su_propia_cuenta(): void
+    {
+        $otherAdmin = User::factory()->create();
+        $otherAdmin->roles()->attach(
+            Role::where('nombre_rol', Role::ADMINISTRADOR)->value('id_rol'),
+            ['fecha_inicio' => now()]
+        );
+
+        $this->actingAs($otherAdmin)
+            ->postJson($this->assignmentUrl(), ['id_materia' => $this->subject->id_materia])
+            ->assertCreated();
+
+        $this->assertSame(
+            $otherAdmin->id_usuario,
+            AuditLog::query()->where('tabla_afectada', 'materia_carrera')->value('id_usuario')
+        );
+    }
+
     public function test_docente_no_puede_asignar_materia_a_carrera(): void
     {
         $this->actingAs($this->teacherUser)
@@ -193,6 +233,78 @@ class SubjectCareerAssignmentTest extends TestCase
         $this->assertDatabaseMissing('log', [
             'tabla_afectada' => 'materia_carrera',
         ]);
+    }
+
+    public function test_rechaza_asignacion_duplicada_aunque_el_par_existente_este_inactivo(): void
+    {
+        SubjectCareer::create([
+            'id_carrera' => $this->career->id_carrera,
+            'id_materia' => $this->subject->id_materia,
+            'estado' => RecordStatus::INACTIVE,
+        ]);
+
+        $this->actingAs($this->adminUser)
+            ->postJson($this->assignmentUrl(), [
+                'id_materia' => $this->subject->id_materia,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('id_materia');
+
+        $this->assertSame(
+            RecordStatus::INACTIVE,
+            SubjectCareer::query()
+                ->where('id_carrera', $this->career->id_carrera)
+                ->where('id_materia', $this->subject->id_materia)
+                ->value('estado')
+        );
+        $this->assertDatabaseMissing('log', [
+            'tabla_afectada' => 'materia_carrera',
+        ]);
+    }
+
+    public function test_la_materia_asignada_a_una_carrera_ya_no_se_ofrece_pero_si_para_otra(): void
+    {
+        $other = Career::create([
+            'nombre' => 'Ingenieria Civil',
+            'codigo' => 'CIV',
+            'estado' => RecordStatus::ACTIVE,
+            'id_facultad' => $this->career->id_facultad,
+        ]);
+
+        SubjectCareer::create([
+            'id_carrera' => $this->career->id_carrera,
+            'id_materia' => $this->subject->id_materia,
+            'estado' => RecordStatus::INACTIVE,
+        ]);
+
+        $this->actingAs($this->adminUser);
+
+        $this->getJson("/api/administracion/carreras/{$this->career->id_carrera}/materias-asignables")
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $this->getJson("/api/administracion/carreras/{$other->id_carrera}/materias-asignables")
+            ->assertOk()
+            ->assertJsonPath('data.0.id_materia', $this->subject->id_materia);
+    }
+
+    public function test_las_asignaciones_no_se_pueden_editar_ni_eliminar(): void
+    {
+        $pair = "{$this->assignmentUrl()}/{$this->subject->id_materia}";
+
+        $this->actingAs($this->adminUser);
+
+        foreach (['PUT', 'PATCH', 'DELETE'] as $method) {
+            foreach ([$this->assignmentUrl(), $pair, '/api/administracion/asignaciones'] as $url) {
+                $this->assertContains(
+                    $this->json($method, $url, ['estado' => RecordStatus::INACTIVE])->getStatusCode(),
+                    [404, 405],
+                    "{$method} {$url} no debería existir"
+                );
+            }
+        }
+
+        $this->assertNoAssignmentWritten();
     }
 
     public function test_rechaza_asignacion_si_materia_o_carrera_estan_inactivas(): void
@@ -410,6 +522,32 @@ class SubjectCareerAssignmentTest extends TestCase
         $this->assertNoAssignmentWritten();
     }
 
+    /**
+     * @dataProvider assignmentRoutes
+     */
+    public function test_docente_no_puede_usar_ninguna_ruta_de_asignacion(string $method, string $uri): void
+    {
+        $this->actingAs($this->teacherUser);
+
+        $this->callAssignmentRoute($method, $uri)
+            ->assertForbidden();
+
+        $this->assertNoAssignmentWritten();
+    }
+
+    /**
+     * @dataProvider assignmentRoutes
+     */
+    public function test_administrador_accede_a_todas_las_rutas_de_asignacion(string $method, string $uri): void
+    {
+        $this->actingAs($this->adminUser);
+
+        $this->assertContains(
+            $this->callAssignmentRoute($method, $uri)->getStatusCode(),
+            [200, 201]
+        );
+    }
+
     public function outOfRangeCareerIds(): array
     {
         return [
@@ -430,6 +568,7 @@ class SubjectCareerAssignmentTest extends TestCase
                 'POST',
                 '/api/administracion/carreras/{career}/materias',
             ],
+            'listar asignaciones' => ['GET', '/api/administracion/asignaciones'],
         ];
     }
 

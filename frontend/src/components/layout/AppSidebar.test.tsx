@@ -26,18 +26,23 @@ function renderSidebar(area: Area, route: string) {
 }
 
 describe('AppSidebar', () => {
-  it('administrador: Materias no se resalta junto con Asignar materia', () => {
-    renderSidebar('administrador', '/materias/asignar')
-
-    expect(screen.getByRole('link', { name: 'Asignar materia' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('link', { name: 'Materias' })).not.toHaveAttribute('aria-current')
-  })
-
-  it('administrador: Materias se resalta en su propia ruta y Asignar materia no', () => {
+  it('administrador: muestra una sola entrada Materias y ninguna de Asignar materia', () => {
     renderSidebar('administrador', '/materias')
 
+    expect(screen.getAllByRole('link', { name: 'Materias' })).toHaveLength(1)
+    expect(screen.getByRole('link', { name: 'Materias' })).toHaveAttribute('href', '/materias')
+    expect(screen.queryByRole('link', { name: /asignar materia/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/asignar materia/i)).not.toBeInTheDocument()
+  })
+
+  it('administrador: Materias se resalta en el catálogo y en la pestaña de asignaciones', () => {
+    renderSidebar('administrador', '/materias')
     expect(screen.getByRole('link', { name: 'Materias' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('link', { name: 'Asignar materia' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('administrador: Materias sigue resaltada con ?tab=asignaciones', () => {
+    renderSidebar('administrador', '/materias?tab=asignaciones')
+    expect(screen.getByRole('link', { name: 'Materias' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('docente: Incidencias queda deshabilitada con su tooltip y sin número', () => {

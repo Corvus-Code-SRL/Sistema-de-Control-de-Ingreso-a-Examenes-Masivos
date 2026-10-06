@@ -18,11 +18,6 @@ Route::get('materias/administracion', [SubjectController::class, 'adminIndex']);
 
 Route::get('periodos', [PeriodController::class, 'index']);
 
-// Endpoint legado de registro de materias.
-Route::post('materias', [SubjectController::class, 'store']);
-
-Route::put('materias/{subject}', [SubjectController::class, 'update']);
-
 Route::get(
     'carreras/{id_carrera}/materias/{id_materia}/grupos',
     [SubjectGroupController::class, 'index']
@@ -48,6 +43,12 @@ Route::prefix('administracion')
             [SubjectCareerAssignmentController::class, 'store']
         )
             ->where('career', '[0-9]{1,9}');
+
+        // El filtro id_carrera es un query param: lo valida ListSubjectCareerAssignmentsRequest.
+        Route::get(
+            'asignaciones',
+            [SubjectCareerAssignmentController::class, 'index']
+        );
     });
 
 Route::get('grupos/{id_grupo}', [GroupController::class, 'show']);

@@ -1,56 +1,57 @@
-import { BookOpen } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
-import { EmptyState } from '@/components/common/EmptyState'
-import { ErrorState } from '@/components/common/ErrorState'
-import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
-import { Card } from '@/components/ui/card'
-import { AdminSubjectsTable } from '../components/AdminSubjectsTable'
-import { useAdminSubjects } from '../hooks/useAdminSubjects'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { SubjectAssignmentsTab } from '../components/SubjectAssignmentsTab'
+import { SubjectCatalogTab } from '../components/SubjectCatalogTab'
+
+const TAB_PARAM = 'tab'
+
+type SubjectsTab = 'catalogo' | 'asignaciones'
+
+/** La pestaña vive en la URL (`?tab=asignaciones`) para que se pueda compartir y recargar. */
+function tabFrom(value: string | null): SubjectsTab {
+  return value === 'asignaciones' ? 'asignaciones' : 'catalogo'
+}
 
 /**
- * Catálogo institucional de materias para Administración.
+ * Materias de Administración, en dos pestañas.
  *
- * HU-007 permite seleccionar una materia existente y acceder a su edición.
- * El registro de nuevas materias pertenece a HU-006 y no se integra aquí.
+ * Catálogo: lista de solo lectura del catálogo institucional (las materias no se crean ni se editan
+ * desde la aplicación). Asignaciones: vincula materias a carreras activas y lista los pares.
  */
 export function AdminSubjectsPage() {
-  const { subjects, status, error, reload } = useAdminSubjects()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = tabFrom(searchParams.get(TAB_PARAM))
+
+  const changeTab = (value: string) => {
+    setSearchParams(value === 'asignaciones' ? { [TAB_PARAM]: 'asignaciones' } : {})
+  }
 
   return (
     <AppShell
       mobileTitle="Materias"
-      breadcrumbs={[
-        { label: 'Administración' },
-        { label: 'Materias' },
-      ]}
+      breadcrumbs={[{ label: 'Administración' }, { label: 'Materias' }]}
     >
       <PageHeader
         title="Materias"
-        subtitle="Catálogo institucional de materias disponibles para administración."
+        subtitle="Catálogo institucional de materias y su asignación a las carreras."
       />
 
-      <Card className="overflow-hidden p-0">
-        {status === 'loading' && (
-          <LoadingState rows={5} label="Cargando materias" />
-        )}
+      <Tabs value={tab} onValueChange={changeTab}>
+        <TabsList>
+          <TabsTrigger value="catalogo">Catálogo</TabsTrigger>
+          <TabsTrigger value="asignaciones">Asignaciones</TabsTrigger>
+        </TabsList>
 
-        {status === 'error' && error && (
-          <ErrorState error={error} onRetry={reload} />
-        )}
+        <TabsContent value="catalogo">
+          <SubjectCatalogTab />
+        </TabsContent>
 
-        {status === 'success' && subjects.length === 0 && (
-          <EmptyState
-            icon={BookOpen}
-            title="Aún no hay materias registradas"
-            description="El catálogo institucional todavía no contiene materias."
-          />
-        )}
-
-        {status === 'success' && subjects.length > 0 && (
-          <AdminSubjectsTable subjects={subjects} />
-        )}
-      </Card>
+        <TabsContent value="asignaciones">
+          <SubjectAssignmentsTab />
+        </TabsContent>
+      </Tabs>
     </AppShell>
   )
 }

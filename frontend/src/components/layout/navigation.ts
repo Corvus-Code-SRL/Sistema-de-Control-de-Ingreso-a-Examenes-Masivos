@@ -9,7 +9,6 @@ import {
   GraduationCap,
   History,
   Home,
-  Link2,
   PlaySquare,
   ScrollText,
   ShieldCheck,
@@ -24,10 +23,7 @@ export interface NavItem {
   icon: LucideIcon
   /** Sin `to` el destino aún no existe: el enlace se dibuja deshabilitado. */
   to?: string
-  /**
-   * Solo se marca activo con la ruta exacta. Hace falta cuando otro ítem cuelga de la misma ruta
-   * (Materias y Asignar materia del administrador: «/materias» y «/materias/asignar»).
-   */
+  /** Solo se marca activo con la ruta exacta; hace falta cuando otro ítem cuelga de la misma ruta. */
   end?: boolean
 }
 
@@ -90,7 +86,7 @@ const navegacionAuxiliar: NavGroup[] = [
 /**
  * Navegación lateral del administrador.
  *
- * Cuentas, Materias, Asignar materia y Ambientes tienen pantallas disponibles.
+ * Cuentas, Materias (catálogo y asignaciones, en pestañas) y Ambientes tienen pantallas disponibles.
  * Facultades, carreras y bitácora permanecen deshabilitadas hasta sus
  * respectivas historias.
  */
@@ -100,8 +96,7 @@ const navegacionAdministrador: NavGroup[] = [
     label: 'Administración',
     items: [
       { label: 'Cuentas', icon: Users, to: '/cuentas' },
-      { label: 'Materias', icon: BookOpen, to: '/materias', end: true },
-      { label: 'Asignar materia', icon: Link2, to: '/materias/asignar' },
+      { label: 'Materias', icon: BookOpen, to: '/materias' },
       { label: 'Facultades', icon: Building2 },
       { label: 'Ambientes', icon: DoorOpen, to: '/ambientes' },
       { label: 'Carreras', icon: GraduationCap },
