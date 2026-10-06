@@ -53,7 +53,11 @@ class SubjectCareerAssignmentController extends Controller
 
         return SubjectCareerAssignmentResource::collection(
             $this->service->listAssignments($careerId === null ? null : (int) $careerId)
-        );
+        )->additional([
+            'meta' => [
+                'carreras' => CareerResource::collection($this->service->listAssignedCareers())->resolve(),
+            ],
+        ]);
     }
 
     public function store(
