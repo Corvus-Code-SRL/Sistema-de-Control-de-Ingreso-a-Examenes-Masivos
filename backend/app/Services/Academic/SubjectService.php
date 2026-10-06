@@ -3,77 +3,57 @@
 namespace App\Services\Academic;
 
 use App\Models\Subject;
-use App\Services\Security\AuditLogService;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
+/** Consulta de solo lectura del catálogo institucional de materias para Administración. */
 class SubjectService
 {
-    private AuditLogService $auditService;
+    /** Letras acentuadas y su equivalente sin acento, para comparar sin distinguir tildes. */
+    private const ACCENTED = 'ÁÉÍÓÚÜÑáéíóúüñ';
+    private const PLAIN = 'AEIOUUNaeiouun';
 
-    public function __construct(AuditLogService $auditService)
+    public function listForAdministration(?string $search = null): Collection
     {
-        $this->auditService = $auditService;
+        $query = Subject::query()->orderBy('nombre')->orderBy('id_materia');
+
+        $term = $this->normalize((string) $search);
+
+        if ($term !== '') {
+            $this->applySearch($query, $term);
+        }
+
+        return $query->get();
     }
 
-    public function listForAdministration(): Collection
+    /**
+     * Compara sin distinguir mayúsculas ni tildes, sin depender de la extensión unaccent:
+     * translate() normaliza las columnas y el término con el mismo mapa.
+     */
+    private function applySearch(Builder $query, string $term): void
     {
-        return Subject::query()
-            ->orderBy('nombre')
-            ->get();
-    }
+        $pattern = '%' . $this->escapeLike($term) . '%';
+        $normalized = "translate(lower(%s), '" . self::ACCENTED . "', '" . self::PLAIN . "') ILIKE ?";
 
-    public function create(array $data, string $actorId): Subject
-    {
-        return DB::transaction(function () use ($data, $actorId) {
-            $subject = Subject::create([
-                'nombre'      => $data['nombre'],
-                'codigo'      => $data['codigo'],
-                'descripcion' => $data['descripcion'] ?? null,
-                'estado'      => Subject::ESTADO_ACTIVO,
-            ]);
-
-            $this->auditService->registrar(
-                'CREAR',
-                'materia',
-                null,
-                $subject->toArray(),
-                $actorId
-            );
-
-            return $subject;
+        $query->where(function (Builder $where) use ($normalized, $pattern) {
+            $where->whereRaw(sprintf($normalized, 'materia.codigo'), [$pattern])
+                ->orWhereRaw(sprintf($normalized, 'materia.nombre'), [$pattern]);
         });
     }
 
-    public function update(Subject $subject, array $data, string $actorId): Subject
+    private function normalize(string $term): string
     {
-        return DB::transaction(function () use ($subject, $data, $actorId) {
-            $before = [];
-            $after = [];
+        $plain = array_combine(
+            preg_split('//u', self::ACCENTED, -1, PREG_SPLIT_NO_EMPTY),
+            str_split(self::PLAIN)
+        );
 
-            foreach (['nombre', 'codigo'] as $field) {
-                if ((string) $subject->{$field} !== (string) $data[$field]) {
-                    $before[$field] = $subject->{$field};
-                    $after[$field] = $data[$field];
-                }
-            }
+        return strtr(trim($term), $plain);
+    }
 
-            if ($after === []) {
-                return $subject;
-            }
-
-            $subject->fill($after);
-            $subject->save();
-
-            $this->auditService->registrar(
-                'MODIFICAR',
-                'materia',
-                $before,
-                $after,
-                $actorId
-            );
-
-            return $subject->fresh();
-        });
+    /** Un % o _ escrito por el usuario se busca como texto literal, no como comodín. */
+    private function escapeLike(string $term): string
+    {
+        return addcslashes($term, '\\%_');
     }
 }

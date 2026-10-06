@@ -21,9 +21,6 @@ class Subject extends Model
     public const ESTADO_ACTIVO   = 'ACTIVO';
     public const ESTADO_INACTIVO = 'INACTIVO';
 
-    /** Código institucional de materia: exactamente 7 dígitos. Ej: 2008057. */
-    public const CODIGO_REGEX = '/^[0-9]{7}$/';
-
     protected $table = 'materia';
     protected $primaryKey = 'id_materia';
     public $timestamps = false;

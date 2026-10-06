@@ -3,20 +3,17 @@
 namespace App\Http\Controllers\Academic;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Academic\StoreSubjectRequest;
-use App\Http\Requests\Academic\UpdateSubjectRequest;
+use App\Http\Requests\Academic\ListAdminSubjectsRequest;
 use App\Http\Resources\Academic\SubjectCareerResource;
 use App\Http\Resources\Academic\SubjectResource;
-use App\Models\Subject;
 use App\Services\Academic\SubjectCatalogService;
 use App\Services\Academic\SubjectService;
 use App\Support\CurrentUser;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 /**
- * Expone el catálogo institucional de materias como pares materia-carrera
- * y gestiona el registro de nuevas materias.
+ * Expone el catálogo institucional de materias: los pares materia-carrera del docente y el
+ * catálogo de solo lectura de Administración. Las materias no se crean ni se editan desde la app.
  */
 class SubjectController extends Controller
 {
@@ -24,7 +21,6 @@ class SubjectController extends Controller
     private SubjectService $subjectService;
     private CurrentUser $currentUser;
 
-    // Se inyectan ambos servicios (el de tu compañero y el tuyo)
     public function __construct(
         SubjectCatalogService $subjectCatalog,
         SubjectService $subjectService,
@@ -35,7 +31,6 @@ class SubjectController extends Controller
         $this->currentUser = $currentUser;
     }
 
-    // Método de tu compañero (no lo tocamos, queda intacto)
     public function index(): AnonymousResourceCollection
     {
         $result = $this->subjectCatalog->listSubjectCareers($this->currentUser->teacherId());
@@ -50,36 +45,10 @@ class SubjectController extends Controller
             ->additional($additional);
     }
 
-    public function adminIndex(): AnonymousResourceCollection
+    public function adminIndex(ListAdminSubjectsRequest $request): AnonymousResourceCollection
     {
-        $this->authorize('viewAny', Subject::class);
-
         return SubjectResource::collection(
-            $this->subjectService->listForAdministration()
+            $this->subjectService->listForAdministration($request->validated()['q'] ?? null)
         );
-    }
-
-    public function store(StoreSubjectRequest $request): JsonResponse
-    {
-        $subject = $this->subjectService->create($request->validated(), $this->currentUser->id());
-
-        return response()->json([
-            'data'    => new SubjectResource($subject),
-            'mensaje' => 'Materia registrada correctamente.'
-        ], 201);
-    }
-
-    public function update(UpdateSubjectRequest $request, Subject $subject): JsonResponse
-    {
-        $subject = $this->subjectService->update(
-            $subject,
-            $request->validated(),
-            $this->currentUser->id()
-        );
-
-        return response()->json([
-            'data'    => new SubjectResource($subject),
-            'mensaje' => 'Materia actualizada correctamente.',
-        ]);
     }
 }
