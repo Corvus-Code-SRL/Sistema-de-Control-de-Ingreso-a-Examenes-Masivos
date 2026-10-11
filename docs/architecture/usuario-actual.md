@@ -17,7 +17,9 @@ Son la misma cuenta; el rol lo comprueba cada Form Request con `UserRoleService:
 
 Sin sesión no hay a quién atribuir una escritura, pero `log.id_usuario` es NOT NULL. Los seeders y comandos usan `App\Support\SystemActor` (la cuenta de `config('sciem.usuario_prueba')`, que `UserSeeder` siembra). **Solo ellos**: `SystemActorOnlyForSeedersTest` falla si un Controller, Request, Policy o Service lo usa, o si un seeder usa `CurrentUser`.
 
-> **Riesgo conocido (Sprint 3):** esa cuenta se siembra con SIS `000000000`, contraseña `password` y rol Administrador. Mientras exista, es una puerta de entrada conocida en cualquier entorno compartido.
+`UserSeeder` la siembra con SIS `000000000`, rol Administrador y una **contraseña inutilizable** (un hash bcrypt de un secreto que nadie conoce): nadie puede iniciar sesión con ella, y las pruebas actúan como ella con `Sanctum::actingAs`. En las bases que ya la tenían con la contraseña `password`, la migración `2026_10_11_000000_disable_system_account_login` la cierra (filtra por `cod_sis = '000000000'`, cambia el hash y revoca sus tokens; es idempotente).
+
+> **Pendiente (fuera de RNF-02):** el id de `SystemActor` (`SCIEM_USUARIO_PRUEBA`) coincide con el del Administrador de los datos de prueba (`TestDataIds::ADMINISTRATOR`, Valeria Montaño, `ADM0001`). Ambos seeders escriben esa misma fila y se pisan según el orden en que corran. Separarlos exige un id propio para la cuenta de sistema y cambiar `SCIEM_USUARIO_PRUEBA` en cada `.env`.
 
 ### Regla: los Services no resuelven al usuario
 
