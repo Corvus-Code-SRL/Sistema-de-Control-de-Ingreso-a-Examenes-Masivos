@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Security;
 
+use App\Http\Middleware\EnsureAccountIsActive;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Route as LaravelRoute;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
@@ -13,6 +15,9 @@ use Tests\TestCase;
 class RoutesRequireAuthenticationTest extends TestCase
 {
     private const PUBLIC_ROUTE = 'POST api/auth/login';
+
+    /** Una cuenta inactiva puede cerrar su sesión: la única ruta protegida sin account.active. */
+    private const LOGOUT_ROUTE = 'POST api/auth/logout';
 
     public function test_toda_ruta_de_la_api_salvo_el_login_declara_auth_sanctum(): void
     {
@@ -29,6 +34,41 @@ class RoutesRequireAuthenticationTest extends TestCase
         }
 
         $this->assertSame([], $unprotected, "Rutas de la API sin auth:sanctum:\n" . implode("\n", $unprotected));
+    }
+
+    public function test_toda_ruta_protegida_exige_cuenta_activa_salvo_el_logout(): void
+    {
+        $withoutCheck = [];
+
+        foreach ($this->apiRoutes() as $route) {
+            $signature = $this->signature($route);
+
+            if ($signature === self::PUBLIC_ROUTE || $signature === self::LOGOUT_ROUTE) {
+                continue;
+            }
+
+            if (! in_array('account.active', $route->gatherMiddleware(), true)) {
+                $withoutCheck[] = $signature;
+            }
+        }
+
+        $this->assertSame(
+            [],
+            $withoutCheck,
+            "Rutas sin account.active (una cuenta inactiva conservaría el acceso):\n" . implode("\n", $withoutCheck)
+        );
+
+        // withoutMiddleware() no quita el alias de gatherMiddleware(): lo excluye al resolver la cadena.
+        $logout = Route::getRoutes()->match(Request::create('/api/auth/logout', 'POST'));
+
+        $this->assertContains(EnsureAccountIsActive::class, $logout->excludedMiddleware());
+        $this->assertContains('auth:sanctum', $logout->gatherMiddleware());
+
+        foreach ($this->apiRoutes() as $route) {
+            if ($this->signature($route) !== self::LOGOUT_ROUTE) {
+                $this->assertNotContains(EnsureAccountIsActive::class, $route->excludedMiddleware());
+            }
+        }
     }
 
     public function test_sin_token_toda_ruta_salvo_el_login_responde_401(): void

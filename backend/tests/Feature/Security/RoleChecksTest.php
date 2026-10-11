@@ -73,12 +73,14 @@ class RoleChecksTest extends TestCase
 
         $teacher->forceFill(['estado' => User::ESTADO_INACTIVO])->save();
 
+        // Lo rechaza EnsureAccountIsActive antes de llegar al Request, y revoca el token.
         $this->withBearer($token)
             ->postJson('/api/grupos', $this->groupPayload('TOK2'))
             ->assertForbidden()
-            ->assertJsonPath('message', 'Solo un docente puede gestionar grupos.');
+            ->assertJsonPath('motivo', 'cuenta_inactiva');
 
         $this->assertDatabaseMissing('grupo', ['num_grupo' => 'TOK2']);
+        $this->withBearer($token)->postJson('/api/grupos', $this->groupPayload('TOK3'))->assertUnauthorized();
     }
 
     public function test_un_administrador_con_token_vigente_recibe_403_cuando_la_cuenta_se_deshabilita(): void
@@ -91,11 +93,20 @@ class RoleChecksTest extends TestCase
 
         $administrator->forceFill(['estado' => User::ESTADO_INACTIVO])->save();
 
-        // Request (AdministratorRequest, StoreUserRequest, VerifySisRequest) y Policy (materias).
-        $this->withBearer($token)->getJson('/api/roles')->assertForbidden();
-        $this->withBearer($token)->getJson('/api/sis/verificar/202312345')->assertForbidden();
-        $this->withBearer($token)->postJson('/api/usuarios', [])->assertForbidden();
-        $this->withBearer($token)->getJson('/api/materias/administracion')->assertForbidden();
+        $this->withBearer($token)->getJson('/api/roles')
+            ->assertForbidden()
+            ->assertJsonPath('motivo', 'cuenta_inactiva');
+        $this->withBearer($token)->getJson('/api/roles')->assertUnauthorized();
+
+        // Con la sesión de la cuenta (sin depender del token ya revocado), todas las rutas de
+        // administración siguen cerradas: Request (AdministratorRequest, StoreUserRequest,
+        // VerifySisRequest) y Policy (materias) también lo exigen por su cuenta.
+        $this->actAsUserId($administrator->id_usuario);
+
+        $this->getJson('/api/roles')->assertForbidden();
+        $this->getJson('/api/sis/verificar/202312345')->assertForbidden();
+        $this->postJson('/api/usuarios', [])->assertForbidden();
+        $this->getJson('/api/materias/administracion')->assertForbidden();
     }
 
     public function test_solo_un_docente_gestiona_grupos_y_examenes(): void
@@ -141,7 +152,6 @@ class RoleChecksTest extends TestCase
             $this->createAccount(Role::DOCENTE),
             $this->createAccount(Role::AUXILIAR),
             $this->createAccount(),
-            $this->createAccount(Role::ADMINISTRADOR, User::ESTADO_INACTIVO),
         ];
 
         foreach ($outsiders as $account) {
@@ -158,6 +168,13 @@ class RoleChecksTest extends TestCase
                 ->assertForbidden()
                 ->assertJsonPath('message', 'Solo un Administrador puede verificar códigos SIS.');
         }
+
+        // Un Administrador deshabilitado ni siquiera llega al Request: lo corta EnsureAccountIsActive.
+        $this->actAsUserId($this->createAccount(Role::ADMINISTRADOR, User::ESTADO_INACTIVO)->id_usuario);
+
+        $this->getJson('/api/sis/verificar/202312345')
+            ->assertForbidden()
+            ->assertJsonPath('motivo', 'cuenta_inactiva');
 
         $this->assertDatabaseMissing('usuario', ['cod_sis' => '202312345']);
 
