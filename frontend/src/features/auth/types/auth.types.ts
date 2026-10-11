@@ -1,3 +1,5 @@
+import type { SessionEndReason } from '@/lib/api-client'
+
 /**
  * Áreas de trabajo de SCIEM.
  *
@@ -106,6 +108,8 @@ export interface AuthState {
   rol: SessionRole | null
   token: string | null
   estado: AuthStatus
+  /** Solo con `estado: 'expirada'`: por qué terminó la sesión si no fue un simple 401. */
+  motivoSesion?: SessionEndReason
 }
 
 /**

@@ -2,6 +2,19 @@
 
 namespace App\Exceptions;
 
+use App\Exceptions\Academic\StudentRosterFileException;
+use App\Exceptions\Academic\StudentRosterGroupAccessException;
+use App\Exceptions\Academic\StudentRosterPreviewUnavailableException;
+use App\Exceptions\Exams\ExamAssistantNotFoundException;
+use App\Exceptions\Exams\ExamOwnershipException;
+use App\Exceptions\Exams\ExamStateException;
+use App\Exceptions\Exams\ExamWarningsException;
+use App\Exceptions\Security\DuplicateAccountException;
+use App\Exceptions\Security\InactiveAccountException;
+use App\Exceptions\Security\InvalidCredentialsException;
+use App\Exceptions\Security\NoCurrentRoleException;
+use App\Exceptions\Security\SelfRoleAssignmentException;
+use App\Exceptions\Security\SisNoValidoException;
 use App\Support\ApiResponse;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
@@ -12,12 +25,30 @@ use Throwable;
 class Handler extends ExceptionHandler
 {
     /**
-     * A list of the exception types that are not reported.
+     * Excepciones de negocio: son resultados esperados que ya responden con su propio render(), no
+     * fallos. Reportarlas llena el log de trazas (algunas con nombres de personas) y tapa los
+     * errores reales. QueryException, TypeError y demás siguen reportándose.
+     *
+     * Quedan reportadas a propósito ActivePeriodNotConfiguredException (error de despliegue) y
+     * SisNoDisponibleException (el SIS caído es una señal operativa). Toda clase de app/Exceptions
+     * debe figurar aquí o en ErrorReportingTest::REPORTED.
      *
      * @var array<int, class-string<Throwable>>
      */
     protected $dontReport = [
-        //
+        StudentRosterFileException::class,
+        StudentRosterGroupAccessException::class,
+        StudentRosterPreviewUnavailableException::class,
+        ExamAssistantNotFoundException::class,
+        ExamOwnershipException::class,
+        ExamStateException::class,
+        ExamWarningsException::class,
+        DuplicateAccountException::class,
+        InactiveAccountException::class,
+        InvalidCredentialsException::class,
+        NoCurrentRoleException::class,
+        SelfRoleAssignmentException::class,
+        SisNoValidoException::class,
     ];
 
     /**

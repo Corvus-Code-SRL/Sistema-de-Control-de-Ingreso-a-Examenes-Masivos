@@ -7,11 +7,12 @@ import { AuthProvider } from './AuthProvider'
 import { useAuth } from '../hooks/useAuth'
 
 function Probe() {
-  const { estado, usuario, rol, token, iniciarSesion, cerrarSesion } = useAuth()
+  const { estado, motivoSesion, usuario, rol, token, iniciarSesion, cerrarSesion } = useAuth()
 
   return (
     <div>
       <p data-testid="estado">{estado}</p>
+      <p data-testid="motivo">{motivoSesion ?? '—'}</p>
       <p data-testid="usuario">{usuario?.nombre_completo ?? '—'}</p>
       <p data-testid="rol">{rol?.nombre_rol ?? '—'}</p>
       <p data-testid="token">{token ?? '—'}</p>
@@ -77,6 +78,23 @@ describe('AuthProvider — rehidratación', () => {
 
     expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('una cuenta deshabilitada (403 cuenta_inactiva en /yo) deja la sesión expirada con su motivo', async () => {
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, 'tok-de-cuenta-inactiva')
+    mockApiWith(() => loginErrors.inactive)
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    )
+
+    await waitFor(() => expect(estado()).toBe('expirada'))
+
+    expect(screen.getByTestId('motivo')).toHaveTextContent('cuenta_inactiva')
+    expect(screen.getByTestId('token')).toHaveTextContent('—')
+    expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
   })
 
   it('un fallo de red al verificar no borra el token guardado', async () => {

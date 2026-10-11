@@ -12,9 +12,9 @@ class AdministratorAccountSeeder extends Seeder
     /**
      * Da el rol Administrador a la cuenta de sistema (SystemActor).
      *
-     * Es la cuenta que firma las escrituras sin sesión y, al tener contraseña, también sirve para
-     * ingresar en desarrollo; la gestión de roles exige que sea Administrador. Si ya tiene un rol
-     * vigente no se toca. Requiere haber ejecutado antes UserSeeder y RoleSeeder.
+     * Es la cuenta que firma las escrituras sin sesión; la gestión de roles exige que sea
+     * Administrador. No sirve para iniciar sesión: UserSeeder le deja una contraseña inutilizable.
+     * Si ya tiene un rol vigente no se toca. Requiere haber ejecutado antes UserSeeder y RoleSeeder.
      */
     public function run()
     {

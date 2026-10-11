@@ -122,13 +122,20 @@ const UNEXPECTED_ERROR = 'Ocurrió un error inesperado al consultar el servidor.
 export type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 type Query = Record<string, string | number | undefined>
 
+/** Código `motivo` con el que el servidor rechaza a una cuenta deshabilitada que aún tenía un token. */
+export const INACTIVE_ACCOUNT_MOTIVO = 'cuenta_inactiva'
+
+/** Por qué terminó la sesión cuando no fue un simple vencimiento del token (401). */
+export type SessionEndReason = typeof INACTIVE_ACCOUNT_MOTIVO
+
 /**
  * Lo que el cliente HTTP necesita saber de la sesión sin depender del feature `auth`:
- * el token a enviar y qué hacer cuando una petición con token recibe un 401.
+ * el token a enviar y qué hacer cuando una petición con token deja la sesión sin efecto: un 401
+ * (sin `reason`) o un 403 `cuenta_inactiva` (con `reason`).
  */
 export interface SessionHandlers {
   getToken: () => string | null
-  onSessionExpired: () => void
+  onSessionExpired: (reason?: SessionEndReason) => void
 }
 
 let sessionHandlers: SessionHandlers | null = null
@@ -242,16 +249,23 @@ export async function apiClient<TResponse>(
     }
 
     if (!response.ok) {
+      const apiError = await toApiError(response)
+
       /*
        * Un 401 con token enviado es una sesión muerta. Sin token no lo es: sin sesión la app sigue
        * funcionando y algunas rutas ya responden 401 a los anónimos. Y las peticiones `skipAuth`
        * (el login) no llegan aquí con token: su 401 son credenciales incorrectas.
+       *
+       * Un 403 `cuenta_inactiva` con token también termina la sesión: el servidor ya revocó el token
+       * y cualquier otro 403 sigue siendo un permiso negado que la pantalla muestra sin cerrarla.
        */
-      if (response.status === 401 && token && !options.ignoreUnauthorized) {
+      if (token && response.status === 401 && !options.ignoreUnauthorized) {
         sessionHandlers?.onSessionExpired()
+      } else if (token && apiError.isForbidden && apiError.motivo === INACTIVE_ACCOUNT_MOTIVO) {
+        sessionHandlers?.onSessionExpired(INACTIVE_ACCOUNT_MOTIVO)
       }
 
-      throw await toApiError(response)
+      throw apiError
     }
 
     // Una respuesta sin cuerpo (ej. 204) no tiene JSON que parsear.

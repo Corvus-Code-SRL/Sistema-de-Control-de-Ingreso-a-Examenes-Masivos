@@ -345,7 +345,7 @@ Todos los ids numéricos de prueba están en el rango 9000–9999 y todos los uu
 | `ActionSeeder` | Catálogo `accion`: las 12 acciones de la bitácora, en MAYÚSCULAS. `updateOrInsert` por `operacion`. | **Sí**, siempre con `--class` |
 | `IncidentTypeSeeder` | Catálogo `tipo_falta`: 4 tipos de falta. Solo inserta los que faltan y nunca actualiza: una fila existente con otra descripción se deja como está. | **Sí**, siempre con `--class` |
 | `RoleSeeder`, `ExamTypeSeeder` | Catálogos `rol` y `tipo_examen`. Usan `updateOrInsert`: reescriben la descripción o la categoría si cambiaron. | Ya aplicados; no repetir sin necesidad |
-| `UserSeeder`, `AdministratorAccountSeeder` | La cuenta de sistema que firma la bitácora de seeders y comandos (`SCIEM_USUARIO_PRUEBA`, vía `SystemActor`). `UserSeeder` sobrescribe su nombre, SIS (`000000000`) y contraseña (`password`); queda con rol Administrador: **riesgo conocido**, se resuelve en el Sprint 3. | Solo local |
+| `UserSeeder`, `AdministratorAccountSeeder` | La cuenta de sistema que firma la bitácora de seeders y comandos (`SCIEM_USUARIO_PRUEBA`, vía `SystemActor`). `UserSeeder` sobrescribe su nombre y su SIS (`000000000`) y le deja una contraseña inutilizable: es una cuenta de firma, nadie puede iniciar sesión con ella (RNF-02); conserva el rol Administrador. | Solo local |
 | `TestData\*` | Datos temporales con ids fijos y *upsert* por clave primaria (ver arriba). | Solo local: se niegan a correr si el host no es local |
 | `DatabaseSeeder` (`php artisan db:seed` a secas) | Llama a `UserSeeder`, `RoleSeeder`, `ActionSeeder`, `AdministratorAccountSeeder`, `ExamTypeSeeder` e `IncidentTypeSeeder`. No carga `TestData`. | Solo local: **nunca** sobre la compartida |
 

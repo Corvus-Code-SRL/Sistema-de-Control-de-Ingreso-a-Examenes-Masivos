@@ -150,6 +150,43 @@ describe('sesión expirada', () => {
     await waitFor(() => expect(app.pathname).toBe('/examenes/programados'))
   })
 
+  it('un 403 cuenta_inactiva lleva al login con el aviso de cuenta inactiva y descarta el token', async () => {
+    const user = userEvent.setup()
+    stubBackend({ session: 'docente', probe: loginErrors.inactive })
+
+    const app = renderApp('/examenes/programados', <DeadSessionProbe />)
+    await screen.findByRole('heading', { name: /programados/i })
+
+    await user.click(screen.getByRole('button', { name: 'consultar' }))
+
+    await waitFor(() => expect(app.pathname).toBe('/login'))
+
+    const notice = await screen.findByRole('status')
+
+    expect(notice).toHaveAttribute('data-notice', 'cuenta-inactiva')
+    expect(notice).toHaveTextContent('Su cuenta está inactiva. Contacte al Administrador.')
+    expect(screen.queryByText('Su sesión expiró')).not.toBeInTheDocument()
+    expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
+  })
+
+  it('tras un 403 cuenta_inactiva y un nuevo ingreso, regresa a la ruta en la que estaba', async () => {
+    const user = userEvent.setup()
+    stubBackend({ session: 'docente', probe: loginErrors.inactive })
+
+    const app = renderApp('/examenes/programados', <DeadSessionProbe />)
+    await screen.findByRole('heading', { name: /programados/i })
+    await user.click(screen.getByRole('button', { name: 'consultar' }))
+
+    await screen.findByRole('heading', { name: 'Ingresar' })
+
+    await user.type(screen.getByLabelText(/^Código SIS/), '10452')
+    await user.type(screen.getByLabelText(/^Contraseña/), 'password')
+    await user.click(screen.getByRole('button', { name: 'Ingresar' }))
+
+    await waitFor(() => expect(app.pathname).toBe('/examenes/programados'))
+    expect(screen.queryByText('Su cuenta está inactiva. Contacte al Administrador.')).not.toBeInTheDocument()
+  })
+
   it('un 403 se muestra como permiso negado en su lugar y no cierra la sesión', async () => {
     const user = userEvent.setup()
     stubBackend({ session: 'docente', probe: { status: 403, body: { message: 'Sin permiso.' } } })

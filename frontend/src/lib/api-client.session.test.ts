@@ -101,4 +101,48 @@ describe('api-client — sesión', () => {
     expect((error as ApiError).isTooManyRequests).toBe(true)
     expect(onSessionExpired).not.toHaveBeenCalled()
   })
+
+  it('un 403 cuenta_inactiva con token da la sesión por terminada y avisa el motivo', async () => {
+    mockApiWith(() => ({
+      status: 403,
+      body: { message: 'Su cuenta está deshabilitada. Contacte al Administrador.', motivo: 'cuenta_inactiva' },
+    }))
+
+    const error = await apiClient('/examenes').catch((cause: unknown) => cause)
+
+    expect((error as ApiError).isForbidden).toBe(true)
+    expect((error as ApiError).motivo).toBe('cuenta_inactiva')
+    expect(onSessionExpired).toHaveBeenCalledTimes(1)
+    expect(onSessionExpired).toHaveBeenCalledWith('cuenta_inactiva')
+  })
+
+  it('un 403 con otro motivo sigue siendo un permiso negado y no toca la sesión', async () => {
+    mockApiWith(() => ({ status: 403, body: { message: 'Sin rol.', motivo: 'sin_rol_vigente' } }))
+
+    await expect(apiClient('/examenes')).rejects.toMatchObject({ status: 403, motivo: 'sin_rol_vigente' })
+
+    expect(onSessionExpired).not.toHaveBeenCalled()
+  })
+
+  it('un 403 cuenta_inactiva del login (skipAuth) lo resuelve la pantalla y no toca la sesión', async () => {
+    mockApiWith(() => ({
+      status: 403,
+      body: { message: 'Su cuenta está deshabilitada. Contacte al Administrador.', motivo: 'cuenta_inactiva' },
+    }))
+
+    await expect(apiPost('/auth/login', { cod_sis: '10398', password: 'x' }, { skipAuth: true })).rejects.toMatchObject(
+      { status: 403, motivo: 'cuenta_inactiva' }
+    )
+
+    expect(onSessionExpired).not.toHaveBeenCalled()
+  })
+
+  it('un 403 cuenta_inactiva sin token no es una sesión que cerrar', async () => {
+    token = null
+    mockApiWith(() => ({ status: 403, body: { message: 'Inactiva.', motivo: 'cuenta_inactiva' } }))
+
+    await expect(apiClient('/examenes')).rejects.toMatchObject({ status: 403 })
+
+    expect(onSessionExpired).not.toHaveBeenCalled()
+  })
 })

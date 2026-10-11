@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
+import { INACTIVE_ACCOUNT_MOTIVO } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import { useAuth } from '../hooks/useAuth'
 import { LOGIN_FIELD_IDS, type UseLoginFormResult } from '../hooks/useLoginForm'
@@ -16,6 +17,9 @@ const SIS_HELP_ID = 'login-codigo-sis-help'
 const SIS_ERROR_ID = 'login-codigo-sis-error'
 const PASSWORD_ERROR_ID = 'login-password-error'
 const FAILURE_ID = 'login-failure'
+
+/** Aviso cuando la cuenta se deshabilitó con la sesión abierta (403 `cuenta_inactiva`). */
+const INACTIVE_ACCOUNT_NOTICE = 'Su cuenta está inactiva. Contacte al Administrador.'
 
 /** Aspecto de un campo que no se puede editar: mientras se envía y durante la espera de un 429. */
 const READ_ONLY_CLASSNAME = 'border-dis-border bg-dis-bg text-dis-text'
@@ -32,7 +36,9 @@ interface LoginFormProps {
  */
 export function LoginForm({ form, keyboardOpen }: LoginFormProps) {
   const { failure, fieldErrors, isReadOnly, isSubmitting, throttleRemaining } = form
-  const sessionExpired = useAuth().estado === 'expirada'
+  const { estado, motivoSesion } = useAuth()
+  const accountDeactivated = estado === 'expirada' && motivoSesion === INACTIVE_ACCOUNT_MOTIVO
+  const sessionExpired = estado === 'expirada' && !accountDeactivated
 
   const isThrottled = throttleRemaining > 0
   const credentialsFailed = failure?.kind === 'credenciales'
@@ -61,6 +67,17 @@ export function LoginForm({ form, keyboardOpen }: LoginFormProps) {
           Use su código SIS y su contraseña institucional.
         </p>
       </div>
+
+      {accountDeactivated && (
+        <Alert
+          role="status"
+          className="border-warn-border bg-warn-soft text-sm text-warn-fg"
+          data-notice="cuenta-inactiva"
+        >
+          <TriangleAlert aria-hidden="true" />
+          <AlertTitle>{INACTIVE_ACCOUNT_NOTICE}</AlertTitle>
+        </Alert>
+      )}
 
       {sessionExpired && (
         <Alert
