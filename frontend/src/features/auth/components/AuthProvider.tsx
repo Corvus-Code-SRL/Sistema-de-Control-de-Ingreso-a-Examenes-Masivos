@@ -1,5 +1,10 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ApiError, configureSessionHandlers } from '@/lib/api-client'
+import {
+  ApiError,
+  INACTIVE_ACCOUNT_MOTIVO,
+  configureSessionHandlers,
+  type SessionEndReason,
+} from '@/lib/api-client'
 import { confirmPassword, getSession, login, logout } from '../services/authService'
 import { clearStoredToken, readStoredToken, storeToken } from '../services/tokenStorage'
 import type { AuthState, SessionRole } from '../types/auth.types'
@@ -17,6 +22,8 @@ import type { AuthState, SessionRole } from '../types/auth.types'
  * - `autenticado`: sesión vigente.
  * - `expirada`: una petición con token recibió 401. El token ya no sirve: ProtectedRoute redirige
  *   al login, que muestra «Su sesión expiró», y tras entrar se vuelve a la ruta en la que estaba.
+ *   Si la respuesta fue un 403 `cuenta_inactiva` (la cuenta se deshabilitó con la sesión abierta), el
+ *   flujo es el mismo y `motivoSesion` hace que el login muestre «Su cuenta está inactiva…».
  */
 
 export interface IniciarSesionOptions {
@@ -70,12 +77,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState(next)
   }, [])
 
-  const expire = useCallback(() => {
+  const expire = useCallback((reason?: SessionEndReason) => {
     if (tokenRef.current === null) return
 
     clearStoredToken()
     tokenRef.current = null
-    setState((previous) => ({ ...previous, token: null, estado: 'expirada' }))
+    setState((previous) => ({ ...previous, token: null, estado: 'expirada', motivoSesion: reason }))
   }, [])
 
   const handlers = useRef({ getToken: () => tokenRef.current, onSessionExpired: expire })
@@ -105,6 +112,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return
+
+        // Una cuenta deshabilitada ya dejó la sesión como expirada (el cliente HTTP lo avisó): se
+        // conserva para que el login muestre por qué, en vez de volver a anónimo sin mensaje.
+        if (error instanceof ApiError && error.isForbidden && error.motivo === INACTIVE_ACCOUNT_MOTIVO) return
 
         // Un token vencido o una cuenta que ya no puede entrar no son culpa del usuario: se
         // descarta sin mensaje. Un fallo de red o un 500 no prueba nada: el token se conserva.
