@@ -153,7 +153,7 @@ class UserRoleService
     {
         $activeGroups = DB::table('grupo')
             ->where('grupo.id_usuario_docente', $user->id_usuario)
-            ->where('grupo.id_periodo', $this->subjectCatalog->activePeriodId())
+            ->where('grupo.id_gestion_periodo', $this->subjectCatalog->activePeriodId())
             ->where('grupo.estado', RecordStatus::ACTIVE);
 
         $groupCount = (clone $activeGroups)->count();

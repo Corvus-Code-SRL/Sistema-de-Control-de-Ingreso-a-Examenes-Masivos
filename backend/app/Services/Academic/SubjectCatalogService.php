@@ -3,6 +3,7 @@
 namespace App\Services\Academic;
 
 use App\Exceptions\Academic\ActivePeriodNotConfiguredException;
+use App\Models\AcademicOffering;
 use App\Models\Group;
 use App\Models\Period;
 use App\Models\SubjectCareer;
@@ -15,13 +16,18 @@ use Illuminate\Validation\ValidationException;
  * Consulta el catálogo institucional de materias como pares materia-carrera.
  *
  * El docente no tiene relación directa con la materia: su vínculo se deriva de los
- * grupos que dicta en el periodo activo.
+ * grupos que dicta en el periodo activo. Solo ve los pares que la oferta académica del
+ * periodo activo (oferta_academica) incluye: una materia que no se dicta ese periodo no
+ * aparece, aunque siga en el catálogo, y puede ofertarse de nuevo después.
  */
 class SubjectCatalogService
 {
     public function listSubjectCareers(string $teacherId): array
     {
-        $pairs = $this->basePairQuery($teacherId)
+        $periodId = $this->activePeriodId();
+
+        $pairs = $this->basePairQuery($teacherId, $periodId)
+            ->whereExists($this->activeOfferingConstraint($periodId))
             ->orderBy('materia.nombre')
             ->orderBy('carrera.nombre')
             ->get();
@@ -31,8 +37,8 @@ class SubjectCatalogService
             'meta' => [
                 'total' => $pairs->count(),
                 'total_mias' => $pairs->where('cantidad_grupos', '>', 0)->count(),
-                'id_periodo_activo' => $this->activePeriodId(),
-                'nombre_periodo_activo' => $this->activePeriodName(),
+                'id_periodo_activo' => $periodId,
+                'nombre_periodo_activo' => $this->periodLabel($periodId),
             ],
             'mensaje' => $pairs->isEmpty()
                 ? 'No hay materias disponibles en el catálogo institucional.'
@@ -83,14 +89,14 @@ class SubjectCatalogService
      * Subconsulta correlacionada: cuántos grupos dicta el docente en el par de cada fila.
      * Resuelve "mis materias" sin lanzar una consulta por registro.
      */
-    private function teacherGroupCountQuery(string $teacherId): Builder
+    private function teacherGroupCountQuery(string $teacherId, int $periodId): Builder
     {
         return Group::query()
             ->selectRaw('count(*)')
             ->whereColumn('grupo.id_carrera', 'materia_carrera.id_carrera')
             ->whereColumn('grupo.id_materia', 'materia_carrera.id_materia')
             ->where('grupo.id_usuario_docente', $teacherId)
-            ->where('grupo.id_periodo', $this->activePeriodId())
+            ->where('grupo.id_gestion_periodo', $periodId)
             ->where('grupo.estado', RecordStatus::ACTIVE);
     }
 

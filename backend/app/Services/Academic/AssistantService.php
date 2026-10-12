@@ -223,7 +223,7 @@ class AssistantService
     {
         return Group::query()
             ->where('id_usuario_docente', $teacherId)
-            ->where('id_periodo', $this->subjectCatalog->activePeriodId())
+            ->where('id_gestion_periodo', $this->subjectCatalog->activePeriodId())
             ->where('estado', RecordStatus::ACTIVE)
             ->with('subject')
             ->orderBy('id_materia')
@@ -677,7 +677,7 @@ class AssistantService
     private function constrainToActiveGroups($query, string $teacherId, int $periodId): void
     {
         $query->where('grupo.id_usuario_docente', $teacherId)
-            ->where('grupo.id_periodo', $periodId)
+            ->where('grupo.id_gestion_periodo', $periodId)
             ->where('grupo.estado', RecordStatus::ACTIVE)
             ->where('grupo_auxiliar.estado', RecordStatus::ACTIVE);
     }

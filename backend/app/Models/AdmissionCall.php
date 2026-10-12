@@ -11,8 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * @property int $id_admision
  * @property int $id_facultad
- * @property int $id_periodo
- * @property string $gestion
+ * @property int $id_gestion_periodo
  * @property string $nro_opciones
  * @property string $estado
  */
@@ -24,13 +23,12 @@ class AdmissionCall extends Model
 
     protected $casts = [
         'id_facultad' => 'int',
-        'id_periodo' => 'int',
+        'id_gestion_periodo' => 'int',
     ];
 
     protected $fillable = [
         'id_facultad',
-        'id_periodo',
-        'gestion',
+        'id_gestion_periodo',
         'nro_opciones',
         'estado'
     ];
@@ -42,7 +40,7 @@ class AdmissionCall extends Model
 
     public function period(): BelongsTo
     {
-        return $this->belongsTo(Period::class, 'id_periodo', 'id_periodo');
+        return $this->belongsTo(Period::class, 'id_gestion_periodo', 'id_gestion_periodo');
     }
 
     public function admissionExams(): HasMany

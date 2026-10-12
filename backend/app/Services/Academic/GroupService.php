@@ -2,6 +2,7 @@
 
 namespace App\Services\Academic;
 
+use App\Models\AcademicOffering;
 use App\Models\Group;
 use App\Models\Period;
 use App\Models\User;
@@ -31,13 +32,13 @@ class GroupService
 
     public function listGroupsForPair(int $careerId, int $subjectId, string $teacherId): array
     {
-        $pair = $this->subjectCatalog->findSelectablePair($careerId, $subjectId, $teacherId);
+        $pair = $this->subjectCatalog->findOfferedPair($careerId, $subjectId, $teacherId);
 
         $groups = $this->markOwnGroups(
             $this->baseGroupQuery()
                 ->where('grupo.id_carrera', $careerId)
                 ->where('grupo.id_materia', $subjectId)
-                ->where('grupo.id_periodo', $this->subjectCatalog->activePeriodId())
+                ->where('grupo.id_gestion_periodo', $this->subjectCatalog->activePeriodId())
                 ->orderBy('grupo.num_grupo')
                 ->get(),
             $teacherId
@@ -89,7 +90,7 @@ class GroupService
             'pair' => $pair,
             'meta' => [
                 'id_periodo_activo' => $activePeriodId,
-                'es_periodo_activo' => (int) $group->id_periodo === $activePeriodId,
+                'es_periodo_activo' => (int) $group->id_gestion_periodo === $activePeriodId,
             ],
         ];
     }
@@ -258,14 +259,13 @@ class GroupService
     }
 
     /**
-     * CA 8 (HU-18) y CA 5 (HU-19): la quíntupla completa (carrera, materia, número
-     * de grupo, gestión, período) es lo que define duplicidad, nunca la materia sola.
+     * CA 8 (HU-18) y CA 5 (HU-19): (carrera, materia, número de grupo, período) define la
+     * duplicidad, nunca la materia sola. La gestión ya viaja dentro del período.
      */
     private function assertNoDuplicateGroup(
         int $careerId,
         int $subjectId,
         string $groupNumber,
-        string $management,
         int $periodId,
         ?int $excludeGroupId = null
     ): void {
@@ -273,8 +273,7 @@ class GroupService
             ->where('id_carrera', $careerId)
             ->where('id_materia', $subjectId)
             ->where('num_grupo', $groupNumber)
-            ->where('gestion', $management)
-            ->where('id_periodo', $periodId)
+            ->where('id_gestion_periodo', $periodId)
             ->when($excludeGroupId !== null, function (Builder $query) use ($excludeGroupId): void {
                 $query->where('id_grupo', '!=', $excludeGroupId);
             })
@@ -295,10 +294,20 @@ class GroupService
         ]);
     }
 
-    private function isUniqueViolation(QueryException $exception): bool
+    /**
+     * 23505 (unique_violation): otra solicitud creó el mismo grupo. 23503 (foreign_key_violation):
+     * la oferta del par en ese período desapareció entre la validación y la escritura.
+     */
+    private function translateDatabaseError(QueryException $exception): \Throwable
     {
-        // 23505 es el SQLSTATE de "unique_violation" en PostgreSQL.
-        return $exception->getCode() === '23505';
+        switch ($exception->getCode()) {
+            case '23505':
+                return $this->duplicateGroupException();
+            case '23503':
+                return $this->pairNotOfferedException();
+            default:
+                return $exception;
+        }
     }
 
     /**
