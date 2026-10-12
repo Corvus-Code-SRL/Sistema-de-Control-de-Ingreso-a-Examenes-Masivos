@@ -25,6 +25,10 @@ class DatabaseSchemaTest extends TestCase
         $this->assertTrue(Schema::hasTable('estudiante'));
         $this->assertTrue(Schema::hasTable('grupo'));
         $this->assertTrue(Schema::hasTable('grupo_estudiante'));
+        $this->assertTrue(Schema::hasTable('gestion'));
+        $this->assertTrue(Schema::hasTable('periodo'));
+        $this->assertTrue(Schema::hasTable('gestion_periodo'));
+        $this->assertTrue(Schema::hasTable('oferta_academica'));
     }
 
     public function testStudentCiIsNullable(): void
@@ -87,22 +91,131 @@ class DatabaseSchemaTest extends TestCase
         $this->assertRejected(fn () => $this->insertExam($teacher, ['minutos_apertura' => -1]));
     }
 
-    public function testPeriodGestionIsASmallintBetween1900And2200(): void
+    public function testGestionYearIsASmallintBetween2000And2100AndUnique(): void
     {
         $type = DB::selectOne(
             "select data_type from information_schema.columns
-             where table_schema = 'public' and table_name = 'periodo' and column_name = 'gestion'"
+             where table_schema = 'public' and table_name = 'gestion' and column_name = 'anio'"
         );
         $this->assertSame('smallint', $type->data_type);
 
-        DB::table('periodo')->insert(['nombre_periodo' => '1-2026', 'gestion' => 2026]);
+        DB::table('gestion')->insert(['anio' => 2026, 'estado' => 'ACTIVO']);
 
-        $this->assertRejected(
-            fn () => DB::table('periodo')->insert(['nombre_periodo' => '1-1899', 'gestion' => 1899])
+        $this->assertRejected(fn () => DB::table('gestion')->insert(['anio' => 1999, 'estado' => 'ACTIVO']));
+        $this->assertRejected(fn () => DB::table('gestion')->insert(['anio' => 2101, 'estado' => 'ACTIVO']));
+        $this->assertRejected(fn () => DB::table('gestion')->insert(['anio' => 2026, 'estado' => 'ACTIVO']));
+    }
+
+    public function testPeriodoIsAFixedCatalogOfFiveEntries(): void
+    {
+        $rows = DB::table('periodo')->orderBy('codigo')->get(['codigo', 'nombre'])
+            ->map(fn ($row) => $row->codigo . ':' . $row->nombre)
+            ->all();
+
+        $this->assertSame(['0:Anual', '1:1', '2:2', '3:Verano', '4:Invierno'], $rows);
+
+        $this->assertRejected(fn () => DB::table('periodo')->insert(['codigo' => 1, 'nombre' => 'Otro']));
+        $this->assertRejected(fn () => DB::table('periodo')->insert(['codigo' => 9, 'nombre' => '1']));
+    }
+
+    public function testGestionPeriodoIsUniquePerYearAndPeriodWithASingleActiveRow(): void
+    {
+        $yearId = DB::table('gestion')->insertGetId(['anio' => 2026, 'estado' => 'ACTIVO'], 'id_gestion');
+        $first = (int) DB::table('periodo')->where('codigo', 1)->value('id_periodo');
+        $second = (int) DB::table('periodo')->where('codigo', 2)->value('id_periodo');
+
+        $firstId = DB::table('gestion_periodo')->insertGetId(
+            ['id_gestion' => $yearId, 'id_periodo' => $first, 'activo' => true],
+            'id_gestion_periodo'
         );
-        $this->assertRejected(
-            fn () => DB::table('periodo')->insert(['nombre_periodo' => '1-2201', 'gestion' => 2201])
+
+        // (gestión, período) es único.
+        $this->assertRejected(fn () => DB::table('gestion_periodo')->insert(
+            ['id_gestion' => $yearId, 'id_periodo' => $first, 'activo' => false]
+        ));
+
+        // Solo una fila puede estar activa; las inactivas no tienen tope.
+        $this->assertRejected(fn () => DB::table('gestion_periodo')->insert(
+            ['id_gestion' => $yearId, 'id_periodo' => $second, 'activo' => true]
+        ));
+        DB::table('gestion_periodo')->insert(
+            ['id_gestion' => $yearId, 'id_periodo' => $second, 'activo' => false]
         );
+
+        // Las fechas son opcionales, pero el fin no puede ser anterior al inicio.
+        $this->assertRejected(fn () => DB::table('gestion_periodo')->where('id_gestion_periodo', $firstId)->update(
+            ['fecha_inicio' => '2026-08-01', 'fecha_fin' => '2026-07-01']
+        ));
+        $this->assertSame(
+            1,
+            DB::table('gestion_periodo')->where('activo', true)->count()
+        );
+    }
+
+    public function testAGroupCanOnlyExistForAnOfferedPairInItsPeriod(): void
+    {
+        $teacher = $this->insertUser('docente');
+
+        // insertGroup() ofrece el par en su período antes de crear el grupo.
+        $groupId = $this->insertGroup($teacher);
+        $group = DB::table('grupo')->where('id_grupo', $groupId)->first();
+
+        $this->assertSame(
+            1,
+            DB::table('oferta_academica')
+                ->where('id_carrera', $group->id_carrera)
+                ->where('id_materia', $group->id_materia)
+                ->where('id_gestion_periodo', $group->id_gestion_periodo)
+                ->count()
+        );
+
+        // Otro período donde el par no se ofrece: la clave compuesta de grupo lo rechaza.
+        $yearId = (int) DB::table('gestion')->value('id_gestion');
+        $typeId = (int) DB::table('periodo')->where('codigo', 2)->value('id_periodo');
+        $otherPeriod = DB::table('gestion_periodo')->insertGetId(
+            ['id_gestion' => $yearId, 'id_periodo' => $typeId],
+            'id_gestion_periodo'
+        );
+
+        $this->assertRejected(fn () => DB::table('grupo')->insert([
+            'id_carrera' => $group->id_carrera,
+            'id_materia' => $group->id_materia,
+            'num_grupo' => '2',
+            'estado' => 'ACTIVO',
+            'id_usuario_docente' => $teacher,
+            'id_gestion_periodo' => $otherPeriod,
+        ]));
+
+        // La unicidad del grupo ya no incluye ninguna «gestión» textual.
+        $this->assertRejected(fn () => DB::table('grupo')->insert([
+            'id_carrera' => $group->id_carrera,
+            'id_materia' => $group->id_materia,
+            'num_grupo' => $group->num_grupo,
+            'estado' => 'ACTIVO',
+            'id_usuario_docente' => $teacher,
+            'id_gestion_periodo' => $group->id_gestion_periodo,
+        ]));
+
+        $this->assertFalse(Schema::hasColumn('grupo', 'gestion'));
+        $this->assertFalse(Schema::hasColumn('grupo', 'id_periodo'));
+        $this->assertFalse(Schema::hasColumn('convocatoria_admision', 'gestion'));
+        $this->assertTrue(Schema::hasColumn('convocatoria_admision', 'id_gestion_periodo'));
+    }
+
+    public function testAnOfferingNeedsAnExistingSubjectCareerPair(): void
+    {
+        $yearId = DB::table('gestion')->insertGetId(['anio' => 2026, 'estado' => 'ACTIVO'], 'id_gestion');
+        $typeId = (int) DB::table('periodo')->where('codigo', 1)->value('id_periodo');
+        $periodId = DB::table('gestion_periodo')->insertGetId(
+            ['id_gestion' => $yearId, 'id_periodo' => $typeId],
+            'id_gestion_periodo'
+        );
+
+        $this->assertRejected(fn () => DB::table('oferta_academica')->insert([
+            'id_carrera' => 987654,
+            'id_materia' => 987654,
+            'id_gestion_periodo' => $periodId,
+        ]));
     }
 
     public function testAnExamCanOnlyBeCancelledWhileItIsScheduled(): void
@@ -242,6 +355,50 @@ class DatabaseSchemaTest extends TestCase
         }
     }
 
+    /** El esquema final de gestión, período y oferta académica está descrito en el script. */
+    public function testCreationScriptDeclaresTheGestionPeriodoModel(): void
+    {
+        $script = file_get_contents(base_path('../docs/database/creation-script.sql'));
+
+        $constraints = collect(DB::select(
+            "select conname from pg_constraint
+             where conrelid in (
+                 'public.gestion'::regclass,
+                 'public.periodo'::regclass,
+                 'public.gestion_periodo'::regclass,
+                 'public.oferta_academica'::regclass
+             ) and contype in ('p', 'f', 'u', 'c')"
+        ))->pluck('conname');
+
+        $indexes = collect(DB::select(
+            "select indexname from pg_indexes
+             where schemaname = 'public'
+               and indexname in (
+                   'unq_gestion_periodo_activo', 'idx_gestion_periodo_gestion', 'idx_gestion_periodo_periodo',
+                   'idx_oferta_academica_gestion_periodo', 'idx_oferta_academica_materia_carrera',
+                   'idx_grupo_gestion_periodo', 'idx_convocatoria_admision_gestion_periodo'
+               )"
+        ))->pluck('indexname');
+
+        $grupoConstraints = collect(DB::select(
+            "select conname from pg_constraint
+             where conrelid = 'public.grupo'::regclass
+               and conname in ('unq_grupo', 'fk_grupo_oferta_academica', 'fk_grupo_gestion_periodo')"
+        ))->pluck('conname');
+
+        $objects = $constraints->merge($indexes)->merge($grupoConstraints);
+
+        $this->assertGreaterThanOrEqual(15, $objects->count());
+
+        foreach ($objects as $name) {
+            $this->assertStringContainsString($name, $script, "El script no declara {$name}.");
+        }
+
+        foreach (['gestion_periodo', 'oferta_academica', 'id_gestion_periodo', 'Invierno'] as $word) {
+            $this->assertStringContainsString($word, $script);
+        }
+    }
+
     public function testUsuarioTracksPendingPasswordChangeAndDefaultsToFalse(): void
     {
         $column = DB::selectOne(
@@ -363,16 +520,26 @@ class DatabaseSchemaTest extends TestCase
         DB::table('materia_carrera')->insert(
             ['id_carrera' => $careerId, 'id_materia' => $subjectId, 'estado' => 'ACTIVO']
         );
-        $periodId = DB::table('periodo')->insertGetId(['nombre_periodo' => '1-2026', 'gestion' => 2026], 'id_periodo');
+        $yearId = DB::table('gestion')->insertGetId(['anio' => 2026, 'estado' => 'ACTIVO'], 'id_gestion');
+        $typeId = (int) DB::table('periodo')->where('codigo', 1)->value('id_periodo');
+        $periodId = DB::table('gestion_periodo')->insertGetId(
+            ['id_gestion' => $yearId, 'id_periodo' => $typeId],
+            'id_gestion_periodo'
+        );
+
+        DB::table('oferta_academica')->insert([
+            'id_carrera' => $careerId,
+            'id_materia' => $subjectId,
+            'id_gestion_periodo' => $periodId,
+        ]);
 
         return DB::table('grupo')->insertGetId([
             'id_carrera' => $careerId,
             'id_materia' => $subjectId,
             'num_grupo' => '1',
-            'gestion' => '2026',
             'estado' => 'ACTIVO',
             'id_usuario_docente' => $teacherId,
-            'id_periodo' => $periodId,
+            'id_gestion_periodo' => $periodId,
         ], 'id_grupo');
     }
 
