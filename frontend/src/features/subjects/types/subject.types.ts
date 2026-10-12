@@ -35,7 +35,7 @@ export interface SubjectCatalogMeta {
   total: number
   total_mias: number
   id_periodo_activo: number
-  /** Nombre del período activo («2-2026»); `null` si no está registrado en el catálogo. */
+  /** Etiqueta del período activo («2/2026», «Verano 2026»); `null` si no hay un período activo. */
   nombre_periodo_activo: string | null
 }
 

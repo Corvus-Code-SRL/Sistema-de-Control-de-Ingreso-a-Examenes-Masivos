@@ -190,7 +190,7 @@ export function RegistrarGrupoForm({
               <SelectContent>
                 {periods.map((period) => (
                   <SelectItem key={period.id_periodo} value={String(period.id_periodo)} className="text-xs">
-                    {period.nombre_periodo}-{period.gestion}
+                    {period.nombre_periodo}
                     {period.id_periodo === activePeriodId ? ' (activo)' : ''}
                   </SelectItem>
                 ))}

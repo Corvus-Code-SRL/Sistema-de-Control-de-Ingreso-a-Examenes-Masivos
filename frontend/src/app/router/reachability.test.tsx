@@ -34,7 +34,7 @@ function stubBackend(session: AccountKey) {
       return {
         body: {
           data: [],
-          meta: { total: 0, total_mias: 0, id_periodo_activo: 1, nombre_periodo_activo: '2-2026' },
+          meta: { total: 0, total_mias: 0, id_periodo_activo: 1, nombre_periodo_activo: '2/2026' },
         },
       }
     }
