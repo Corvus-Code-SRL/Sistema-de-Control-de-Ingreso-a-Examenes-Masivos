@@ -171,7 +171,6 @@ DB_USERNAME=postgres
 DB_PASSWORD=sciem_dev
 DB_SSLMODE=prefer
 REDIS_HOST=redis
-SCIEM_PERIODO_ACTIVO_ID=9303
 ```
 
 ```bash

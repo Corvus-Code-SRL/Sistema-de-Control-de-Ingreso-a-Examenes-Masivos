@@ -68,8 +68,9 @@ class ExamService
 
         $groups = Group::query()
             ->withStudentCount()
+            ->with('period')
             ->where('id_usuario_docente', $teacherId)
-            ->where('id_periodo', $this->subjectCatalog->activePeriodId())
+            ->where('id_gestion_periodo', $this->subjectCatalog->activePeriodId())
             ->where('estado', RecordStatus::ACTIVE)
             ->orderBy('id_carrera')
             ->orderBy('id_materia')
@@ -131,7 +132,7 @@ class ExamService
             ->where(function (Builder $query) use ($activePeriodId) {
                 $query->whereDoesntHave('groups')
                     ->orWhereHas('groups', function (Builder $groups) use ($activePeriodId) {
-                        $groups->where('grupo.id_periodo', $activePeriodId);
+                        $groups->where('grupo.id_gestion_periodo', $activePeriodId);
                     });
             })
             ->orderBy('fecha')

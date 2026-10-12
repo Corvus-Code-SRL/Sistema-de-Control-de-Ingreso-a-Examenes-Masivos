@@ -45,7 +45,7 @@ describe('ActualizarGrupoForm (HU-019)', () => {
     vi.clearAllMocks()
     mockUpdateGroup()
     mockedUsePeriods.mockReturnValue({
-      periods: [periodoActivo],
+      periods: [{ ...periodoActivo, activo: true }],
       activePeriodId: periodoActivo.id_periodo,
       isLoading: false,
       error: null,
@@ -57,7 +57,7 @@ describe('ActualizarGrupoForm (HU-019)', () => {
 
     expect(screen.getByLabelText(/N° de grupo/i)).toHaveValue('1')
     expect(screen.getByRole('combobox', { name: /Período académico/i })).toHaveTextContent(
-      '2-2026-2026'
+      '2/2026'
     )
     expect(screen.getByText('Bases de Datos I · Ingenieria de Sistemas')).toBeInTheDocument()
     expect(screen.getByText('Paola Careaga')).toBeInTheDocument()

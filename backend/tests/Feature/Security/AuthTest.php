@@ -10,6 +10,7 @@ use Database\Seeders\TestData\AccountTestDataSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Tests\Concerns\ActivatesPeriod;
 use Tests\TestCase;
 
 /**
@@ -18,6 +19,7 @@ use Tests\TestCase;
  */
 class AuthTest extends TestCase
 {
+    use ActivatesPeriod;
     use DatabaseTransactions;
 
     private const TEACHER_ID = '00000000-0000-4000-8000-000000000011';
@@ -326,6 +328,8 @@ class AuthTest extends TestCase
 
     public function test_las_rutas_que_antes_estaban_abiertas_ahora_exigen_token(): void
     {
+        $this->activatePeriod();
+
         $this->getJson('/api/periodos')->assertStatus(401);
         $this->getJson('/api/materias')->assertStatus(401);
 

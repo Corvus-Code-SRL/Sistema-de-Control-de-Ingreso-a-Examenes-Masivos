@@ -2,13 +2,15 @@
 
 `backend/database/migrations/2026_09_25_000000_create_baseline_schema.php` reproduce el esquema vigente
 (7 tipos enum, 36 tablas, índices, restricciones y un trigger, con HU-21, HU-24, las tablas de auxiliares
-(`grupo_auxiliar`, `examen_auxiliar`), `examen.minutos_apertura` y `periodo.gestion` ya incorporados).
+(`grupo_auxiliar`, `examen_auxiliar`), `examen.minutos_apertura` y `periodo.gestion` ya incorporados;
+la gestión, el período y la oferta académica se normalizaron después: ver `periodo-activo.md`).
 Ejecuta `backend/database/schema/baseline.sql`, que es el comienzo exacto de `docs/database/creation-script.sql`
 (lo verifica `DatabaseSchemaTest`). Ese archivo y la migración no se editan nunca: todo cambio
 estructural posterior va en una migración nueva (`php artisan make:migration ...`) y, para que
 `creation-script.sql` siga siendo el esquema final, el SQL equivalente se **agrega al final** de ese script, en la
-sección «CAMBIOS POSTERIORES A LA BASE» (hoy: la migración `2026_09_29_000001` de HU-11 y las dos de HU-001,
-`2026_10_11_000001` y `2026_10_11_000002`).
+sección «CAMBIOS POSTERIORES A LA BASE» (hoy: la migración `2026_09_29_000001` de HU-11, las dos de HU-001,
+`2026_10_11_000001` y `2026_10_11_000002`, y las dos de gestión y período, `2026_10_12_000001` y
+`2026_10_12_000002`, que agregan `gestion`, `gestion_periodo` y `oferta_academica`; ver `periodo-activo.md`).
 
 Sustituye a las seis migraciones parciales anteriores (`create_enum_types`, `create_rol_table`,
 `create_usuario_table`, `create_usuario_rol_table`, `create_accion_table`, `create_log_table`), que solo

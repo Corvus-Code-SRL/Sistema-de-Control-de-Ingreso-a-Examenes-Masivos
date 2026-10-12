@@ -4,19 +4,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Periodo activo
-    |--------------------------------------------------------------------------
-    |
-    | La tabla periodo no tiene ninguna columna que indique cuál está vigente,
-    | así que el periodo activo se resuelve por configuración hasta que exista
-    | una historia de usuario que lo administre.
-    |
-    */
-
-    'periodo_activo_id' => env('SCIEM_PERIODO_ACTIVO_ID'),
-
-    /*
-    |--------------------------------------------------------------------------
     | Cuenta de sistema (seeders y comandos)
     |--------------------------------------------------------------------------
     |

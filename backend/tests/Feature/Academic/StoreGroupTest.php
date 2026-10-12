@@ -3,6 +3,7 @@
 namespace Tests\Feature\Academic;
 
 use App\Models\Group;
+use App\Support\RecordStatus;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\SeedsAssistantManagement;
@@ -55,8 +56,7 @@ class StoreGroupTest extends TestCase
             'id_carrera' => $this->sistemasId,
             'id_materia' => $this->calculoId,
             'num_grupo' => 'NUEVO',
-            'gestion' => '2026',
-            'id_periodo' => $this->periodoActivoId,
+            'id_gestion_periodo' => $this->periodoActivoId,
             'id_usuario_docente' => $this->docenteId,
         ]);
     }
@@ -121,13 +121,15 @@ class StoreGroupTest extends TestCase
             'id_carrera' => $this->informaticaId,
             'id_materia' => $this->calculoId,
             'num_grupo' => '1',
-            'id_periodo' => $this->periodoActivoId,
+            'id_gestion_periodo' => $this->periodoActivoId,
         ]);
     }
 
     /** CA 3: el mismo número en otro período no es duplicado. */
     public function test_permite_el_mismo_numero_de_grupo_en_otro_periodo(): void
     {
+        $this->offerPair($this->sistemasId, $this->calculoId, $this->periodoAnteriorId);
+
         $this->postJson('/api/grupos', $this->payload([
             'num_grupo' => '1',
             'id_periodo' => $this->periodoAnteriorId,
@@ -137,8 +139,7 @@ class StoreGroupTest extends TestCase
             'id_carrera' => $this->sistemasId,
             'id_materia' => $this->calculoId,
             'num_grupo' => '1',
-            'id_periodo' => $this->periodoAnteriorId,
-            'gestion' => '2025',
+            'id_gestion_periodo' => $this->periodoAnteriorId,
         ]);
     }
 
@@ -248,7 +249,7 @@ class StoreGroupTest extends TestCase
 
         $this->assertDatabaseHas('grupo', [
             'num_grupo' => 'SP',
-            'id_periodo' => $this->periodoActivoId,
+            'id_gestion_periodo' => $this->periodoActivoId,
         ]);
     }
 
@@ -258,11 +259,75 @@ class StoreGroupTest extends TestCase
         $this->getJson('/api/periodos')
             ->assertOk()
             ->assertJsonPath('meta.id_periodo_activo', $this->periodoActivoId)
-            ->assertJsonCount(2, 'data');
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id_periodo', $this->periodoActivoId)
+            ->assertJsonPath('data.0.nombre_periodo', '1/2026')
+            ->assertJsonPath('data.0.gestion', 2026)
+            ->assertJsonPath('data.0.activo', true)
+            ->assertJsonPath('data.1.id_periodo', $this->periodoAnteriorId)
+            ->assertJsonPath('data.1.nombre_periodo', '2/2025')
+            ->assertJsonPath('data.1.activo', false);
+    }
+
+    /** La oferta académica manda: un par no ofertado en el período elegido no admite grupos. */
+    public function test_rechaza_registrar_en_un_periodo_donde_la_materia_no_se_ofrece(): void
+    {
+        $antes = Group::count();
+
+        $response = $this->postJson('/api/grupos', $this->payload([
+            'num_grupo' => 'NOOF',
+            'id_periodo' => $this->periodoAnteriorId,
+        ]));
+
+        $response->assertStatus(422)->assertJsonValidationErrors('id_periodo');
+        $this->assertStringContainsString(
+            'no se ofrece en el período',
+            $response->json('errors.id_periodo.0')
+        );
+        $this->assertSame($antes, Group::count());
+        $this->assertDatabaseMissing('grupo', ['num_grupo' => 'NOOF']);
+    }
+
+    public function test_una_oferta_inactiva_tampoco_admite_grupos(): void
+    {
+        $this->offerPair(
+            $this->sistemasId,
+            $this->calculoId,
+            $this->periodoAnteriorId,
+            RecordStatus::INACTIVE
+        );
+
+        $this->postJson('/api/grupos', $this->payload([
+            'num_grupo' => 'OFIN',
+            'id_periodo' => $this->periodoAnteriorId,
+        ]))->assertStatus(422)->assertJsonValidationErrors('id_periodo');
+    }
+
+    public function test_el_periodo_activo_sin_oferta_del_par_responde_422(): void
+    {
+        // El par existe y está activo, pero esta materia no se dicta este período.
+        $this->dontOfferPair($this->sistemasId, $this->materiaInactivaId, $this->periodoActivoId);
+        $subjectId = \App\Models\Subject::create([
+            'nombre' => 'Electiva',
+            'codigo' => 'ELE-9',
+            'estado' => RecordStatus::ACTIVE,
+        ])->id_materia;
+        \App\Models\SubjectCareer::create([
+            'id_carrera' => $this->sistemasId,
+            'id_materia' => $subjectId,
+            'estado' => RecordStatus::ACTIVE,
+        ]);
+
+        $this->postJson('/api/grupos', $this->payload([
+            'id_materia' => $subjectId,
+            'num_grupo' => '1',
+        ]))->assertStatus(422)->assertJsonValidationErrors('id_periodo');
     }
 
     public function test_permite_verificar_y_elegir_otro_periodo_al_registrar(): void
     {
+        $this->offerPair($this->sistemasId, $this->calculoId, $this->periodoAnteriorId);
+
         $this->postJson('/api/grupos', $this->payload([
             'num_grupo' => 'PA',
             'id_periodo' => $this->periodoAnteriorId,
@@ -270,8 +335,7 @@ class StoreGroupTest extends TestCase
 
         $this->assertDatabaseHas('grupo', [
             'num_grupo' => 'PA',
-            'id_periodo' => $this->periodoAnteriorId,
-            'gestion' => '2025',
+            'id_gestion_periodo' => $this->periodoAnteriorId,
         ]);
     }
 

@@ -170,10 +170,9 @@ class ExamParticipantServiceTest extends TestCase
             'id_carrera' => $this->sistemasId,
             'id_materia' => $this->calculoId,
             'num_grupo' => '8',
-            'gestion' => '2026',
             'estado' => RecordStatus::ACTIVE,
             'id_usuario_docente' => $this->docenteId,
-            'id_periodo' => $this->periodoActivoId,
+            'id_gestion_periodo' => $this->periodoActivoId,
         ]);
         [$first] = $this->rosterStudentIds($this->grupoPropioId);
 

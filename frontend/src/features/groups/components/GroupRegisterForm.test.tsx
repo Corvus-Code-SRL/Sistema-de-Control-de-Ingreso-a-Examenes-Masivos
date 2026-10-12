@@ -17,7 +17,7 @@ const submit = vi.fn()
 const onCancel = vi.fn()
 const onRegistered = vi.fn()
 
-const periodoAnterior = { id_periodo: 2, nombre_periodo: '1-2026', gestion: 2026 }
+const periodoAnterior = { id_periodo: 2, nombre_periodo: '1/2026', gestion: 2026, activo: false }
 
 function mockCreateGroup(overrides: Partial<ReturnType<typeof useCreateGroup>> = {}) {
   mockedUseCreateGroup.mockReturnValue({
@@ -48,7 +48,7 @@ describe('RegistrarGrupoForm (HU-018)', () => {
     vi.clearAllMocks()
     mockCreateGroup()
     mockedUsePeriods.mockReturnValue({
-      periods: [periodoActivo, periodoAnterior],
+      periods: [{ ...periodoActivo, activo: true }, periodoAnterior],
       activePeriodId: periodoActivo.id_periodo,
       isLoading: false,
       error: null,
@@ -100,7 +100,7 @@ describe('RegistrarGrupoForm (HU-018)', () => {
     renderForm()
 
     expect(screen.getByRole('combobox', { name: /Período académico/i })).toHaveTextContent(
-      '2-2026-2026 (activo)'
+      '2/2026 (activo)'
     )
     expect(screen.getByText(/Por defecto, el período activo/i)).toBeInTheDocument()
   })
@@ -115,7 +115,7 @@ describe('RegistrarGrupoForm (HU-018)', () => {
     const { rerender } = renderForm()
 
     mockedUsePeriods.mockReturnValue({
-      periods: [periodoActivo, periodoAnterior],
+      periods: [{ ...periodoActivo, activo: true }, periodoAnterior],
       activePeriodId: periodoActivo.id_periodo,
       isLoading: false,
       error: null,

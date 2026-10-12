@@ -2,11 +2,16 @@ import type { ExamStatus } from '@/features/exams'
 import type { SubjectCareer } from '@/features/subjects'
 import type { ResourceResponse } from '@/types/api.types'
 
-/** Periodo académico al que pertenece un grupo. */
+/**
+ * Periodo académico al que pertenece un grupo (una fila de `gestion_periodo`).
+ *
+ * `id_periodo` es el id de esa instancia y `nombre_periodo` su etiqueta completa («1/2026»,
+ * «Verano 2026»): ya incluye el año, no hay que concatenarle `gestion`.
+ */
 export interface Period {
   id_periodo: number
   nombre_periodo: string
-  /** `periodo.gestion` es smallint: el año. */
+  /** Año de la gestión (`gestion.anio`). */
   gestion: number
 }
 
@@ -142,6 +147,8 @@ export interface PeriodOption {
   id_periodo: number
   nombre_periodo: string
   gestion: number
+  /** Es el período vigente (`gestion_periodo.activo`); a lo sumo uno. */
+  activo: boolean
 }
 
 

@@ -176,10 +176,9 @@ class SubjectGroupsTest extends TestCase
                 'id_carrera' => $this->sistemasId,
                 'id_materia' => $this->calculoId,
                 'num_grupo' => $number,
-                'gestion' => '2026',
                 'estado' => RecordStatus::ACTIVE,
                 'id_usuario_docente' => $this->otroDocenteId,
-                'id_periodo' => $this->periodoActivoId,
+                'id_gestion_periodo' => $this->periodoActivoId,
             ]);
         }
 
@@ -192,6 +191,19 @@ class SubjectGroupsTest extends TestCase
         DB::disableQueryLog();
 
         $this->assertSame($consultasIniciales, $consultasConMasGrupos);
+    }
+
+    public function test_un_par_no_ofertado_en_el_periodo_activo_responde_404(): void
+    {
+        $this->seedAcademicCatalog();
+        $this->dontOfferPair($this->sistemasId, $this->materiaInactivaId, $this->periodoActivoId);
+        $this->offerPair($this->sistemasId, $this->materiaInactivaId, $this->periodoAnteriorId);
+        \Illuminate\Support\Facades\DB::table('materia')
+            ->where('id_materia', $this->materiaInactivaId)
+            ->update(['estado' => \App\Support\RecordStatus::ACTIVE]);
+
+        $this->getJson($this->groupsUrl($this->sistemasId, $this->materiaInactivaId))
+            ->assertNotFound();
     }
 
     private function groupsUrl(int $careerId, int $subjectId): string

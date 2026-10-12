@@ -24,9 +24,9 @@ class GroupResource extends JsonResource
                 ])),
             ],
             'periodo' => [
-                'id_periodo' => (int) $this->period->id_periodo,
-                'nombre_periodo' => $this->period->nombre_periodo,
-                'gestion' => (int) $this->period->gestion,
+                'id_periodo' => (int) $this->period->id_gestion_periodo,
+                'nombre_periodo' => $this->period->label,
+                'gestion' => $this->period->year,
             ],
         ];
     }

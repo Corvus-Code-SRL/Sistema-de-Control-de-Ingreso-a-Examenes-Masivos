@@ -203,10 +203,9 @@ class AssignGroupsTest extends TestCase
             'id_carrera' => $this->sistemasId,
             'id_materia' => $this->basesDatosId,
             'num_grupo' => '9',
-            'gestion' => '2026',
             'estado' => RecordStatus::ACTIVE,
             'id_usuario_docente' => $this->docenteId,
-            'id_periodo' => $this->periodoActivoId,
+            'id_gestion_periodo' => $this->periodoActivoId,
         ]);
         $this->enrollStudents($group->id_grupo, 1);
 
@@ -225,10 +224,9 @@ class AssignGroupsTest extends TestCase
             'id_carrera' => $this->informaticaId,
             'id_materia' => $this->calculoId,
             'num_grupo' => '9',
-            'gestion' => '2026',
             'estado' => RecordStatus::ACTIVE,
             'id_usuario_docente' => $this->docenteId,
-            'id_periodo' => $this->periodoActivoId,
+            'id_gestion_periodo' => $this->periodoActivoId,
         ]);
         $this->enrollStudents($group->id_grupo, 1);
 
@@ -308,10 +306,9 @@ class AssignGroupsTest extends TestCase
             'id_carrera' => $this->sistemasId,
             'id_materia' => $this->calculoId,
             'num_grupo' => '8',
-            'gestion' => '2026',
             'estado' => RecordStatus::ACTIVE,
             'id_usuario_docente' => $this->docenteId,
-            'id_periodo' => $this->periodoActivoId,
+            'id_gestion_periodo' => $this->periodoActivoId,
         ]);
         $studentId = DB::table('grupo_estudiante')
             ->where('id_grupo', $this->grupoPropioId)

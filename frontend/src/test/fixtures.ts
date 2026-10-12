@@ -29,7 +29,7 @@ export const informatica: Career = {
 
 export const periodoActivo: Period = {
   id_periodo: 3,
-  nombre_periodo: '2-2026',
+  nombre_periodo: '2/2026',
   gestion: 2026,
 }
 
@@ -103,7 +103,10 @@ export function subjectCatalogResponse(subjects: SubjectCareer[], mensaje: strin
 /** Respuesta cruda de `GET /periodos`: el período activo y el anterior. */
 export function periodsResponse() {
   return {
-    data: [periodoActivo, { id_periodo: 2, nombre_periodo: '1-2026', gestion: 2026 }],
+    data: [
+      { ...periodoActivo, activo: true },
+      { id_periodo: 2, nombre_periodo: '1/2026', gestion: 2026, activo: false },
+    ],
     meta: { id_periodo_activo: periodoActivo.id_periodo },
   }
 }

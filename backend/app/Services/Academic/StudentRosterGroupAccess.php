@@ -54,7 +54,7 @@ class StudentRosterGroupAccess
 
         // Sin período activo configurado lanza el error de configuración, no un 422 engañoso.
         if (
-            (int) $group->id_periodo
+            (int) $group->id_gestion_periodo
             !== $this->subjectCatalog->activePeriodId()
         ) {
             throw new StudentRosterGroupAccessException(

@@ -250,15 +250,14 @@ Todo el equipo trabaja con los mismos registros: cada valor está escrito a mano
 
 ### Cómo cargarlos
 
-1. Partir de una base creada con `docs/database/creation-script.sql`. Si la base ya tiene datos armados a mano con los mismos códigos (por ejemplo la carrera `SIS` o el periodo `2-2026` con otro id), el seeder se detiene sin escribir nada y lo explica.
-2. En `backend/.env`, `APP_ENV=local` (o `development`) y estos dos valores, que ya trae `.env.example`:
+1. Partir de una base creada con `docs/database/creation-script.sql`. Si la base ya tiene datos armados a mano con los mismos códigos (por ejemplo la carrera `SIS` o la gestión `2026` con otro id), el seeder se detiene sin escribir nada y lo explica.
+2. En `backend/.env`, `APP_ENV=local` (o `development`) y este valor, que ya trae `.env.example`:
 
     ```dotenv
-    SCIEM_PERIODO_ACTIVO_ID=9303
     SCIEM_USUARIO_PRUEBA=00000000-0000-4000-8000-000000000001
     ```
 
-    `SCIEM_PERIODO_ACTIVO_ID` es obligatorio: sin él, los endpoints que necesitan el periodo activo responden 500 con un mensaje que lo indica (`GET /api/periodos` sigue funcionando, con `id_periodo_activo` en `null`). El seeder crea el periodo `9303` que ese valor referencia.
+    El periodo activo **ya no se configura por entorno**: el seeder deja activo el período `9303` (`2/2026`) en `gestion_periodo.activo`. Sin ningún período activo, los endpoints que lo necesitan responden 500 con un mensaje que lo indica (`GET /api/periodos` sigue funcionando, con `id_periodo_activo` en `null`). Cómo activar otro, y cómo migrar una base con datos: `docs/database/periodo-activo.md`.
 
     > `SCIEM_DOCENTE_FIJO_ID` **ya no existe** (RNF-02): el usuario que actúa es el autenticado con su token. Un `.env` anterior que todavía la tenga no se rompe: la variable se ignora. `SCIEM_USUARIO_PRUEBA` queda solo para los seeders (`SystemActor`, ver `docs/architecture/usuario-actual.md`).
 

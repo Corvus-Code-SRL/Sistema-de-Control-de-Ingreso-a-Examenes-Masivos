@@ -41,7 +41,11 @@ final class TestDataIds
     public const SUBJECT_ACCOUNTING = 9207;
     public const SUBJECT_ARCHIVED = 9208;
 
-    // periodo.id_periodo
+    // gestion.id_gestion
+    public const YEAR_2025 = 9311;
+    public const YEAR_2026 = 9312;
+
+    // gestion_periodo.id_gestion_periodo (2/2025, 1/2026 y el período activo 2/2026)
     public const PERIOD_2025_2 = 9301;
     public const PERIOD_2026_1 = 9302;
     public const PERIOD_ACTIVE = 9303;

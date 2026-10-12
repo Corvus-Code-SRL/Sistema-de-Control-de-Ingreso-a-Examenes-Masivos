@@ -72,7 +72,7 @@ describe('SubjectsPage', () => {
     renderWithRouter(<SubjectsPage />, { route: '/materias' })
     await waitForLoad()
 
-    expect(screen.getByText('Período 2-2026')).toBeInTheDocument()
+    expect(screen.getByText('Período 2/2026')).toBeInTheDocument()
     expect(screen.queryByText('Período 3')).not.toBeInTheDocument()
   })
 

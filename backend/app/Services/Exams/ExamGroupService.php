@@ -154,7 +154,7 @@ class ExamGroupService
 
         foreach ($groups as $group) {
             $isValid = (string) $group->id_usuario_docente === $teacherId
-                && (int) $group->id_periodo === $activePeriodId
+                && (int) $group->id_gestion_periodo === $activePeriodId
                 && $group->estado === RecordStatus::ACTIVE
                 && (int) $group->id_carrera === (int) $exam->id_carrera
                 && (int) $group->id_materia === (int) $exam->id_materia;
