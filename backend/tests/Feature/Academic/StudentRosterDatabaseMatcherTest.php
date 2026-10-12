@@ -315,7 +315,7 @@ class StudentRosterDatabaseMatcherTest extends TestCase
             ->where('id_materia', $this->calculoId)
             ->where('num_grupo', '1')
             ->where('id_usuario_docente', $this->docenteId)
-            ->where('id_periodo', $this->periodoActivoId)
+            ->where('id_gestion_periodo', $this->periodoActivoId)
             ->value('id_grupo');
     }
 

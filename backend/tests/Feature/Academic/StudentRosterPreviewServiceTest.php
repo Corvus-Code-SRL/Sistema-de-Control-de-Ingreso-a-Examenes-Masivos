@@ -242,7 +242,7 @@ class StudentRosterPreviewServiceTest extends TestCase
                 $this->docenteId
             )
             ->where(
-                'id_periodo',
+                'id_gestion_periodo',
                 $this->periodoActivoId
             )
             ->where(

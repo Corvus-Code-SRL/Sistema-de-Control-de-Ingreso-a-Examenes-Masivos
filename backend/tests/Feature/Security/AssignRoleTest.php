@@ -291,6 +291,8 @@ class AssignRoleTest extends TestCase
 
     public function test_una_cuenta_sin_grupos_no_tiene_asignaciones_activas(): void
     {
+        $this->createPeriod(2026, 1, true);
+
         $this->getJson("/api/usuarios/{$this->account->id_usuario}/asignaciones")
             ->assertOk()
             ->assertJsonPath('data.grupos', 0)

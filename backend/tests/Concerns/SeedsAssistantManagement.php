@@ -31,7 +31,7 @@ trait SeedsAssistantManagement
         $this->seed(ActionSeeder::class);
 
         $this->segundoGrupoPropioId = (int) Group::where('id_usuario_docente', $this->docenteId)
-            ->where('id_periodo', $this->periodoActivoId)
+            ->where('id_gestion_periodo', $this->periodoActivoId)
             ->where('num_grupo', '2')
             ->value('id_grupo');
 

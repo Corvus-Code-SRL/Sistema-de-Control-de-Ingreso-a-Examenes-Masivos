@@ -2,7 +2,10 @@
 
 namespace Tests\Feature\Academic;
 
+use App\Models\Subject;
+use App\Models\SubjectCareer;
 use App\Models\User;
+use App\Support\RecordStatus;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\SeedsAcademicCatalog;
@@ -15,6 +18,7 @@ class SubjectCatalogTest extends TestCase
 
     public function test_catalogo_vacio_responde_con_mensaje(): void
     {
+        $this->createPeriod(2026, 1, true);
         $this->actingAs(User::factory()->create());
 
         $response = $this->getJson('/api/materias');
@@ -36,7 +40,7 @@ class SubjectCatalogTest extends TestCase
             ->assertJsonPath('meta.total', 5)
             ->assertJsonPath('meta.total_mias', 1)
             ->assertJsonPath('meta.id_periodo_activo', $this->periodoActivoId)
-            ->assertJsonPath('meta.nombre_periodo_activo', '2026-1');
+            ->assertJsonPath('meta.nombre_periodo_activo', '1/2026');
 
         $propia = $this->findPair($response->json('data'), $this->sistemasId, $this->calculoId);
         $ajena = $this->findPair($response->json('data'), $this->sistemasId, $this->basesDatosId);
@@ -80,6 +84,51 @@ class SubjectCatalogTest extends TestCase
 
         $this->assertFalse($pair['es_mia']);
         $this->assertSame(0, $pair['cantidad_grupos']);
+    }
+
+    public function test_una_materia_sin_oferta_en_el_periodo_activo_no_aparece(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $subjectId = Subject::create([
+            'nombre' => 'Electiva de verano',
+            'codigo' => 'ELE-1',
+            'estado' => RecordStatus::ACTIVE,
+        ])->id_materia;
+        SubjectCareer::create([
+            'id_carrera' => $this->sistemasId,
+            'id_materia' => $subjectId,
+            'estado' => RecordStatus::ACTIVE,
+        ]);
+
+        // Sin oferta alguna: sigue en el catálogo permanente, pero el docente no la ve.
+        $data = $this->getJson('/api/materias')->assertOk()->assertJsonPath('meta.total', 5)->json('data');
+        $this->assertFalse($this->hasPair($data, $this->sistemasId, $subjectId));
+
+        // Ofertada solo en el período anterior: tampoco aparece en el activo.
+        $this->offerPair($this->sistemasId, $subjectId, $this->periodoAnteriorId);
+        $data = $this->getJson('/api/materias')->assertOk()->assertJsonPath('meta.total', 5)->json('data');
+        $this->assertFalse($this->hasPair($data, $this->sistemasId, $subjectId));
+
+        // Ofertada en el activo: aparece.
+        $this->offerPair($this->sistemasId, $subjectId, $this->periodoActivoId);
+        $data = $this->getJson('/api/materias')->assertOk()->assertJsonPath('meta.total', 6)->json('data');
+        $this->assertTrue($this->hasPair($data, $this->sistemasId, $subjectId));
+    }
+
+    public function test_una_oferta_inactiva_no_cuenta(): void
+    {
+        $this->seedAcademicCatalog();
+
+        DB::table('oferta_academica')
+            ->where('id_carrera', $this->sistemasId)
+            ->where('id_materia', $this->materiaInactivaId)
+            ->where('id_gestion_periodo', $this->periodoActivoId)
+            ->update(['estado' => RecordStatus::INACTIVE]);
+
+        $data = $this->getJson('/api/materias')->assertOk()->assertJsonPath('meta.total', 4)->json('data');
+
+        $this->assertFalse($this->hasPair($data, $this->sistemasId, $this->materiaInactivaId));
     }
 
     public function test_un_docente_sin_grupos_igual_puede_consultar_el_catalogo(): void
@@ -158,6 +207,17 @@ class SubjectCatalogTest extends TestCase
         DB::disableQueryLog();
 
         $this->assertSame($consultasIniciales, $consultasConMasMaterias);
+    }
+
+    private function hasPair(array $data, int $careerId, int $subjectId): bool
+    {
+        foreach ($data as $pair) {
+            if ($pair['id_carrera'] === $careerId && $pair['id_materia'] === $subjectId) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function findPair(array $data, int $careerId, int $subjectId): array
