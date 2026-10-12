@@ -114,11 +114,12 @@ class GroupService
         $periodId = (int) ($data['id_periodo'] ?? $this->subjectCatalog->activePeriodId());
         $period = $this->findPeriodOrFail($periodId);
 
+        $this->assertPairIsOffered((int) $pair->id_carrera, (int) $pair->id_materia, $periodId);
+
         $this->assertNoDuplicateGroup(
             (int) $pair->id_carrera,
             (int) $pair->id_materia,
             $data['num_grupo'],
-            $this->groupManagementFor($period),
             $periodId
         );
 
@@ -128,18 +129,15 @@ class GroupService
                     'id_carrera' => $pair->id_carrera,
                     'id_materia' => $pair->id_materia,
                     'num_grupo' => $data['num_grupo'],
-                    'gestion' => $this->groupManagementFor($period),
                     'estado' => RecordStatus::ACTIVE,
                     'id_usuario_docente' => $teacherId,
-                    'id_periodo' => $period->id_periodo,
+                    'id_gestion_periodo' => $period->id_gestion_periodo,
                 ]);
             } catch (QueryException $exception) {
                 // Red de seguridad ante una carrera entre dos solicitudes casi
                 // simultáneas: la validación de arriba ya cubre el caso normal,
-                // pero la constraint unq_grupo es la garantía real a nivel de datos.
-                throw $this->isUniqueViolation($exception)
-                    ? $this->duplicateGroupException()
-                    : $exception;
+                // pero las constraints unq_grupo y fk_grupo_oferta_academica son la garantía real.
+                throw $this->translateDatabaseError($exception);
             }
         });
 
@@ -161,14 +159,15 @@ class GroupService
 
             $this->assertGroupBelongsToTeacher($group, $teacherId);
 
-            $periodId = (int) ($data['id_periodo'] ?? $group->id_periodo);
+            $periodId = (int) ($data['id_periodo'] ?? $group->id_gestion_periodo);
             $period = $this->findPeriodOrFail($periodId);
+
+            $this->assertPairIsOffered((int) $group->id_carrera, (int) $group->id_materia, $periodId);
 
             $this->assertNoDuplicateGroup(
                 (int) $group->id_carrera,
                 (int) $group->id_materia,
                 $data['num_grupo'],
-                $this->groupManagementFor($period),
                 $periodId,
                 (int) $group->id_grupo
             );
@@ -176,14 +175,11 @@ class GroupService
             try {
                 $group->fill([
                     'num_grupo' => $data['num_grupo'],
-                    'gestion' => $this->groupManagementFor($period),
-                    'id_periodo' => $period->id_periodo,
+                    'id_gestion_periodo' => $period->id_gestion_periodo,
                 ]);
                 $group->save();
             } catch (QueryException $exception) {
-                throw $this->isUniqueViolation($exception)
-                    ? $this->duplicateGroupException()
-                    : $exception;
+                throw $this->translateDatabaseError($exception);
             }
 
             return $group;
