@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\DB;
  *
  * Los grupos cubren los casos del módulo Academic: grupos propios y ajenos en el mismo
  * par, el mismo número de grupo en la misma materia de otra carrera, un grupo sin
- * nómina, uno de un par inactivo y uno de un periodo anterior.
+ * nómina, uno de un par inactivo y uno de un periodo anterior. Cada par de grupo se oferta en
+ * el período de su grupo (clave compuesta de grupo), heredando el estado del par.
  */
 class GroupTestDataSeeder extends Seeder
 {
@@ -86,7 +87,7 @@ class GroupTestDataSeeder extends Seeder
         ];
         [$fixed, $teacher2, $teacher3] = [Ids::TEACHER_FIXED, Ids::TEACHER_2, Ids::TEACHER_3];
 
-        DB::table('grupo')->upsert([
+        $groups = [
             // Mismo par (Sistemas, Cálculo I): grupo 1 del docente 10452, grupo 2 de otro docente.
             $this->group(Ids::GROUP_CALCULUS_SYS_1, $sys, Ids::SUBJECT_CALCULUS, '1', $fixed),
             $this->group(Ids::GROUP_CALCULUS_SYS_2, $sys, Ids::SUBJECT_CALCULUS, '2', $teacher2),
@@ -110,7 +111,10 @@ class GroupTestDataSeeder extends Seeder
             ),
             // Par donde el docente 10452 no dicta ningún grupo.
             $this->group(Ids::GROUP_ACCOUNTING_ADM_1, $adm, Ids::SUBJECT_ACCOUNTING, '1', $teacher2),
-        ], ['id_grupo']);
+        ];
+
+        $this->offerPairsOf($groups);
+        DB::table('grupo')->upsert($groups, ['id_grupo']);
 
         $enrollments = [];
 
@@ -146,11 +150,38 @@ class GroupTestDataSeeder extends Seeder
             'id_carrera' => $careerId,
             'id_materia' => $subjectId,
             'num_grupo' => $number,
-            'gestion' => '2026',
             'estado' => 'ACTIVO',
             'id_usuario_docente' => $teacherId,
-            'id_periodo' => $periodId,
+            'id_gestion_periodo' => $periodId,
         ];
+    }
+
+    /** Oferta cada (carrera, materia, período) de los grupos con el estado que el par tiene. */
+    private function offerPairsOf(array $groups): void
+    {
+        $offerings = [];
+
+        foreach ($groups as $group) {
+            $status = DB::table('materia_carrera')
+                ->where('id_carrera', $group['id_carrera'])
+                ->where('id_materia', $group['id_materia'])
+                ->value('estado');
+
+            $key = "{$group['id_carrera']}-{$group['id_materia']}-{$group['id_gestion_periodo']}";
+
+            $offerings[$key] = [
+                'id_carrera' => $group['id_carrera'],
+                'id_materia' => $group['id_materia'],
+                'id_gestion_periodo' => $group['id_gestion_periodo'],
+                'estado' => $status,
+            ];
+        }
+
+        DB::table('oferta_academica')->upsert(
+            array_values($offerings),
+            ['id_carrera', 'id_materia', 'id_gestion_periodo'],
+            ['estado']
+        );
     }
 
     private function enrollment(int $groupId, int $studentId, string $status): array
