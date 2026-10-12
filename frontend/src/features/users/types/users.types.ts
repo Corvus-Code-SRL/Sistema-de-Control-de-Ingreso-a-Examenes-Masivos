@@ -92,6 +92,14 @@ export interface NewUserAccount {
   apellido_paterno: string
   apellido_materno: string | null
   correo: string
+  /** Solo viaja en el registro: el servidor guarda su hash y nunca la devuelve. */
+  contrasenia_temporal: string
+}
+
+/** Lo que el registro dejó al terminar: la cuenta y el rol que recibió (`null` si quedó sin rol). */
+export interface RegistrationResult {
+  account: UserAccount
+  role: Role | null
 }
 
 /** Nombre del rol Docente en el catálogo; su cambio exige revisar asignaciones. */

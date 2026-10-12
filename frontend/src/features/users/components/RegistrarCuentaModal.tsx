@@ -3,17 +3,39 @@ import {
   Search, Info, X, ChevronLeft, ArrowRight, Pencil,
   RefreshCw, CheckCircle, GraduationCap, AlertCircle, Lock, Check, Trash2
 } from 'lucide-react';
+import { PasswordInput } from '@/components/common/PasswordInput';
 import { ApiError } from '@/lib/api-client';
-import { registerUser, verifySisCode } from '../services/usersService';
-import type { SisPerson, UserAccount } from '../types/users.types';
+import { useRoles } from '../hooks/useRoles';
+import { describeRoleError } from '../lib/describeRoleError';
+import { assignRole, registerUser, verifySisCode } from '../services/usersService';
+import type { RegistrationResult, Role, SisPerson, UserAccount } from '../types/users.types';
+import { RoleOptions } from './RoleOptions';
 
 interface RegistrarCuentaModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: (userData: SisPerson) => void;
+  /**
+   * Se llama una vez por cada cuenta registrada, al terminar su flujo: con el rol asignado o con
+   * `null` si el Administrador eligió «Asignar después». No cierra el modal: eso lo hace `onClose`.
+   */
+  onFinished?: (result: RegistrationResult) => void;
 }
 
 export type ErrorType = 'not_found' | 'duplicate' | 'sis_down' | null;
+
+/** Pasos del registro: «Datos» agrupa la verificación en el SIS y el formulario de la cuenta. */
+type Paso = 'sis' | 'datos' | 'rol' | 'listo';
+
+/** Largo mínimo de la contraseña temporal; el servidor aplica la misma regla. */
+const MIN_TEMPORARY_PASSWORD_LENGTH = 8;
+
+const STEPS = [
+  { key: 'datos', label: 'Datos' },
+  { key: 'rol', label: 'Rol' },
+  { key: 'listo', label: 'Listo' },
+] as const;
+
+const REMINDER = 'Entregue la contraseña temporal al usuario; deberá cambiarla en su primer ingreso.';
 
 /** Primer mensaje de cada campo rechazado; sin campos, el mensaje general del servidor. */
 function toFormErrors(error: ApiError): Record<string, string> {
@@ -32,22 +54,70 @@ function currentTime(): string {
   }).format(new Date());
 }
 
-export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const [paso, setPaso] = useState<1 | 2 | 'success'>(1);
+function stepIndex(paso: Paso): number {
+  if (paso === 'rol') return 1;
+  if (paso === 'listo') return 2;
+
+  return 0;
+}
+
+function Stepper({ paso }: { paso: Paso }) {
+  const current = stepIndex(paso);
+
+  return (
+    <ol aria-label="Pasos del registro" className="hidden md:flex items-center gap-2 mb-2">
+      {STEPS.map((step, index) => {
+        const done = index < current;
+        const active = index === current;
+
+        return (
+          <React.Fragment key={step.key}>
+            {index > 0 && <li aria-hidden="true" className="flex-1 h-[1px] bg-border-strong min-w-[16px]"></li>}
+            <li
+              aria-current={active ? 'step' : undefined}
+              className={`flex items-center gap-2 text-[13px] ${
+                active ? 'font-semibold text-text' : done ? 'font-semibold text-brand' : 'font-medium text-muted-foreground'
+              }`}
+            >
+              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold ${
+                active
+                  ? 'bg-brand text-primary-foreground'
+                  : done
+                    ? 'bg-brand-soft text-brand'
+                    : 'border-[1.5px] border-border-strong bg-surface'
+              }`}>
+                {done ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : index + 1}
+              </span>
+              <span>{step.label}</span>
+            </li>
+          </React.Fragment>
+        );
+      })}
+    </ol>
+  );
+}
+
+export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOpen, onClose, onFinished }) => {
+  const [paso, setPaso] = useState<Paso>('sis');
   const [codSis, setCodSis] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [sisData, setSisData] = useState<SisPerson | null>(null);
   const [verifiedAt, setVerifiedAt] = useState<string | null>(null);
   const [registeredAt, setRegisteredAt] = useState<string | null>(null);
   const [registeredAccount, setRegisteredAccount] = useState<UserAccount | null>(null);
+  const [assignedRole, setAssignedRole] = useState<Role | null>(null);
   // Una verificación en curso se aborta al cancelar: su respuesta no debe revivir el registro.
   const verification = useRef<AbortController | null>(null);
   const [errorType, setErrorType] = useState<ErrorType>(null);
   const [backendErrorMsg, setBackendErrorMsg] = useState('');
 
   const [correo, setCorreo] = useState('');
+  const [contrasenia, setContrasenia] = useState('');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [roleError, setRoleError] = useState<string | null>(null);
 
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
@@ -88,11 +158,16 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
 
   const handleRegistrar = async () => {
     const newErrors: Record<string, string> = {};
-    
+
     if (!correo || !correo.includes('@')) {
       newErrors.correo = 'Ingrese un correo válido, por ejemplo nombre@umss.edu.';
     }
-    
+
+    if (contrasenia.length < MIN_TEMPORARY_PASSWORD_LENGTH) {
+      newErrors.contrasenia_temporal =
+        `La contraseña temporal debe tener al menos ${MIN_TEMPORARY_PASSWORD_LENGTH} caracteres.`;
+    }
+
     if (Object.keys(newErrors).length > 0 || !sisData) {
       setFormErrors(newErrors);
       return;
@@ -110,11 +185,14 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
         apellido_paterno: sisData.paterno,
         apellido_materno: sisData.materno,
         correo,
+        contrasenia_temporal: contrasenia,
       });
 
+      // La clave ya está en el servidor: no se conserva en memoria ni se vuelve a mostrar.
+      setContrasenia('');
       setRegisteredAccount(account);
       setRegisteredAt(currentTime());
-      setPaso('success');
+      setPaso('rol');
     } catch (error) {
       setFormErrors(
         error instanceof ApiError ? toFormErrors(error) : { general: 'Error de conexión con el servidor.' }
@@ -124,43 +202,90 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
     }
   };
 
+  const handleAsignarRol = async (roleId: number) => {
+    if (!registeredAccount) return;
+
+    setIsAssigning(true);
+    setRoleError(null);
+
+    try {
+      setAssignedRole(await assignRole(registeredAccount.id_usuario, roleId));
+      setPaso('listo');
+    } catch (error) {
+      setRoleError(describeRoleError(error));
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  /** Avisa que el flujo de la cuenta terminó, con o sin rol. Se llama una sola vez por cuenta. */
+  const reportFinished = () => {
+    if (registeredAccount) {
+      onFinished?.({ account: registeredAccount, role: assignedRole });
+    }
+  };
+
+  const resetFlow = () => {
+    verification.current?.abort();
+    verification.current = null;
+    setIsVerifying(false);
+    setPaso('sis');
+    setCodSis('');
+    setSisData(null);
+    setVerifiedAt(null);
+    setRegisteredAt(null);
+    setRegisteredAccount(null);
+    setAssignedRole(null);
+    setErrorType(null);
+    setBackendErrorMsg('');
+    setCorreo('');
+    setContrasenia('');
+    setFormErrors({});
+    setRoleError(null);
+    setShowCancelConfirm(false);
+  };
+
+  const cerrarPorCompleto = () => {
+    resetFlow();
+    onClose();
+  };
+
+  /** La cuenta ya existe: cerrar no la descarta, solo termina el flujo. */
+  const finishAndClose = () => {
+    reportFinished();
+    cerrarPorCompleto();
+  };
+
   const handleCerrar = () => {
     // Con la cuenta ya enviada no hay nada que cancelar: el registro está confirmado.
-    if (isSubmitting) return;
+    if (isSubmitting || isAssigning) return;
 
-    if ((sisData || paso === 2) && paso !== 'success') {
+    if (paso === 'rol' || paso === 'listo') {
+      finishAndClose();
+    } else if (sisData) {
       setShowCancelConfirm(true);
     } else {
       cerrarPorCompleto();
     }
   };
 
-  const cerrarPorCompleto = () => {
-    verification.current?.abort();
-    verification.current = null;
-    setIsVerifying(false);
-    setPaso(1);
-    setCodSis('');
-    setSisData(null);
-    setVerifiedAt(null);
-    setRegisteredAt(null);
-    setRegisteredAccount(null);
-    setErrorType(null);
-    setBackendErrorMsg('');
-    setCorreo('');
-    setFormErrors({});
-    setShowCancelConfirm(false);
-    onClose();
+  const registerAnother = () => {
+    reportFinished();
+    resetFlow();
   };
 
   const hasInputError = errorType === 'not_found' || errorType === 'duplicate';
+  const fieldErrorCount = Object.values(formErrors).filter(Boolean).length;
+  const fullName = registeredAccount
+    ? registeredAccount.nombre_completo
+    : [sisData?.nombre, sisData?.paterno, sisData?.materno].filter(Boolean).join(' ');
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center bg-surface md:bg-[var(--sciem-scrim)] md:p-4">
       <div className="flex flex-col bg-surface w-full h-full md:h-auto md:max-h-[90vh] md:w-[640px] md:rounded-[14px] md:shadow-[var(--shadow-lg)] overflow-hidden relative">
-        
+
         {showCancelConfirm && (
           <div className="absolute inset-0 z-50 bg-[var(--sciem-scrim)] backdrop-blur-[2px] flex items-center justify-center p-4">
             <div className="bg-surface rounded-[14px] shadow-[var(--shadow-lg)] w-full max-w-[440px] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -186,7 +311,7 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
         )}
 
         <div className="md:hidden flex items-center gap-2 h-14 px-2 border-b border-border-soft bg-surface shrink-0">
-          <button onClick={handleCerrar} disabled={isSubmitting} aria-label="Cancelar registro" className="w-10 h-10 flex items-center justify-center text-muted-foreground rounded-[8px]">
+          <button onClick={handleCerrar} disabled={isSubmitting || isAssigning} aria-label="Cancelar registro" className="w-10 h-10 flex items-center justify-center text-muted-foreground rounded-[8px]">
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div className="flex-1 font-semibold text-[16px] text-text truncate">Registrar cuenta</div>
@@ -196,67 +321,61 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
           <div className="flex-1 min-w-0">
             <h2 className="text-[18px] leading-[26px] font-semibold text-text">Registrar cuenta</h2>
             <p className="text-[13px] text-muted-foreground leading-[19px] mt-0.5">
-              {paso === 1 ? 'Paso 1 de 2' : paso === 2 ? 'Paso 2 de 2' : registeredAt
+              {paso === 'sis' || paso === 'datos' ? 'Paso 1 de 3' : paso === 'rol' ? 'Paso 2 de 3' : registeredAt
                 ? `Registrada a las ${registeredAt} (hora de este equipo)`
                 : 'Registro confirmado · queda en la bitácora'}
             </p>
           </div>
-          <button onClick={handleCerrar} disabled={isSubmitting} aria-label="Cancelar registro" className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:bg-bg-app rounded-[8px] transition-colors">
+          <button onClick={handleCerrar} disabled={isSubmitting || isAssigning} aria-label="Cancelar registro" className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:bg-bg-app rounded-[8px] transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
 
+        {paso === 'rol' && registeredAccount ? (
+          <RoleStep
+            account={registeredAccount}
+            isAssigning={isAssigning}
+            error={roleError}
+            onAssign={handleAsignarRol}
+            onSkip={handleCerrar}
+          />
+        ) : (
+          <>
         <div className="flex-1 overflow-y-auto p-4 md:px-6 md:py-4 flex flex-col gap-4">
-          
-          {paso !== 'success' && (
-            <div className="hidden md:flex items-center gap-2 mb-2">
-              <span className={`flex items-center gap-2 text-[13px] ${paso === 1 ? 'font-semibold text-text' : 'font-semibold text-brand'}`}>
-                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[12px] ${paso === 1 ? 'bg-brand text-primary-foreground' : 'bg-brand-soft text-brand'}`}>
-                  {paso === 1 ? '1' : <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                </span>
-                <span>Código SIS</span>
-              </span>
-              <span className="flex-1 h-[1px] bg-border-strong min-w-[16px]"></span>
-              <span className={`flex items-center gap-2 text-[13px] ${paso === 2 ? 'font-semibold text-text' : 'font-medium text-muted-foreground'}`}>
-                <span className={`w-6 h-6 rounded-full border-[1.5px] flex items-center justify-center text-[12px] font-bold ${paso === 2 ? 'bg-brand border-brand text-primary-foreground' : 'border-border-strong bg-surface'}`}>
-                  2
-                </span>
-                <span>Datos de la cuenta</span>
-              </span>
-            </div>
-          )}
 
-          {paso !== 'success' && (
+          {paso !== 'listo' && <Stepper paso={paso} />}
+
+          {paso !== 'listo' && (
             <p className="text-[13px] text-muted-foreground">
               Los campos marcados con <span aria-hidden="true" className="text-danger">*</span> son obligatorios.
             </p>
           )}
 
-          {paso === 1 && (
+          {paso === 'sis' && (
             <>
               <div className="flex flex-col md:flex-row items-start md:items-start gap-3 md:gap-4">
                 <div className="flex flex-col gap-1.5 w-full md:flex-1">
                   <label htmlFor="registro-cod-sis" className="text-[14px] font-medium text-text flex items-center gap-1">
                     Código SIS <span aria-hidden="true" className="text-danger">*</span>
                   </label>
-                  
+
                   <div className={`flex items-center gap-2 h-10 px-3 rounded-[8px] border bg-surface transition-all ${
                     hasInputError
-                      ? 'border-danger shadow-[0_0_0_3px_rgba(217,45,32,0.12)] text-danger'
-                      : sisData || isVerifying 
-                        ? 'border-border-strong' 
+                      ? 'border-danger ring-[3px] ring-danger/15 text-danger'
+                      : sisData || isVerifying
+                        ? 'border-border-strong'
                         : 'border-border-strong focus-within:border-brand focus-within:shadow-[var(--focus-ring)]'
                   }`}>
                     <span className={`${hasInputError ? 'text-danger' : 'text-subtle'} font-medium select-none`}>#</span>
-                    <input 
+                    <input
                       id="registro-cod-sis"
-                      type="text" 
+                      type="text"
                       aria-required="true"
                       aria-invalid={hasInputError}
                       value={codSis}
                       onChange={(e) => {
                         setCodSis(e.target.value);
-                        setErrorType(null); 
+                        setErrorType(null);
                       }}
                       placeholder="9 dígitos"
                       disabled={isVerifying || !!sisData}
@@ -264,7 +383,7 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
                       maxLength={9}
                     />
                   </div>
-                  
+
                   {errorType === 'not_found' && (
                     <div className="text-[13px] text-danger font-medium flex gap-1.5 mt-0.5">
                       <AlertCircle className="w-[18px] h-[18px] shrink-0" />
@@ -309,7 +428,7 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
               </div>
 
               {errorType === 'sis_down' && (
-                <div className="mt-2 flex gap-3 p-4 rounded-[12px] bg-danger-soft border border-[#F4B7B1] text-danger">
+                <div className="mt-2 flex gap-3 p-4 rounded-[12px] bg-danger-soft border border-danger-border text-danger">
                   <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                   <div className="flex flex-col gap-3 w-full">
                     <div className="flex flex-col">
@@ -333,7 +452,7 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
               )}
 
               {sisData && (
-                <div className="mt-2 flex flex-col gap-3 p-4 rounded-[12px] border border-[#B6DEC6] bg-ok-soft">
+                <div className="mt-2 flex flex-col gap-3 p-4 rounded-[12px] border border-ok-border bg-ok-soft">
                   <div className="flex items-center gap-2 text-ok-fg">
                     <CheckCircle className="w-[18px] h-[18px]" />
                     <span className="font-semibold text-[14px]">Persona reconocida por el SIS</span>
@@ -370,21 +489,21 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
             </>
           )}
 
-          {paso === 2 && sisData && (
+          {paso === 'datos' && sisData && (
             <div className="flex flex-col gap-5">
               <div className="flex items-center gap-2 text-ok-fg text-[14px]">
                 <CheckCircle className="w-[18px] h-[18px]" />
                 <span>Código SIS <b className="font-semibold">{codSis}</b> verificado</span>
               </div>
 
-              {Object.keys(formErrors).length > 0 && (
-                <div className="flex gap-3 items-start p-3 rounded-[12px] bg-danger-soft border border-[#F4B7B1] text-danger">
+              {fieldErrorCount > 0 || formErrors.general ? (
+                <div className="flex gap-3 items-start p-3 rounded-[12px] bg-danger-soft border border-danger-border text-danger">
                   <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                   <div className="font-semibold text-[14px]">
-                    {formErrors.general || `Corrija ${Object.keys(formErrors).length} campos para registrar la cuenta`}
+                    {formErrors.general || `Corrija ${fieldErrorCount} campos para registrar la cuenta`}
                   </div>
                 </div>
-              )}
+              ) : null}
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex flex-col gap-1.5">
@@ -414,16 +533,16 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
               <div className="grid grid-cols-1 gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="registro-correo" className="text-[14px] font-medium text-text flex items-center gap-1">Correo institucional <span aria-hidden="true" className="text-danger">*</span></label>
-                  <div className={`flex items-center gap-2 h-10 px-3 rounded-[8px] border bg-surface transition-all ${formErrors.correo ? 'border-danger shadow-[0_0_0_3px_rgba(217,45,32,0.12)] text-danger' : 'border-border-strong focus-within:border-brand focus-within:shadow-[var(--focus-ring)]'}`}>
+                  <div className={`flex items-center gap-2 h-10 px-3 rounded-[8px] border bg-surface transition-all ${formErrors.correo ? 'border-danger ring-[3px] ring-danger/15 text-danger' : 'border-border-strong focus-within:border-brand focus-within:shadow-[var(--focus-ring)]'}`}>
                     <svg className={`w-4 h-4 shrink-0 ${formErrors.correo ? 'text-danger' : 'text-subtle'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-                    <input 
+                    <input
                       id="registro-correo"
-                      type="email" 
+                      type="email"
                       aria-required="true"
                       aria-invalid={!!formErrors.correo}
                       value={correo}
                       onChange={(e) => { setCorreo(e.target.value); setFormErrors(prev => ({...prev, correo: ''})); }}
-                      className="flex-1 w-full bg-transparent outline-none text-[14px] text-text" 
+                      className="flex-1 w-full bg-transparent outline-none text-[14px] text-text"
                     />
                   </div>
                   {formErrors.correo ? (
@@ -434,19 +553,45 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
                     </div>
                   )}
                 </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="registro-contrasenia" className="text-[14px] font-medium text-text flex items-center gap-1">Contraseña temporal <span aria-hidden="true" className="text-danger">*</span></label>
+                  <PasswordInput
+                    id="registro-contrasenia"
+                    name="contrasenia_temporal"
+                    autoComplete="new-password"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    placeholder="Mínimo 8 caracteres"
+                    aria-required="true"
+                    aria-invalid={!!formErrors.contrasenia_temporal}
+                    aria-describedby="registro-contrasenia-ayuda"
+                    value={contrasenia}
+                    onChange={(e) => { setContrasenia(e.target.value); setFormErrors(prev => ({...prev, contrasenia_temporal: ''})); }}
+                    groupClassName={formErrors.contrasenia_temporal ? 'border-danger ring-[3px] ring-danger/15' : undefined}
+                  />
+                  {formErrors.contrasenia_temporal ? (
+                    <div id="registro-contrasenia-ayuda" className="text-[13px] text-danger font-medium flex gap-1.5 mt-0.5"><AlertCircle className="w-[18px] h-[18px] shrink-0" /> <span>{formErrors.contrasenia_temporal}</span></div>
+                  ) : (
+                    <div id="registro-contrasenia-ayuda" className="text-[13px] text-muted-foreground">
+                      Entréguela al usuario: deberá cambiarla en su primer ingreso.
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="mt-2 flex gap-3 p-3 md:py-3 md:px-4 rounded-[10px] bg-info-soft border border-info-border text-info">
                 <Info className="w-5 h-5 shrink-0 mt-0.5" />
                 <div className="flex flex-col">
-                  <span className="font-semibold text-[14px]">La cuenta se crea sin rol</span>
-                  <span className="text-[13px] opacity-90 mt-0.5 leading-[19px]">Podrá asignarle un rol al terminar. Hasta entonces no podrá usar SCIEM.</span>
+                  <span className="font-semibold text-[14px]">El rol se asigna en el siguiente paso</span>
+                  <span className="text-[13px] opacity-90 mt-0.5 leading-[19px]">Puede dejarlo para después, pero hasta que la cuenta tenga un rol no podrá usar SCIEM.</span>
                 </div>
               </div>
             </div>
           )}
 
-          {paso === 'success' && (
+          {paso === 'listo' && (
             <div className="flex flex-col gap-6 items-center text-center py-4 md:py-6">
               <div className="w-[56px] h-[56px] rounded-full bg-ok-soft text-ok flex items-center justify-center shrink-0">
                 <CheckCircle className="w-7 h-7" />
@@ -454,7 +599,7 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
               <div className="flex flex-col gap-1">
                 <h2 className="text-[20px] font-bold text-text">Cuenta creada</h2>
                 <p className="text-[14px] text-muted-foreground">
-                  {sisData?.nombre} {sisData?.paterno} {sisData?.materno} · SIS {codSis} · sin rol
+                  {fullName} · SIS {registeredAccount?.cod_sis ?? codSis} · {assignedRole?.nombre_rol ?? 'Sin rol'}
                 </p>
                 {registeredAccount && (
                   <p className="text-[13px] text-muted-foreground">
@@ -462,14 +607,12 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
                   </p>
                 )}
               </div>
-              
+
               <div className="w-full flex gap-3 p-4 rounded-[12px] bg-warn-soft border border-warn-border text-warn-fg text-left">
                 <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                 <div className="flex flex-col">
-                  <span className="font-semibold text-[14px]">La cuenta todavía no puede usar SCIEM</span>
-                  <span className="text-[13px] opacity-90 mt-0.5 leading-[19px]">
-                    Asígnele un rol para habilitar sus funciones. Según el SIS, el rol propuesto es {sisData?.tipo}.
-                  </span>
+                  <span className="font-semibold text-[14px]">Entregue la contraseña temporal</span>
+                  <span className="text-[13px] opacity-90 mt-0.5 leading-[19px]">{REMINDER}</span>
                 </div>
               </div>
             </div>
@@ -478,15 +621,15 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
         </div>
 
         <div className="mt-auto md:mt-0 p-4 md:px-6 md:py-[14px] border-t border-border-soft bg-surface md:bg-sunken flex flex-col-reverse md:flex-row gap-3 justify-between items-center shrink-0">
-          
-          {paso === 1 && (
+
+          {paso === 'sis' && (
             <>
               <button onClick={handleCerrar} className="w-full md:w-auto h-10 px-4 flex items-center justify-center rounded-[10px] border border-border-strong bg-surface text-text text-[14px] font-semibold hover:bg-sunken transition-colors">
                 Cancelar
               </button>
-              <button 
+              <button
                 disabled={!sisData}
-                onClick={() => setPaso(2)}
+                onClick={() => setPaso('datos')}
                 className={`w-full md:w-auto h-10 px-4 flex items-center justify-center gap-2 rounded-[10px] border text-[14px] font-semibold transition-all ${
                   sisData ? 'bg-brand text-primary-foreground border-transparent hover:bg-brand-active' : 'bg-bg-app text-dis-text border-border-soft cursor-not-allowed'
                 }`}
@@ -496,68 +639,126 @@ export const RegistrarCuentaModal: React.FC<RegistrarCuentaModalProps> = ({ isOp
             </>
           )}
 
-          {paso === 2 && (
+          {paso === 'datos' && (
             <>
-              <button onClick={() => { setPaso(1); setFormErrors({}); }} className="w-full md:w-auto h-10 px-4 flex items-center justify-center gap-2 rounded-[10px] border border-border-strong bg-surface text-text text-[14px] font-semibold hover:bg-sunken transition-colors">
+              <button onClick={() => { setPaso('sis'); setFormErrors({}); }} className="w-full md:w-auto h-10 px-4 flex items-center justify-center gap-2 rounded-[10px] border border-border-strong bg-surface text-text text-[14px] font-semibold hover:bg-sunken transition-colors">
                 <ChevronLeft className="w-4 h-4" /> Atrás
               </button>
               <div className="flex flex-col-reverse md:flex-row gap-3 w-full md:w-auto">
                 <button onClick={handleCerrar} disabled={isSubmitting} className="w-full md:w-auto h-10 px-4 flex items-center justify-center rounded-[10px] border border-border-strong bg-surface text-text text-[14px] font-semibold hover:bg-sunken transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                   Cancelar
                 </button>
-                <button 
+                <button
                   onClick={handleRegistrar}
                   disabled={isSubmitting}
                   className="w-full md:w-auto h-10 px-4 flex items-center justify-center gap-2 rounded-[10px] bg-brand text-primary-foreground text-[14px] font-semibold hover:bg-brand-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4 stroke-[3]" />} 
+                  {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4 stroke-[3]" />}
                   Registrar cuenta
                 </button>
               </div>
             </>
           )}
 
-          {paso === 'success' && (
+          {paso === 'listo' && (
             <>
-              <button 
-                onClick={() => {
-                  setPaso(1);
-                  setCodSis('');
-                  setSisData(null);
-                  setCorreo('');
-                  setVerifiedAt(null);
-                  setRegisteredAt(null);
-                  setRegisteredAccount(null);
-                }}
+              <button
+                onClick={registerAnother}
                 className="hidden md:flex w-full md:w-auto h-10 px-4 items-center justify-center gap-2 rounded-[10px] text-brand text-[14px] font-semibold hover:bg-bg-app transition-colors"
               >
                 Registrar otra
               </button>
               <div className="flex flex-col-reverse md:flex-row gap-3 w-full md:w-auto">
-                <button 
-                  onClick={() => { 
-                    handleCerrar(); 
-                    if (onSuccess && sisData) onSuccess(sisData); 
-                  }} 
-                  className="w-full md:w-auto h-10 px-4 flex items-center justify-center rounded-[10px] border border-border-strong bg-surface text-text text-[14px] font-semibold hover:bg-sunken transition-colors"
-                >
-                  Cerrar
-                </button>
-                <button 
-                  onClick={() => { 
-                    handleCerrar(); 
-                    if (onSuccess && sisData) onSuccess(sisData); 
-                  }} 
+                <button
+                  onClick={finishAndClose}
                   className="w-full md:w-auto h-10 px-4 flex items-center justify-center gap-2 rounded-[10px] bg-brand text-primary-foreground text-[14px] font-semibold hover:bg-brand-active transition-colors"
                 >
-                  <CheckCircle className="w-4 h-4" /> Asignar rol ahora
+                  <CheckCircle className="w-4 h-4" /> Cerrar
                 </button>
               </div>
             </>
           )}
 
         </div>
+          </>
+        )}
       </div>
     </div>
   );
 };
+
+interface RoleStepProps {
+  account: UserAccount;
+  isAssigning: boolean;
+  error: string | null;
+  onAssign: (roleId: number) => void;
+  /** «Asignar después»: la cuenta queda sin rol y el modal se cierra. */
+  onSkip: () => void;
+}
+
+/**
+ * Paso «Rol»: la cuenta ya existe y se elige su rol sin salir del registro.
+ *
+ * Es un componente aparte para que el catálogo de roles se pida solo cuando se llega aquí, no al
+ * abrir el modal. Reutiliza el endpoint y el selector de la asignación desde Cuentas (HU-004).
+ */
+function RoleStep({ account, isAssigning, error, onAssign, onSkip }: RoleStepProps) {
+  const roles = useRoles();
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+
+  return (
+    <>
+      <div className="flex-1 overflow-y-auto p-4 md:px-6 md:py-4 flex flex-col gap-4">
+        <Stepper paso="rol" />
+
+        <div className="flex items-center gap-2 text-ok-fg text-[14px]">
+          <CheckCircle className="w-[18px] h-[18px]" />
+          <span>
+            Cuenta de <b className="font-semibold">{account.nombre_completo}</b> registrada · SIS{' '}
+            <b className="font-semibold">{account.cod_sis}</b>
+          </span>
+        </div>
+
+        {error && (
+          <div role="alert" className="flex gap-3 items-start p-3 rounded-[12px] bg-danger-soft border border-danger-border text-danger-fg">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div className="font-semibold text-[14px]">{error}</div>
+          </div>
+        )}
+
+        <RoleOptions
+          roles={roles}
+          selectedRoleId={selectedRoleId}
+          disabled={isAssigning}
+          onSelect={setSelectedRoleId}
+        />
+
+        <div className="flex gap-3 p-3 md:py-3 md:px-4 rounded-[10px] bg-info-soft border border-info-border text-info">
+          <Info className="w-5 h-5 shrink-0 mt-0.5" />
+          <div className="flex flex-col">
+            <span className="font-semibold text-[14px]">Una cuenta tiene un solo rol a la vez</span>
+            <span className="text-[13px] opacity-90 mt-0.5 leading-[19px]">Si elige «Asignar después», la cuenta queda sin rol y no podrá ingresar hasta que se le asigne uno desde Cuentas.</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-auto md:mt-0 p-4 md:px-6 md:py-[14px] border-t border-border-soft bg-surface md:bg-sunken flex flex-col-reverse md:flex-row gap-3 justify-between items-center shrink-0">
+        <button
+          onClick={onSkip}
+          disabled={isAssigning}
+          className="w-full md:w-auto h-10 px-4 flex items-center justify-center rounded-[10px] border border-border-strong bg-surface text-text text-[14px] font-semibold hover:bg-sunken transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Asignar después
+        </button>
+        <button
+          onClick={() => selectedRoleId !== null && onAssign(selectedRoleId)}
+          disabled={selectedRoleId === null || isAssigning}
+          className="w-full md:w-auto h-10 px-4 flex items-center justify-center gap-2 rounded-[10px] bg-brand text-primary-foreground text-[14px] font-semibold hover:bg-brand-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isAssigning ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4 stroke-[3]" />}
+          Asignar rol
+        </button>
+      </div>
+    </>
+  );
+}

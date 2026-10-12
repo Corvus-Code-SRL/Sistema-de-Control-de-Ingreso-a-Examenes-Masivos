@@ -2,7 +2,7 @@ import { screen, waitForElementToBeRemoved, within } from '@testing-library/reac
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { CuentasPage } from './CuentasPage'
-import { mockApi, mockApiOnce } from '@/test/http'
+import { mockApi, mockApiOnce, mockApiWith } from '@/test/http'
 import { renderWithRouter } from '@/test/render'
 import {
   accountsResponse,
@@ -10,6 +10,7 @@ import {
   assistant,
   makeAccount,
   roles,
+  sisPerson,
   teacher,
   userMatchers,
 } from '@/test/userFixtures'
@@ -134,5 +135,91 @@ describe('CuentasPage', () => {
 
     expect(await screen.findByText('Rol asignado')).toBeInTheDocument()
     expect(await table().findByText('Auxiliar')).toBeInTheDocument()
+  })
+
+  describe('registro de cuentas (HU-001)', () => {
+    const newAccount = makeAccount({
+      id_usuario: '7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
+      cod_sis: '202312345',
+      correo: 'laura.mendoza@umss.edu',
+    })
+
+    /** Servidor que cuenta las consultas del listado y registra la cuenta nueva. */
+    function stubRegistration() {
+      let registered = false
+
+      const backend = mockApiWith(({ url, method }) => {
+        if (userMatchers.sisVerification(url)) return { body: { data: sisPerson } }
+        if (userMatchers.roles(url)) return { body: { data: roles } }
+        if (userMatchers.assignRole(url)) return { body: { data: roles[1] } }
+
+        if (userMatchers.accounts(url) && method === 'POST') {
+          registered = true
+
+          return { status: 201, body: { data: newAccount } }
+        }
+
+        if (userMatchers.accounts(url)) {
+          return {
+            body: accountsResponse(
+              registered ? [{ ...newAccount, rol: null }, teacher] : [teacher]
+            ),
+          }
+        }
+
+        return undefined
+      })
+
+      return backend
+    }
+
+    async function registerAccount() {
+      await userEvent.click(screen.getByRole('button', { name: 'Registrar cuenta' }))
+      await userEvent.type(screen.getByLabelText(/código sis/i), '202312345')
+      await userEvent.click(screen.getByRole('button', { name: /verificar en el sis/i }))
+      await screen.findByText('Persona reconocida por el SIS')
+      await userEvent.click(screen.getByRole('button', { name: /continuar/i }))
+      await userEvent.type(screen.getByLabelText(/correo institucional/i), 'l.mendoza@umss.edu')
+      await userEvent.type(screen.getByLabelText(/contraseña temporal/i), 'Temporal2026')
+      await userEvent.click(screen.getAllByRole('button', { name: 'Registrar cuenta' }).at(-1)!)
+    }
+
+    const listings = (calls: { url: string; method: string }[]) =>
+      calls.filter((call) => userMatchers.accounts(call.url) && call.method === 'GET')
+
+    it('«Asignar después» cierra el modal, avisa y muestra la cuenta sin rol', async () => {
+      const { calls } = stubRegistration()
+
+      await renderPage()
+      await registerAccount()
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Asignar después' }))
+
+      expect(await screen.findByText('Cuenta creada sin rol')).toBeInTheDocument()
+      expect(
+        screen.getByText('Entregue la contraseña temporal; el usuario podrá ingresar cuando tenga un rol.')
+      ).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Asignar después' })).not.toBeInTheDocument()
+
+      expect(await table().findByText('Laura Mendoza Rivas')).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: 'Sin rol (1)' })).toBeInTheDocument()
+      expect(listings(calls)).toHaveLength(2)
+    })
+
+    it('asigna el rol dentro del registro y avisa con el rol recibido', async () => {
+      stubRegistration()
+
+      await renderPage()
+      await registerAccount()
+
+      await userEvent.click(await screen.findByRole('radio', { name: /docente/i }))
+      await userEvent.click(screen.getByRole('button', { name: 'Asignar rol' }))
+      await screen.findByText('Cuenta creada')
+      await userEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+
+      expect(
+        await screen.findByText(/quedó registrada como Docente\. Entregue la contraseña temporal/)
+      ).toBeInTheDocument()
+    })
   })
 })
