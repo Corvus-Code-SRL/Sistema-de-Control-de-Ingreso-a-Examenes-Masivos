@@ -207,7 +207,7 @@ class GroupService
     {
         $period = Period::query()->find($periodId);
 
-        if ($period === null) {
+        if ($period === null || $period->estado !== RecordStatus::ACTIVE) {
             throw ValidationException::withMessages([
                 'id_periodo' => ['El período académico seleccionado no existe.'],
             ]);
@@ -217,12 +217,33 @@ class GroupService
     }
 
     /**
-     * El formulario solo pide N° de grupo y período: no hay un input de "Gestión".
-     * grupo.gestion (varchar) se deriva del periodo.gestion (smallint) elegido.
+     * Un grupo solo existe para un par ofertado en su período (oferta_academica activa). La clave
+     * compuesta de grupo es la garantía a nivel de datos; esta validación da el mensaje claro.
      */
-    private function groupManagementFor(Period $period): string
+    private function assertPairIsOffered(int $careerId, int $subjectId, int $periodId): void
     {
-        return (string) $period->gestion;
+        $isOffered = AcademicOffering::query()
+            ->where('id_carrera', $careerId)
+            ->where('id_materia', $subjectId)
+            ->where('id_gestion_periodo', $periodId)
+            ->where('estado', RecordStatus::ACTIVE)
+            ->exists();
+
+        if ($isOffered) {
+            return;
+        }
+
+        throw $this->pairNotOfferedException();
+    }
+
+    private function pairNotOfferedException(): ValidationException
+    {
+        return ValidationException::withMessages([
+            'id_periodo' => [
+                'La materia no se ofrece en el período académico seleccionado. '
+                . 'Elija otro período o solicite que se incluya en la oferta.',
+            ],
+        ]);
     }
 
     /**

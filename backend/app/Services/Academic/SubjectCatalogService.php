@@ -58,30 +58,76 @@ class SubjectCatalogService
         return $pair;
     }
 
+    /**
+     * Resuelve el par que el docente consulta en el período activo: además de existir y estar
+     * activo, debe estar ofertado en él. Un par no ofertado responde como inexistente (404).
+     */
+    public function findOfferedPair(int $careerId, int $subjectId, string $teacherId): SubjectCareer
+    {
+        $pair = $this->findSelectablePair($careerId, $subjectId, $teacherId);
+
+        $isOffered = AcademicOffering::query()
+            ->where('id_carrera', $careerId)
+            ->where('id_materia', $subjectId)
+            ->where('id_gestion_periodo', $this->activePeriodId())
+            ->where('estado', RecordStatus::ACTIVE)
+            ->exists();
+
+        if (! $isOffered) {
+            throw new ModelNotFoundException(
+                'La materia no se ofrece en el período académico activo.'
+            );
+        }
+
+        return $pair;
+    }
+
+    /**
+     * Id del período activo (gestion_periodo.activo). Sin período activo falla con
+     * ActivePeriodNotConfiguredException, que responde un 500 con la instrucción de activarlo.
+     */
     public function activePeriodId(): int
     {
-        $id = (int) config('sciem.periodo_activo_id');
+        $id = Period::query()->active()->value('id_gestion_periodo');
 
-        if ($id <= 0) {
+        if ($id === null) {
             throw new ActivePeriodNotConfiguredException();
         }
 
-        return $id;
+        return (int) $id;
     }
 
-    /** Nombre del período activo («2-2026»); null si el período configurado no existe en el catálogo. */
+    /** Etiqueta del período activo («1/2026», «Verano 2026»). */
     public function activePeriodName(): ?string
     {
-        return Period::query()->whereKey($this->activePeriodId())->value('nombre_periodo');
+        return $this->periodLabel($this->activePeriodId());
     }
 
-    private function basePairQuery(string $teacherId): Builder
+    private function periodLabel(int $periodId): ?string
+    {
+        return Period::query()->withLabel()->find($periodId)?->label;
+    }
+
+    /** Subconsulta correlacionada: el par de la fila tiene una oferta ACTIVA en el período dado. */
+    private function activeOfferingConstraint(int $periodId): \Closure
+    {
+        return function ($query) use ($periodId): void {
+            $query->selectRaw('1')
+                ->from('oferta_academica')
+                ->whereColumn('oferta_academica.id_carrera', 'materia_carrera.id_carrera')
+                ->whereColumn('oferta_academica.id_materia', 'materia_carrera.id_materia')
+                ->where('oferta_academica.id_gestion_periodo', $periodId)
+                ->where('oferta_academica.estado', RecordStatus::ACTIVE);
+        };
+    }
+
+    private function basePairQuery(string $teacherId, ?int $periodId = null): Builder
     {
         return SubjectCareer::query()
             ->join('materia', 'materia.id_materia', '=', 'materia_carrera.id_materia')
             ->join('carrera', 'carrera.id_carrera', '=', 'materia_carrera.id_carrera')
             ->select('materia_carrera.*')
-            ->selectSub($this->teacherGroupCountQuery($teacherId), 'cantidad_grupos')
+            ->selectSub($this->teacherGroupCountQuery($teacherId, $periodId ?? $this->activePeriodId()), 'cantidad_grupos')
             ->with(['subject', 'career']);
     }
 
