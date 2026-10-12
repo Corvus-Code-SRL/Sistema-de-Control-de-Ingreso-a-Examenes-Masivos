@@ -20,17 +20,16 @@ class ExamFormOptionsTest extends TestCase
 
         $data = $this->getJson('/api/examenes/formulario')->assertOk()->json('data');
 
-        // 5 pares en el catálogo: se excluyen el de materia inactiva y el par inactivo.
+        // Solo se ofrecen los pares activos con grupos propios en el periodo vigente
         $pairs = collect($data['materias'])
             ->map(fn (array $pair) => [$pair['id_carrera'], $pair['id_materia']])
             ->all();
 
         $this->assertEqualsCanonicalizing([
-            [$this->sistemasId, $this->calculoId],
-            [$this->informaticaId, $this->calculoId],
-            [$this->sistemasId, $this->basesDatosId],
+            [$this->sistemasId, $this->calculoId]
         ], $pairs);
 
+        $this->assertTrue($data['materias'][0]['es_mia']);
         $this->assertEqualsCanonicalizing(
             [$this->aulaId, $this->otraAulaId],
             array_column($data['ambientes'], 'id_ambiente')
