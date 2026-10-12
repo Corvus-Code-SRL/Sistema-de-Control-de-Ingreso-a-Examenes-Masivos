@@ -1,8 +1,15 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
+import { apiClient } from '@/lib/api-client'
 import { mockApiWith } from '@/test/http'
-import { TOKEN_STORAGE_KEY, loginBody, loginErrors, meBody } from '@/test/authFixtures'
+import {
+  TOKEN_STORAGE_KEY,
+  loginBody,
+  loginErrors,
+  meBody,
+  passwordChangeRequired,
+} from '@/test/authFixtures'
 import { AuthProvider } from './AuthProvider'
 import { useAuth } from '../hooks/useAuth'
 
@@ -197,5 +204,129 @@ describe('AuthProvider — iniciar y cerrar sesión', () => {
 
     await waitFor(() => expect(estado()).toBe('anonimo'))
     expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
+  })
+})
+
+describe('AuthProvider — contraseña temporal (HU-001)', () => {
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  function PendingProbe() {
+    const { estado, usuario, iniciarSesion, cambiarContrasenia } = useAuth()
+
+    return (
+      <div>
+        <p data-testid="estado">{estado}</p>
+        <p data-testid="pendiente">{String(usuario?.debe_cambiar_contrasenia ?? '—')}</p>
+        <button onClick={() => iniciarSesion('10452', 'Temporal2026').catch(() => undefined)}>entrar</button>
+        <button onClick={() => apiClient('/materias').catch(() => undefined)}>consultar</button>
+        <button
+          onClick={() =>
+            cambiarContrasenia({
+              contrasenia_actual: 'Temporal2026',
+              contrasenia_nueva: 'ClaveNueva2026',
+              contrasenia_nueva_confirmation: 'ClaveNueva2026',
+            }).catch(() => undefined)
+          }
+        >
+          cambiar
+        </button>
+      </div>
+    )
+  }
+
+  const pending = () => screen.getByTestId('pendiente').textContent
+
+  it('el login y /auth/yo traen el indicador y la sesión sigue autenticada', async () => {
+    const user = userEvent.setup()
+    mockApiWith(({ url }) =>
+      url.endsWith('/auth/login')
+        ? { body: loginBody('docente', 'tok-nuevo', true) }
+        : { body: meBody('docente', true) }
+    )
+
+    render(
+      <AuthProvider>
+        <PendingProbe />
+      </AuthProvider>
+    )
+
+    await user.click(screen.getByRole('button', { name: 'entrar' }))
+
+    await waitFor(() => expect(estado()).toBe('autenticado'))
+    expect(pending()).toBe('true')
+    expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBe('tok-nuevo')
+  })
+
+  it('un 403 cambio_de_clave_pendiente enciende el indicador sin cerrar la sesión', async () => {
+    const user = userEvent.setup()
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, 'tok-guardado')
+    mockApiWith(({ url }) => (url.endsWith('/auth/yo') ? { body: meBody('docente') } : passwordChangeRequired))
+
+    render(
+      <AuthProvider>
+        <PendingProbe />
+      </AuthProvider>
+    )
+
+    await waitFor(() => expect(estado()).toBe('autenticado'))
+    expect(pending()).toBe('false')
+
+    await user.click(screen.getByRole('button', { name: 'consultar' }))
+
+    await waitFor(() => expect(pending()).toBe('true'))
+    expect(estado()).toBe('autenticado')
+    expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBe('tok-guardado')
+  })
+
+  it('cambiar la contraseña apaga el indicador y conserva el token', async () => {
+    const user = userEvent.setup()
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, 'tok-guardado')
+    const { calls } = mockApiWith(({ url }) =>
+      url.endsWith('/auth/yo')
+        ? { body: meBody('docente', true) }
+        : { body: { data: { debe_cambiar_contrasenia: false } } }
+    )
+
+    render(
+      <AuthProvider>
+        <PendingProbe />
+      </AuthProvider>
+    )
+
+    await waitFor(() => expect(pending()).toBe('true'))
+
+    await user.click(screen.getByRole('button', { name: 'cambiar' }))
+
+    await waitFor(() => expect(pending()).toBe('false'))
+    expect(estado()).toBe('autenticado')
+    expect(calls.at(-1)?.url).toMatch(/\/auth\/cambiar-contrasenia$/)
+    expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBe('tok-guardado')
+  })
+
+  it('si el servidor rechaza el cambio, el indicador sigue encendido', async () => {
+    const user = userEvent.setup()
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, 'tok-guardado')
+    mockApiWith(({ url }) =>
+      url.endsWith('/auth/yo')
+        ? { body: meBody('docente', true) }
+        : {
+            status: 422,
+            body: { message: 'Inválido.', errors: { contrasenia_actual: ['La contraseña actual es incorrecta.'] } },
+          }
+    )
+
+    render(
+      <AuthProvider>
+        <PendingProbe />
+      </AuthProvider>
+    )
+
+    await waitFor(() => expect(pending()).toBe('true'))
+    await user.click(screen.getByRole('button', { name: 'cambiar' }))
+
+    await waitFor(() => expect(estado()).toBe('autenticado'))
+    expect(pending()).toBe('true')
   })
 })

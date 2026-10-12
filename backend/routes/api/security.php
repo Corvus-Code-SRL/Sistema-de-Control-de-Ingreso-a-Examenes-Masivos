@@ -6,6 +6,7 @@ use App\Http\Controllers\Security\UserController;
 use App\Http\Controllers\Security\UserQueryController;
 use App\Http\Controllers\Security\UserRoleController;
 use App\Http\Middleware\EnsureAccountIsActive;
+use App\Http\Middleware\EnsurePasswordIsChanged;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -45,8 +46,15 @@ Route::get('/usuarios/{user}/asignaciones', [UserRoleController::class, 'assignm
 Route::prefix('auth')->name('auth.')->group(function () {
     // Una cuenta inactiva también puede cerrar su sesión: no pasa por EnsureAccountIsActive.
     Route::post('/logout', [AuthController::class, 'logout'])
-        ->withoutMiddleware(EnsureAccountIsActive::class)
+        ->withoutMiddleware([EnsureAccountIsActive::class, EnsurePasswordIsChanged::class])
         ->name('logout');
-    Route::get('/yo', [AuthController::class, 'me'])->name('yo');
+    // HU-001: con contraseña temporal pendiente, estas dos son las únicas rutas (con logout) que responden.
+    Route::get('/yo', [AuthController::class, 'me'])
+        ->withoutMiddleware(EnsurePasswordIsChanged::class)
+        ->name('yo');
+    Route::post('/cambiar-contrasenia', [AuthController::class, 'changePassword'])
+        ->withoutMiddleware(EnsurePasswordIsChanged::class)
+        ->middleware('throttle:5,1,cambiar-contrasenia')
+        ->name('cambiar-contrasenia');
     Route::post('/confirmar-password', [AuthController::class, 'confirmPassword'])->name('confirmar-password');
 });

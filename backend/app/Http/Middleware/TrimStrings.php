@@ -15,5 +15,9 @@ class TrimStrings extends Middleware
         'current_password',
         'password',
         'password_confirmation',
+        'contrasenia_temporal',
+        'contrasenia_actual',
+        'contrasenia_nueva',
+        'contrasenia_nueva_confirmation',
     ];
 }

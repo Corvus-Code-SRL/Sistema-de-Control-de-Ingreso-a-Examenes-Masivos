@@ -13,6 +13,7 @@ use App\Exceptions\Security\DuplicateAccountException;
 use App\Exceptions\Security\InactiveAccountException;
 use App\Exceptions\Security\InvalidCredentialsException;
 use App\Exceptions\Security\NoCurrentRoleException;
+use App\Exceptions\Security\PasswordChangeRequiredException;
 use App\Exceptions\Security\SelfRoleAssignmentException;
 use App\Exceptions\Security\SisNoValidoException;
 use App\Support\ApiResponse;
@@ -47,6 +48,7 @@ class Handler extends ExceptionHandler
         InactiveAccountException::class,
         InvalidCredentialsException::class,
         NoCurrentRoleException::class,
+        PasswordChangeRequiredException::class,
         SelfRoleAssignmentException::class,
         SisNoValidoException::class,
     ];
@@ -60,6 +62,10 @@ class Handler extends ExceptionHandler
         'current_password',
         'password',
         'password_confirmation',
+        'contrasenia_temporal',
+        'contrasenia_actual',
+        'contrasenia_nueva',
+        'contrasenia_nueva_confirmation',
     ];
 
     /**

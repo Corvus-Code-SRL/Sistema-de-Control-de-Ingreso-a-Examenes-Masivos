@@ -7,6 +7,7 @@ export type {
   AccountRole,
   AccountStatus,
   ActiveAssignments,
+  RegistrationResult,
   Role,
   RoleHistoryEntry,
   SisPerson,

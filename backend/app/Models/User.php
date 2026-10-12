@@ -22,6 +22,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string $contrasenia
  * @property string $cod_sis
  * @property string $estado
+ * @property bool $debe_cambiar_contrasenia
  */
 class User extends Authenticatable
 {
@@ -44,7 +45,12 @@ class User extends Authenticatable
         'correo',
         'contrasenia',
         'cod_sis',
-        'estado'
+        'estado',
+        'debe_cambiar_contrasenia',
+    ];
+
+    protected $casts = [
+        'debe_cambiar_contrasenia' => 'boolean',
     ];
 
     /** Nunca se serializa la contraseña, pase lo que pase. */

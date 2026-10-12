@@ -41,6 +41,8 @@ export interface SessionUser {
   nombre_completo: string
   correo: string
   estado: string
+  /** `true` mientras la cuenta use la contraseña temporal que le entregó el Administrador. */
+  debe_cambiar_contrasenia: boolean
 }
 
 export interface SessionRole {
@@ -87,6 +89,19 @@ export interface LogoutResponse {
 export interface ConfirmPasswordResponse {
   data: { password_confirmado_en: string }
   mensaje?: string
+}
+
+/** POST /api/auth/cambiar-contrasenia */
+export interface ChangePasswordResponse {
+  data: { debe_cambiar_contrasenia: false }
+  mensaje?: string
+}
+
+/** Cuerpo de POST /api/auth/cambiar-contrasenia. */
+export interface ChangePasswordInput {
+  contrasenia_actual: string
+  contrasenia_nueva: string
+  contrasenia_nueva_confirmation: string
 }
 
 /*

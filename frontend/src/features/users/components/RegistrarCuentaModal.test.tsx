@@ -3,22 +3,24 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { RegistrarCuentaModal } from './RegistrarCuentaModal'
 import { mockApi } from '@/test/http'
-import { makeAccount, sisPerson, userMatchers } from '@/test/userFixtures'
+import { makeAccount, roles, sisPerson, userMatchers } from '@/test/userFixtures'
 
 const COD_SIS = '202312345'
+const TEMPORARY_PASSWORD = 'Temporal2026'
+const REMINDER = 'Entregue la contraseña temporal al usuario; deberá cambiarla en su primer ingreso.'
 
 function renderModal() {
   const onClose = vi.fn()
-  const onSuccess = vi.fn()
-  const view = render(<RegistrarCuentaModal isOpen onClose={onClose} onSuccess={onSuccess} />)
+  const onFinished = vi.fn()
+  const view = render(<RegistrarCuentaModal isOpen onClose={onClose} onFinished={onFinished} />)
 
   /** El modal sigue montado al cerrarse: reabrirlo muestra si descartó lo escrito. */
   const reopen = () => {
-    view.rerender(<RegistrarCuentaModal isOpen={false} onClose={onClose} onSuccess={onSuccess} />)
-    view.rerender(<RegistrarCuentaModal isOpen onClose={onClose} onSuccess={onSuccess} />)
+    view.rerender(<RegistrarCuentaModal isOpen={false} onClose={onClose} onFinished={onFinished} />)
+    view.rerender(<RegistrarCuentaModal isOpen onClose={onClose} onFinished={onFinished} />)
   }
 
-  return { onClose, onSuccess, reopen }
+  return { onClose, onFinished, reopen }
 }
 
 /** Peticiones hechas a un endpoint, con su método y cuerpo ya leídos. */
@@ -42,6 +44,31 @@ async function goToAccountData() {
   await screen.findByText('Persona reconocida por el SIS')
   await userEvent.click(screen.getByRole('button', { name: /continuar/i }))
 }
+
+/** Completa lo que pide el paso «Datos» y registra la cuenta. */
+async function fillAndRegister(password = TEMPORARY_PASSWORD) {
+  await userEvent.type(screen.getByLabelText(/correo institucional/i), 'l.mendoza@umss.edu')
+  await userEvent.type(screen.getByLabelText(/contraseña temporal/i), password)
+  await userEvent.click(screen.getByRole('button', { name: 'Registrar cuenta' }))
+}
+
+const registeredAccount = makeAccount({ cod_sis: COD_SIS, correo: 'laura.mendoza@umss.edu' })
+
+const registrationApi = [
+  { matches: userMatchers.sisVerification, body: { data: sisPerson } },
+  { matches: userMatchers.assignRole, body: { data: roles[1] } },
+  { matches: userMatchers.roles, body: { data: roles } },
+  {
+    matches: userMatchers.accounts,
+    status: 201,
+    body: { data: registeredAccount, mensaje: 'Cuenta creada correctamente.' },
+  },
+]
+
+const roleAssignments = () =>
+  requestsTo(userMatchers.assignRole).filter((request) => request.method === 'POST')
+
+const roleCatalogRequests = () => requestsTo(userMatchers.roles)
 
 describe('RegistrarCuentaModal', () => {
   describe('campos obligatorios visibles', () => {
@@ -78,6 +105,49 @@ describe('RegistrarCuentaModal', () => {
       expect(screen.queryByText('Tipo institucional', { selector: 'label' })).not.toBeInTheDocument()
       // Los únicos datos que se escriben son los que la cuenta guarda: solo el correo es editable.
       expect(screen.getAllByRole('textbox')).toHaveLength(1)
+    })
+
+    it('pide la contraseña temporal como obligatoria y la oculta por defecto', async () => {
+      mockApi([{ matches: userMatchers.sisVerification, body: { data: sisPerson } }])
+      renderModal()
+
+      await goToAccountData()
+
+      const field = screen.getByLabelText(/contraseña temporal/i)
+
+      expect(screen.getByText(/^contraseña temporal/i, { selector: 'label' })).toHaveTextContent('*')
+      expect(field).toHaveAttribute('aria-required', 'true')
+      expect(field).toHaveAttribute('type', 'password')
+      expect(field).toHaveAttribute('autocomplete', 'new-password')
+    })
+
+    it('permite mostrar y ocultar la contraseña temporal', async () => {
+      mockApi([{ matches: userMatchers.sisVerification, body: { data: sisPerson } }])
+      renderModal()
+
+      await goToAccountData()
+      await userEvent.type(screen.getByLabelText(/contraseña temporal/i), TEMPORARY_PASSWORD)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Mostrar contraseña' }))
+      expect(screen.getByLabelText(/contraseña temporal/i)).toHaveAttribute('type', 'text')
+      expect(screen.getByLabelText(/contraseña temporal/i)).toHaveValue(TEMPORARY_PASSWORD)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Ocultar contraseña' }))
+      expect(screen.getByLabelText(/contraseña temporal/i)).toHaveAttribute('type', 'password')
+    })
+
+    it('rechaza una contraseña temporal de menos de 8 caracteres sin llamar al servidor', async () => {
+      mockApi([{ matches: userMatchers.sisVerification, body: { data: sisPerson } }])
+      renderModal()
+
+      await goToAccountData()
+      await fillAndRegister('Corta1')
+
+      expect(
+        screen.getByText('La contraseña temporal debe tener al menos 8 caracteres.')
+      ).toBeInTheDocument()
+      expect(screen.getByLabelText(/contraseña temporal/i)).toHaveAttribute('aria-invalid', 'true')
+      expect(registrations()).toHaveLength(0)
     })
 
     it('la tarjeta del SIS conserva tipo y facultad como información de solo lectura', async () => {
@@ -188,23 +258,10 @@ describe('RegistrarCuentaModal', () => {
     })
   })
 
-  it('confirma el registro con hora del equipo, correo devuelto y campos declarados', async () => {
+  it('registra la cuenta con su contraseña temporal y pasa solo al paso Rol', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date(2026, 9, 5, 14, 37, 0))
-    mockApi([
-      { matches: userMatchers.sisVerification, body: { data: sisPerson } },
-      {
-        matches: userMatchers.accounts,
-        status: 201,
-        body: {
-          data: makeAccount({
-            cod_sis: COD_SIS,
-            correo: 'laura.mendoza@umss.edu',
-          }),
-          mensaje: 'Cuenta creada correctamente.',
-        },
-      },
-    ])
+    mockApi(registrationApi)
     renderModal()
 
     await verifyCode()
@@ -216,18 +273,14 @@ describe('RegistrarCuentaModal', () => {
 
     expect(screen.getByText('Este correo quedará asociado a la cuenta.')).toBeInTheDocument()
     expect(screen.queryByText(/recibirá sus credenciales de acceso/i)).not.toBeInTheDocument()
+    // El catálogo de roles no se pide hasta llegar al paso Rol.
+    expect(roleCatalogRequests()).toHaveLength(0)
 
-    await userEvent.type(screen.getByLabelText(/correo institucional/i), 'l.mendoza@umss.edu')
-    await userEvent.click(screen.getByRole('button', { name: 'Registrar cuenta' }))
+    await fillAndRegister()
 
-    expect(await screen.findByText('Cuenta creada')).toBeInTheDocument()
-    expect(screen.getByText(/laura mendoza rivas · sis 202312345 · sin rol/i)).toBeInTheDocument()
-
-    expect(
-      screen.getByText('Registrada a las 14:37 (hora de este equipo)')
-    ).toBeInTheDocument()
-
-    expect(screen.getByText('laura.mendoza@umss.edu')).toBeInTheDocument()
+    expect(await screen.findByRole('radio', { name: /docente/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Asignar después' })).toBeInTheDocument()
+    expect(screen.getByText('Paso 2 de 3')).toBeInTheDocument()
 
     expect(registrations()).toEqual([
       {
@@ -238,10 +291,135 @@ describe('RegistrarCuentaModal', () => {
           apellido_paterno: 'Mendoza',
           apellido_materno: 'Rivas',
           correo: 'l.mendoza@umss.edu',
+          contrasenia_temporal: TEMPORARY_PASSWORD,
         }),
       },
     ])
     vi.useRealTimers()
+  })
+
+  describe('flujo Datos → Rol → Listo', () => {
+    it('asigna el rol en el mismo modal y confirma con nombre, SIS, rol y recordatorio', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date(2026, 9, 5, 14, 37, 0))
+      mockApi(registrationApi)
+      const { onClose, onFinished } = renderModal()
+
+      await goToAccountData()
+      await fillAndRegister()
+
+      await userEvent.click(await screen.findByRole('radio', { name: /docente/i }))
+      await userEvent.click(screen.getByRole('button', { name: 'Asignar rol' }))
+
+      expect(await screen.findByText('Cuenta creada')).toBeInTheDocument()
+      expect(screen.getByText('Laura Mendoza Rivas · SIS 202312345 · Docente')).toBeInTheDocument()
+      expect(screen.getByText('laura.mendoza@umss.edu')).toBeInTheDocument()
+      expect(screen.getByText(REMINDER)).toBeInTheDocument()
+      expect(screen.getByText('Registrada a las 14:37 (hora de este equipo)')).toBeInTheDocument()
+
+      expect(roleAssignments()).toEqual([
+        { method: 'POST', body: JSON.stringify({ id_rol: roles[1].id_rol }) },
+      ])
+      // La contraseña no se vuelve a mostrar.
+      expect(screen.queryByText(TEMPORARY_PASSWORD)).not.toBeInTheDocument()
+      expect(onFinished).not.toHaveBeenCalled()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+
+      expect(onFinished).toHaveBeenCalledWith({ account: registeredAccount, role: roles[1] })
+      expect(onClose).toHaveBeenCalledTimes(1)
+      vi.useRealTimers()
+    })
+
+    it('«Asignar después» cierra el modal y deja la cuenta sin rol', async () => {
+      mockApi(registrationApi)
+      const { onClose, onFinished } = renderModal()
+
+      await goToAccountData()
+      await fillAndRegister()
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Asignar después' }))
+
+      expect(onClose).toHaveBeenCalledTimes(1)
+      expect(onFinished).toHaveBeenCalledWith({ account: registeredAccount, role: null })
+      expect(roleAssignments()).toHaveLength(0)
+      expect(screen.queryByText('¿Descartar el registro?')).not.toBeInTheDocument()
+    })
+
+    it('cerrar en el paso Rol equivale a «Asignar después»: la cuenta ya existe', async () => {
+      mockApi(registrationApi)
+      const { onClose, onFinished } = renderModal()
+
+      await goToAccountData()
+      await fillAndRegister()
+
+      await screen.findByRole('button', { name: 'Asignar después' })
+      // Hay una cabecera para móvil y otra para escritorio: las dos cierran igual.
+      await userEvent.click(screen.getAllByRole('button', { name: 'Cancelar registro' })[0])
+
+      expect(onFinished).toHaveBeenCalledWith({ account: registeredAccount, role: null })
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it('no asigna sin elegir un rol', async () => {
+      mockApi(registrationApi)
+      renderModal()
+
+      await goToAccountData()
+      await fillAndRegister()
+
+      await screen.findByRole('radio', { name: /docente/i })
+
+      expect(screen.getByRole('button', { name: 'Asignar rol' })).toBeDisabled()
+    })
+
+    it('muestra el rechazo del servidor y deja reintentar o asignar después', async () => {
+      mockApi([
+        {
+          matches: userMatchers.assignRole,
+          status: 422,
+          body: {
+            message: 'Los datos proporcionados no son válidos.',
+            errors: { id_rol: ['El rol seleccionado no existe en el sistema.'] },
+          },
+        },
+        ...registrationApi,
+      ])
+      const { onFinished } = renderModal()
+
+      await goToAccountData()
+      await fillAndRegister()
+
+      await userEvent.click(await screen.findByRole('radio', { name: /auxiliar/i }))
+      await userEvent.click(screen.getByRole('button', { name: 'Asignar rol' }))
+
+      expect(
+        await screen.findByText('El rol seleccionado no existe en el sistema.')
+      ).toBeInTheDocument()
+      expect(screen.queryByText('Cuenta creada')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Asignar después' })).toBeEnabled()
+      expect(onFinished).not.toHaveBeenCalled()
+    })
+
+    it('«Registrar otra» informa la cuenta terminada y vuelve a empezar sin la contraseña', async () => {
+      mockApi(registrationApi)
+      const { onClose, onFinished } = renderModal()
+
+      await goToAccountData()
+      await fillAndRegister()
+      await userEvent.click(await screen.findByRole('radio', { name: /docente/i }))
+      await userEvent.click(screen.getByRole('button', { name: 'Asignar rol' }))
+      await screen.findByText('Cuenta creada')
+
+      await userEvent.click(screen.getByRole('button', { name: 'Registrar otra' }))
+
+      expect(onFinished).toHaveBeenCalledTimes(1)
+      expect(onClose).not.toHaveBeenCalled()
+      expect(screen.getByLabelText(/código sis/i)).toHaveValue('')
+
+      await goToAccountData()
+      expect(screen.getByLabelText(/contraseña temporal/i)).toHaveValue('')
+    })
   })
 
   describe('mensajes específicos de la verificación', () => {
@@ -323,11 +501,36 @@ describe('RegistrarCuentaModal', () => {
       renderModal()
 
       await goToAccountData()
-      await userEvent.type(screen.getByLabelText(/correo institucional/i), 'l.mendoza@umss.edu')
-      await userEvent.click(screen.getByRole('button', { name: 'Registrar cuenta' }))
+      await fillAndRegister()
 
       expect(
         await screen.findByText('Ya existe una cuenta registrada con este correo institucional.')
+      ).toBeInTheDocument()
+      expect(screen.queryByText('Cuenta creada')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Asignar después' })).not.toBeInTheDocument()
+    })
+
+    it('muestra bajo el campo el rechazo de la contraseña temporal', async () => {
+      mockApi([
+        { matches: userMatchers.sisVerification, body: { data: sisPerson } },
+        {
+          matches: userMatchers.accounts,
+          status: 422,
+          body: {
+            message: 'Los datos proporcionados no son válidos.',
+            errors: {
+              contrasenia_temporal: ['La contraseña temporal debe tener al menos 8 caracteres.'],
+            },
+          },
+        },
+      ])
+      renderModal()
+
+      await goToAccountData()
+      await fillAndRegister('12345678')
+
+      expect(
+        await screen.findByText('La contraseña temporal debe tener al menos 8 caracteres.')
       ).toBeInTheDocument()
       expect(screen.queryByText('Cuenta creada')).not.toBeInTheDocument()
     })

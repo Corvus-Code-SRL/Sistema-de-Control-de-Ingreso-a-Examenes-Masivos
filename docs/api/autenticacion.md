@@ -10,6 +10,7 @@ Convenciones: prefijo `/api`, JSON, cabecera `Accept: application/json`. Las res
 | POST | `/api/auth/logout` | Token |
 | GET | `/api/auth/yo` | Token |
 | POST | `/api/auth/confirmar-password` | Token |
+| POST | `/api/auth/cambiar-contrasenia` | Token — `throttle:5,1` por cuenta |
 
 ## Rutas protegidas y roles
 
@@ -54,7 +55,8 @@ Cuerpo:
       "apellido_materno": "Andrade",
       "nombre_completo": "Marcelo Quiroga Andrade",
       "correo": "marcelo.quiroga@sciem.test",
-      "estado": "ACTIVO"
+      "estado": "ACTIVO",
+      "debe_cambiar_contrasenia": false
     },
     "rol": { "id_rol": 2, "nombre_rol": "Docente" },
     "token": "1|Qm9ndXNUb2tlbi4uLg",
@@ -123,7 +125,7 @@ Reconstruye la sesión al cargar la página: cuenta, rol vigente y lo necesario 
   "data": {
     "usuario": { "id_usuario": "…", "cod_sis": "10452", "nombre": "Marcelo", "apellido_paterno": "Quiroga",
                  "apellido_materno": "Andrade", "nombre_completo": "Marcelo Quiroga Andrade",
-                 "correo": "marcelo.quiroga@sciem.test", "estado": "ACTIVO" },
+                 "correo": "marcelo.quiroga@sciem.test", "estado": "ACTIVO", "debe_cambiar_contrasenia": false },
     "rol": { "id_rol": 2, "nombre_rol": "Docente" },
     "navegacion": {
       "permisos": ["examenes.gestionar"],
@@ -154,13 +156,48 @@ Cuerpo: `{ "password": "…" }`
 
 Contraseña incorrecta: **422** con error de validación en `password` (no 401, para que el cliente no cierre la sesión). El momento se guarda en `personal_access_tokens.password_confirmado_en`, también al iniciar sesión.
 
-## Contraseña inicial de cuentas registradas
+## POST /api/auth/cambiar-contrasenia
 
-La HU-001 registra la cuenta de usuario, pero no define todavía el mecanismo de entrega o establecimiento de la contraseña inicial.
+Cambia la contraseña propia. Es la salida de la contraseña temporal (HU-001) y la única ruta, junto con `GET /api/auth/yo` y `POST /api/auth/logout`, que responde mientras el cambio está pendiente.
 
-Actualmente el backend genera una clave aleatoria para cumplir la restricción `NOT NULL` de `usuario.contrasenia` y almacena únicamente su hash. Esa clave no se devuelve en la API ni se envía por correo desde la HU-001.
+```json
+{ "contrasenia_actual": "Temporal2026", "contrasenia_nueva": "ClaveNueva2026", "contrasenia_nueva_confirmation": "ClaveNueva2026" }
+```
 
-La definición del flujo de primer acceso —por ejemplo, entrega segura de una credencial temporal o establecimiento de una nueva contraseña por el usuario— queda pendiente del flujo de autenticación/RNF correspondiente. Hasta que ese mecanismo sea definido, la interfaz de registro no debe indicar que las credenciales serán enviadas por correo.
+- `contrasenia_actual` debe coincidir con la guardada.
+- `contrasenia_nueva`: al menos 8 caracteres (72 como máximo, el límite de bcrypt), confirmada en `contrasenia_nueva_confirmation` y **distinta de la actual**.
+- Limitada a **5 intentos por minuto y por cuenta** (429 al excederlos).
+
+**200**
+
+```json
+{ "data": { "debe_cambiar_contrasenia": false }, "mensaje": "Contraseña actualizada correctamente." }
+```
+
+**422** con `errors.contrasenia_actual` (no coincide) o `errors.contrasenia_nueva` (corta, sin confirmar o igual a la actual). No es un 401, para que el cliente no cierre la sesión.
+
+Al terminar: `usuario.debe_cambiar_contrasenia` pasa a `false`, se **revocan las demás sesiones de la cuenta** (se conserva la que hizo el cambio) y se registra `MODIFICAR` sobre `usuario` en la bitácora, **sin ningún valor de contraseña** en `antiguo_valor` ni `nuevo_valor`.
+
+## Contraseña temporal de cuentas registradas (HU-001)
+
+El Administrador escribe la **contraseña temporal** (`contrasenia_temporal`, mínimo 8 caracteres) al registrar la cuenta en `POST /api/usuarios` y se la entrega al usuario. Solo se guarda su hash: nunca se devuelve, se registra en la bitácora ni se envía por correo. La cuenta nace con `usuario.debe_cambiar_contrasenia = true`.
+
+Mientras ese indicador sea `true`, **toda ruta protegida responde 403** con `motivo: "cambio_de_clave_pendiente"`, salvo:
+
+| Ruta | Para qué |
+|---|---|
+| `GET /api/auth/yo` | El frontend lee `usuario.debe_cambiar_contrasenia` y decide a dónde ir |
+| `POST /api/auth/cambiar-contrasenia` | Cerrar el pendiente |
+| `POST /api/auth/logout` | Salir |
+
+```json
+{ "message": "Debe cambiar su contraseña temporal antes de continuar.", "motivo": "cambio_de_clave_pendiente" }
+```
+
+- El token **no se revoca**: la sesión sigue viva para poder cambiar la contraseña.
+- `account.active` se evalúa antes: una cuenta deshabilitada recibe `cuenta_inactiva`.
+- El login funciona igual y su respuesta (y la de `/auth/yo`) incluye `usuario.debe_cambiar_contrasenia`.
+- Una cuenta sin rol vigente sigue sin poder iniciar sesión (`sin_rol_vigente`) hasta que se le asigne uno. Las cuentas anteriores a HU-001 tienen el indicador en `false` y no se ven afectadas.
 
 ## Esquema y puesta en marcha
 

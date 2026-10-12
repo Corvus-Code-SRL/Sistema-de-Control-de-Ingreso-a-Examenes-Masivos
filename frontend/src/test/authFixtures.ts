@@ -33,6 +33,7 @@ function account(
       nombre_completo: `${nombre} ${paterno} ${materno}`,
       correo: `${nombre.toLowerCase()}.${paterno.toLowerCase()}@sciem.test`,
       estado: 'ACTIVO',
+      debe_cambiar_contrasenia: false,
     },
     role: { id_rol, nombre_rol },
   }
@@ -46,12 +47,17 @@ export const accounts = {
 
 export type AccountKey = keyof typeof accounts
 
-export function loginBody(key: AccountKey, token = `1|token-${key}`): LoginResponse {
+/** `mustChangePassword`: la cuenta entró con la contraseña temporal que le entregó el Administrador. */
+export function loginBody(
+  key: AccountKey,
+  token = `1|token-${key}`,
+  mustChangePassword = false
+): LoginResponse {
   const { user, role } = accounts[key]
 
   return {
     data: {
-      usuario: user,
+      usuario: { ...user, debe_cambiar_contrasenia: mustChangePassword },
       rol: role,
       token,
       tipo_token: 'Bearer',
@@ -61,12 +67,12 @@ export function loginBody(key: AccountKey, token = `1|token-${key}`): LoginRespo
   }
 }
 
-export function meBody(key: AccountKey): MeResponse {
+export function meBody(key: AccountKey, mustChangePassword = false): MeResponse {
   const { user, role } = accounts[key]
 
   return {
     data: {
-      usuario: user,
+      usuario: { ...user, debe_cambiar_contrasenia: mustChangePassword },
       rol: role,
       navegacion: { permisos: [], interfaces: [] },
       password_confirmado_en: '2026-10-02T21:00:00+00:00',
@@ -91,5 +97,14 @@ export const loginErrors = {
   throttled: {
     status: 429,
     body: { message: 'Too Many Attempts.' },
+  },
+}
+
+/** Respuesta de toda ruta protegida mientras la contraseña temporal sigue sin cambiarse. */
+export const passwordChangeRequired = {
+  status: 403,
+  body: {
+    message: 'Debe cambiar su contraseña temporal antes de continuar.',
+    motivo: 'cambio_de_clave_pendiente',
   },
 }

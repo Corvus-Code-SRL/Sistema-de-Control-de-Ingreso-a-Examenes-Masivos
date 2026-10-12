@@ -14,21 +14,20 @@ import { AsignarRolModal } from '../components/AsignarRolModal'
 import { RegistrarCuentaModal } from '../components/RegistrarCuentaModal'
 import { SuccessToast, type ToastMessage } from '../components/SuccessToast'
 import { useUserAccounts } from '../hooks/useUserAccounts'
-import { accountFullName, type Role, type UserAccount } from '../types/users.types'
+import {
+  accountFullName,
+  type RegistrationResult,
+  type Role,
+  type UserAccount,
+} from '../types/users.types'
 
 type AccountFilter = 'todas' | 'sin-rol'
-
-/** Lo que devuelve el registro de HU-001 al terminar: los datos que confirmó el SIS. */
-interface RegisteredPerson {
-  nombre: string
-  paterno: string
-}
 
 /**
  * Cuentas con acceso a SCIEM y su rol vigente.
  *
- * Desde aquí se registran cuentas nuevas (HU-001) y se asigna el rol a las que
- * aún no tienen uno (HU-004).
+ * Desde aquí se registran cuentas nuevas, con su contraseña temporal y su rol en el mismo
+ * flujo (HU-001), y se asigna el rol a las que quedaron sin uno (HU-004).
  */
 export function CuentasPage() {
   const { status, data, error, reload } = useUserAccounts()
@@ -56,12 +55,18 @@ export function CuentasPage() {
     })
   }, [accounts, filter, search])
 
-  const handleRegistered = (person: RegisteredPerson) => {
-    setIsRegistering(false)
-    setToast({
-      title: 'Cuenta creada',
-      description: `${person.nombre} ${person.paterno} quedó sin rol. Asígnele uno para que pueda ingresar.`,
-    })
+  const handleRegistered = ({ account, role }: RegistrationResult) => {
+    setToast(
+      role
+        ? {
+            title: 'Cuenta creada',
+            description: `${account.nombre} ${account.apellido_paterno} quedó registrada como ${role.nombre_rol}. Entregue la contraseña temporal; deberá cambiarla en su primer ingreso.`,
+          }
+        : {
+            title: 'Cuenta creada sin rol',
+            description: 'Entregue la contraseña temporal; el usuario podrá ingresar cuando tenga un rol.',
+          }
+    )
     reload()
   }
 
@@ -143,7 +148,7 @@ export function CuentasPage() {
       <RegistrarCuentaModal
         isOpen={isRegistering}
         onClose={() => setIsRegistering(false)}
-        onSuccess={handleRegistered}
+        onFinished={handleRegistered}
       />
 
       <AsignarRolModal

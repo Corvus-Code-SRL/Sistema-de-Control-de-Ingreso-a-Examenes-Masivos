@@ -1,7 +1,5 @@
 import { useState } from 'react'
 import { AlertTriangle, ArrowRightLeft, Lock } from 'lucide-react'
-import { ErrorState } from '@/components/common/ErrorState'
-import { LoadingState } from '@/components/common/LoadingState'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,9 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { ApiError } from '@/lib/api-client'
-import { cn } from '@/lib/utils'
 import { useRoles } from '../hooks/useRoles'
+import { describeRoleError } from '../lib/describeRoleError'
 import { assignRole, getActiveAssignments } from '../services/usersService'
 import {
   TEACHER_ROLE,
@@ -25,6 +22,7 @@ import {
   type UserAccount,
 } from '../types/users.types'
 import { RoleBadge } from './RoleBadge'
+import { RoleOptions } from './RoleOptions'
 
 interface AsignarRolModalProps {
   open: boolean
@@ -86,7 +84,7 @@ function RoleAssignment({ account, onCancel, onAssigned }: RoleAssignmentProps) 
     try {
       onAssigned(await assignRole(account.id_usuario, selectedRole.id_rol))
     } catch (cause) {
-      setErrorMessage(describeError(cause))
+      setErrorMessage(describeRoleError(cause))
       setStep('select')
     } finally {
       setIsSubmitting(false)
@@ -110,7 +108,7 @@ function RoleAssignment({ account, onCancel, onAssigned }: RoleAssignmentProps) 
       try {
         setAssignments(await getActiveAssignments(account.id_usuario))
       } catch (cause) {
-        setErrorMessage(describeError(cause))
+        setErrorMessage(describeRoleError(cause))
         return
       } finally {
         setIsSubmitting(false)
@@ -211,54 +209,13 @@ function RoleAssignment({ account, onCancel, onAssigned }: RoleAssignmentProps) 
         </Alert>
       )}
 
-      <fieldset className="space-y-2">
-        <legend className="mb-2 text-sm font-semibold text-foreground">
-          Nuevo rol <span className="text-danger">*</span>
-        </legend>
-
-        {roles.status === 'loading' && <LoadingState rows={3} label="Cargando roles" />}
-
-        {roles.status === 'error' && roles.error && (
-          <ErrorState error={roles.error} onRetry={roles.reload} className="py-6" />
-        )}
-
-        {roles.status === 'success' &&
-          roles.data?.map((role) => {
-            const isCurrent = currentRole?.id_rol === role.id_rol
-            const isSelected = selectedRoleId === role.id_rol
-
-            return (
-              <label
-                key={role.id_rol}
-                className={cn(
-                  'flex items-start gap-3 rounded-lg border p-4 transition-colors',
-                  isCurrent && 'cursor-not-allowed border-border-soft bg-sunken opacity-70',
-                  !isCurrent && isSelected && 'cursor-pointer border-brand bg-brand-soft/40',
-                  !isCurrent && !isSelected && 'cursor-pointer border-border-soft hover:border-border-strong'
-                )}
-              >
-                <input
-                  type="radio"
-                  name="rol"
-                  value={role.id_rol}
-                  checked={isSelected}
-                  disabled={isCurrent || isSubmitting}
-                  onChange={() => setSelectedRoleId(role.id_rol)}
-                  className="mt-1 accent-brand"
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-foreground">{role.nombre_rol}</span>
-                    {isCurrent && <span className="text-xs text-muted-foreground">Rol actual</span>}
-                  </span>
-                  {role.descripcion && (
-                    <span className="mt-1 block text-sm text-muted-foreground">{role.descripcion}</span>
-                  )}
-                </span>
-              </label>
-            )
-          })}
-      </fieldset>
+      <RoleOptions
+        roles={roles}
+        currentRoleId={currentRole?.id_rol}
+        selectedRoleId={selectedRoleId}
+        disabled={isSubmitting}
+        onSelect={setSelectedRoleId}
+      />
 
       <DialogFooter>
         <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
@@ -270,14 +227,6 @@ function RoleAssignment({ account, onCancel, onAssigned }: RoleAssignmentProps) 
       </DialogFooter>
     </>
   )
-}
-
-function describeError(cause: unknown): string {
-  if (cause instanceof ApiError) {
-    return cause.errors.id_rol?.[0] ?? cause.message
-  }
-
-  return 'No se pudo guardar el rol. Intente nuevamente.'
 }
 
 function plural(count: number, singular: string, pluralForm: string): string {

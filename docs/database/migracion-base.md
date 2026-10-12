@@ -7,7 +7,8 @@ Ejecuta `backend/database/schema/baseline.sql`, que es el comienzo exacto de `do
 (lo verifica `DatabaseSchemaTest`). Ese archivo y la migración no se editan nunca: todo cambio
 estructural posterior va en una migración nueva (`php artisan make:migration ...`) y, para que
 `creation-script.sql` siga siendo el esquema final, el SQL equivalente se **agrega al final** de ese script, en la
-sección «CAMBIOS POSTERIORES A LA BASE» (hoy: la migración `2026_09_29_000001` de HU-11).
+sección «CAMBIOS POSTERIORES A LA BASE» (hoy: la migración `2026_09_29_000001` de HU-11 y las dos de HU-001,
+`2026_10_11_000001` y `2026_10_11_000002`).
 
 Sustituye a las seis migraciones parciales anteriores (`create_enum_types`, `create_rol_table`,
 `create_usuario_table`, `create_usuario_rol_table`, `create_accion_table`, `create_log_table`), que solo

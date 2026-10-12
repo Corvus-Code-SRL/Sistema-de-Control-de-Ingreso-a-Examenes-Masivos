@@ -136,6 +136,47 @@ class AuthService
     }
 
     /**
+     * Cambia la contraseña propia (HU-001: cierre de la contraseña temporal).
+     *
+     * La actual debe coincidir. Al terminar se apaga `debe_cambiar_contrasenia` y se revocan las
+     * demás sesiones de la cuenta, conservando la que hizo el cambio.
+     */
+    public function changePassword(User $user, string $currentPassword, string $newPassword, $token): void
+    {
+        if (! Hash::check($currentPassword, $user->getAuthPassword())) {
+            throw ValidationException::withMessages([
+                'contrasenia_actual' => ['La contraseña actual es incorrecta.'],
+            ]);
+        }
+
+        DB::transaction(function () use ($user, $newPassword, $token) {
+            $mustChange = (bool) $user->debe_cambiar_contrasenia;
+
+            $user->forceFill([
+                'contrasenia' => Hash::make($newPassword),
+                'debe_cambiar_contrasenia' => false,
+            ])->save();
+
+            $otherTokens = $user->tokens();
+
+            if ($token instanceof Model) {
+                $otherTokens->where($token->getKeyName(), '!=', $token->getKey());
+            }
+
+            $otherTokens->delete();
+
+            // Solo el indicador y un marcador: ningún valor de contraseña llega a la bitácora.
+            $this->auditLog->registrar(
+                'MODIFICAR',
+                'usuario',
+                ['debe_cambiar_contrasenia' => $mustChange],
+                ['debe_cambiar_contrasenia' => false, 'contrasenia_cambiada' => true],
+                $user->id_usuario
+            );
+        });
+    }
+
+    /**
      * Rol vigente: la asignación abierta (fecha_fin nula), en una sola consulta. El esquema no
      * impide varias abiertas a la vez, así que se toma la más reciente.
      */

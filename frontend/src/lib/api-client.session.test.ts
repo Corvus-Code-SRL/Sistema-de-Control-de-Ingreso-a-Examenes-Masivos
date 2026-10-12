@@ -9,12 +9,14 @@ import { ApiError, apiClient, apiPost, configureSessionHandlers } from './api-cl
  */
 describe('api-client — sesión', () => {
   const onSessionExpired = vi.fn()
+  const onPasswordChangeRequired = vi.fn()
   let token: string | null
 
   beforeEach(() => {
     token = 'abc123'
     onSessionExpired.mockClear()
-    configureSessionHandlers({ getToken: () => token, onSessionExpired })
+    onPasswordChangeRequired.mockClear()
+    configureSessionHandlers({ getToken: () => token, onSessionExpired, onPasswordChangeRequired })
   })
 
   afterEach(() => {
@@ -134,6 +136,38 @@ describe('api-client — sesión', () => {
       { status: 403, motivo: 'cuenta_inactiva' }
     )
 
+    expect(onSessionExpired).not.toHaveBeenCalled()
+  })
+
+  it('un 403 cambio_de_clave_pendiente con token avisa del cambio pendiente sin cerrar la sesión', async () => {
+    mockApiWith(() => ({
+      status: 403,
+      body: {
+        message: 'Debe cambiar su contraseña temporal antes de continuar.',
+        motivo: 'cambio_de_clave_pendiente',
+      },
+    }))
+
+    await expect(apiClient('/examenes')).rejects.toMatchObject({
+      status: 403,
+      motivo: 'cambio_de_clave_pendiente',
+    })
+
+    expect(onPasswordChangeRequired).toHaveBeenCalledTimes(1)
+    expect(onSessionExpired).not.toHaveBeenCalled()
+  })
+
+  it('un 403 cambio_de_clave_pendiente sin token o del login no toca la sesión', async () => {
+    mockApiWith(() => ({ status: 403, body: { message: 'Pendiente.', motivo: 'cambio_de_clave_pendiente' } }))
+
+    await expect(
+      apiPost('/auth/login', { cod_sis: '10452', password: 'x' }, { skipAuth: true })
+    ).rejects.toMatchObject({ status: 403 })
+
+    token = null
+    await expect(apiClient('/examenes')).rejects.toMatchObject({ status: 403 })
+
+    expect(onPasswordChangeRequired).not.toHaveBeenCalled()
     expect(onSessionExpired).not.toHaveBeenCalled()
   })
 
