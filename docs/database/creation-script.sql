@@ -1549,3 +1549,17 @@ CREATE TABLE public.intento_ingreso (
 
 CREATE INDEX idx_intento_examen_registrado
     ON public.intento_ingreso(id_examen, registrado_en);
+
+--
+-- Versión 7: HU-001 (2026_10_11_000001_add_debe_cambiar_contrasenia_to_usuario y
+--                    2026_10_11_000002_widen_usuario_apellidos)
+--   * usuario.debe_cambiar_contrasenia marca la cuenta que entró con contraseña temporal.
+--   * usuario admite apellidos de hasta 60 caracteres (el SIS los devuelve en un solo campo).
+--     estudiante y postulante no cambian.
+
+ALTER TABLE public.usuario
+    ADD COLUMN debe_cambiar_contrasenia boolean NOT NULL DEFAULT false;
+
+ALTER TABLE public.usuario
+    ALTER COLUMN apellido_paterno TYPE varchar(60),
+    ALTER COLUMN apellido_materno TYPE varchar(60);

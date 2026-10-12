@@ -242,6 +242,59 @@ class DatabaseSchemaTest extends TestCase
         }
     }
 
+    public function testUsuarioTracksPendingPasswordChangeAndDefaultsToFalse(): void
+    {
+        $column = DB::selectOne(
+            "select data_type, is_nullable, column_default from information_schema.columns
+             where table_schema = 'public' and table_name = 'usuario'
+               and column_name = 'debe_cambiar_contrasenia'"
+        );
+
+        $this->assertNotNull($column);
+        $this->assertSame('boolean', $column->data_type);
+        $this->assertSame('NO', $column->is_nullable);
+        $this->assertSame('false', $column->column_default);
+
+        $id = $this->insertUser('conindicador');
+
+        $this->assertFalse(
+            (bool) DB::table('usuario')->where('id_usuario', $id)->value('debe_cambiar_contrasenia')
+        );
+    }
+
+    public function testUsuarioLastNamesAdmitSixtyCharactersButEstudianteKeepsItsLimit(): void
+    {
+        $widths = DB::select(
+            "select table_name, column_name, character_maximum_length from information_schema.columns
+             where table_schema = 'public' and column_name in ('apellido_paterno', 'apellido_materno')
+               and table_name in ('usuario', 'estudiante')"
+        );
+
+        foreach ($widths as $column) {
+            $expected = $column->table_name === 'usuario' ? 60 : 30;
+
+            $this->assertSame(
+                $expected,
+                (int) $column->character_maximum_length,
+                "{$column->table_name}.{$column->column_name}"
+            );
+        }
+
+        $this->assertCount(4, $widths);
+    }
+
+    public function testCreationScriptDeclaresTheUsuarioChangesOfHu001(): void
+    {
+        $script = file_get_contents(base_path('../docs/database/creation-script.sql'));
+
+        $this->assertStringContainsString(
+            'ADD COLUMN debe_cambiar_contrasenia boolean NOT NULL DEFAULT false',
+            $script
+        );
+        $this->assertStringContainsString('ALTER COLUMN apellido_paterno TYPE varchar(60)', $script);
+        $this->assertStringContainsString('ALTER COLUMN apellido_materno TYPE varchar(60)', $script);
+    }
+
     /** Corre la operación en un savepoint: la base debe rechazarla sin abortar la transacción del test. */
     private function assertRejected(callable $operation): void
     {
