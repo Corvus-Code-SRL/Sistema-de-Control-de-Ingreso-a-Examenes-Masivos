@@ -34,9 +34,12 @@ class StoreUserRequest extends FormRequest
             // CA 1, 7, 8 — campos obligatorios y formato
             'cod_sis'          => ['required', 'string', 'max:15', 'unique:usuario,cod_sis'],
             'nombre'           => ['required', 'string', 'max:50'],
-            'apellido_paterno' => ['required', 'string', 'max:30'],
-            'apellido_materno' => ['nullable', 'string', 'max:30'],
+            // El SIS devuelve los apellidos en un solo campo: usuario admite hasta 60 caracteres.
+            'apellido_paterno' => ['required', 'string', 'max:60'],
+            'apellido_materno' => ['nullable', 'string', 'max:60'],
             'correo'           => ['required', 'email', 'max:100', 'unique:usuario,correo'],
+            // 72 es el límite de bcrypt: más allá, los caracteres no cuentan.
+            'contrasenia_temporal' => ['required', 'string', 'min:8', 'max:72'],
         ];
     }
 
@@ -48,6 +51,7 @@ class StoreUserRequest extends FormRequest
             'apellido_paterno' => 'apellido paterno',
             'apellido_materno' => 'apellido materno',
             'correo'           => 'correo institucional',
+            'contrasenia_temporal' => 'contraseña temporal',
         ];
     }
 
@@ -58,6 +62,8 @@ class StoreUserRequest extends FormRequest
             'cod_sis.unique' => 'Ya existe una cuenta registrada con este código SIS.',
             'correo.unique'  => 'Ya existe una cuenta registrada con este correo institucional.',
             'correo.email'   => 'El correo institucional no tiene un formato válido.',
+            'contrasenia_temporal.required' => 'Ingrese la contraseña temporal de la cuenta.',
+            'contrasenia_temporal.min'      => 'La contraseña temporal debe tener al menos 8 caracteres.',
         ];
     }
 }

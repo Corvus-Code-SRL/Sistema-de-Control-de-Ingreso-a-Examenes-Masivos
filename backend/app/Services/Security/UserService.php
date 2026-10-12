@@ -10,7 +10,6 @@ use App\Services\Security\Contracts\SisGateway;
 use App\Support\SisCode;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 class UserService
 {
@@ -26,8 +25,11 @@ class UserService
     /**
      * Registra una cuenta de usuario en SCIEM.
      *
-     * La cuenta se crea SIN rol asignado (CA 5): la asignación de rol
-     * es responsabilidad de la HU-004.
+     * La cuenta se crea SIN rol asignado (CA 5): el rol se asigna después
+     * (HU-004), en el mismo flujo del registro o desde Cuentas.
+     *
+     * La contraseña temporal solo se guarda hasheada y la cuenta queda obligada a
+     * cambiarla en su primer ingreso.
      */
     public function registrar(array $datos, string $actorId): User
     {
@@ -42,7 +44,8 @@ class UserService
                 'apellido_materno' => $datos['apellido_materno'] ?? null,
                 'correo'           => $datos['correo'],
                 'cod_sis'          => $datos['cod_sis'],
-                'contrasenia'      => Hash::make($this->generarClaveInicial()),
+                'contrasenia'      => Hash::make($datos['contrasenia_temporal']),
+                'debe_cambiar_contrasenia' => true,
                 'estado'           => User::ESTADO_ACTIVO,
             ]);
 
@@ -102,15 +105,5 @@ class UserService
         if (! $this->sis->estaDisponible()) {
             throw new SisNoDisponibleException();   // -> 503
         }
-    }
-
-    /**
-     * PENDIENTE DE DEFINICIÓN CON EL EQUIPO: el mockup no pide contraseña,
-     * pero la columna es NOT NULL. Falta decidir si se envía por correo
-     * o si el usuario la establece en su primer acceso.
-     */
-    private function generarClaveInicial(): string
-    {
-        return Str::random(12);
     }
 }

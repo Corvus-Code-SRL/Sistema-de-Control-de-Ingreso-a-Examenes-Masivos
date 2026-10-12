@@ -33,6 +33,7 @@ class SisNormalizationTest extends TestCase
             'nombre' => 'Juan Carlos',
             'apellido_paterno' => 'Perez',
             'correo' => 'juan.perez@est.umss.edu',
+            'contrasenia_temporal' => 'Temporal2026',
         ])->assertStatus(201)->assertJsonPath('data.cod_sis', '202312345');
 
         $this->assertDatabaseHas('usuario', ['cod_sis' => '202312345']);
@@ -47,6 +48,7 @@ class SisNormalizationTest extends TestCase
             'nombre' => 'Valeria',
             'apellido_paterno' => 'Montano',
             'correo' => 'valeria@sciem.test',
+            'contrasenia_temporal' => 'Temporal2026',
         ])->assertStatus(422)->assertJsonValidationErrors('cod_sis');
     }
 

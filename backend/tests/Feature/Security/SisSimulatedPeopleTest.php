@@ -92,6 +92,7 @@ class SisSimulatedPeopleTest extends TestCase
             'nombre' => $first,
             'apellido_paterno' => $last,
             'correo' => $email,
+            'contrasenia_temporal' => 'Temporal2026',
         ])
             ->assertStatus(201)
             ->assertJsonPath('data.cod_sis', $code)
@@ -116,7 +117,13 @@ class SisSimulatedPeopleTest extends TestCase
         string $last,
         string $email
     ): void {
-        $payload = ['cod_sis' => $code, 'nombre' => $first, 'apellido_paterno' => $last, 'correo' => $email];
+        $payload = [
+            'cod_sis' => $code,
+            'nombre' => $first,
+            'apellido_paterno' => $last,
+            'correo' => $email,
+            'contrasenia_temporal' => 'Temporal2026',
+        ];
 
         $this->postJson('/api/usuarios', $payload)->assertStatus(201);
 
