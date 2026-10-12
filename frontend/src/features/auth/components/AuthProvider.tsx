@@ -5,9 +5,9 @@ import {
   configureSessionHandlers,
   type SessionEndReason,
 } from '@/lib/api-client'
-import { confirmPassword, getSession, login, logout } from '../services/authService'
+import { changePassword, confirmPassword, getSession, login, logout } from '../services/authService'
 import { clearStoredToken, readStoredToken, storeToken } from '../services/tokenStorage'
-import type { AuthState, SessionRole } from '../types/auth.types'
+import type { AuthState, ChangePasswordInput, SessionRole } from '../types/auth.types'
 
 /**
  * Sesión de la aplicación (RNF-02).
@@ -24,6 +24,11 @@ import type { AuthState, SessionRole } from '../types/auth.types'
  *   al login, que muestra «Su sesión expiró», y tras entrar se vuelve a la ruta en la que estaba.
  *   Si la respuesta fue un 403 `cuenta_inactiva` (la cuenta se deshabilitó con la sesión abierta), el
  *   flujo es el mismo y `motivoSesion` hace que el login muestre «Su cuenta está inactiva…».
+ *
+ * Contraseña temporal (HU-001): mientras `usuario.debe_cambiar_contrasenia` sea `true` la sesión está
+ * `autenticado` pero el servidor rechaza todo salvo cambiar la contraseña. El indicador llega con el
+ * login y con GET /auth/yo, y un 403 `cambio_de_clave_pendiente` en cualquier petición lo enciende.
+ * El router no deja salir de la pantalla de cambio hasta que `cambiarContrasenia` lo apaga.
  */
 
 export interface IniciarSesionOptions {
@@ -45,6 +50,11 @@ export interface AuthContextValue extends AuthState {
   cerrarSesion: () => Promise<void>
   /** Rechaza con `ApiError` (422) si la contraseña es incorrecta. */
   confirmarPassword: (password: string) => Promise<void>
+  /**
+   * Cambia la contraseña propia y, si el servidor la acepta, libera la sesión del cambio pendiente.
+   * Rechaza con `ApiError` (422) con los campos que no cumplen las reglas.
+   */
+  cambiarContrasenia: (input: ChangePasswordInput) => Promise<void>
 }
 
 const ANONYMOUS: AuthState = { usuario: null, rol: null, token: null, estado: 'anonimo' }
@@ -58,6 +68,7 @@ export const AuthContext = createContext<AuthContextValue>({
   iniciarSesion: () => Promise.reject(new Error('AuthProvider no está montado.')),
   cerrarSesion: () => Promise.resolve(),
   confirmarPassword: () => Promise.reject(new Error('AuthProvider no está montado.')),
+  cambiarContrasenia: () => Promise.reject(new Error('AuthProvider no está montado.')),
 })
 
 function initialState(): AuthState {
@@ -85,7 +96,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState((previous) => ({ ...previous, token: null, estado: 'expirada', motivoSesion: reason }))
   }, [])
 
-  const handlers = useRef({ getToken: () => tokenRef.current, onSessionExpired: expire })
+  const requirePasswordChange = useCallback(() => {
+    setState((previous) =>
+      previous.usuario && !previous.usuario.debe_cambiar_contrasenia
+        ? { ...previous, usuario: { ...previous.usuario, debe_cambiar_contrasenia: true } }
+        : previous
+    )
+  }, [])
+
+  const handlers = useRef({
+    getToken: () => tokenRef.current,
+    onSessionExpired: expire,
+    onPasswordChangeRequired: requirePasswordChange,
+  })
 
   /*
    * Se registra al renderizar por primera vez (los hijos montan y piden datos antes que los
@@ -178,9 +201,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await confirmPassword(password)
   }, [])
 
+  const cambiarContrasenia = useCallback(async (input: ChangePasswordInput) => {
+    await changePassword(input)
+
+    setState((previous) =>
+      previous.usuario
+        ? { ...previous, usuario: { ...previous.usuario, debe_cambiar_contrasenia: false } }
+        : previous
+    )
+  }, [])
+
   const value = useMemo(
-    () => ({ ...state, iniciarSesion, cerrarSesion, confirmarPassword }),
-    [state, iniciarSesion, cerrarSesion, confirmarPassword]
+    () => ({ ...state, iniciarSesion, cerrarSesion, confirmarPassword, cambiarContrasenia }),
+    [state, iniciarSesion, cerrarSesion, confirmarPassword, cambiarContrasenia]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -3,6 +3,8 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { LoadingState } from '@/components/common/LoadingState'
 import { MyAssignmentsPage, MyAssistantsPage } from '@/features/assistants'
 import {
+  CHANGE_PASSWORD_PATH,
+  CambiarContrasenaPage,
   LOGIN_REDIRECT_KEY,
   LoginPage,
   ProtectedRoute,
@@ -144,13 +146,30 @@ function AreaRoutes() {
   return <DocenteRoutes />
 }
 
+/**
+ * Con la contraseña temporal pendiente (HU-001) la sesión solo sirve para cambiarla: cualquier otra
+ * ruta, incluido /login, vuelve aquí. Escribir otra URL a mano tampoco la abre.
+ */
+function PasswordChangeRoutes() {
+  return (
+    <Routes>
+      <Route path={CHANGE_PASSWORD_PATH} element={<CambiarContrasenaPage />} />
+      <Route path="*" element={<Navigate to={CHANGE_PASSWORD_PATH} replace />} />
+    </Routes>
+  )
+}
+
 export function AppRouter() {
-  const { estado } = useAuth()
+  const { estado, usuario } = useAuth()
 
   // Con un token guardado no se pinta nada hasta saber si sigue vivo: así la recarga de una
   // sesión válida no muestra por un instante la pantalla equivocada.
   if (estado === 'verificando') {
     return <LoadingState rows={3} label="Verificando la sesión" />
+  }
+
+  if (estado === 'autenticado' && usuario?.debe_cambiar_contrasenia) {
+    return <PasswordChangeRoutes />
   }
 
   return (

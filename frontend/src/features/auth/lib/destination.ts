@@ -9,6 +9,9 @@
  */
 export const LOGIN_PATH = '/login'
 
+/** Única pantalla disponible mientras la cuenta tenga una contraseña temporal por cambiar (HU-001). */
+export const CHANGE_PASSWORD_PATH = '/cambiar-contrasena'
+
 const HOME_BY_ROLE: Record<string, string> = {
   Administrador: '/cuentas',
   Docente: '/materias',

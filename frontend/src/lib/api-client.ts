@@ -125,6 +125,12 @@ type Query = Record<string, string | number | undefined>
 /** Código `motivo` con el que el servidor rechaza a una cuenta deshabilitada que aún tenía un token. */
 export const INACTIVE_ACCOUNT_MOTIVO = 'cuenta_inactiva'
 
+/**
+ * Código `motivo` con el que el servidor rechaza TODA ruta (salvo /auth/yo, logout y cambiar-contrasenia)
+ * mientras la cuenta tiene una contraseña temporal por cambiar. La sesión sigue viva.
+ */
+export const PASSWORD_CHANGE_REQUIRED_MOTIVO = 'cambio_de_clave_pendiente'
+
 /** Por qué terminó la sesión cuando no fue un simple vencimiento del token (401). */
 export type SessionEndReason = typeof INACTIVE_ACCOUNT_MOTIVO
 
@@ -136,6 +142,8 @@ export type SessionEndReason = typeof INACTIVE_ACCOUNT_MOTIVO
 export interface SessionHandlers {
   getToken: () => string | null
   onSessionExpired: (reason?: SessionEndReason) => void
+  /** Un 403 `cambio_de_clave_pendiente` con token: la sesión sigue, pero solo sirve para cambiar la contraseña. */
+  onPasswordChangeRequired?: () => void
 }
 
 let sessionHandlers: SessionHandlers | null = null
@@ -263,6 +271,8 @@ export async function apiClient<TResponse>(
         sessionHandlers?.onSessionExpired()
       } else if (token && apiError.isForbidden && apiError.motivo === INACTIVE_ACCOUNT_MOTIVO) {
         sessionHandlers?.onSessionExpired(INACTIVE_ACCOUNT_MOTIVO)
+      } else if (token && apiError.isForbidden && apiError.motivo === PASSWORD_CHANGE_REQUIRED_MOTIVO) {
+        sessionHandlers?.onPasswordChangeRequired?.()
       }
 
       throw apiError
