@@ -20,9 +20,10 @@ Route::post('auth/login', [AuthController::class, 'login'])
     ->middleware('throttle:10,1')
     ->name('auth.login');
 
-// Todo lo demás exige el token de Sanctum y una cuenta ACTIVA. Un módulo nuevo queda protegido sin
-// tocar nada aquí; RoutesRequireAuthenticationTest falla si alguna ruta queda fuera de este grupo.
-Route::middleware(['auth:sanctum', 'account.active'])->group(function () {
+// Todo lo demás exige el token de Sanctum, una cuenta ACTIVA y la contraseña temporal ya cambiada.
+// Un módulo nuevo queda protegido sin tocar nada aquí; RoutesRequireAuthenticationTest falla si
+// alguna ruta queda fuera de este grupo.
+Route::middleware(['auth:sanctum', 'account.active', 'password.changed'])->group(function () {
     Route::get('/user', function (Request $request) {
         return $request->user();
     });

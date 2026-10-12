@@ -3,6 +3,7 @@
 namespace Tests\Feature\Security;
 
 use App\Http\Middleware\EnsureAccountIsActive;
+use App\Http\Middleware\EnsurePasswordIsChanged;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route as LaravelRoute;
 use Illuminate\Support\Facades\Route;
@@ -68,6 +69,60 @@ class RoutesRequireAuthenticationTest extends TestCase
             if ($this->signature($route) !== self::LOGOUT_ROUTE) {
                 $this->assertNotContains(EnsureAccountIsActive::class, $route->excludedMiddleware());
             }
+        }
+    }
+
+    /** HU-001: con la contraseña temporal pendiente solo estas rutas (y el logout) siguen respondiendo. */
+    private const PASSWORD_CHANGE_ROUTES = [
+        'GET api/auth/yo',
+        'POST api/auth/cambiar-contrasenia',
+        'POST api/auth/logout',
+    ];
+
+    public function test_toda_ruta_protegida_exige_el_cambio_de_contrasenia_salvo_tres(): void
+    {
+        $withoutCheck = [];
+        $exempt = [];
+
+        foreach ($this->apiRoutes() as $route) {
+            $signature = $this->signature($route);
+
+            if ($signature === self::PUBLIC_ROUTE) {
+                continue;
+            }
+
+            if (in_array(EnsurePasswordIsChanged::class, $route->excludedMiddleware(), true)) {
+                $exempt[] = $signature;
+
+                continue;
+            }
+
+            if (! in_array('password.changed', $route->gatherMiddleware(), true)) {
+                $withoutCheck[] = $signature;
+            }
+        }
+
+        $this->assertSame(
+            [],
+            $withoutCheck,
+            "Rutas sin password.changed (una cuenta con clave temporal conservaría el acceso):
+"
+            . implode("
+", $withoutCheck)
+        );
+
+        sort($exempt);
+        $this->assertSame(self::PASSWORD_CHANGE_ROUTES, $exempt);
+    }
+
+    public function test_las_rutas_eximidas_del_cambio_de_contrasenia_siguen_exigiendo_cuenta_activa(): void
+    {
+        foreach (['GET api/auth/yo', 'POST api/auth/cambiar-contrasenia'] as $signature) {
+            $route = collect($this->apiRoutes())->first(fn ($route) => $this->signature($route) === $signature);
+
+            $this->assertNotNull($route, "No existe la ruta {$signature}.");
+            $this->assertContains('account.active', $route->gatherMiddleware());
+            $this->assertNotContains(EnsureAccountIsActive::class, $route->excludedMiddleware());
         }
     }
 

@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Security;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Security\ChangePasswordRequest;
 use App\Http\Requests\Security\ConfirmPasswordRequest;
 use App\Http\Requests\Security\LoginRequest;
 use App\Http\Resources\Security\AuthSessionResource;
 use App\Http\Resources\Security\LogoutResource;
+use App\Http\Resources\Security\PasswordChangedResource;
 use App\Http\Resources\Security\PasswordConfirmationResource;
 use App\Services\Security\AuthService;
 use Illuminate\Http\Request;
@@ -61,5 +63,21 @@ class AuthController extends Controller
         );
 
         return (new PasswordConfirmationResource($confirmedAt))->additional(['mensaje' => 'Contraseña confirmada.']);
+    }
+
+    /** POST /api/auth/cambiar-contrasenia */
+    public function changePassword(ChangePasswordRequest $request): PasswordChangedResource
+    {
+        $user = $request->user();
+        $validated = $request->validated();
+
+        $this->auth->changePassword(
+            $user,
+            $validated['contrasenia_actual'],
+            $validated['contrasenia_nueva'],
+            $user->currentAccessToken()
+        );
+
+        return (new PasswordChangedResource(null))->additional(['mensaje' => 'Contraseña actualizada correctamente.']);
     }
 }

@@ -27,6 +27,7 @@ class AuthSessionResource extends JsonResource
                 'nombre_completo' => $user->nombre_completo,
                 'correo' => $user->correo,
                 'estado' => $user->estado,
+                'debe_cambiar_contrasenia' => (bool) $user->debe_cambiar_contrasenia,
             ],
             'rol' => [
                 'id_rol' => $role->id_rol,
