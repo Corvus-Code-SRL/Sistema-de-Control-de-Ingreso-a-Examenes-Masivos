@@ -78,6 +78,49 @@ class StudentVerificationTest extends TestCase
         $this->assertSame(0, DB::table('intento_ingreso')->count());
     }
 
+    public function test_busca_nombres_sin_distinguir_tildes_ni_mayusculas(): void
+    {
+        $this->student->update([
+            'nombre' => 'José',
+            'apellido_paterno' => 'Pérez',
+            'apellido_materno' => 'Ñúñez',
+        ]);
+        $this->rebuildSnapshot();
+
+        foreach (['jose perez', 'JOSÉ PÉREZ', 'nunez', 'ÑÚÑEZ'] as $name) {
+            $this->getJson($this->url('buscar') . '?' . http_build_query(['nombre' => $name]))
+                ->assertOk()
+                ->assertJsonCount(1, 'data')
+                ->assertJsonPath('data.0.id_estudiante', $this->student->id_estudiante)
+                ->assertJsonPath('data.0.nombre_completo', 'José Pérez Ñúñez');
+        }
+    }
+
+    public function test_busca_por_nombre_con_porcentaje_guion_bajo_y_barra_invertida_literales(): void
+    {
+        $this->student->update(['nombre' => 'José%_\\']);
+        $this->rebuildSnapshot();
+
+        $this->getJson($this->url('buscar') . '?' . http_build_query(['nombre' => '%_\\']))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id_estudiante', $this->student->id_estudiante);
+
+        $this->getJson($this->url('buscar') . '?' . http_build_query(['nombre' => '%_otro']))
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
+    public function test_busqueda_por_nombre_conserva_el_limite_de_diez_resultados(): void
+    {
+        $this->enrollStudents($this->grupoPropioId, 9);
+        $this->rebuildSnapshot();
+
+        $this->getJson($this->url('buscar') . '?nombre=Estudiante')
+            ->assertOk()
+            ->assertJsonCount(10, 'data');
+    }
+
     public function test_verificacion_por_sis_devuelve_la_foto_opcional_del_estudiante(): void
     {
         $photoUrl = 'https://res.cloudinary.com/sciem/image/upload/estudiantes/9501.webp';

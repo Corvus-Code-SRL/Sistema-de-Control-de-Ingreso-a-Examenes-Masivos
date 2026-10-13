@@ -17,6 +17,10 @@ class EntryControlSnapshotService
 {
     private const PREFIX = 'entry-control';
 
+    private const ACCENTED = 'ÁÉÍÓÚÜÑáéíóúüñ';
+
+    private const PLAIN = 'AEIOUUNaeiouun';
+
     public const UNASSIGNED_ROOM_MESSAGE = 'Asigne un ambiente a este auxiliar antes de abrir el control.';
 
     private ExamTimingService $timing;
@@ -143,7 +147,7 @@ class EntryControlSnapshotService
                     'id_estudiante' => $studentId,
                     'cod_sis' => $student->cod_sis,
                     'nombre_completo' => $fullName,
-                    'nombre_busqueda' => mb_strtolower($fullName),
+                    'nombre_busqueda' => $this->normalizeName($fullName),
                 ];
             }
         }
@@ -282,7 +286,7 @@ class EntryControlSnapshotService
     {
         $this->assertCanControl($examId, $actor);
         $token = $this->activeTokenOrFail($examId);
-        $needle = mb_strtolower(trim($name));
+        $needle = $this->normalizeName($name);
         $matches = [];
 
         foreach ($this->cache()->get($this->key($examId, $token, 'search'), []) as $student) {
@@ -297,6 +301,17 @@ class EntryControlSnapshotService
         }
 
         return $matches;
+    }
+
+    /** Aplica el mismo mapa de tildes de SubjectService a ambos lados de la búsqueda literal. */
+    private function normalizeName(string $name): string
+    {
+        $plain = array_combine(
+            preg_split('//u', self::ACCENTED, -1, PREG_SPLIT_NO_EMPTY),
+            str_split(self::PLAIN)
+        );
+
+        return mb_strtolower(strtr(trim($name), $plain));
     }
 
     public function assignedRoomFor(int $examId, int $studentId): ?object
