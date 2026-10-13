@@ -24,7 +24,8 @@ class GroupDetailTest extends TestCase
             ->assertJsonPath('data.grupo.cantidad_estudiantes', 4)
             ->assertJsonPath('data.grupo.docente.nombre_completo', 'Ana Rojas')
             ->assertJsonPath('data.grupo.periodo.id_periodo', $this->periodoActivoId)
-            ->assertJsonPath('data.grupo.periodo.nombre_periodo', '1/2026')
+            ->assertJsonPath('data.grupo.periodo.etiqueta', '1/2026')
+            ->assertJsonPath('data.grupo.periodo.nombre_periodo', 'Semestre 1')
             ->assertJsonPath('data.grupo.periodo.gestion', 2026)
             ->assertJsonPath('data.grupo.gestion', '2026')
             ->assertJsonPath('data.materia.id_materia', $this->calculoId)
@@ -41,7 +42,7 @@ class GroupDetailTest extends TestCase
                         'es_mio',
                         'cantidad_estudiantes',
                         'docente' => ['nombre_completo'],
-                        'periodo' => ['id_periodo', 'nombre_periodo', 'gestion'],
+                        'periodo' => ['id_periodo', 'nombre_periodo', 'etiqueta', 'gestion'],
                     ],
                     'materia' => ['id_materia', 'id_carrera', 'nombre', 'codigo', 'carrera'],
                 ],
@@ -85,7 +86,8 @@ class GroupDetailTest extends TestCase
         $this->getJson($this->groupUrl($this->grupoPeriodoAnteriorId))
             ->assertOk()
             ->assertJsonPath('data.materia.id_carrera', $this->informaticaId)
-            ->assertJsonPath('data.grupo.periodo.nombre_periodo', '2/2025')
+            ->assertJsonPath('data.grupo.periodo.etiqueta', '2/2025')
+            ->assertJsonPath('data.grupo.periodo.nombre_periodo', 'Semestre 2')
             ->assertJsonPath('data.grupo.gestion', '2025')
             ->assertJsonPath('meta.es_periodo_activo', false);
     }

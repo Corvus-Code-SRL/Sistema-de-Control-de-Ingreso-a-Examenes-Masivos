@@ -8,16 +8,16 @@ use Illuminate\Http\Request;
 use RuntimeException;
 
 /**
- * Ningún período académico está activo (gestion_periodo.activo).
+ * Ningún período académico está vigente (gestion_periodo.vigente).
  *
  * Es un error de despliegue, no de la solicitud: falla temprano y con un mensaje
  * claro en vez de crear grupos sin período.
- * Para activar uno: docs/database/periodo-activo.md.
+ * Para fijar uno: docs/database/periodo-vigente.md.
  */
 class ActivePeriodNotConfiguredException extends RuntimeException
 {
-    protected $message = 'No hay un período académico activo. '
-        . 'Un administrador del sistema debe activar uno (gestion_periodo.activo).';
+    protected $message = 'No hay un período académico vigente. '
+        . 'Un administrador del sistema debe fijar uno (gestion_periodo.vigente).';
 
     public function render(Request $request): JsonResponse
     {

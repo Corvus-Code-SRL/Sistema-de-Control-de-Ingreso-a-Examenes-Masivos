@@ -5,12 +5,16 @@ import type { ResourceResponse } from '@/types/api.types'
 /**
  * Periodo académico al que pertenece un grupo (una fila de `gestion_periodo`).
  *
- * `id_periodo` es el id de esa instancia y `nombre_periodo` su etiqueta completa («1/2026»,
- * «Verano 2026»): ya incluye el año, no hay que concatenarle `gestion`.
+ * `etiqueta` es la forma estándar de la UMSS `{codigo}/{anio}` («1/2026», «3/2026») y es lo que se
+ * muestra. `nombre_periodo` es el nombre del catálogo («Semestre 1», «Verano»): texto secundario
+ * (un *tooltip*), nunca en lugar de la etiqueta. La interfaz no construye etiquetas.
  */
 export interface Period {
   id_periodo: number
+  /** Nombre del catálogo de períodos. */
   nombre_periodo: string
+  /** Etiqueta estándar `{codigo}/{anio}`. */
+  etiqueta: string
   /** Año de la gestión (`gestion.anio`). */
   gestion: number
 }
@@ -113,7 +117,7 @@ export interface CreateGroupPayload {
   id_carrera: number
   id_materia: number
   num_grupo: string
-  /** Editable por el Docente; si se omite, el backend asigna el período activo (CA 11). */
+  /** Editable por el Docente; si se omite, el backend asigna el período vigente (CA 11). */
   id_periodo?: number
 }
 
@@ -145,10 +149,13 @@ export interface GroupMutationResponse {
 /** Un período disponible para el selector (`GET /api/periodos`). */
 export interface PeriodOption {
   id_periodo: number
+  /** Nombre del catálogo («Semestre 1»): ayuda secundaria. */
   nombre_periodo: string
+  /** Etiqueta estándar `{codigo}/{anio}`: es la que se muestra. */
+  etiqueta: string
   gestion: number
-  /** Es el período vigente (`gestion_periodo.activo`); a lo sumo uno. */
-  activo: boolean
+  /** Es el período vigente (`gestion_periodo.vigente`); a lo sumo uno. */
+  vigente: boolean
 }
 
 

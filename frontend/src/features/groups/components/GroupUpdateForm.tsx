@@ -181,8 +181,13 @@ export function ActualizarGrupoForm({
               </SelectTrigger>
               <SelectContent>
                 {periods.map((period) => (
-                  <SelectItem key={period.id_periodo} value={String(period.id_periodo)} className="text-xs">
-                    {period.nombre_periodo}
+                  <SelectItem
+                    key={period.id_periodo}
+                    value={String(period.id_periodo)}
+                    title={period.nombre_periodo}
+                    className="text-xs"
+                  >
+                    {period.etiqueta}
                   </SelectItem>
                 ))}
               </SelectContent>

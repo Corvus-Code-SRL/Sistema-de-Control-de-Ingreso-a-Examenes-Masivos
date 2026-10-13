@@ -21,8 +21,8 @@ use Illuminate\Support\Facades\DB;
  * creación: las relaciones de este módulo (par materia-carrera, oferta académica, grupos por
  * período) se leen mejor con un juego de datos explícito.
  *
- * El período activo es 1/2026 (gestion_periodo.activo) y el anterior 2/2025. Todo par creado aquí
- * queda ofertado en el período activo; cada grupo oferta su par en el período del grupo.
+ * El período vigente es 1/2026 (gestion_periodo.vigente) y el anterior 2/2025. Todo par creado aquí
+ * queda ofertado en el período vigente; cada grupo oferta su par en el período del grupo.
  */
 trait SeedsAcademicCatalog
 {
@@ -123,7 +123,7 @@ trait SeedsAcademicCatalog
     }
 
     /** Crea la gestión (si no existe) y su período; `$code` es periodo.codigo (1, 2, 3 Verano...). */
-    protected function createPeriod(int $year, int $code, bool $active = false): int
+    protected function createPeriod(int $year, int $code, bool $current = false): int
     {
         $yearId = AcademicYear::query()->firstOrCreate(
             ['anio' => $year],
@@ -133,7 +133,7 @@ trait SeedsAcademicCatalog
         return Period::create([
             'id_gestion' => $yearId,
             'id_periodo' => PeriodType::query()->where('codigo', $code)->value('id_periodo'),
-            'activo' => $active,
+            'vigente' => $current,
             'estado' => RecordStatus::ACTIVE,
         ])->id_gestion_periodo;
     }

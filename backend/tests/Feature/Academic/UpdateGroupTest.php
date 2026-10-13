@@ -198,7 +198,7 @@ class UpdateGroupTest extends TestCase
             'id_periodo' => $this->periodoAnteriorId,
         ])->assertStatus(200)
             ->assertJsonPath('data.grupo.gestion', '2025')
-            ->assertJsonPath('data.grupo.periodo.nombre_periodo', '2/2025');
+            ->assertJsonPath('data.grupo.periodo.etiqueta', '2/2025');
 
         $this->assertDatabaseHas('grupo', [
             'id_grupo' => $this->grupoPropioId,

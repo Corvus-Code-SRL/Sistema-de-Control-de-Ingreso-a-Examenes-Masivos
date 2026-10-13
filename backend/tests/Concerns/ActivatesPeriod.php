@@ -8,15 +8,15 @@ use App\Models\PeriodType;
 use App\Support\RecordStatus;
 
 /**
- * Deja un período activo (gestion_periodo.activo) para las pruebas que no arman el catálogo
+ * Deja un período vigente (gestion_periodo.vigente) para las pruebas que no arman el catálogo
  * académico completo pero llaman endpoints que resuelven el período vigente.
  */
 trait ActivatesPeriod
 {
-    /** Crea (o reutiliza) la gestión, crea el período y lo marca activo. Devuelve su id. */
+    /** Crea (o reutiliza) la gestión, crea el período y lo marca vigente. Devuelve su id. */
     protected function activatePeriod(int $year = 2026, int $code = 1): int
     {
-        Period::query()->where('activo', true)->update(['activo' => false]);
+        Period::query()->where('vigente', true)->update(['vigente' => false]);
 
         $yearId = AcademicYear::query()->firstOrCreate(
             ['anio' => $year],
@@ -26,7 +26,7 @@ trait ActivatesPeriod
         return Period::create([
             'id_gestion' => $yearId,
             'id_periodo' => PeriodType::query()->where('codigo', $code)->value('id_periodo'),
-            'activo' => true,
+            'vigente' => true,
             'estado' => RecordStatus::ACTIVE,
         ])->id_gestion_periodo;
     }

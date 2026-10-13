@@ -254,19 +254,42 @@ class StoreGroupTest extends TestCase
     }
 
     /** CA 11: el período activo es visible antes de confirmar y se puede cambiar. */
-    public function test_el_listado_de_periodos_indica_cual_es_el_activo(): void
+    public function test_el_listado_de_periodos_indica_cual_es_el_vigente(): void
     {
         $this->getJson('/api/periodos')
             ->assertOk()
             ->assertJsonPath('meta.id_periodo_activo', $this->periodoActivoId)
             ->assertJsonCount(2, 'data')
             ->assertJsonPath('data.0.id_periodo', $this->periodoActivoId)
-            ->assertJsonPath('data.0.nombre_periodo', '1/2026')
+            ->assertJsonPath('data.0.etiqueta', '1/2026')
+            ->assertJsonPath('data.0.nombre_periodo', 'Semestre 1')
             ->assertJsonPath('data.0.gestion', 2026)
-            ->assertJsonPath('data.0.activo', true)
+            ->assertJsonPath('data.0.vigente', true)
             ->assertJsonPath('data.1.id_periodo', $this->periodoAnteriorId)
-            ->assertJsonPath('data.1.nombre_periodo', '2/2025')
-            ->assertJsonPath('data.1.activo', false);
+            ->assertJsonPath('data.1.etiqueta', '2/2025')
+            ->assertJsonPath('data.1.nombre_periodo', 'Semestre 2')
+            ->assertJsonPath('data.1.vigente', false);
+    }
+
+    /** La etiqueta es `{codigo}/{anio}` para todos los períodos; el nombre del catálogo va aparte. */
+    public function test_todos_los_periodos_usan_la_etiqueta_codigo_anio(): void
+    {
+        $this->createPeriod(2026, 0);
+        $this->createPeriod(2026, 3);
+        $this->createPeriod(2026, 4);
+
+        $data = $this->getJson('/api/periodos')->assertOk()->json('data');
+
+        $byLabel = [];
+        foreach ($data as $period) {
+            $byLabel[$period['etiqueta']] = $period['nombre_periodo'];
+        }
+
+        $this->assertSame('Anual', $byLabel['0/2026']);
+        $this->assertSame('Semestre 1', $byLabel['1/2026']);
+        $this->assertSame('Verano', $byLabel['3/2026']);
+        $this->assertSame('Invierno', $byLabel['4/2026']);
+        $this->assertSame('Semestre 2', $byLabel['2/2025']);
     }
 
     /** La oferta académica manda: un par no ofertado en el período elegido no admite grupos. */

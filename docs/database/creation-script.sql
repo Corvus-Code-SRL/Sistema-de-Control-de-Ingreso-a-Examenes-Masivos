@@ -1684,3 +1684,17 @@ ALTER TABLE public.grupo
     ADD CONSTRAINT fk_grupo_oferta_academica
         FOREIGN KEY (id_carrera, id_materia, id_gestion_periodo)
         REFERENCES public.oferta_academica(id_carrera, id_materia, id_gestion_periodo);
+
+--
+-- Versión 9: gestion_periodo.activo pasa a `vigente` y nombres del catálogo de períodos
+--            (2026_10_12_000003_rename_activo_to_vigente)
+--   * `estado` conserva su significado de siempre: el registro está habilitado o deshabilitado.
+--     `vigente` marca el único período en curso (a lo sumo uno, por índice parcial). Los valores
+--     existentes se conservan: el período que era «activo» sigue siendo el vigente.
+--   * periodo.nombre: 1 → «Semestre 1» y 2 → «Semestre 2». Anual, Verano e Invierno no cambian.
+
+ALTER TABLE public.gestion_periodo RENAME COLUMN activo TO vigente;
+ALTER INDEX public.unq_gestion_periodo_activo RENAME TO unq_gestion_periodo_vigente;
+
+UPDATE public.periodo SET nombre = 'Semestre 1' WHERE codigo = 1;
+UPDATE public.periodo SET nombre = 'Semestre 2' WHERE codigo = 2;

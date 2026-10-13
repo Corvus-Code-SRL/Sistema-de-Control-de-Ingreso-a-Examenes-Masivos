@@ -112,34 +112,34 @@ class DatabaseSchemaTest extends TestCase
             ->map(fn ($row) => $row->codigo . ':' . $row->nombre)
             ->all();
 
-        $this->assertSame(['0:Anual', '1:1', '2:2', '3:Verano', '4:Invierno'], $rows);
+        $this->assertSame(['0:Anual', '1:Semestre 1', '2:Semestre 2', '3:Verano', '4:Invierno'], $rows);
 
         $this->assertRejected(fn () => DB::table('periodo')->insert(['codigo' => 1, 'nombre' => 'Otro']));
-        $this->assertRejected(fn () => DB::table('periodo')->insert(['codigo' => 9, 'nombre' => '1']));
+        $this->assertRejected(fn () => DB::table('periodo')->insert(['codigo' => 9, 'nombre' => 'Semestre 1']));
     }
 
-    public function testGestionPeriodoIsUniquePerYearAndPeriodWithASingleActiveRow(): void
+    public function testGestionPeriodoIsUniquePerYearAndPeriodWithASingleVigenteRow(): void
     {
         $yearId = DB::table('gestion')->insertGetId(['anio' => 2026, 'estado' => 'ACTIVO'], 'id_gestion');
         $first = (int) DB::table('periodo')->where('codigo', 1)->value('id_periodo');
         $second = (int) DB::table('periodo')->where('codigo', 2)->value('id_periodo');
 
         $firstId = DB::table('gestion_periodo')->insertGetId(
-            ['id_gestion' => $yearId, 'id_periodo' => $first, 'activo' => true],
+            ['id_gestion' => $yearId, 'id_periodo' => $first, 'vigente' => true],
             'id_gestion_periodo'
         );
 
         // (gestión, período) es único.
         $this->assertRejected(fn () => DB::table('gestion_periodo')->insert(
-            ['id_gestion' => $yearId, 'id_periodo' => $first, 'activo' => false]
+            ['id_gestion' => $yearId, 'id_periodo' => $first, 'vigente' => false]
         ));
 
-        // Solo una fila puede estar activa; las inactivas no tienen tope.
+        // Solo una fila puede ser la vigente; las demás no tienen tope.
         $this->assertRejected(fn () => DB::table('gestion_periodo')->insert(
-            ['id_gestion' => $yearId, 'id_periodo' => $second, 'activo' => true]
+            ['id_gestion' => $yearId, 'id_periodo' => $second, 'vigente' => true]
         ));
         DB::table('gestion_periodo')->insert(
-            ['id_gestion' => $yearId, 'id_periodo' => $second, 'activo' => false]
+            ['id_gestion' => $yearId, 'id_periodo' => $second, 'vigente' => false]
         );
 
         // Las fechas son opcionales, pero el fin no puede ser anterior al inicio.
@@ -148,7 +148,7 @@ class DatabaseSchemaTest extends TestCase
         ));
         $this->assertSame(
             1,
-            DB::table('gestion_periodo')->where('activo', true)->count()
+            DB::table('gestion_periodo')->where('vigente', true)->count()
         );
     }
 
@@ -374,7 +374,7 @@ class DatabaseSchemaTest extends TestCase
             "select indexname from pg_indexes
              where schemaname = 'public'
                and indexname in (
-                   'unq_gestion_periodo_activo', 'idx_gestion_periodo_gestion', 'idx_gestion_periodo_periodo',
+                   'unq_gestion_periodo_vigente', 'idx_gestion_periodo_gestion', 'idx_gestion_periodo_periodo',
                    'idx_oferta_academica_gestion_periodo', 'idx_oferta_academica_materia_carrera',
                    'idx_grupo_gestion_periodo', 'idx_convocatoria_admision_gestion_periodo'
                )"
@@ -394,7 +394,7 @@ class DatabaseSchemaTest extends TestCase
             $this->assertStringContainsString($name, $script, "El script no declara {$name}.");
         }
 
-        foreach (['gestion_periodo', 'oferta_academica', 'id_gestion_periodo', 'Invierno'] as $word) {
+        foreach (['gestion_periodo', 'oferta_academica', 'id_gestion_periodo', 'Invierno', 'Semestre 1', 'vigente'] as $word) {
             $this->assertStringContainsString($word, $script);
         }
     }

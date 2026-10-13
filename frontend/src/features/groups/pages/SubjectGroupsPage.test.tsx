@@ -198,7 +198,7 @@ describe('SubjectGroupsPage', () => {
       makeGroup({
         id_grupo: 322,
         num_grupo: 'A',
-        periodo: { id_periodo: 2, nombre_periodo: '1/2026', gestion: 2026 },
+        periodo: { id_periodo: 2, nombre_periodo: 'Semestre 1', etiqueta: '1/2026', gestion: 2026 },
       })
     )
 

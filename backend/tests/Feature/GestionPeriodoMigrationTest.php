@@ -9,15 +9,16 @@ use RuntimeException;
 use Tests\TestCase;
 
 /**
- * Las migraciones 2026_10_12_000001 (gestión y período) y 2026_10_12_000002 (oferta académica) sobre
- * una base con la forma ANTERIOR: se revierten, se siembran filas con la forma antigua y se vuelven a
- * aplicar. Todo corre dentro de una transacción (el DDL de PostgreSQL es transaccional) que se
+ * Las migraciones 2026_10_12_000001 (gestión y período), 2026_10_12_000002 (oferta académica) y
+ * 2026_10_12_000003 (activo → vigente) sobre una base con la forma ANTERIOR: se revierten, se siembran
+ * filas con la forma antigua y se vuelven a aplicar. Todo corre dentro de una transacción (el DDL de PostgreSQL es transaccional) que se
  * descarta al final, así el esquema y los datos de las demás pruebas quedan intactos.
  */
 class GestionPeriodoMigrationTest extends TestCase
 {
     private const NORMALIZE = '2026_10_12_000001_normalize_gestion_and_periodo.php';
     private const OFFERING = '2026_10_12_000002_create_oferta_academica.php';
+    private const RENAME = '2026_10_12_000003_rename_activo_to_vigente.php';
 
     private int $careerId;
     private int $calculusId;
@@ -30,6 +31,7 @@ class GestionPeriodoMigrationTest extends TestCase
 
         require_once database_path('migrations/' . self::NORMALIZE);
         require_once database_path('migrations/' . self::OFFERING);
+        require_once database_path('migrations/' . self::RENAME);
     }
 
     protected function tearDown(): void
@@ -40,11 +42,17 @@ class GestionPeriodoMigrationTest extends TestCase
         parent::tearDown();
     }
 
-    /** Revierte las dos migraciones y deja la base con las tablas anteriores (periodo con nombre y año). */
-    private function toLegacyShape(): void
+    private function migrateDown(): void
     {
+        (new \RenameActivoToVigente())->down();
         (new \CreateOfertaAcademica())->down();
         (new \NormalizeGestionAndPeriodo())->down();
+    }
+
+    /** Revierte las tres migraciones y deja la base con las tablas anteriores (periodo con nombre y año). */
+    private function toLegacyShape(): void
+    {
+        $this->migrateDown();
 
         $this->assertTrue(Schema::hasColumns('periodo', ['id_periodo', 'nombre_periodo', 'gestion']));
         $this->assertTrue(Schema::hasColumn('grupo', 'gestion'));
@@ -55,6 +63,7 @@ class GestionPeriodoMigrationTest extends TestCase
     {
         (new \NormalizeGestionAndPeriodo())->up();
         (new \CreateOfertaAcademica())->up();
+        (new \RenameActivoToVigente())->up();
     }
 
     private function seedLegacyPeriods(array $periods): void
@@ -145,7 +154,7 @@ class GestionPeriodoMigrationTest extends TestCase
             // Gestiones sin repetir y catálogo fijo.
             $this->assertSame([2025, 2026], DB::table('gestion')->orderBy('anio')->pluck('anio')->map(fn ($a) => (int) $a)->all());
             $this->assertSame(
-                ['0:Anual', '1:1', '2:2', '3:Verano', '4:Invierno'],
+                ['0:Anual', '1:Semestre 1', '2:Semestre 2', '3:Verano', '4:Invierno'],
                 DB::table('periodo')->orderBy('codigo')->get()->map(fn ($p) => $p->codigo . ':' . $p->nombre)->all()
             );
 
@@ -154,14 +163,14 @@ class GestionPeriodoMigrationTest extends TestCase
                 ->join('gestion', 'gestion.id_gestion', '=', 'gestion_periodo.id_gestion')
                 ->join('periodo', 'periodo.id_periodo', '=', 'gestion_periodo.id_periodo')
                 ->orderBy('gestion_periodo.id_gestion_periodo')
-                ->get(['gestion_periodo.id_gestion_periodo as id', 'gestion.anio', 'periodo.codigo', 'gestion_periodo.activo']);
+                ->get(['gestion_periodo.id_gestion_periodo as id', 'gestion.anio', 'periodo.codigo', 'gestion_periodo.vigente']);
 
-            $summary = $rows->mapWithKeys(fn ($r) => [(int) $r->id => $r->codigo . '/' . $r->anio . ($r->activo ? '*' : '')])->all();
+            $summary = $rows->mapWithKeys(fn ($r) => [(int) $r->id => $r->codigo . '/' . $r->anio . ($r->vigente ? '*' : '')])->all();
 
             $this->assertSame([1 => '1/2026', 2 => '2/2026*', 9301 => '3/2026', 9302 => '2/2025'], $summary);
 
             // Solo uno activo: el que apuntaba SCIEM_PERIODO_ACTIVO_ID.
-            $this->assertSame(1, DB::table('gestion_periodo')->where('activo', true)->count());
+            $this->assertSame(1, DB::table('gestion_periodo')->where('vigente', true)->count());
         } finally {
             DB::rollBack();
         }
@@ -216,7 +225,7 @@ class GestionPeriodoMigrationTest extends TestCase
         }
     }
 
-    public function test_sin_variable_de_entorno_ningun_periodo_queda_activo(): void
+    public function test_sin_variable_de_entorno_ningun_periodo_queda_vigente(): void
     {
         DB::beginTransaction();
 
@@ -228,8 +237,8 @@ class GestionPeriodoMigrationTest extends TestCase
 
             $this->migrateUp();
 
-            $this->assertSame(0, DB::table('gestion_periodo')->where('activo', true)->count());
-            // Sin período activo solo se ofertan los pares ya usados por grupos (aquí, ninguno).
+            $this->assertSame(0, DB::table('gestion_periodo')->where('vigente', true)->count());
+            // Sin período vigente solo se ofertan los pares ya usados por grupos (aquí, ninguno).
             $this->assertSame(0, DB::table('oferta_academica')->count());
         } finally {
             DB::rollBack();
@@ -374,6 +383,118 @@ class GestionPeriodoMigrationTest extends TestCase
         return array_map(fn ($row) => $row->kind . ' ' . $row->item, $rows);
     }
 
+    /** @return array<string,mixed> columna `vigente` y nombre del índice parcial, en el estado actual. */
+    private function vigenteState(): array
+    {
+        return [
+            'tiene_vigente' => Schema::hasColumn('gestion_periodo', 'vigente'),
+            'tiene_activo' => Schema::hasColumn('gestion_periodo', 'activo'),
+            'indice_vigente' => DB::table('pg_indexes')->where('indexname', 'unq_gestion_periodo_vigente')->exists(),
+            'indice_activo' => DB::table('pg_indexes')->where('indexname', 'unq_gestion_periodo_activo')->exists(),
+        ];
+    }
+
+    public function test_renombra_activo_a_vigente_y_conserva_el_periodo_vigente_y_la_oferta(): void
+    {
+        DB::beginTransaction();
+
+        try {
+            // Estado de la base compartida: período 2 vigente (fijado a mano) y ofertas ya rellenadas.
+            $this->toLegacyShape();
+            $this->seedLegacyPeriods([[1, '1-2026', 2026], [2, '2-2026', 2026]]);
+            $this->seedLegacyCatalogAndGroups([]);
+            $this->activateInEnvironment(2);
+            (new \NormalizeGestionAndPeriodo())->up();
+            (new \CreateOfertaAcademica())->up();
+
+            $this->assertSame(
+                ['tiene_vigente' => false, 'tiene_activo' => true, 'indice_vigente' => false, 'indice_activo' => true],
+                $this->vigenteState()
+            );
+
+            DB::table('oferta_academica')->insertOrIgnore([
+                'id_carrera' => $this->careerId,
+                'id_materia' => $this->calculusId,
+                'id_gestion_periodo' => 2,
+                'estado' => 'ACTIVO',
+            ]);
+
+            $offeringsBefore = DB::table('oferta_academica')->orderBy('id_materia')->get()->all();
+            $periodsBefore = DB::table('gestion_periodo')->orderBy('id_gestion_periodo')->count();
+            $this->assertSame(1, DB::table('gestion_periodo')->where('activo', true)->count());
+
+            (new \RenameActivoToVigente())->up();
+
+            $this->assertSame(
+                ['tiene_vigente' => true, 'tiene_activo' => false, 'indice_vigente' => true, 'indice_activo' => false],
+                $this->vigenteState()
+            );
+
+            // El valor se conserva: sigue vigente el 2, y no se tocó ni la oferta ni los períodos.
+            $this->assertSame(
+                [2],
+                DB::table('gestion_periodo')->where('vigente', true)->pluck('id_gestion_periodo')
+                    ->map(fn ($id) => (int) $id)->all()
+            );
+            $this->assertEquals($offeringsBefore, DB::table('oferta_academica')->orderBy('id_materia')->get()->all());
+            $this->assertSame($periodsBefore, DB::table('gestion_periodo')->count());
+        } finally {
+            DB::rollBack();
+        }
+    }
+
+    public function test_el_renombre_es_idempotente_y_solo_cambia_los_semestres_del_catalogo(): void
+    {
+        DB::beginTransaction();
+
+        try {
+            // La base ya está migrada: dos ejecuciones seguidas no fallan ni cambian nada.
+            $before = DB::table('periodo')->orderBy('codigo')->pluck('nombre', 'codigo')->all();
+
+            (new \RenameActivoToVigente())->up();
+            (new \RenameActivoToVigente())->up();
+
+            $after = DB::table('periodo')->orderBy('codigo')->pluck('nombre', 'codigo')->all();
+
+            $this->assertSame($before, $after);
+            $this->assertSame(
+                [0 => 'Anual', 1 => 'Semestre 1', 2 => 'Semestre 2', 3 => 'Verano', 4 => 'Invierno'],
+                $after
+            );
+            $this->assertSame(
+                ['tiene_vigente' => true, 'tiene_activo' => false, 'indice_vigente' => true, 'indice_activo' => false],
+                $this->vigenteState()
+            );
+        } finally {
+            DB::rollBack();
+        }
+    }
+
+    public function test_el_down_del_renombre_devuelve_activo_y_los_nombres_numericos(): void
+    {
+        DB::beginTransaction();
+
+        try {
+            (new \RenameActivoToVigente())->down();
+            (new \RenameActivoToVigente())->down(); // también idempotente
+
+            $this->assertSame(
+                ['tiene_vigente' => false, 'tiene_activo' => true, 'indice_vigente' => false, 'indice_activo' => true],
+                $this->vigenteState()
+            );
+            $this->assertSame(
+                [0 => 'Anual', 1 => '1', 2 => '2', 3 => 'Verano', 4 => 'Invierno'],
+                DB::table('periodo')->orderBy('codigo')->pluck('nombre', 'codigo')->all()
+            );
+
+            (new \RenameActivoToVigente())->up();
+
+            $this->assertTrue(Schema::hasColumn('gestion_periodo', 'vigente'));
+        } finally {
+            DB::rollBack();
+        }
+    }
+
     public function test_el_down_restaura_nombre_y_gestion_originales(): void
     {
         DB::beginTransaction();
@@ -386,8 +507,7 @@ class GestionPeriodoMigrationTest extends TestCase
 
             $this->migrateUp();
 
-            (new \CreateOfertaAcademica())->down();
-            (new \NormalizeGestionAndPeriodo())->down();
+            $this->migrateDown();
 
             // «AAAA-N» vuelve en la forma «N-AAAA», que es la de la base compartida.
             $this->assertSame(

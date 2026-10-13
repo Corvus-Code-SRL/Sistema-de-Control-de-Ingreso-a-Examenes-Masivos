@@ -10,18 +10,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * Mapea public.gestion_periodo: la instancia de un período en una gestión («1/2026»).
  *
- * Es lo que la API llama «período» (su id viaja como `id_periodo`). Solo uno puede estar activo:
- * un índice parcial lo garantiza.
+ * Es lo que la API llama «período» (su id viaja como `id_periodo`). `estado` dice si el registro
+ * está habilitado; `vigente` marca el único período en curso (un índice parcial lo garantiza).
  *
  * @property int $id_gestion_periodo
  * @property int $id_gestion
  * @property int $id_periodo
  * @property string|null $fecha_inicio
  * @property string|null $fecha_fin
- * @property bool $activo
+ * @property bool $vigente
  * @property string $estado
  * @property-read int $year Año de la gestión.
- * @property-read string $label «1/2026», «2/2026», «Anual 2026», «Verano 2026», «Invierno 2026».
+ * @property-read string $label Etiqueta estándar «{codigo}/{anio}»: «0/2026», «1/2026», «3/2026»…
+ * @property-read string $type_name Nombre del catálogo: «Semestre 1», «Anual», «Verano»…
  */
 class Period extends Model
 {
@@ -32,7 +33,7 @@ class Period extends Model
     protected $casts = [
         'id_gestion' => 'int',
         'id_periodo' => 'int',
-        'activo' => 'boolean',
+        'vigente' => 'boolean',
     ];
 
     protected $fillable = [
@@ -40,7 +41,7 @@ class Period extends Model
         'id_periodo',
         'fecha_inicio',
         'fecha_fin',
-        'activo',
+        'vigente',
         'estado',
     ];
 
@@ -69,9 +70,10 @@ class Period extends Model
         return $this->hasMany(AcademicOffering::class, 'id_gestion_periodo', 'id_gestion_periodo');
     }
 
-    public function scopeActive(Builder $query): Builder
+    /** El único período vigente (en curso). */
+    public function scopeCurrent(Builder $query): Builder
     {
-        return $query->where('gestion_periodo.activo', true);
+        return $query->where('gestion_periodo.vigente', true);
     }
 
     /**
@@ -101,19 +103,25 @@ class Period extends Model
         return (int) $this->academicYear->anio;
     }
 
-    /** «1/2026» y «2/2026» para los períodos numéricos; «Anual 2026», «Verano 2026»… para el resto. */
+    /** Nombre del tipo de período en el catálogo («Semestre 1», «Anual», «Verano»…). */
+    public function getTypeNameAttribute(): string
+    {
+        if (array_key_exists('nombre_tipo_periodo', $this->attributes)) {
+            return (string) $this->attributes['nombre_tipo_periodo'];
+        }
+
+        return (string) $this->periodType->nombre;
+    }
+
+    /** Etiqueta estándar de la UMSS: «{codigo}/{anio}», para todos los períodos («0/2026», «3/2026»…). */
     public function getLabelAttribute(): string
     {
         if (array_key_exists('codigo_periodo', $this->attributes)) {
             $code = (int) $this->attributes['codigo_periodo'];
-            $name = (string) $this->attributes['nombre_tipo_periodo'];
         } else {
             $code = (int) $this->periodType->codigo;
-            $name = (string) $this->periodType->nombre;
         }
 
-        return in_array($code, PeriodType::NUMERIC_CODES, true)
-            ? sprintf('%d/%d', $code, $this->year)
-            : sprintf('%s %d', $name, $this->year);
+        return sprintf('%d/%d', $code, $this->year);
     }
 }

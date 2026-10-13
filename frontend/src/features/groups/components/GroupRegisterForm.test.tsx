@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api-client'
 import { periodoActivo } from '@/test/fixtures'
 import { useCreateGroup } from '../hooks/useCreateGroup'
@@ -10,6 +10,13 @@ import { RegistrarGrupoForm } from './GroupRegisterForm'
 vi.mock('../hooks/useCreateGroup', () => ({ useCreateGroup: vi.fn() }))
 vi.mock('../hooks/usePeriods', () => ({ usePeriods: vi.fn() }))
 
+beforeAll(() => {
+  Object.defineProperty(HTMLElement.prototype, 'hasPointerCapture', { configurable: true, value: () => false })
+  Object.defineProperty(HTMLElement.prototype, 'setPointerCapture', { configurable: true, value: () => undefined })
+  Object.defineProperty(HTMLElement.prototype, 'releasePointerCapture', { configurable: true, value: () => undefined })
+  Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: () => undefined })
+})
+
 const mockedUseCreateGroup = vi.mocked(useCreateGroup)
 const mockedUsePeriods = vi.mocked(usePeriods)
 
@@ -17,7 +24,13 @@ const submit = vi.fn()
 const onCancel = vi.fn()
 const onRegistered = vi.fn()
 
-const periodoAnterior = { id_periodo: 2, nombre_periodo: '1/2026', gestion: 2026, activo: false }
+const periodoAnterior = {
+  id_periodo: 2,
+  nombre_periodo: 'Semestre 1',
+  etiqueta: '1/2026',
+  gestion: 2026,
+  vigente: false,
+}
 
 function mockCreateGroup(overrides: Partial<ReturnType<typeof useCreateGroup>> = {}) {
   mockedUseCreateGroup.mockReturnValue({
@@ -48,7 +61,7 @@ describe('RegistrarGrupoForm (HU-018)', () => {
     vi.clearAllMocks()
     mockCreateGroup()
     mockedUsePeriods.mockReturnValue({
-      periods: [{ ...periodoActivo, activo: true }, periodoAnterior],
+      periods: [{ ...periodoActivo, vigente: true }, periodoAnterior],
       activePeriodId: periodoActivo.id_periodo,
       isLoading: false,
       error: null,
@@ -96,16 +109,29 @@ describe('RegistrarGrupoForm (HU-018)', () => {
     expect(screen.queryByLabelText(/Auxiliares/i)).not.toBeInTheDocument()
   })
 
-  it('CA11: preselecciona el período activo y permite verificarlo', () => {
+  it('CA11: preselecciona el período vigente y permite verificarlo', () => {
     renderForm()
 
     expect(screen.getByRole('combobox', { name: /Período académico/i })).toHaveTextContent(
-      '2/2026 (activo)'
+      '2/2026 (vigente)'
     )
-    expect(screen.getByText(/Por defecto, el período activo/i)).toBeInTheDocument()
+    expect(screen.getByText(/Por defecto, el período vigente/i)).toBeInTheDocument()
   })
 
-  it('CA11: preselecciona el período activo aunque los períodos lleguen después del primer render', () => {
+  it('muestra la etiqueta estándar y deja el nombre del catálogo solo como ayuda', async () => {
+    renderForm()
+
+    await userEvent.click(screen.getByRole('combobox', { name: /Período académico/i }))
+
+    const current = await screen.findByRole('option', { name: '2/2026 (vigente)' })
+    const previous = screen.getByRole('option', { name: '1/2026' })
+
+    expect(current).toHaveAttribute('title', 'Semestre 2')
+    expect(previous).toHaveAttribute('title', 'Semestre 1')
+    expect(screen.queryByRole('option', { name: /Semestre/ })).not.toBeInTheDocument()
+  })
+
+  it('CA11: preselecciona el período vigente aunque los períodos lleguen después del primer render', () => {
     mockedUsePeriods.mockReturnValue({
       periods: [],
       activePeriodId: null,
@@ -115,7 +141,7 @@ describe('RegistrarGrupoForm (HU-018)', () => {
     const { rerender } = renderForm()
 
     mockedUsePeriods.mockReturnValue({
-      periods: [{ ...periodoActivo, activo: true }, periodoAnterior],
+      periods: [{ ...periodoActivo, vigente: true }, periodoAnterior],
       activePeriodId: periodoActivo.id_periodo,
       isLoading: false,
       error: null,
@@ -132,7 +158,7 @@ describe('RegistrarGrupoForm (HU-018)', () => {
       />
     )
 
-    expect(screen.getByRole('combobox', { name: /Período académico/i })).toHaveTextContent('(activo)')
+    expect(screen.getByRole('combobox', { name: /Período académico/i })).toHaveTextContent('(vigente)')
   })
 
   it('CA3: aclara que la unicidad es por materia, carrera, gestión y período', () => {

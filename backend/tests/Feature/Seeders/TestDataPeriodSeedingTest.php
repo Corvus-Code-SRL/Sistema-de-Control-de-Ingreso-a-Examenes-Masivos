@@ -16,7 +16,7 @@ use Tests\TestCase;
 
 /**
  * Los datos de prueba compartidos arman gestiones, períodos y oferta consistentes: el período activo
- * (9303) sale de gestion_periodo.activo y todo grupo sembrado tiene su par ofertado en su período.
+ * (9303) sale de gestion_periodo.vigente y todo grupo sembrado tiene su par ofertado en su período.
  */
 class TestDataPeriodSeedingTest extends TestCase
 {
@@ -33,7 +33,7 @@ class TestDataPeriodSeedingTest extends TestCase
         ]);
     }
 
-    public function test_siembra_las_gestiones_y_los_periodos_con_el_9303_activo(): void
+    public function test_siembra_las_gestiones_y_los_periodos_con_el_9303_vigente(): void
     {
         $this->seedTestData();
 
@@ -47,7 +47,7 @@ class TestDataPeriodSeedingTest extends TestCase
             ->whereIn('gestion_periodo.id_gestion_periodo', [Ids::PERIOD_2025_2, Ids::PERIOD_2026_1, Ids::PERIOD_ACTIVE])
             ->orderBy('gestion_periodo.id_gestion_periodo')
             ->get()
-            ->mapWithKeys(fn (Period $period) => [$period->id_gestion_periodo => $period->label . ($period->activo ? '*' : '')])
+            ->mapWithKeys(fn (Period $period) => [$period->id_gestion_periodo => $period->label . ($period->vigente ? '*' : '')])
             ->all();
 
         $this->assertSame(
@@ -57,7 +57,7 @@ class TestDataPeriodSeedingTest extends TestCase
 
         $this->assertSame(
             [Ids::PERIOD_ACTIVE],
-            Period::query()->active()->pluck('id_gestion_periodo')->map(fn ($id) => (int) $id)->all()
+            Period::query()->current()->pluck('id_gestion_periodo')->map(fn ($id) => (int) $id)->all()
         );
     }
 
@@ -125,6 +125,6 @@ class TestDataPeriodSeedingTest extends TestCase
 
         $this->assertSame($offeringsAfterFirst, DB::table('oferta_academica')->count());
         $this->assertSame($periodsAfterFirst, DB::table('gestion_periodo')->count());
-        $this->assertSame(1, Period::query()->active()->count());
+        $this->assertSame(1, Period::query()->current()->count());
     }
 }
