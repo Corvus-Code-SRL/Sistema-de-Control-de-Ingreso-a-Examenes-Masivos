@@ -65,7 +65,11 @@ class StudentRosterBatchConfirmTest extends TestCase
 
     /* --------------------------- consultas por confirmación --------------------------- */
 
-    public function test_confirmar_50_filas_nuevas_cuesta_10_consultas_o_menos(): void
+    /**
+     * Una consulta más que antes: el período activo ya no sale de la configuración sino de
+     * gestion_periodo.vigente. El costo sigue siendo constante respecto de las filas.
+     */
+    public function test_confirmar_50_filas_nuevas_cuesta_11_consultas_o_menos(): void
     {
         $token = $this->previewToken($this->rosterRows(50));
 
@@ -74,7 +78,7 @@ class StudentRosterBatchConfirmTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('data.estudiantes_creados', 50);
         $response->assertJsonPath('data.estudiantes_inscritos', 50);
-        $this->assertLessThanOrEqual(10, $queries, "Se esperaban 10 consultas o menos:\n" . implode("\n", $statements));
+        $this->assertLessThanOrEqual(11, $queries, "Se esperaban 11 consultas o menos:\n" . implode("\n", $statements));
         $this->assertSame(50, $this->enrolled());
         $this->assertSame(2, count(array_filter($statements, function (string $sql): bool {
             return strpos($sql, 'insert into') === 0;

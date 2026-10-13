@@ -106,7 +106,7 @@ El token **vive 15 minutos**, es de **un solo uso**, y queda atado al docente y 
 | 422 | `El grupo no está activo.` | Grupo inactivo |
 | 422 | `El grupo no pertenece al período académico activo.` | Grupo de otro período |
 | 422 | `La nómina no puede modificarse mientras un examen del grupo está en ingreso o en curso.` | Nómina congelada |
-| 500 | `No hay un período académico activo configurado. Defina SCIEM_PERIODO_ACTIVO_ID…` | Error de despliegue |
+| 500 | `No hay un período académico vigente. Un administrador del sistema debe fijar uno…` | Error de despliegue: ninguna fila de `gestion_periodo` es la vigente (ver `docs/database/periodo-vigente.md`) |
 
 ## POST …/nomina/confirm
 

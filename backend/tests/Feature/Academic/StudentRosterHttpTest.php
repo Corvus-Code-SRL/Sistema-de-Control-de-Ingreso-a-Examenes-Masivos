@@ -501,7 +501,7 @@ class StudentRosterHttpTest extends TestCase
                 $this->otroDocenteId
             )
             ->where(
-                'id_periodo',
+                'id_gestion_periodo',
                 $this->periodoActivoId
             )
             ->where(
@@ -533,10 +533,9 @@ class StudentRosterHttpTest extends TestCase
             'id_carrera' => $activeGroup->id_carrera,
             'id_materia' => $activeGroup->id_materia,
             'num_grupo' => '99',
-            'gestion' => $activeGroup->gestion,
             'estado' => RecordStatus::INACTIVE,
             'id_usuario_docente' => $this->docenteId,
-            'id_periodo' => $this->periodoActivoId,
+            'id_gestion_periodo' => $this->periodoActivoId,
         ]);
 
         $response = $this->post(
@@ -562,7 +561,7 @@ class StudentRosterHttpTest extends TestCase
                 $this->docenteId
             )
             ->where(
-                'id_periodo',
+                'id_gestion_periodo',
                 '!=',
                 $this->periodoActivoId
             )
@@ -1012,7 +1011,7 @@ class StudentRosterHttpTest extends TestCase
                 $this->docenteId
             )
             ->where(
-                'id_periodo',
+                'id_gestion_periodo',
                 $this->periodoActivoId
             )
             ->where(

@@ -13,7 +13,8 @@ use Tests\TestCase;
 
 /**
  * HU-006, criterio 12: un par recién asignado por el Administrador aparece en las materias del
- * docente en la siguiente carga y permite registrar un grupo en él.
+ * docente en la siguiente carga y permite registrar un grupo en él, siempre que además se ofrezca
+ * en el período activo (oferta_academica): el catálogo es permanente, la oferta es por período.
  */
 class AssignedSubjectTeacherSideTest extends TestCase
 {
@@ -69,7 +70,7 @@ class AssignedSubjectTeacherSideTest extends TestCase
         return null;
     }
 
-    public function test_el_par_asignado_aparece_en_las_materias_del_docente_en_la_siguiente_carga(): void
+    public function test_el_par_asignado_aparece_en_las_materias_del_docente_cuando_se_oferta(): void
     {
         $this->actAsTeacher($this->docenteId);
         $subject = Subject::create([
@@ -85,7 +86,12 @@ class AssignedSubjectTeacherSideTest extends TestCase
             ])
             ->assertCreated();
 
+        // Asignado a la carrera pero todavía sin oferta: el docente aún no lo ve.
         $this->actAsTeacher($this->docenteId);
+        $this->assertNull($this->findPair($this->pairs(), $subject->id_materia));
+
+        $this->offerPair($this->sistemasId, $subject->id_materia, $this->periodoActivoId);
+
         $pair = $this->findPair($this->pairs(), $subject->id_materia);
 
         $this->assertNotNull($pair);
@@ -97,6 +103,7 @@ class AssignedSubjectTeacherSideTest extends TestCase
     public function test_el_docente_puede_registrar_un_grupo_en_el_par_recien_asignado(): void
     {
         $subject = $this->assignNewSubjectToSystems();
+        $this->offerPair($this->sistemasId, $subject->id_materia, $this->periodoActivoId);
 
         $this->actAsTeacher($this->docenteId);
 
@@ -116,6 +123,21 @@ class AssignedSubjectTeacherSideTest extends TestCase
         $pair = $this->findPair($this->pairs(), $subject->id_materia);
         $this->assertTrue($pair['es_mia']);
         $this->assertSame(1, $pair['cantidad_grupos']);
+    }
+
+    public function test_asignado_pero_sin_oferta_el_docente_no_puede_registrar_grupos(): void
+    {
+        $subject = $this->assignNewSubjectToSystems();
+
+        $this->actAsTeacher($this->docenteId);
+
+        $this->postJson('/api/grupos', [
+            'id_carrera' => $this->sistemasId,
+            'id_materia' => $subject->id_materia,
+            'num_grupo' => 'A',
+        ])->assertStatus(422)->assertJsonValidationErrors('id_periodo');
+
+        $this->assertDatabaseMissing('grupo', ['id_materia' => $subject->id_materia]);
     }
 
     public function test_sin_la_asignacion_el_docente_no_puede_registrar_grupos_en_la_materia(): void

@@ -2,6 +2,7 @@
 
 namespace App\Services\Academic;
 
+use App\Models\AcademicOffering;
 use App\Models\Group;
 use App\Models\Period;
 use App\Models\User;
@@ -31,13 +32,13 @@ class GroupService
 
     public function listGroupsForPair(int $careerId, int $subjectId, string $teacherId): array
     {
-        $pair = $this->subjectCatalog->findSelectablePair($careerId, $subjectId, $teacherId);
+        $pair = $this->subjectCatalog->findOfferedPair($careerId, $subjectId, $teacherId);
 
         $groups = $this->markOwnGroups(
             $this->baseGroupQuery()
                 ->where('grupo.id_carrera', $careerId)
                 ->where('grupo.id_materia', $subjectId)
-                ->where('grupo.id_periodo', $this->subjectCatalog->activePeriodId())
+                ->where('grupo.id_gestion_periodo', $this->subjectCatalog->activePeriodId())
                 ->orderBy('grupo.num_grupo')
                 ->get(),
             $teacherId
@@ -89,7 +90,7 @@ class GroupService
             'pair' => $pair,
             'meta' => [
                 'id_periodo_activo' => $activePeriodId,
-                'es_periodo_activo' => (int) $group->id_periodo === $activePeriodId,
+                'es_periodo_activo' => (int) $group->id_gestion_periodo === $activePeriodId,
             ],
         ];
     }
@@ -113,11 +114,12 @@ class GroupService
         $periodId = (int) ($data['id_periodo'] ?? $this->subjectCatalog->activePeriodId());
         $period = $this->findPeriodOrFail($periodId);
 
+        $this->assertPairIsOffered((int) $pair->id_carrera, (int) $pair->id_materia, $periodId);
+
         $this->assertNoDuplicateGroup(
             (int) $pair->id_carrera,
             (int) $pair->id_materia,
             $data['num_grupo'],
-            $this->groupManagementFor($period),
             $periodId
         );
 
@@ -127,18 +129,15 @@ class GroupService
                     'id_carrera' => $pair->id_carrera,
                     'id_materia' => $pair->id_materia,
                     'num_grupo' => $data['num_grupo'],
-                    'gestion' => $this->groupManagementFor($period),
                     'estado' => RecordStatus::ACTIVE,
                     'id_usuario_docente' => $teacherId,
-                    'id_periodo' => $period->id_periodo,
+                    'id_gestion_periodo' => $period->id_gestion_periodo,
                 ]);
             } catch (QueryException $exception) {
                 // Red de seguridad ante una carrera entre dos solicitudes casi
                 // simultáneas: la validación de arriba ya cubre el caso normal,
-                // pero la constraint unq_grupo es la garantía real a nivel de datos.
-                throw $this->isUniqueViolation($exception)
-                    ? $this->duplicateGroupException()
-                    : $exception;
+                // pero las constraints unq_grupo y fk_grupo_oferta_academica son la garantía real.
+                throw $this->translateDatabaseError($exception);
             }
         });
 
@@ -160,14 +159,15 @@ class GroupService
 
             $this->assertGroupBelongsToTeacher($group, $teacherId);
 
-            $periodId = (int) ($data['id_periodo'] ?? $group->id_periodo);
+            $periodId = (int) ($data['id_periodo'] ?? $group->id_gestion_periodo);
             $period = $this->findPeriodOrFail($periodId);
+
+            $this->assertPairIsOffered((int) $group->id_carrera, (int) $group->id_materia, $periodId);
 
             $this->assertNoDuplicateGroup(
                 (int) $group->id_carrera,
                 (int) $group->id_materia,
                 $data['num_grupo'],
-                $this->groupManagementFor($period),
                 $periodId,
                 (int) $group->id_grupo
             );
@@ -175,14 +175,11 @@ class GroupService
             try {
                 $group->fill([
                     'num_grupo' => $data['num_grupo'],
-                    'gestion' => $this->groupManagementFor($period),
-                    'id_periodo' => $period->id_periodo,
+                    'id_gestion_periodo' => $period->id_gestion_periodo,
                 ]);
                 $group->save();
             } catch (QueryException $exception) {
-                throw $this->isUniqueViolation($exception)
-                    ? $this->duplicateGroupException()
-                    : $exception;
+                throw $this->translateDatabaseError($exception);
             }
 
             return $group;
@@ -210,7 +207,7 @@ class GroupService
     {
         $period = Period::query()->find($periodId);
 
-        if ($period === null) {
+        if ($period === null || $period->estado !== RecordStatus::ACTIVE) {
             throw ValidationException::withMessages([
                 'id_periodo' => ['El período académico seleccionado no existe.'],
             ]);
@@ -220,12 +217,33 @@ class GroupService
     }
 
     /**
-     * El formulario solo pide N° de grupo y período: no hay un input de "Gestión".
-     * grupo.gestion (varchar) se deriva del periodo.gestion (smallint) elegido.
+     * Un grupo solo existe para un par ofertado en su período (oferta_academica activa). La clave
+     * compuesta de grupo es la garantía a nivel de datos; esta validación da el mensaje claro.
      */
-    private function groupManagementFor(Period $period): string
+    private function assertPairIsOffered(int $careerId, int $subjectId, int $periodId): void
     {
-        return (string) $period->gestion;
+        $isOffered = AcademicOffering::query()
+            ->where('id_carrera', $careerId)
+            ->where('id_materia', $subjectId)
+            ->where('id_gestion_periodo', $periodId)
+            ->where('estado', RecordStatus::ACTIVE)
+            ->exists();
+
+        if ($isOffered) {
+            return;
+        }
+
+        throw $this->pairNotOfferedException();
+    }
+
+    private function pairNotOfferedException(): ValidationException
+    {
+        return ValidationException::withMessages([
+            'id_periodo' => [
+                'La materia no se ofrece en el período académico seleccionado. '
+                . 'Elija otro período o solicite que se incluya en la oferta.',
+            ],
+        ]);
     }
 
     /**
@@ -258,14 +276,13 @@ class GroupService
     }
 
     /**
-     * CA 8 (HU-18) y CA 5 (HU-19): la quíntupla completa (carrera, materia, número
-     * de grupo, gestión, período) es lo que define duplicidad, nunca la materia sola.
+     * CA 8 (HU-18) y CA 5 (HU-19): (carrera, materia, número de grupo, período) define la
+     * duplicidad, nunca la materia sola. La gestión ya viaja dentro del período.
      */
     private function assertNoDuplicateGroup(
         int $careerId,
         int $subjectId,
         string $groupNumber,
-        string $management,
         int $periodId,
         ?int $excludeGroupId = null
     ): void {
@@ -273,8 +290,7 @@ class GroupService
             ->where('id_carrera', $careerId)
             ->where('id_materia', $subjectId)
             ->where('num_grupo', $groupNumber)
-            ->where('gestion', $management)
-            ->where('id_periodo', $periodId)
+            ->where('id_gestion_periodo', $periodId)
             ->when($excludeGroupId !== null, function (Builder $query) use ($excludeGroupId): void {
                 $query->where('id_grupo', '!=', $excludeGroupId);
             })
@@ -295,10 +311,20 @@ class GroupService
         ]);
     }
 
-    private function isUniqueViolation(QueryException $exception): bool
+    /**
+     * 23505 (unique_violation): otra solicitud creó el mismo grupo. 23503 (foreign_key_violation):
+     * la oferta del par en ese período desapareció entre la validación y la escritura.
+     */
+    private function translateDatabaseError(QueryException $exception): \Throwable
     {
-        // 23505 es el SQLSTATE de "unique_violation" en PostgreSQL.
-        return $exception->getCode() === '23505';
+        switch ($exception->getCode()) {
+            case '23505':
+                return $this->duplicateGroupException();
+            case '23503':
+                return $this->pairNotOfferedException();
+            default:
+                return $exception;
+        }
     }
 
     /**

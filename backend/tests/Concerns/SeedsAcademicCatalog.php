@@ -2,9 +2,11 @@
 
 namespace Tests\Concerns;
 
+use App\Models\AcademicYear;
 use App\Models\Career;
 use App\Models\Group;
 use App\Models\Period;
+use App\Models\PeriodType;
 use App\Models\Role;
 use App\Models\Subject;
 use App\Models\SubjectCareer;
@@ -16,8 +18,11 @@ use Illuminate\Support\Facades\DB;
  * Datos de prueba fijos para el catálogo académico.
  *
  * No se usan factories porque el esquema no lo definen migraciones sino el script de
- * creación: las relaciones de este módulo (par materia-carrera, grupos por periodo)
- * se leen mejor con un juego de datos explícito.
+ * creación: las relaciones de este módulo (par materia-carrera, oferta académica, grupos por
+ * período) se leen mejor con un juego de datos explícito.
+ *
+ * El período vigente es 1/2026 (gestion_periodo.vigente) y el anterior 2/2025. Todo par creado aquí
+ * queda ofertado en el período vigente; cada grupo oferta su par en el período del grupo.
  */
 trait SeedsAcademicCatalog
 {
@@ -103,20 +108,59 @@ trait SeedsAcademicCatalog
         // Materia ACTIVA con par INACTIVO.
         $this->createPair($this->informaticaId, $this->basesDatosId, RecordStatus::INACTIVE);
 
-        $this->periodoActivoId = Period::create([
-            'nombre_periodo' => '2026-1',
-            'gestion' => 2026,
-        ])->id_periodo;
+        $this->periodoActivoId = $this->createPeriod(2026, 1, true);
+        $this->periodoAnteriorId = $this->createPeriod(2025, 2, false);
 
-        $this->periodoAnteriorId = Period::create([
-            'nombre_periodo' => '2025-2',
-            'gestion' => 2025,
-        ])->id_periodo;
+        // Todo el catálogo de arriba se dicta en el período activo; los casos de «no ofertado»
+        // los prepara cada prueba con dontOfferPair().
+        foreach (DB::table('materia_carrera')->get(['id_carrera', 'id_materia']) as $pair) {
+            $this->offerPair((int) $pair->id_carrera, (int) $pair->id_materia, $this->periodoActivoId);
+        }
 
         $this->seedGroups();
 
         $this->actAsTeacher($this->docenteId);
-        config()->set('sciem.periodo_activo_id', $this->periodoActivoId);
+    }
+
+    /** Crea la gestión (si no existe) y su período; `$code` es periodo.codigo (1, 2, 3 Verano...). */
+    protected function createPeriod(int $year, int $code, bool $current = false): int
+    {
+        $yearId = AcademicYear::query()->firstOrCreate(
+            ['anio' => $year],
+            ['estado' => RecordStatus::ACTIVE]
+        )->id_gestion;
+
+        return Period::create([
+            'id_gestion' => $yearId,
+            'id_periodo' => PeriodType::query()->where('codigo', $code)->value('id_periodo'),
+            'vigente' => $current,
+            'estado' => RecordStatus::ACTIVE,
+        ])->id_gestion_periodo;
+    }
+
+    /** Oferta el par en el período (idempotente). */
+    protected function offerPair(
+        int $careerId,
+        int $subjectId,
+        int $periodId,
+        string $status = RecordStatus::ACTIVE
+    ): void {
+        DB::table('oferta_academica')->insertOrIgnore([
+            'id_carrera' => $careerId,
+            'id_materia' => $subjectId,
+            'id_gestion_periodo' => $periodId,
+            'estado' => $status,
+        ]);
+    }
+
+    /** Quita la oferta del par en el período; falla si algún grupo todavía la usa. */
+    protected function dontOfferPair(int $careerId, int $subjectId, int $periodId): void
+    {
+        DB::table('oferta_academica')
+            ->where('id_carrera', $careerId)
+            ->where('id_materia', $subjectId)
+            ->where('id_gestion_periodo', $periodId)
+            ->delete();
     }
 
     protected function seedExtraPairs(int $amount): void
@@ -129,6 +173,7 @@ trait SeedsAcademicCatalog
             ])->id_materia;
 
             $this->createPair($this->sistemasId, $subjectId, RecordStatus::ACTIVE);
+            $this->offerPair($this->sistemasId, $subjectId, $this->periodoActivoId);
         }
     }
 
@@ -258,14 +303,16 @@ trait SeedsAcademicCatalog
         string $teacherId,
         int $periodId
     ): int {
+        // Un grupo solo existe para un par ofertado en su período.
+        $this->offerPair($careerId, $subjectId, $periodId);
+
         return Group::create([
             'id_carrera' => $careerId,
             'id_materia' => $subjectId,
             'num_grupo' => $number,
-            'gestion' => '2026',
             'estado' => RecordStatus::ACTIVE,
             'id_usuario_docente' => $teacherId,
-            'id_periodo' => $periodId,
+            'id_gestion_periodo' => $periodId,
         ])->id_grupo;
     }
 }

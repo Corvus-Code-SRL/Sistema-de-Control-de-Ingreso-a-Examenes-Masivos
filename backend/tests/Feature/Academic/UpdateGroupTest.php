@@ -36,14 +36,15 @@ class UpdateGroupTest extends TestCase
     /** Crea un grupo del docente en el par indicado, en el período activo. */
     private function seedOwnGroup(int $careerId, int $subjectId, string $numGrupo): Group
     {
+        $this->offerPair($careerId, $subjectId, $this->periodoActivoId);
+
         return Group::create([
             'id_carrera' => $careerId,
             'id_materia' => $subjectId,
             'num_grupo' => $numGrupo,
-            'gestion' => '2026',
             'estado' => RecordStatus::ACTIVE,
             'id_usuario_docente' => $this->docenteId,
-            'id_periodo' => $this->periodoActivoId,
+            'id_gestion_periodo' => $this->periodoActivoId,
         ]);
     }
 
@@ -190,15 +191,31 @@ class UpdateGroupTest extends TestCase
 
     public function test_actualizar_el_periodo_recalcula_la_gestion(): void
     {
+        $this->offerPair($this->sistemasId, $this->calculoId, $this->periodoAnteriorId);
+
         $this->putJson($this->url(), [
             'num_grupo' => '1',
             'id_periodo' => $this->periodoAnteriorId,
-        ])->assertStatus(200);
+        ])->assertStatus(200)
+            ->assertJsonPath('data.grupo.gestion', '2025')
+            ->assertJsonPath('data.grupo.periodo.etiqueta', '2/2025');
 
         $this->assertDatabaseHas('grupo', [
             'id_grupo' => $this->grupoPropioId,
+            'id_gestion_periodo' => $this->periodoAnteriorId,
+        ]);
+    }
+
+    public function test_rechaza_mover_el_grupo_a_un_periodo_donde_la_materia_no_se_ofrece(): void
+    {
+        $this->putJson($this->url(), [
+            'num_grupo' => '1',
             'id_periodo' => $this->periodoAnteriorId,
-            'gestion' => '2025',
+        ])->assertStatus(422)->assertJsonValidationErrors('id_periodo');
+
+        $this->assertDatabaseHas('grupo', [
+            'id_grupo' => $this->grupoPropioId,
+            'id_gestion_periodo' => $this->periodoActivoId,
         ]);
     }
 

@@ -14,10 +14,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property int $id_carrera
  * @property int $id_materia
  * @property string $num_grupo
- * @property string $gestion
  * @property string $estado
  * @property string $id_usuario_docente
- * @property int $id_periodo
+ * @property int $id_gestion_periodo
+ * @property-read string $gestion Año de la gestión del período del grupo (derivado; ya no es columna).
  */
 class Group extends Model
 {
@@ -30,22 +30,27 @@ class Group extends Model
         'id_materia' => 'int',
         'estado' => 'string',
         'id_usuario_docente' => 'string',
-        'id_periodo' => 'int'
+        'id_gestion_periodo' => 'int'
     ];
 
     protected $fillable = [
         'id_carrera',
         'id_materia',
         'num_grupo',
-        'gestion',
         'estado',
         'id_usuario_docente',
-        'id_periodo'
+        'id_gestion_periodo'
     ];
 
     public function period(): BelongsTo
     {
-        return $this->belongsTo(Period::class, 'id_periodo', 'id_periodo');
+        return $this->belongsTo(Period::class, 'id_gestion_periodo', 'id_gestion_periodo')->withLabel();
+    }
+
+    /** El año de la gestión del período del grupo, como texto («2026»). */
+    public function getGestionAttribute(): string
+    {
+        return (string) $this->period->year;
     }
 
     public function students(): BelongsToMany

@@ -58,7 +58,7 @@ class StudentRosterGroupAccessTest extends TestCase
                 $this->otroDocenteId
             )
             ->where(
-                'id_periodo',
+                'id_gestion_periodo',
                 $this->periodoActivoId
             )
             ->firstOrFail();
@@ -100,7 +100,7 @@ class StudentRosterGroupAccessTest extends TestCase
                 $this->docenteId
             )
             ->where(
-                'id_periodo',
+                'id_gestion_periodo',
                 $this->periodoAnteriorId
             )
             ->firstOrFail();
@@ -180,7 +180,7 @@ class StudentRosterGroupAccessTest extends TestCase
         $group = $this->ownActiveGroup();
         $otherGroupId = (int) Group::query()
             ->where('id_usuario_docente', $this->docenteId)
-            ->where('id_periodo', $this->periodoActivoId)
+            ->where('id_gestion_periodo', $this->periodoActivoId)
             ->where('id_grupo', '!=', $group->id_grupo)
             ->value('id_grupo');
 
@@ -215,7 +215,7 @@ class StudentRosterGroupAccessTest extends TestCase
                 $this->docenteId
             )
             ->where(
-                'id_periodo',
+                'id_gestion_periodo',
                 $this->periodoActivoId
             )
             ->where(

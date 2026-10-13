@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Catálogo académico de prueba: facultades, carreras, materias, pares materia-carrera,
- * periodos, ambientes y tipos de examen.
+ * gestiones, periodos con su oferta académica, ambientes y tipos de examen.
  */
 class CatalogTestDataSeeder extends Seeder
 {
@@ -61,12 +61,7 @@ class CatalogTestDataSeeder extends Seeder
             $this->pair(Ids::CAREER_SYSTEMS, Ids::SUBJECT_ARCHIVED, '6', false),
         ], ['id_carrera', 'id_materia']);
 
-        // La tabla no marca el periodo vigente: lo fija SCIEM_PERIODO_ACTIVO_ID (9303).
-        DB::table('periodo')->upsert([
-            ['id_periodo' => Ids::PERIOD_2025_2, 'nombre_periodo' => '2-2025', 'gestion' => 2025],
-            ['id_periodo' => Ids::PERIOD_2026_1, 'nombre_periodo' => '1-2026', 'gestion' => 2026],
-            ['id_periodo' => Ids::PERIOD_ACTIVE, 'nombre_periodo' => '2-2026', 'gestion' => 2026],
-        ], ['id_periodo']);
+        $this->seedPeriods();
 
         DB::table('ambiente')->upsert([
             $this->classroom(9601, '691A', 60, 'Edificio nuevo, planta baja'),
@@ -87,6 +82,83 @@ class CatalogTestDataSeeder extends Seeder
             ['id_tipo_examen' => 9701, 'nombre' => 'Parcial', 'categoria' => 'REGULAR'],
             ['id_tipo_examen' => 9702, 'nombre' => 'Final', 'categoria' => 'REGULAR'],
         ], ['id_tipo_examen']);
+    }
+
+    /**
+     * Gestiones 2025 y 2026, el catálogo de períodos y las instancias 2/2025, 1/2026 y 2/2026 (la
+     * vigente, id 9303). Cada par ACTIVO de los datos de prueba se oferta en el período activo; las
+     * ofertas de los grupos de otros períodos las agrega GroupTestDataSeeder.
+     */
+    private function seedPeriods(): void
+    {
+        DB::table('gestion')->upsert([
+            ['id_gestion' => Ids::YEAR_2025, 'anio' => 2025, 'estado' => 'ACTIVO'],
+            ['id_gestion' => Ids::YEAR_2026, 'anio' => 2026, 'estado' => 'ACTIVO'],
+        ], ['id_gestion'], ['anio', 'estado']);
+
+        // La migración ya los crea; se repiten por si la base se cargó desde otro camino.
+        DB::table('periodo')->upsert([
+            ['codigo' => 0, 'nombre' => 'Anual'],
+            ['codigo' => 1, 'nombre' => 'Semestre 1'],
+            ['codigo' => 2, 'nombre' => 'Semestre 2'],
+            ['codigo' => 3, 'nombre' => 'Verano'],
+            ['codigo' => 4, 'nombre' => 'Invierno'],
+        ], ['codigo'], ['nombre']);
+
+        $type = fn (int $code) => (int) DB::table('periodo')->where('codigo', $code)->value('id_periodo');
+
+        // Solo un período puede ser el vigente: se libera el anterior antes de fijar el de prueba.
+        DB::table('gestion_periodo')
+            ->where('vigente', true)
+            ->where('id_gestion_periodo', '!=', Ids::PERIOD_ACTIVE)
+            ->update(['vigente' => false]);
+
+        DB::table('gestion_periodo')->upsert([
+            [
+                'id_gestion_periodo' => Ids::PERIOD_2025_2,
+                'id_gestion' => Ids::YEAR_2025,
+                'id_periodo' => $type(2),
+                'vigente' => false,
+                'estado' => 'ACTIVO',
+            ],
+            [
+                'id_gestion_periodo' => Ids::PERIOD_2026_1,
+                'id_gestion' => Ids::YEAR_2026,
+                'id_periodo' => $type(1),
+                'vigente' => false,
+                'estado' => 'ACTIVO',
+            ],
+            [
+                'id_gestion_periodo' => Ids::PERIOD_ACTIVE,
+                'id_gestion' => Ids::YEAR_2026,
+                'id_periodo' => $type(2),
+                'vigente' => true,
+                'estado' => 'ACTIVO',
+            ],
+        ], ['id_gestion_periodo'], ['id_gestion', 'id_periodo', 'vigente', 'estado']);
+
+        $offerings = DB::table('materia_carrera')
+            ->where('estado', 'ACTIVO')
+            ->whereIn('id_carrera', [
+                Ids::CAREER_SYSTEMS,
+                Ids::CAREER_INFORMATICS,
+                Ids::CAREER_ECONOMICS,
+                Ids::CAREER_BUSINESS,
+            ])
+            ->get(['id_carrera', 'id_materia'])
+            ->map(fn ($pair) => [
+                'id_carrera' => $pair->id_carrera,
+                'id_materia' => $pair->id_materia,
+                'id_gestion_periodo' => Ids::PERIOD_ACTIVE,
+                'estado' => 'ACTIVO',
+            ])
+            ->all();
+
+        DB::table('oferta_academica')->upsert(
+            $offerings,
+            ['id_carrera', 'id_materia', 'id_gestion_periodo'],
+            ['estado']
+        );
     }
 
     private function faculty(int $id, string $name, string $code): array

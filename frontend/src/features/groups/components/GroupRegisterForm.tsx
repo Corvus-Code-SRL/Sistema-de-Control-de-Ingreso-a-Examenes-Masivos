@@ -189,9 +189,14 @@ export function RegistrarGrupoForm({
               </SelectTrigger>
               <SelectContent>
                 {periods.map((period) => (
-                  <SelectItem key={period.id_periodo} value={String(period.id_periodo)} className="text-xs">
-                    {period.nombre_periodo}-{period.gestion}
-                    {period.id_periodo === activePeriodId ? ' (activo)' : ''}
+                  <SelectItem
+                    key={period.id_periodo}
+                    value={String(period.id_periodo)}
+                    title={period.nombre_periodo}
+                    className="text-xs"
+                  >
+                    {period.etiqueta}
+                    {period.id_periodo === activePeriodId ? ' (vigente)' : ''}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -203,7 +208,7 @@ export function RegistrarGrupoForm({
               </p>
             ) : (
               <p className="text-xs text-muted-foreground leading-normal">
-                Por defecto, el período activo. Verifíquelo antes de confirmar.
+                Por defecto, el período vigente. Verifíquelo antes de confirmar.
               </p>
             )}
           </div>
