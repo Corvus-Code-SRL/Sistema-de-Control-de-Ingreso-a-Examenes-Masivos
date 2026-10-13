@@ -44,6 +44,16 @@ class VerificationService
         $result['antecedentes'] = $record['antecedentes'];
         $result['ingreso_previo'] = $record['ingreso_previo'];
 
+        $presentedCi = trim((string) ($input['ci'] ?? ''));
+        $registeredCi = trim((string) ($record['estudiante']['ci'] ?? ''));
+        if ($presentedCi !== '' && $registeredCi !== '' && $presentedCi !== $registeredCi) {
+            return $this->deny(
+                $result,
+                'CI_NO_COINCIDE',
+                'El CI presentado no coincide con el registrado para este estudiante.'
+            );
+        }
+
         if ($record['grupo'] === null) {
             return $this->deny($result, 'NO_PERTENECE', 'No figura en los grupos de este examen.');
         }
