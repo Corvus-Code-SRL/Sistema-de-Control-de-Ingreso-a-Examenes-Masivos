@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { AlertTriangle, CheckCircle2, CircleX, DoorOpen, RotateCcw, ShieldAlert } from 'lucide-react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import type { Verification } from '../types/entry-control.types'
+import type { EntryStudent, Verification } from '../types/entry-control.types'
 
 interface Props {
   result: Verification
@@ -21,14 +22,31 @@ function verdictLabel(value: string): string {
   return labels[value] ?? value.replace(/_/g, ' ')
 }
 
+function StudentPhoto({ student }: { student: EntryStudent }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const initials = student.nombre_completo.split(' ').slice(0, 2).map((part) => part[0]).join('').toUpperCase()
+
+  return <div className="flex shrink-0 flex-col items-center gap-1">
+    <Avatar className="size-20">
+      {student.foto_url && <AvatarImage
+        src={student.foto_url}
+        alt={`Fotografía de ${student.nombre_completo}`}
+        referrerPolicy="no-referrer"
+        onLoadingStatusChange={(status) => setImageFailed(status === 'error')}
+      />}
+      <AvatarFallback className="bg-brand-soft text-lg font-semibold text-brand-deep">{initials}</AvatarFallback>
+    </Avatar>
+    {(!student.foto_url || imageFailed) && <span className="text-xs text-muted-foreground">Sin fotografía</span>}
+  </div>
+}
+
 function StudentDetails({ result }: { result: Verification }) {
   const student = result.estudiante
   if (!student) return null
-  const initials = student.nombre_completo.split(' ').slice(0, 2).map((part) => part[0]).join('').toUpperCase()
 
   return <div className="rounded-lg border bg-card p-4">
     <div className="flex items-center gap-3">
-      <Avatar className="size-11"><AvatarFallback className="bg-brand-soft font-semibold text-brand-deep">{initials}</AvatarFallback></Avatar>
+      <StudentPhoto key={`${student.id_estudiante}:${student.foto_url ?? ''}`} student={student} />
       <div className="min-w-0"><p className="font-semibold">{student.nombre_completo}</p><p className="text-xs text-muted-foreground">Estudiante inscrito</p></div>
     </div>
     <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">

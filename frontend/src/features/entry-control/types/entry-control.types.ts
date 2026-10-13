@@ -28,7 +28,7 @@ export interface EntryStudent extends StudentMatch {
   ci: string | null
   ci_pendiente: boolean
   carrera: string | null
-  foto_url: string | null // Reservado para una futura fuente de fotografías.
+  foto_url: string | null
 }
 
 export interface PreviousEntry {
