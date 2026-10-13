@@ -459,7 +459,7 @@ class StudentVerificationTest extends TestCase
             app(RoomAssignmentService::class)->prepare($other->id_examen);
             $this->fail('La apertura debía fallar.');
         } catch (\DomainException $exception) {
-            $this->assertStringContainsString('capacidad', $exception->getMessage());
+            $this->assertStringContainsString('Capacidad', $exception->getMessage());
         }
 
         $this->assertSame(Exam::PROGRAMADO, $other->fresh()->estado);
@@ -484,11 +484,11 @@ class StudentVerificationTest extends TestCase
                 ->update(['minutos_apertura' => 30]);
 
             $this->assertSame(30, $exam->fresh()->minutos_apertura);
-            app(OpenEntryControlJob::class)->handle(app(RoomAssignmentService::class));
+            app()->call([app(OpenEntryControlJob::class), 'handle']);
             $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
 
             Carbon::setTestNow(Carbon::parse('2026-09-29 12:01:00', config('sciem.zona_horaria')));
-            app(OpenEntryControlJob::class)->handle(app(RoomAssignmentService::class));
+            app()->call([app(OpenEntryControlJob::class), 'handle']);
             $this->assertSame(Exam::EN_INGRESO, $exam->fresh()->estado);
         } finally {
             Carbon::setTestNow();
@@ -510,7 +510,7 @@ class StudentVerificationTest extends TestCase
                 'id_grupo' => $this->grupoPropioId,
             ]);
 
-            app(OpenEntryControlJob::class)->handle(app(RoomAssignmentService::class));
+            app()->call([app(OpenEntryControlJob::class), 'handle']);
             $this->assertSame(Exam::EN_INGRESO, $other->fresh()->estado);
             $firstRoom = app(RoomAssignmentService::class)->assignedRoomFor(
                 $other->id_examen,

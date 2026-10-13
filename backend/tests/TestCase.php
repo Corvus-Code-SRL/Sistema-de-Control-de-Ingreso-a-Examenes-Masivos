@@ -71,9 +71,11 @@ abstract class TestCase extends BaseTestCase
     {
         $connection = $app->make('db')->connection();
 
-        if ($connection->getDatabaseName() !== 'sciem_test') {
+        if ($connection->getDatabaseName() !== 'sciem_test'
+            || $connection->getDriverName() !== 'pgsql'
+            || ! in_array($connection->getConfig('host'), ['127.0.0.1', 'localhost', '::1'], true)) {
             throw new RuntimeException(
-                'Las pruebas solo pueden reiniciar la base de datos sciem_test.'
+                'Las pruebas solo pueden reiniciar la base de datos sciem_test en PostgreSQL local.'
             );
         }
 
