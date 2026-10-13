@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '@/lib/api-client'
-import { entryControlService, isFullStatus } from '../services/entryControlService'
-import type { EntryContext, EntryStatus } from '../types/entry-control.types'
+import { entryControlService, isFullStatus, isPendingStatus } from '../services/entryControlService'
+import type { EntryContext, EntryOpeningFailure, EntryStatus } from '../types/entry-control.types'
 
 function message(error: unknown): string {
   if (error instanceof ApiError && error.status >= 500) {
@@ -13,6 +13,7 @@ function message(error: unknown): string {
 export function useEntryStatus(examId: number) {
   const [context, setContext] = useState<EntryContext | null>(null)
   const [status, setStatus] = useState<EntryStatus | null>(null)
+  const [openingFailure, setOpeningFailure] = useState<EntryOpeningFailure | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [statusError, setStatusError] = useState<string | null>(null)
@@ -24,8 +25,15 @@ export function useEntryStatus(examId: number) {
     inFlight.current = true
     try {
       const next = await entryControlService.status(examId, force ? undefined : version.current)
-      version.current = next.version
-      if (isFullStatus(next)) setStatus(next)
+      if (isPendingStatus(next)) {
+        version.current = undefined
+        setStatus(null)
+        setOpeningFailure(next.motivo_apertura)
+      } else {
+        version.current = next.version
+        if (isFullStatus(next)) setStatus(next)
+        setOpeningFailure(null)
+      }
       setStatusError(null)
     } catch (cause) {
       setStatusError(message(cause))
@@ -41,11 +49,12 @@ export function useEntryStatus(examId: number) {
     try {
       const nextContext = await entryControlService.context(examId)
       setContext(nextContext)
-      if (nextContext.estado === 'EN_INGRESO') {
+      if (nextContext.estado === 'EN_INGRESO' || nextContext.estado === 'PROGRAMADO') {
         await refresh(true)
       } else {
         version.current = undefined
         setStatus(null)
+        setOpeningFailure(null)
       }
     } catch (cause) {
       setError(message(cause))
@@ -58,6 +67,7 @@ export function useEntryStatus(examId: number) {
     version.current = undefined
     setContext(null)
     setStatus(null)
+    setOpeningFailure(null)
     void load()
   }, [load])
 
@@ -79,9 +89,11 @@ export function useEntryStatus(examId: number) {
       checking = true
       try {
         const nextContext = await entryControlService.context(examId)
-        if (active && nextContext.estado !== 'PROGRAMADO') {
-          setContext(nextContext)
-          if (nextContext.estado === 'EN_INGRESO') await refresh(true)
+        if (active) {
+          if (nextContext.estado !== 'PROGRAMADO') setContext(nextContext)
+          if (nextContext.estado === 'EN_INGRESO' || nextContext.estado === 'PROGRAMADO') {
+            await refresh(true)
+          }
         }
       } catch {
         // El siguiente ciclo vuelve a consultar; el botón Actualizar sigue disponible.
@@ -93,5 +105,5 @@ export function useEntryStatus(examId: number) {
     return () => { active = false; window.clearInterval(timer) }
   }, [context?.estado, examId, refresh])
 
-  return { context, status, loading, error, statusError, refresh, reload: load }
+  return { context, status, openingFailure, loading, error, statusError, refresh, reload: load }
 }
