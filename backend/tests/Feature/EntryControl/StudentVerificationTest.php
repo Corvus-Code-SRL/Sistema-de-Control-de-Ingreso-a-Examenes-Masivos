@@ -78,6 +78,19 @@ class StudentVerificationTest extends TestCase
         $this->assertSame(0, DB::table('intento_ingreso')->count());
     }
 
+    public function test_verificacion_por_sis_devuelve_la_foto_opcional_del_estudiante(): void
+    {
+        $photoUrl = 'https://res.cloudinary.com/sciem/image/upload/estudiantes/9501.webp';
+        $this->student->update(['foto_url' => $photoUrl]);
+        $this->rebuildSnapshot();
+
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.veredicto', 'AUTORIZADO')
+            ->assertJsonPath('data.estudiante.cod_sis', $this->student->cod_sis)
+            ->assertJsonPath('data.estudiante.foto_url', $photoUrl);
+    }
+
     public function test_no_verifica_si_la_duracion_del_examen_ya_termino(): void
     {
         $timezone = config('sciem.zona_horaria');
