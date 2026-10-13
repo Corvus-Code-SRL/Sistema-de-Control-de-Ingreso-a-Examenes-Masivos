@@ -72,7 +72,17 @@ export interface EntryStatus {
   conectados?: unknown[]
 }
 
-export type StatusResponse = EntryStatus | {
+export interface EntryOpeningFailure {
+  codigo: 'SIN_NOMINA' | 'SIN_AMBIENTES' | 'CAPACIDAD_INSUFICIENTE'
+  mensaje: string
+}
+
+export interface PendingEntryStatus {
+  estado: 'PROGRAMADO'
+  motivo_apertura: EntryOpeningFailure | null
+}
+
+export type StatusResponse = EntryStatus | PendingEntryStatus | {
   sin_cambios: true
   version: string
   conectados?: unknown[]
