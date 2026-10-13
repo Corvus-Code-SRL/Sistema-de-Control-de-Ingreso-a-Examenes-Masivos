@@ -20,10 +20,10 @@ const allowed = { veredicto: 'AUTORIZADO', motivo: 'Inscrito en un grupo del exa
   ambiente_asignado: { id_ambiente: 5, nro_aula: '691A' },
   antecedentes: { tiene_antecedentes: false, cantidad: 0, resumen: null }, ingreso_previo: null }
 
-function routes(verdict = allowed, examContext = context) {
+function routes(verdict = allowed, examContext = context): Parameters<typeof mockApi>[0] {
   return [
     { matches: (url: string) => url.endsWith('/contexto'), body: { data: examContext } },
-    { matches: (url: string) => url.includes('/estado'), body: { data: status } },
+    { matches: (url: string) => url.includes('/estado'), body: { data: examContext.estado === 'PROGRAMADO' ? { estado: 'PROGRAMADO', motivo_apertura: null } : status } },
     { matches: (url: string) => url.endsWith('/verificar'), body: { data: verdict } },
     { matches: (url: string) => url.endsWith('/confirmar-ingreso'), status: 201, body: { data: { creado: true } } },
   ]
@@ -113,7 +113,8 @@ describe('EntryControlPage', () => {
 
     expect(await screen.findByText(/El control de ingreso no está abierto/)).toBeInTheDocument()
     expect(screen.queryByLabelText('Código SIS')).not.toBeInTheDocument()
-    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('/estado'))).toBe(false)
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('/estado'))).toBe(true)
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith('/verificar'))).toBe(false)
   })
 
   it('muestra el formulario cuando el examen se abre automáticamente', async () => {
@@ -129,6 +130,7 @@ describe('EntryControlPage', () => {
       })
       expect(screen.getByText(/El control de ingreso no está abierto/)).toBeInTheDocument()
       apiRoutes[0].body = { data: context }
+      apiRoutes[1].body = { data: status }
 
       await act(async () => { await vi.advanceTimersByTimeAsync(15000) })
       expect(screen.getByLabelText('Código SIS')).toBeInTheDocument()
@@ -137,6 +139,77 @@ describe('EntryControlPage', () => {
       vi.useRealTimers()
       if (hidden) Object.defineProperty(document, 'hidden', hidden)
     }
+  })
+
+  it.each([
+    ['SIN_NOMINA', 'El examen no tiene estudiantes en su nómina.'],
+    ['SIN_AMBIENTES', 'El examen no tiene ambientes asignados.'],
+    ['CAPACIDAD_INSUFICIENTE', 'Capacidad 1 menor que la nómina de 2.'],
+  ])('muestra el motivo %s en lugar del aviso genérico', async (codigo, mensaje) => {
+    const apiRoutes = routes(allowed, { ...context, estado: 'PROGRAMADO' })
+    apiRoutes[1].body = { data: { estado: 'PROGRAMADO', motivo_apertura: { codigo, mensaje } } }
+    mockApi(apiRoutes)
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+
+    expect(await screen.findByText(mensaje)).toBeInTheDocument()
+    expect(screen.queryByText(/El control de ingreso no está abierto/)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Código SIS')).not.toBeInTheDocument()
+    expect(screen.queryByText(/No se pudo actualizar el contador/)).not.toBeInTheDocument()
+  })
+
+  it('actualiza el motivo durante la espera y lo retira cuando abre', async () => {
+    const apiRoutes = routes(allowed, { ...context, estado: 'PROGRAMADO' })
+    mockApi(apiRoutes)
+    const hidden = Object.getOwnPropertyDescriptor(document, 'hidden')
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false })
+    vi.useFakeTimers()
+    try {
+      await act(async () => {
+        renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+      })
+      expect(screen.getByText(/El control de ingreso no está abierto/)).toBeInTheDocument()
+      const mensaje = 'Capacidad 1 menor que la nómina de 2.'
+      apiRoutes[1].body = { data: { estado: 'PROGRAMADO', motivo_apertura: { codigo: 'CAPACIDAD_INSUFICIENTE', mensaje } } }
+      await act(async () => { await vi.advanceTimersByTimeAsync(15000) })
+      expect(screen.getByText(mensaje)).toBeInTheDocument()
+      expect(screen.queryByLabelText('Código SIS')).not.toBeInTheDocument()
+
+      apiRoutes[0].body = { data: context }
+      apiRoutes[1].body = { data: status }
+      await act(async () => { await vi.advanceTimersByTimeAsync(15000) })
+      expect(screen.queryByText(mensaje)).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Código SIS')).toBeInTheDocument()
+
+      apiRoutes[1].body = { data: { sin_cambios: true, version: status.version, conectados: [] } }
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+      expect(screen.queryByText(mensaje)).not.toBeInTheDocument()
+      expect(screen.queryByText(/No se pudo actualizar/)).not.toBeInTheDocument()
+      expect(screen.getByRole('progressbar', { name: 'Estudiantes ingresados' })).toHaveAttribute('aria-valuemax', '1')
+      expect(screen.getByText('1 pendientes')).toBeInTheDocument()
+      expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('desde=1'))).toBe(true)
+    } finally {
+      vi.useRealTimers()
+      if (hidden) Object.defineProperty(document, 'hidden', hidden)
+    }
+  })
+
+  it('permite reintentar la consulta del motivo sin mostrar errores técnicos', async () => {
+    const apiRoutes = routes(allowed, { ...context, estado: 'PROGRAMADO' })
+    apiRoutes[1].status = 500
+    apiRoutes[1].body = { message: 'SQLSTATE[42703]: columna inexistente' }
+    mockApi(apiRoutes)
+    const user = userEvent.setup()
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+
+    expect(await screen.findByText(/No se pudo actualizar el estado del control/)).toBeInTheDocument()
+    expect(screen.queryByText(/SQLSTATE/)).not.toBeInTheDocument()
+    apiRoutes[1].status = 200
+    apiRoutes[1].body = { data: { estado: 'PROGRAMADO', motivo_apertura: {
+      codigo: 'SIN_AMBIENTES', mensaje: 'El examen no tiene ambientes asignados.',
+    } } }
+    await user.click(screen.getByRole('button', { name: 'Actualizar' }))
+    expect(await screen.findByText('El examen no tiene ambientes asignados.')).toBeInTheDocument()
+    expect(screen.queryByText(/No se pudo actualizar/)).not.toBeInTheDocument()
   })
 
   it('oculta los detalles SQL cuando falla el contador', async () => {

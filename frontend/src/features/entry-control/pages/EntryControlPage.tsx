@@ -19,7 +19,7 @@ export function EntryControlPage() {
 }
 
 function EntryControlContent({ examId }: { examId: number }) {
-  const { context, status, loading, error, statusError, refresh, reload } = useEntryStatus(examId)
+  const { context, status, openingFailure, loading, error, statusError, refresh, reload } = useEntryStatus(examId)
   const [roomId, setRoomId] = useState<number | null>(null)
   const [rejectOpen, setRejectOpen] = useState(false)
   const verification = useStudentVerification(examId, roomId, () => { void refresh(true) })
@@ -43,9 +43,9 @@ function EntryControlContent({ examId }: { examId: number }) {
 
     {!loading && context && <>
       <div className={verification.result ? 'hidden lg:block' : ''}><EntryExamCard context={context} status={status} roomId={roomId} roomDisabled={verification.busy !== null} onRoomChange={(id) => { setRoomId(id); verification.reset() }} /></div>
-      {!open && <div role="status" className="rounded-lg border border-warn-border bg-warn-soft p-4 text-sm text-warn-fg">El control de ingreso no está abierto. Estado del examen: {context.estado.replace(/_/g, ' ')}.</div>}
-      {!hasRoom && <div role="alert" className="rounded-lg border border-danger/30 bg-danger-soft p-4 text-sm text-danger-fg">No hay un ambiente de control asignado. Solicite al docente que asigne uno.</div>}
-      {statusError && <div role="alert" className="rounded-lg border border-warn-border bg-warn-soft p-3 text-sm text-warn-fg">No se pudo actualizar el contador: {statusError}</div>}
+      {!open && <div role="status" className="rounded-lg border border-warn-border bg-warn-soft p-4 text-sm text-warn-fg">{openingFailure?.mensaje ?? `El control de ingreso no está abierto. Estado del examen: ${context.estado.replace(/_/g, ' ')}.`}</div>}
+      {!hasRoom && !openingFailure && <div role="alert" className="rounded-lg border border-danger/30 bg-danger-soft p-4 text-sm text-danger-fg">No hay un ambiente de control asignado. Solicite al docente que asigne uno.</div>}
+      {statusError && <div role="alert" className="rounded-lg border border-warn-border bg-warn-soft p-3 text-sm text-warn-fg">{open ? 'No se pudo actualizar el contador' : 'No se pudo actualizar el estado del control'}: {statusError}</div>}
       {verification.notice && <div role="status" className="flex items-center justify-between gap-2 rounded-lg border border-ok/30 bg-ok-soft p-3 text-sm font-medium text-ok-fg"><span>{verification.notice}</span><button type="button" onClick={() => verification.setNotice(null)} aria-label="Cerrar aviso" className="px-2">×</button></div>}
       {verification.error && <div role="alert" className="rounded-lg border border-danger/30 bg-danger-soft p-3 text-sm text-danger-fg">{verification.error}</div>}
       {open && <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
