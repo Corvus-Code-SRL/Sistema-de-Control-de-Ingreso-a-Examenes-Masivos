@@ -45,7 +45,7 @@ describe('ActualizarGrupoForm (HU-019)', () => {
     vi.clearAllMocks()
     mockUpdateGroup()
     mockedUsePeriods.mockReturnValue({
-      periods: [{ ...periodoActivo, activo: true }],
+      periods: [{ ...periodoActivo, vigente: true }],
       activePeriodId: periodoActivo.id_periodo,
       isLoading: false,
       error: null,

@@ -29,7 +29,8 @@ export const informatica: Career = {
 
 export const periodoActivo: Period = {
   id_periodo: 3,
-  nombre_periodo: '2/2026',
+  nombre_periodo: 'Semestre 2',
+  etiqueta: '2/2026',
   gestion: 2026,
 }
 
@@ -94,7 +95,7 @@ export function subjectCatalogResponse(subjects: SubjectCareer[], mensaje: strin
       total: subjects.length,
       total_mias: subjects.filter((subject) => subject.es_mia).length,
       id_periodo_activo: periodoActivo.id_periodo,
-      nombre_periodo_activo: periodoActivo.nombre_periodo,
+      nombre_periodo_activo: periodoActivo.etiqueta,
     },
     mensaje,
   }
@@ -104,8 +105,8 @@ export function subjectCatalogResponse(subjects: SubjectCareer[], mensaje: strin
 export function periodsResponse() {
   return {
     data: [
-      { ...periodoActivo, activo: true },
-      { id_periodo: 2, nombre_periodo: '1/2026', gestion: 2026, activo: false },
+      { ...periodoActivo, vigente: true },
+      { id_periodo: 2, nombre_periodo: 'Semestre 1', etiqueta: '1/2026', gestion: 2026, vigente: false },
     ],
     meta: { id_periodo_activo: periodoActivo.id_periodo },
   }

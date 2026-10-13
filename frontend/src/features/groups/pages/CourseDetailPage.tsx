@@ -80,7 +80,7 @@ export function CourseDetailPage() {
               {' · '}
               {detail.subject.carrera.nombre}
               {' · '}
-              {detail.group.periodo.nombre_periodo}
+              {detail.group.periodo.etiqueta}
             </>
           )
         }

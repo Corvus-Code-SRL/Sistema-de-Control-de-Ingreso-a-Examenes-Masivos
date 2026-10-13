@@ -39,8 +39,11 @@ export function CourseHeader({ detail }: CourseHeaderProps) {
       <div className="space-y-1">
         <p className="sciem-overline text-muted-foreground">Período</p>
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-sm font-medium text-foreground">
-            {group.periodo.nombre_periodo}
+          <span
+            className="text-sm font-medium text-foreground"
+            title={group.periodo.nombre_periodo}
+          >
+            {group.periodo.etiqueta}
           </span>
 
           {!meta.es_periodo_activo && (
