@@ -25,7 +25,8 @@ class GroupResource extends JsonResource
             ],
             'periodo' => [
                 'id_periodo' => (int) $this->period->id_gestion_periodo,
-                'nombre_periodo' => $this->period->label,
+                'nombre_periodo' => $this->period->type_name,
+                'etiqueta' => $this->period->label,
                 'gestion' => $this->period->year,
             ],
         ];

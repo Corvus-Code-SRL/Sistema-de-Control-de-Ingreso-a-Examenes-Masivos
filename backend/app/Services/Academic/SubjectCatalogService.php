@@ -83,12 +83,12 @@ class SubjectCatalogService
     }
 
     /**
-     * Id del período activo (gestion_periodo.activo). Sin período activo falla con
-     * ActivePeriodNotConfiguredException, que responde un 500 con la instrucción de activarlo.
+     * Id del período vigente (gestion_periodo.vigente). Sin período vigente falla con
+     * ActivePeriodNotConfiguredException, que responde un 500 con la instrucción de fijarlo.
      */
     public function activePeriodId(): int
     {
-        $id = Period::query()->active()->value('id_gestion_periodo');
+        $id = Period::query()->current()->value('id_gestion_periodo');
 
         if ($id === null) {
             throw new ActivePeriodNotConfiguredException();
@@ -97,7 +97,7 @@ class SubjectCatalogService
         return (int) $id;
     }
 
-    /** Etiqueta del período activo («1/2026», «Verano 2026»). */
+    /** Etiqueta del período vigente («1/2026», «3/2026»). */
     public function activePeriodName(): ?string
     {
         return $this->periodLabel($this->activePeriodId());
