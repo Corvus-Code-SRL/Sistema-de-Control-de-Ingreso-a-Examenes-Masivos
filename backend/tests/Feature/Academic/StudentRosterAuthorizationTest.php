@@ -159,12 +159,12 @@ class StudentRosterAuthorizationTest extends TestCase
 
     public function test_sin_periodo_activo_configurado_responde_el_error_de_configuracion(): void
     {
-        \App\Models\Period::query()->update(['activo' => false]);
+        \App\Models\Period::query()->update(['vigente' => false]);
 
         $response = $this->previewRoster($this->csvFile($this->rosterRows(1)), $this->grupoPropioId);
 
         $response->assertStatus(500);
-        $this->assertStringContainsString('período académico activo', (string) $response->json('message'));
+        $this->assertStringContainsString('período académico vigente', (string) $response->json('message'));
         $this->assertNull($response->json('exception'));
     }
 }

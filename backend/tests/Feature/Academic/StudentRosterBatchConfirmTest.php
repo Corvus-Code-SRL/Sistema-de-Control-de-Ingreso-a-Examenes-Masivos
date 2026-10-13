@@ -67,7 +67,7 @@ class StudentRosterBatchConfirmTest extends TestCase
 
     /**
      * Una consulta más que antes: el período activo ya no sale de la configuración sino de
-     * gestion_periodo.activo. El costo sigue siendo constante respecto de las filas.
+     * gestion_periodo.vigente. El costo sigue siendo constante respecto de las filas.
      */
     public function test_confirmar_50_filas_nuevas_cuesta_11_consultas_o_menos(): void
     {
