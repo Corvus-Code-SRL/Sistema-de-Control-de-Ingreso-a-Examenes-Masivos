@@ -123,7 +123,7 @@ class EntryControlSnapshotService
                     'ci_pendiente' => $student->ci === null,
                     'nombre_completo' => $fullName,
                     'carrera' => $career,
-                    'foto_url' => null,
+                    'foto_url' => $student->foto_url,
                 ],
                 'nombre' => $student->nombre,
                 'apellido_paterno' => $student->apellido_paterno,
@@ -238,7 +238,7 @@ class EntryControlSnapshotService
     }
 
     /**
-     * Ambiente donde controla un auxiliar. Si el docente le asignó uno (HU-09) es ese; si no y el
+     * Ambiente donde controla un auxiliar. Si el docente le asignó uno, es ese; si no y el
      * examen tiene un solo ambiente, controla ese. Se resuelve aquí y nunca se escribe en
      * examen_auxiliar. Con varios ambientes y sin asignación no controla (null).
      *
