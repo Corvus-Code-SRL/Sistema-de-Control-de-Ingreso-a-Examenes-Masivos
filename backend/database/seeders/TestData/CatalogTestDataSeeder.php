@@ -86,7 +86,7 @@ class CatalogTestDataSeeder extends Seeder
 
     /**
      * Gestiones 2025 y 2026, el catálogo de períodos y las instancias 2/2025, 1/2026 y 2/2026 (la
-     * activa, id 9303). Cada par ACTIVO de los datos de prueba se oferta en el período activo; las
+     * vigente, id 9303). Cada par ACTIVO de los datos de prueba se oferta en el período activo; las
      * ofertas de los grupos de otros períodos las agrega GroupTestDataSeeder.
      */
     private function seedPeriods(): void
@@ -99,43 +99,43 @@ class CatalogTestDataSeeder extends Seeder
         // La migración ya los crea; se repiten por si la base se cargó desde otro camino.
         DB::table('periodo')->upsert([
             ['codigo' => 0, 'nombre' => 'Anual'],
-            ['codigo' => 1, 'nombre' => '1'],
-            ['codigo' => 2, 'nombre' => '2'],
+            ['codigo' => 1, 'nombre' => 'Semestre 1'],
+            ['codigo' => 2, 'nombre' => 'Semestre 2'],
             ['codigo' => 3, 'nombre' => 'Verano'],
             ['codigo' => 4, 'nombre' => 'Invierno'],
         ], ['codigo'], ['nombre']);
 
         $type = fn (int $code) => (int) DB::table('periodo')->where('codigo', $code)->value('id_periodo');
 
-        // Solo un período puede estar activo: se libera el anterior antes de activar el de prueba.
+        // Solo un período puede ser el vigente: se libera el anterior antes de fijar el de prueba.
         DB::table('gestion_periodo')
-            ->where('activo', true)
+            ->where('vigente', true)
             ->where('id_gestion_periodo', '!=', Ids::PERIOD_ACTIVE)
-            ->update(['activo' => false]);
+            ->update(['vigente' => false]);
 
         DB::table('gestion_periodo')->upsert([
             [
                 'id_gestion_periodo' => Ids::PERIOD_2025_2,
                 'id_gestion' => Ids::YEAR_2025,
                 'id_periodo' => $type(2),
-                'activo' => false,
+                'vigente' => false,
                 'estado' => 'ACTIVO',
             ],
             [
                 'id_gestion_periodo' => Ids::PERIOD_2026_1,
                 'id_gestion' => Ids::YEAR_2026,
                 'id_periodo' => $type(1),
-                'activo' => false,
+                'vigente' => false,
                 'estado' => 'ACTIVO',
             ],
             [
                 'id_gestion_periodo' => Ids::PERIOD_ACTIVE,
                 'id_gestion' => Ids::YEAR_2026,
                 'id_periodo' => $type(2),
-                'activo' => true,
+                'vigente' => true,
                 'estado' => 'ACTIVO',
             ],
-        ], ['id_gestion_periodo'], ['id_gestion', 'id_periodo', 'activo', 'estado']);
+        ], ['id_gestion_periodo'], ['id_gestion', 'id_periodo', 'vigente', 'estado']);
 
         $offerings = DB::table('materia_carrera')
             ->where('estado', 'ACTIVO')
