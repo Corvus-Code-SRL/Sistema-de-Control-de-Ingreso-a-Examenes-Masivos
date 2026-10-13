@@ -9,11 +9,13 @@ interface Props {
   roomId: number | null
   onRoomChange: (id: number) => void
   roomDisabled?: boolean
+  ended?: boolean
 }
 
-export function EntryExamCard({ context, status, roomId, onRoomChange, roomDisabled = false }: Props) {
+export function EntryExamCard({ context, status, roomId, onRoomChange, roomDisabled = false, ended = false }: Props) {
   const room = context.ambientes.find((item) => item.id_ambiente === roomId)
   const isAssistant = context.rol_controlador === 'AUXILIAR'
+  const isOpen = context.estado === 'EN_INGRESO' && !ended
 
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm" aria-label="Examen y progreso">
@@ -24,7 +26,7 @@ export function EntryExamCard({ context, status, roomId, onRoomChange, roomDisab
             <h2 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">{context.nombre_examen}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{[context.materia, context.grupos.length ? `Grupo ${context.grupos.join(', ')}` : null].filter(Boolean).join(' · ')}</p>
           </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${context.estado === 'EN_INGRESO' ? 'bg-ok-soft text-ok-fg' : 'bg-warn-soft text-warn-fg'}`}>{context.estado === 'EN_INGRESO' ? 'Ingreso abierto' : context.estado.replace(/_/g, ' ')}</span>
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${isOpen ? 'bg-ok-soft text-ok-fg' : 'bg-warn-soft text-warn-fg'}`}>{ended ? 'Ingreso terminado' : isOpen ? 'Ingreso abierto' : context.estado.replace(/_/g, ' ')}</span>
         </div>
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-brand-deep">
           <span className="flex items-center gap-1.5"><Clock3 className="size-4" aria-hidden="true" />{context.hora_inicio ?? '—'}–{context.hora_fin ?? '—'}</span>

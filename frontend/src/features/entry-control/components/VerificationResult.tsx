@@ -16,7 +16,7 @@ function verdictLabel(value: string): string {
   const labels: Record<string, string> = {
     AUTORIZADO: 'AUTORIZADO', NO_ENCONTRADO: 'NO AUTORIZADO',
     NO_PERTENECE: 'NO AUTORIZADO',
-    NO_HABILITADO: 'NO HABILITADO', DUPLICADO: 'INGRESO DUPLICADO',
+    NO_HABILITADO: 'NO HABILITADO', CI_NO_COINCIDE: 'CI NO COINCIDE', DUPLICADO: 'INGRESO DUPLICADO',
     AULA_INCORRECTA: 'AULA INCORRECTA', AULA_NO_ASIGNADA: 'AULA NO ASIGNADA',
   }
   return labels[value] ?? value.replace(/_/g, ' ')

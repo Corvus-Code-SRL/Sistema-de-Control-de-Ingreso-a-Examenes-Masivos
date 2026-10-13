@@ -172,17 +172,81 @@ class StudentVerificationTest extends TestCase
         $this->assertSame([], $queries);
     }
 
-    public function test_ci_diferente_no_bloquea_la_verificacion_por_sis(): void
+    public function test_ci_diferente_bloquea_la_verificacion_y_registra_el_intento(): void
     {
         $originalCi = $this->student->ci;
+        $before = $this->getJson($this->url('estado'))->assertOk()->json('data');
+
+        $this->postJson($this->url('verificar'), $this->input(['ci' => '999999999']))
+            ->assertOk()
+            ->assertJsonPath('data.veredicto', 'CI_NO_COINCIDE')
+            ->assertJsonPath('data.autorizado', false)
+            ->assertJsonPath('data.estudiante.ci', $originalCi);
+
+        $this->assertDatabaseHas('intento_ingreso', [
+            'id_examen' => $this->exam->id_examen,
+            'id_estudiante' => $this->student->id_estudiante,
+            'ci_presentado' => '999999999',
+            'motivo' => 'CI_NO_COINCIDE',
+        ]);
+        $this->assertSame('CREAR', DB::table('log')
+            ->join('accion', 'accion.id_accion', '=', 'log.id_accion')
+            ->where('log.tabla_afectada', 'intento_ingreso')
+            ->where('log.id_usuario', $this->docenteId)
+            ->value('accion.operacion'));
+        $this->assertSame($originalCi, $this->student->fresh()->ci);
+        $this->assertSame(0, DB::table('examen_estudiante')->count());
+        $after = $this->getJson($this->url('estado'))->assertOk()->json('data');
+        $this->assertSame($before['version'], $after['version']);
+        $this->assertSame($before['ingresados'], $after['ingresados']);
+        $this->assertSame($before['pendientes'], $after['pendientes']);
+    }
+
+    public function test_ci_coincidente_conserva_ceros_iniciales_y_autoriza(): void
+    {
+        $this->student->update(['ci' => '0012345']);
+        $this->rebuildSnapshot();
+
+        $this->postJson($this->url('verificar'), $this->input(['ci' => ' 0012345 ']))
+            ->assertOk()
+            ->assertJsonPath('data.veredicto', 'AUTORIZADO')
+            ->assertJsonPath('data.autorizado', true);
+
+        $this->assertSame(0, DB::table('intento_ingreso')->count());
+    }
+
+    public function test_ci_presentado_no_bloquea_si_la_ficha_no_tiene_ci(): void
+    {
+        $this->student->update(['ci' => null]);
+        $this->rebuildSnapshot();
 
         $this->postJson($this->url('verificar'), $this->input(['ci' => '999999999']))
             ->assertOk()
             ->assertJsonPath('data.veredicto', 'AUTORIZADO')
-            ->assertJsonPath('data.estudiante.ci', $originalCi);
+            ->assertJsonPath('data.estudiante.ci_pendiente', true);
 
-        $this->assertSame(0, DB::table('intento_ingreso')->count());
-        $this->assertSame($originalCi, $this->student->fresh()->ci);
+        $this->postJson($this->url('confirmar-ingreso'), [
+            'id_estudiante' => $this->student->id_estudiante,
+            'ci' => '999999999',
+            'id_ambiente' => $this->aulaId,
+        ])->assertCreated()->assertJsonPath('data.veredicto', 'INGRESO_REGISTRADO');
+    }
+
+    public function test_confirmacion_directa_rechaza_ci_diferente_sin_registrar_ingreso(): void
+    {
+        $before = $this->getJson($this->url('estado'))->assertOk()->json('data');
+
+        $this->postJson($this->url('confirmar-ingreso'), [
+            'id_estudiante' => $this->student->id_estudiante,
+            'ci' => '999999999',
+            'id_ambiente' => $this->aulaId,
+        ])->assertStatus(422)
+            ->assertJsonPath('veredicto', 'CI_NO_COINCIDE');
+
+        $this->assertSame(0, DB::table('examen_estudiante')->count());
+        $after = $this->getJson($this->url('estado'))->assertOk()->json('data');
+        $this->assertSame($before['version'], $after['version']);
+        $this->assertSame($before['ingresados'], $after['ingresados']);
     }
 
     public function test_solo_sis_permite_verificar_y_confirmar(): void

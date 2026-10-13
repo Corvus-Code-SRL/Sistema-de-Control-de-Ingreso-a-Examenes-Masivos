@@ -57,3 +57,17 @@ describe('VerificationResult fotografía', () => {
     expect(screen.getByText('AA')).toBeInTheDocument()
   })
 })
+
+describe('VerificationResult CI', () => {
+  it('muestra CI no coincide y no ofrece aceptar el ingreso', () => {
+    render(<VerificationResult
+      result={{ ...result, veredicto: 'CI_NO_COINCIDE', motivo: 'El CI presentado no coincide.', autorizado: false }}
+      busy={false} onConfirm={() => {}} onReject={() => {}} onNext={() => {}}
+    />)
+
+    expect(screen.getByRole('heading', { name: 'CI NO COINCIDE' })).toBeInTheDocument()
+    expect(screen.getByText('El CI presentado no coincide.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Aceptar ingreso' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Siguiente estudiante' })).toBeInTheDocument()
+  })
+})
