@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { mockApi } from '@/test/http'
@@ -30,6 +30,27 @@ function routes(verdict = allowed, examContext = context): Parameters<typeof moc
 }
 
 describe('EntryControlPage', () => {
+  it('muestra estudiante, ambiente, hora y controlador en los últimos ingresos', async () => {
+    const apiRoutes = routes()
+    apiRoutes[1].body = { data: {
+      ...status, ingresados: 1, pendientes: 0,
+      ultimos_ingresos: [{
+        id_estudiante: 19, cod_sis: '202309201', nombre: 'Carlos',
+        apellido_paterno: 'Rocha', apellido_materno: 'Mendoza',
+        hora_ingreso: '09:51:00', registrado_en: '2026-09-29T13:51:00Z',
+        nro_aula: '691A', controlador_nombre: 'Ana', controlador_apellido: 'López',
+      }],
+    } }
+    mockApi(apiRoutes)
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+
+    const room = await screen.findByText('Ambiente 691A')
+    const row = room.closest('li') as HTMLLIElement
+    expect(within(row).getByText('Carlos Rocha Mendoza')).toBeInTheDocument()
+    expect(within(row).getByText(/por Ana López/)).toBeInTheDocument()
+    expect(within(row).getByText('09:51')).toBeInTheDocument()
+  })
+
   it('verifica con el aula fija del auxiliar y confirma el ingreso', async () => {
     mockApi(routes())
     const user = userEvent.setup()
