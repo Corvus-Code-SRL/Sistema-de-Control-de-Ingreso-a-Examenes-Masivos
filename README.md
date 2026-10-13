@@ -257,7 +257,7 @@ Todo el equipo trabaja con los mismos registros: cada valor está escrito a mano
     SCIEM_USUARIO_PRUEBA=00000000-0000-4000-8000-000000000001
     ```
 
-    El periodo activo **ya no se configura por entorno**: el seeder deja activo el período `9303` (`2/2026`) en `gestion_periodo.activo`. Sin ningún período activo, los endpoints que lo necesitan responden 500 con un mensaje que lo indica (`GET /api/periodos` sigue funcionando, con `id_periodo_activo` en `null`). Cómo activar otro, y cómo migrar una base con datos: `docs/database/periodo-activo.md`.
+    El período vigente **ya no se configura por entorno**: el seeder deja vigente el período `9303` (`2/2026`) en `gestion_periodo.vigente`. Sin ningún período vigente, los endpoints que lo necesitan responden 500 con un mensaje que lo indica (`GET /api/periodos` sigue funcionando, con `id_periodo_activo` en `null`). Cómo fijar otro, la diferencia entre `estado` y `vigente`, y cómo migrar una base con datos: `docs/database/periodo-vigente.md`.
 
     > `SCIEM_DOCENTE_FIJO_ID` **ya no existe** (RNF-02): el usuario que actúa es el autenticado con su token. Un `.env` anterior que todavía la tenga no se rompe: la variable se ignora. `SCIEM_USUARIO_PRUEBA` queda solo para los seeders (`SystemActor`, ver `docs/architecture/usuario-actual.md`).
 
