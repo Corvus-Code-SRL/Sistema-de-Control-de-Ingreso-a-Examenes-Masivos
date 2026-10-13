@@ -1,11 +1,12 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { mockApi } from '@/test/http'
 import { renderWithRouter } from '@/test/render'
 import { EntryControlPage } from './EntryControlPage'
+import type { EntryContext } from '../types/entry-control.types'
 
-const context = {
+const context: EntryContext = {
   id_examen: 7, nombre_examen: 'Primer parcial', fecha: '2026-09-29',
   hora_inicio: '08:00', hora_fin: '10:00', estado: 'EN_INGRESO',
   materia: 'Bases de Datos I', carrera: 'Ing. de Sistemas', grupos: ['1'],
@@ -108,7 +109,6 @@ describe('EntryControlPage', () => {
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
 
     await screen.findByLabelText('Código SIS')
-    await user.click(screen.getByRole('button', { name: 'Buscar por nombre' }))
     await user.type(screen.getByLabelText('Buscar estudiante por nombre'), 'Carlos')
     await user.click(await screen.findByRole('button', { name: /Carlos Daniel Rocha Mendoza/ }))
     expect(screen.getByLabelText('Código SIS')).toHaveValue('202309201')
@@ -126,6 +126,28 @@ describe('EntryControlPage', () => {
     const rejectBody = JSON.parse((calls.find(([url]) => String(url).endsWith('/rechazar-ingreso'))?.[1] as RequestInit).body as string)
     expect(verifyBody).toEqual({ cod_sis: '202309201', ci: '9456781', id_ambiente: 5 })
     expect(rejectBody).toEqual({ id_estudiante: 19, ci: '9456781', id_ambiente: 5, motivo: 'IDENTIDAD_DUDOSA', observacion: 'Foto distinta' })
+  })
+
+  it('muestra que no hay coincidencias solo después de recibir la búsqueda', async () => {
+    mockApi([
+      ...routes(),
+      { matches: (url) => url.includes('/buscar'), body: { data: [] } },
+    ])
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+
+    const search = await screen.findByLabelText('Buscar estudiante por nombre')
+    fireEvent.change(search, { target: { value: 'José' } })
+    expect(screen.queryByText('No hay coincidencias en este examen.')).not.toBeInTheDocument()
+    expect(await screen.findByText('No hay coincidencias en este examen.')).toBeInTheDocument()
+  })
+
+  it('desactiva la búsqueda por nombre cuando no hay ambiente de control', async () => {
+    mockApi(routes(allowed, { ...context, id_ambiente_asignado: null, ambientes: [] }))
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+
+    expect(await screen.findByLabelText('Buscar estudiante por nombre')).toBeDisabled()
+    expect(screen.getByLabelText('Código SIS')).toBeDisabled()
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('/buscar'))).toBe(false)
   })
 
   it('permite al creador consultar un examen programado sin intentar verificar', async () => {
