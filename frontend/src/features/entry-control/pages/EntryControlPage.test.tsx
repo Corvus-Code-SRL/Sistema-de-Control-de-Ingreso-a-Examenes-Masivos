@@ -150,6 +150,32 @@ describe('EntryControlPage', () => {
     expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('/buscar'))).toBe(false)
   })
 
+  it('muestra que el control terminó y oculta la verificación cuando /estado devuelve 409', async () => {
+    const apiRoutes = routes()
+    mockApi(apiRoutes)
+    vi.useFakeTimers()
+    try {
+      await act(async () => {
+        renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+      })
+      expect(screen.getByLabelText('Código SIS')).toBeInTheDocument()
+
+      apiRoutes[1].status = 409
+      apiRoutes[1].body = { message: 'El control de ingreso ha terminado.' }
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+
+      expect(screen.getByText('El control de ingreso ha terminado.')).toBeInTheDocument()
+      expect(screen.getByText('Ingreso terminado')).toBeInTheDocument()
+      expect(screen.getByText('1 pendientes')).toBeInTheDocument()
+      expect(screen.queryByLabelText('Código SIS')).not.toBeInTheDocument()
+      const calls = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/estado')).length
+      await act(async () => { await vi.advanceTimersByTimeAsync(60000) })
+      expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/estado'))).toHaveLength(calls)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('permite al creador consultar un examen programado sin intentar verificar', async () => {
     mockApi(routes(allowed, { ...context, rol_controlador: 'DOCENTE', estado: 'PROGRAMADO' }))
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })

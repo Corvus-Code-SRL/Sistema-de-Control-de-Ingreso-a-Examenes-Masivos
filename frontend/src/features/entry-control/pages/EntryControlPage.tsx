@@ -19,7 +19,7 @@ export function EntryControlPage() {
 }
 
 function EntryControlContent({ examId }: { examId: number }) {
-  const { context, status, openingFailure, loading, error, statusError, refresh, reload } = useEntryStatus(examId)
+  const { context, status, openingFailure, loading, error, statusError, ended, refresh, reload } = useEntryStatus(examId)
   const [roomId, setRoomId] = useState<number | null>(null)
   const [rejectOpen, setRejectOpen] = useState(false)
   const verification = useStudentVerification(examId, roomId, () => { void refresh(true) })
@@ -29,7 +29,7 @@ function EntryControlContent({ examId }: { examId: number }) {
     setRoomId(context.id_ambiente_asignado ?? context.ambientes[0]?.id_ambiente ?? null)
   }, [context])
 
-  const open = context?.estado === 'EN_INGRESO'
+  const open = context?.estado === 'EN_INGRESO' && !ended
   const hasRoom = roomId !== null && context?.ambientes.some((room) => room.id_ambiente === roomId)
 
   return <AppShell mobileTitle="Control de ingreso" mobileSubtitle={context?.nombre_examen} breadcrumbs={[{ label: 'Control de ingreso', to: '/control-ingreso' }, { label: context?.nombre_examen ?? 'Examen' }]}>
@@ -42,8 +42,8 @@ function EntryControlContent({ examId }: { examId: number }) {
     {!loading && error && <div role="alert" className="rounded-xl border border-danger/30 bg-danger-soft p-5"><p className="font-medium text-danger-fg">No se pudo abrir el control de ingreso</p><p className="mt-1 text-sm">{error}</p><Button variant="outline" className="mt-4" onClick={() => void reload()}>Reintentar</Button></div>}
 
     {!loading && context && <>
-      <div className={verification.result ? 'hidden lg:block' : ''}><EntryExamCard context={context} status={status} roomId={roomId} roomDisabled={verification.busy !== null} onRoomChange={(id) => { setRoomId(id); verification.reset() }} /></div>
-      {!open && <div role="status" className="rounded-lg border border-warn-border bg-warn-soft p-4 text-sm text-warn-fg">{openingFailure?.mensaje ?? `El control de ingreso no está abierto. Estado del examen: ${context.estado.replace(/_/g, ' ')}.`}</div>}
+      <div className={verification.result && !ended ? 'hidden lg:block' : ''}><EntryExamCard context={context} status={status} roomId={roomId} roomDisabled={verification.busy !== null || ended} ended={ended} onRoomChange={(id) => { setRoomId(id); verification.reset() }} /></div>
+      {!open && <div role="status" className="rounded-lg border border-warn-border bg-warn-soft p-4 text-sm text-warn-fg">{ended ? 'El control de ingreso ha terminado.' : openingFailure?.mensaje ?? `El control de ingreso no está abierto. Estado del examen: ${context.estado.replace(/_/g, ' ')}.`}</div>}
       {!hasRoom && !openingFailure && <div role="alert" className="rounded-lg border border-danger/30 bg-danger-soft p-4 text-sm text-danger-fg">No hay un ambiente de control asignado. Solicite al docente que asigne uno.</div>}
       {statusError && <div role="alert" className="rounded-lg border border-warn-border bg-warn-soft p-3 text-sm text-warn-fg">{open ? 'No se pudo actualizar el contador' : 'No se pudo actualizar el estado del control'}: {statusError}</div>}
       {verification.notice && <div role="status" className="flex items-center justify-between gap-2 rounded-lg border border-ok/30 bg-ok-soft p-3 text-sm font-medium text-ok-fg"><span>{verification.notice}</span><button type="button" onClick={() => verification.setNotice(null)} aria-label="Cerrar aviso" className="px-2">×</button></div>}

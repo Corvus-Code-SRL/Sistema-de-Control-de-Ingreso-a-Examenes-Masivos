@@ -3,6 +3,10 @@ import { ApiError } from '@/lib/api-client'
 import { entryControlService, isFullStatus, isPendingStatus } from '../services/entryControlService'
 import type { EntryContext, EntryOpeningFailure, EntryStatus } from '../types/entry-control.types'
 
+const NORMAL_POLL_MS = 2000
+const FIRST_RETRY_MS = 3000
+const MAX_RETRY_MS = 30000
+
 function message(error: unknown): string {
   if (error instanceof ApiError && error.status >= 500) {
     return 'El servidor no pudo responder. Intente nuevamente.'
@@ -17,11 +21,15 @@ export function useEntryStatus(examId: number) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [statusError, setStatusError] = useState<string | null>(null)
+  const [pollDelay, setPollDelay] = useState(NORMAL_POLL_MS)
+  const [ended, setEnded] = useState(false)
   const version = useRef<string | undefined>(undefined)
   const inFlight = useRef(false)
+  const networkFailures = useRef(0)
+  const endedRef = useRef(false)
 
   const refresh = useCallback(async (force = false) => {
-    if (inFlight.current) return
+    if (inFlight.current || endedRef.current) return
     inFlight.current = true
     try {
       const next = await entryControlService.status(examId, force ? undefined : version.current)
@@ -34,8 +42,23 @@ export function useEntryStatus(examId: number) {
         if (isFullStatus(next)) setStatus(next)
         setOpeningFailure(null)
       }
+      networkFailures.current = 0
+      setPollDelay(NORMAL_POLL_MS)
       setStatusError(null)
     } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 409) {
+        endedRef.current = true
+        setEnded(true)
+        setStatusError(null)
+        return
+      }
+      if (cause instanceof ApiError && cause.isNetworkFailure) {
+        networkFailures.current += 1
+        setPollDelay(Math.min(FIRST_RETRY_MS * 2 ** (networkFailures.current - 1), MAX_RETRY_MS))
+      } else {
+        networkFailures.current = 0
+        setPollDelay(NORMAL_POLL_MS)
+      }
       setStatusError(message(cause))
     } finally {
       inFlight.current = false
@@ -43,6 +66,10 @@ export function useEntryStatus(examId: number) {
   }, [examId])
 
   const load = useCallback(async () => {
+    endedRef.current = false
+    networkFailures.current = 0
+    setEnded(false)
+    setPollDelay(NORMAL_POLL_MS)
     setLoading(true)
     setError(null)
     setStatusError(null)
@@ -72,15 +99,21 @@ export function useEntryStatus(examId: number) {
   }, [load])
 
   useEffect(() => {
-    if (!context || context.estado !== 'EN_INGRESO') return
-    const timer = window.setInterval(() => {
-      if (!document.hidden) void refresh()
-    }, 2000)
-    return () => window.clearInterval(timer)
-  }, [context, refresh])
+    if (context?.estado !== 'EN_INGRESO' || ended) return
+
+    let active = true
+    let timer: number
+    const poll = async () => {
+      if (!document.hidden) await refresh()
+      if (active && !endedRef.current) timer = window.setTimeout(poll, pollDelay)
+    }
+    timer = window.setTimeout(poll, pollDelay)
+
+    return () => { active = false; window.clearTimeout(timer) }
+  }, [context?.estado, ended, pollDelay, refresh])
 
   useEffect(() => {
-    if (context?.estado !== 'PROGRAMADO') return
+    if (context?.estado !== 'PROGRAMADO' || ended) return
 
     let active = true
     let checking = false
@@ -103,7 +136,7 @@ export function useEntryStatus(examId: number) {
     }, 15000)
 
     return () => { active = false; window.clearInterval(timer) }
-  }, [context?.estado, examId, refresh])
+  }, [context?.estado, ended, examId, refresh])
 
-  return { context, status, openingFailure, loading, error, statusError, refresh, reload: load }
+  return { context, status, openingFailure, loading, error, statusError, ended, refresh, reload: load }
 }
