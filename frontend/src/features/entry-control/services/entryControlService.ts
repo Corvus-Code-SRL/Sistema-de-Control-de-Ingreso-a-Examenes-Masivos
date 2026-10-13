@@ -1,6 +1,6 @@
 import { apiClient, apiPost } from '@/lib/api-client'
 import type {
-  EntryActionInput, EntryContext, EntryStatus, OpenEntryExam, RejectionReason, StatusResponse,
+  EntryActionInput, EntryContext, EntryStatus, OpenEntryExam, PendingEntryStatus, RejectionReason, StatusResponse,
   StudentMatch, Verification, VerificationInput,
 } from '../types/entry-control.types'
 
@@ -49,5 +49,9 @@ export const entryControlService = {
 }
 
 export function isFullStatus(value: StatusResponse): value is EntryStatus {
-  return !('sin_cambios' in value)
+  return 'ingresados' in value
+}
+
+export function isPendingStatus(value: StatusResponse): value is PendingEntryStatus {
+  return 'estado' in value && value.estado === 'PROGRAMADO'
 }
