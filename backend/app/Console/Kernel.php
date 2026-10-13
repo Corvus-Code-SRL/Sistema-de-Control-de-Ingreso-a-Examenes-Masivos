@@ -4,7 +4,6 @@ namespace App\Console;
 
 use App\Jobs\FinalizeExpiredExamsJob;
 use App\Jobs\OpenEntryControlJob;
-use App\Services\EntryControl\RoomAssignmentService;
 use App\Services\Exams\ExamLifecycleService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
@@ -21,7 +20,7 @@ class Kernel extends ConsoleKernel
     {
         // La apertura corre cada minuto sin depender de un trabajador de cola.
         $schedule->call(function (): void {
-            app(OpenEntryControlJob::class)->handle(app(RoomAssignmentService::class));
+            app()->call([app(OpenEntryControlJob::class), 'handle']);
         })->name('open-entry-control')->everyMinute()->withoutOverlapping(2);
 
         $schedule->call(function (): void {
