@@ -79,8 +79,14 @@ export function IdentifierSuggestions({ examId, field, query, disabled, onSelect
                   onSelect(student)
                 }}
               >
-                <span className="text-sm font-medium">{student.nombre_completo}</span>
-                <span className="sciem-tnum text-xs text-muted-foreground">{student.cod_sis}</span>
+                {field === 'ci' ? (
+                  <span className="sciem-tnum text-sm font-medium">{student.ci ?? query}</span>
+                ) : (
+                  <>
+                    <span className="text-sm font-medium">{student.nombre_completo}</span>
+                    <span className="sciem-tnum text-xs text-muted-foreground">{student.cod_sis}</span>
+                  </>
+                )}
               </button>
             </li>
           ))}

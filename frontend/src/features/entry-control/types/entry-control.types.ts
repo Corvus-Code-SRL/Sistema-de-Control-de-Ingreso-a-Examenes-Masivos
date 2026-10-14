@@ -22,6 +22,7 @@ export interface StudentMatch {
   id_estudiante: number
   cod_sis: string
   nombre_completo: string
+  ci?: string | null
 }
 
 export interface EntryStudent extends StudentMatch {

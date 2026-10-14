@@ -128,17 +128,19 @@ describe('EntryControlPage', () => {
     fireEvent.change(sis, { target: { value: '202' } })
     expect(screen.getByRole('button', { name: 'Verificar estudiante' })).toBeDisabled()
     const suggestion = await screen.findByRole('button', { name: /Carlos Daniel Rocha Mendoza/ })
+    expect(suggestion).toHaveTextContent('202309201')
     fireEvent.click(suggestion)
     expect(sis).toHaveValue('202309201')
     expect(screen.queryByRole('list', { name: 'Sugerencias por código SIS' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Verificar estudiante' })).toBeEnabled()
   })
 
-  it('sugiere por CI sin revelar ni completar el CI registrado', async () => {
+  it('sugiere solo números de CI sin cambiar las sugerencias SIS ni autocompletar el CI', async () => {
     mockApi([
       ...routes(),
       { matches: (url) => url.includes('/buscar?ci=9456'), body: { data: [{
-        id_estudiante: 19, cod_sis: '202309201', nombre_completo: 'Carlos Daniel Rocha Mendoza',
+        id_estudiante: 19, cod_sis: '202309201', ci: '9456781',
+        nombre_completo: 'Carlos Daniel Rocha Mendoza',
       }] } },
     ])
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
@@ -146,8 +148,9 @@ describe('EntryControlPage', () => {
     const sis = await screen.findByLabelText('Código SIS')
     const ci = screen.getByLabelText('Carnet de identidad (opcional)')
     fireEvent.change(ci, { target: { value: '9456' } })
-    const suggestion = await screen.findByRole('button', { name: /Carlos Daniel Rocha Mendoza/ })
-    expect(suggestion).not.toHaveTextContent('9456781')
+    const suggestion = await screen.findByRole('button', { name: '9456781' })
+    expect(suggestion).not.toHaveTextContent('Carlos Daniel Rocha Mendoza')
+    expect(suggestion).not.toHaveTextContent('202309201')
     fireEvent.click(suggestion)
     expect(sis).toHaveValue('202309201')
     expect(ci).toHaveValue('9456')
