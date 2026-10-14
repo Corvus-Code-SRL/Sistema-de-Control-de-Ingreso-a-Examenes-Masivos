@@ -115,6 +115,49 @@ describe('EntryControlPage', () => {
     expect(verifyBody.cod_sis).toBe('202150001')
   })
 
+  it('sugiere estudiantes mientras se escribe el SIS y permite seleccionarlos', async () => {
+    mockApi([
+      ...routes(),
+      { matches: (url) => url.includes('/buscar?sis=202'), body: { data: [{
+        id_estudiante: 19, cod_sis: '202309201', nombre_completo: 'Carlos Daniel Rocha Mendoza',
+      }] } },
+    ])
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+
+    const sis = await screen.findByLabelText('Código SIS')
+    fireEvent.change(sis, { target: { value: '202' } })
+    expect(screen.getByRole('button', { name: 'Verificar estudiante' })).toBeDisabled()
+    const suggestion = await screen.findByRole('button', { name: /Carlos Daniel Rocha Mendoza/ })
+    fireEvent.click(suggestion)
+    expect(sis).toHaveValue('202309201')
+    expect(screen.queryByRole('list', { name: 'Sugerencias por código SIS' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Verificar estudiante' })).toBeEnabled()
+  })
+
+  it('sugiere por CI sin revelar ni completar el CI registrado', async () => {
+    mockApi([
+      ...routes(),
+      { matches: (url) => url.includes('/buscar?ci=9456'), body: { data: [{
+        id_estudiante: 19, cod_sis: '202309201', nombre_completo: 'Carlos Daniel Rocha Mendoza',
+      }] } },
+    ])
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+
+    const sis = await screen.findByLabelText('Código SIS')
+    const ci = screen.getByLabelText('Carnet de identidad (opcional)')
+    fireEvent.change(ci, { target: { value: '9456' } })
+    const suggestion = await screen.findByRole('button', { name: /Carlos Daniel Rocha Mendoza/ })
+    expect(suggestion).not.toHaveTextContent('9456781')
+    fireEvent.click(suggestion)
+    expect(sis).toHaveValue('202309201')
+    expect(ci).toHaveValue('9456')
+    expect(screen.queryByRole('list', { name: 'Sugerencias por CI' })).not.toBeInTheDocument()
+
+    fireEvent.change(ci, { target: { value: '945' } })
+    fireEvent.change(ci, { target: { value: '9456' } })
+    expect(await screen.findByRole('list', { name: 'Sugerencias por CI' })).toBeInTheDocument()
+  })
+
   it('verifica y confirma usando solo el código SIS', async () => {
     mockApi(routes({
       ...allowed,

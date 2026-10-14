@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { StudentSearch } from './StudentSearch'
+import { IdentifierSuggestions } from './IdentifierSuggestions'
 import type { StudentMatch } from '../types/entry-control.types'
 import { CI_MAX_LENGTH, hasInvalidSisMonth, isValidSis, SIS_LENGTH } from '../utils/identificationValidation'
 
@@ -28,7 +29,7 @@ export function IdentificationForm(props: Props) {
     <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6" aria-labelledby="verify-heading">
       <div className="mb-5">
         <h2 id="verify-heading" className="sciem-h2">Verificar estudiante</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Ingrese el código SIS o busque al estudiante por nombre.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Ingrese el código SIS, busque por CI o encuentre al estudiante por nombre.</p>
       </div>
       <form onSubmit={submit} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
@@ -36,11 +37,13 @@ export function IdentificationForm(props: Props) {
             <Label htmlFor="entry-sis">Código SIS</Label>
             <Input id="entry-sis" inputMode="numeric" autoComplete="off" value={props.sis} onChange={(event) => props.onSisChange(event.target.value)} placeholder="AAAAMMNNN" className="h-12 sciem-tnum text-base" maxLength={SIS_LENGTH} aria-describedby={invalidMonth ? 'entry-sis-hint entry-sis-month' : 'entry-sis-hint'} disabled={props.disabled} required />
             
-            
+            {invalidMonth && <p id="entry-sis-month" role="status" className="text-xs text-warn-fg">El mes del código SIS no está entre 01 y 12. Puede continuar con la verificación.</p>}
+            <IdentifierSuggestions examId={props.examId} field="sis" query={props.sis} disabled={props.disabled} onSelect={select} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="entry-ci">Carnet de identidad (opcional)</Label>
             <Input id="entry-ci" inputMode="numeric" autoComplete="off" value={props.ci} onChange={(event) => props.onCiChange(event.target.value)} placeholder="Si está disponible" className="h-12 sciem-tnum text-base" maxLength={CI_MAX_LENGTH} disabled={props.disabled} />
+            <IdentifierSuggestions examId={props.examId} field="ci" query={props.ci} disabled={props.disabled} onSelect={select} />
           </div>
         </div>
         <div className="border-t border-border pt-4">

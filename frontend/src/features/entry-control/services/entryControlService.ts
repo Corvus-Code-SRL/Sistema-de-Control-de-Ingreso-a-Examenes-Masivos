@@ -32,6 +32,18 @@ export const entryControlService = {
     return response.data
   },
 
+  async searchByIdentifier(
+    examId: number,
+    field: 'sis' | 'ci',
+    prefix: string,
+    signal?: AbortSignal
+  ): Promise<StudentMatch[]> {
+    const response = await apiClient<DataResponse<StudentMatch[]>>(`${base(examId)}/buscar`, {
+      query: { [field]: prefix }, signal,
+    })
+    return response.data
+  },
+
   async verify(examId: number, input: VerificationInput): Promise<Verification> {
     const response = await apiPost<DataResponse<Verification>>(`${base(examId)}/verificar`, input)
     return response.data
