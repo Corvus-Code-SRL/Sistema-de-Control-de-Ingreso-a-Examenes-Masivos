@@ -46,7 +46,6 @@ export function StudentSearch({ examId, onSelect, disabled }: Props) {
   return (
     <div className="space-y-2">
       <label htmlFor="student-name" className="block text-sm font-medium">Buscar estudiante por nombre</label>
-      <p id="student-search-hint" className="text-xs text-muted-foreground">Si no conoce el SIS, busque por nombre o apellido y seleccione al estudiante.</p>
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" aria-hidden="true" />
         <Input id="student-name" value={query} onChange={(event) => { setQuery(event.target.value); setSearchedQuery(null); setMatches([]); setError(null) }} placeholder="Escriba al menos 2 caracteres" className="h-11 pl-9" autoComplete="off" aria-describedby="student-search-hint" disabled={disabled} />
