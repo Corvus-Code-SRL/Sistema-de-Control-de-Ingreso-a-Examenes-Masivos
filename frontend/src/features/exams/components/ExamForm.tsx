@@ -26,14 +26,14 @@ export const ExamForm: React.FC<Props> = ({
   updateFormData,
 }) => {
   return (
-    <div className="bg-white rounded-xl border border-[#DDDDDD] p-8 shadow-xs space-y-6">
-      <h2 className="text-base font-bold text-[#2C2C2C]">
+    <div className="bg-card rounded-xl border border-border p-8 shadow-xs space-y-6">
+      <h2 className="text-base font-bold text-foreground">
         Información general del examen
       </h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
         <div className="space-y-1.5">
-          <label htmlFor="nombre_examen" className="block text-xs font-bold text-[#2C2C2C]">
+          <label htmlFor="nombre_examen" className="block text-xs font-bold text-foreground">
             Nombre del examen *
           </label>
           <input
@@ -42,16 +42,16 @@ export const ExamForm: React.FC<Props> = ({
             placeholder="Ej. Primer Parcial"
             value={formData.nombre_examen}
             onChange={(e) => updateFormData({ nombre_examen: e.target.value })}
-            className={`w-full px-3.5 py-2.5 bg-white border ${errors.nombre_examen ? 'border-red-500' : 'border-[#DDDDDD]'
-              } rounded-lg text-xs outline-none focus:border-[#005E68] text-[#2C2C2C] placeholder:text-[#999999] transition-colors`}
+            className={`w-full px-3.5 py-2.5 bg-card border ${errors.nombre_examen ? 'border-danger' : 'border-border'
+              } rounded-lg text-xs outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors`}
           />
           {errors.nombre_examen && (
-            <p className="text-[11px] text-red-600 font-medium">{errors.nombre_examen}</p>
+            <p className="text-[11px] text-danger font-medium">{errors.nombre_examen}</p>
           )}
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="categoria" className="block text-xs font-bold text-[#2C2C2C]">
+          <label htmlFor="categoria" className="block text-xs font-bold text-foreground">
             Categoría *
           </label>
           <FormSelect
@@ -70,7 +70,7 @@ export const ExamForm: React.FC<Props> = ({
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="fecha" className="block text-xs font-bold text-[#2C2C2C]">
+          <label htmlFor="fecha" className="block text-xs font-bold text-foreground">
             Fecha *
           </label>
           <div className="relative">
@@ -80,18 +80,18 @@ export const ExamForm: React.FC<Props> = ({
               min={localToday()}
               value={formData.fecha}
               onChange={(e) => updateFormData({ fecha: e.target.value })}
-              className={`w-full px-3.5 py-2.5 bg-white border ${errors.fecha ? 'border-red-500' : 'border-[#DDDDDD]'
-                } rounded-lg text-xs outline-none focus:border-[#005E68] text-[#2C2C2C] transition-colors`}
+              className={`w-full px-3.5 py-2.5 bg-card border ${errors.fecha ? 'border-danger' : 'border-border'
+                } rounded-lg text-xs outline-none focus:border-primary text-foreground transition-colors`}
             />
-            <CalendarIcon className="h-4 w-4 text-[#6C757D] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <CalendarIcon className="h-4 w-4 text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
           {errors.fecha && (
-            <p className="text-[11px] text-red-600 font-medium">{errors.fecha}</p>
+            <p className="text-[11px] text-danger font-medium">{errors.fecha}</p>
           )}
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="materia" className="block text-xs font-bold text-[#2C2C2C]">
+          <label htmlFor="materia" className="block text-xs font-bold text-foreground">
             Materia *
           </label>
           <FormSelect
@@ -113,12 +113,12 @@ export const ExamForm: React.FC<Props> = ({
             }}
           />
           {errors.materia && (
-            <p className="text-[11px] text-red-600 font-medium">{errors.materia}</p>
+            <p className="text-[11px] text-danger font-medium">{errors.materia}</p>
           )}
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="duracion" className="block text-xs font-bold text-[#2C2C2C]">
+          <label htmlFor="duracion" className="block text-xs font-bold text-foreground">
             Duración (min) *
           </label>
           <input
@@ -133,16 +133,16 @@ export const ExamForm: React.FC<Props> = ({
               const val = e.target.value;
               updateFormData({ duracion: val === '' ? 0 : parseInt(val, 10) || 0 });
             }}
-            className={`w-full px-3.5 py-2.5 bg-white border ${errors.duracion ? 'border-red-500' : 'border-[#DDDDDD]'
-              } rounded-lg text-xs outline-none focus:border-[#005E68] text-[#2C2C2C] placeholder:text-[#999999] transition-colors`}
+            className={`w-full px-3.5 py-2.5 bg-card border ${errors.duracion ? 'border-danger' : 'border-border'
+              } rounded-lg text-xs outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors`}
           />
           {errors.duracion && (
-            <p className="text-[11px] text-red-600 font-medium">{errors.duracion}</p>
+            <p className="text-[11px] text-danger font-medium">{errors.duracion}</p>
           )}
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="hora_inicio" className="block text-xs font-bold text-[#2C2C2C]">
+          <label htmlFor="hora_inicio" className="block text-xs font-bold text-foreground">
             Hora *
           </label>
           <div className="relative">
@@ -151,13 +151,13 @@ export const ExamForm: React.FC<Props> = ({
               type="time"
               value={formData.hora_inicio}
               onChange={(e) => updateFormData({ hora_inicio: e.target.value })}
-              className={`w-full px-3.5 py-2.5 bg-white border ${errors.hora_inicio ? 'border-red-500' : 'border-[#DDDDDD]'
-                } rounded-lg text-xs outline-none focus:border-[#005E68] text-[#2C2C2C] transition-colors`}
+              className={`w-full px-3.5 py-2.5 bg-card border ${errors.hora_inicio ? 'border-danger' : 'border-border'
+                } rounded-lg text-xs outline-none focus:border-primary text-foreground transition-colors`}
             />
-            <ClockIcon className="h-4 w-4 text-[#6C757D] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ClockIcon className="h-4 w-4 text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
           {errors.hora_inicio && (
-            <p className="text-[11px] text-red-600 font-medium">{errors.hora_inicio}</p>
+            <p className="text-[11px] text-danger font-medium">{errors.hora_inicio}</p>
           )}
         </div>
 
