@@ -161,6 +161,34 @@ describe('EntryControlPage', () => {
     expect(await screen.findByRole('list', { name: 'Sugerencias por CI' })).toBeInTheDocument()
   })
 
+  it('muestra como máximo cinco sugerencias por SIS, CI y nombre', async () => {
+    const matches = Array.from({ length: 7 }, (_, index) => ({
+      id_estudiante: index + 1,
+      cod_sis: `20230920${index}`,
+      ci: `945678${index}`,
+      nombre_completo: `Estudiante ${index}`,
+    }))
+    mockApi([
+      ...routes(),
+      { matches: (url) => url.includes('/buscar?sis=202'), body: { data: matches } },
+      { matches: (url) => url.includes('/buscar?ci=9456'), body: { data: matches } },
+      { matches: (url) => url.includes('/buscar?nombre=Estudiante'), body: { data: matches } },
+    ])
+    renderWithRouter(<EntryControlPage />, {
+      route: '/examenes/7/control-ingreso',
+      path: '/examenes/:examId/control-ingreso',
+    })
+
+    fireEvent.change(await screen.findByLabelText('Código SIS'), { target: { value: '202' } })
+    expect(within(await screen.findByRole('list', { name: 'Sugerencias por código SIS' })).getAllByRole('listitem')).toHaveLength(5)
+
+    fireEvent.change(screen.getByLabelText('Carnet de identidad (opcional)'), { target: { value: '9456' } })
+    expect(within(await screen.findByRole('list', { name: 'Sugerencias por CI' })).getAllByRole('listitem')).toHaveLength(5)
+
+    fireEvent.change(screen.getByLabelText('Buscar estudiante por nombre'), { target: { value: 'Estudiante' } })
+    expect(within(await screen.findByRole('list', { name: 'Coincidencias de estudiantes' })).getAllByRole('listitem')).toHaveLength(5)
+  })
+
   it('verifica y confirma usando solo el código SIS', async () => {
     mockApi(routes({
       ...allowed,

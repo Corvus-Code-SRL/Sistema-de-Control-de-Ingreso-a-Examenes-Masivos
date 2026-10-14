@@ -68,7 +68,7 @@ export function IdentifierSuggestions({ examId, field, query, disabled, onSelect
       )}
       {searchedQuery === query && matches.length > 0 && (
         <ul aria-label={`Sugerencias por ${label}`} className="max-h-52 divide-y overflow-y-auto rounded-md border border-border bg-card shadow-sm">
-          {matches.map((student) => (
+          {matches.slice(0, 5).map((student) => (
             <li key={student.id_estudiante}>
               <button
                 type="button"
