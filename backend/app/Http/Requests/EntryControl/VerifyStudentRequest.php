@@ -14,10 +14,18 @@ class VerifyStudentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'cod_sis' => ['required', 'string', 'max:15'],
+            'cod_sis' => ['required', 'string', 'regex:/^[0-9]{9}$/'],
             'id_estudiante' => ['prohibited'],
-            'ci' => ['nullable', 'string', 'min:1', 'max:10'],
+            'ci' => ['nullable', 'string', 'regex:/^[0-9]{1,10}$/'],
             'id_ambiente' => ['required', 'integer', 'min:1', 'max:2147483647'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'cod_sis.regex' => 'El código SIS debe tener exactamente 9 dígitos.',
+            'ci.regex' => 'El CI solo puede contener hasta 10 dígitos.',
         ];
     }
 }
