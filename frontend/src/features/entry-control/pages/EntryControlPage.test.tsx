@@ -74,6 +74,47 @@ describe('EntryControlPage', () => {
     await waitFor(() => expect(calls.some(([url]) => String(url).endsWith('/confirmar-ingreso'))).toBe(true))
   })
 
+  it('filtra letras de SIS y CI al pegar y conserva los ceros iniciales del CI', async () => {
+    mockApi(routes())
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+
+    const sis = await screen.findByLabelText('Código SIS')
+    const ci = screen.getByLabelText('Carnet de identidad (opcional)')
+    const verify = screen.getByRole('button', { name: 'Verificar estudiante' })
+
+    fireEvent.change(sis, { target: { value: '19a9912543x' } })
+    fireEvent.change(ci, { target: { value: 'ab00123x' } })
+    expect(sis).toHaveValue('199912543')
+    expect(ci).toHaveValue('00123')
+    expect(verify).toBeEnabled()
+    fireEvent.click(verify)
+
+    expect(await screen.findByText('AUTORIZADO')).toBeInTheDocument()
+    const calls = vi.mocked(fetch).mock.calls
+    const verifyBody = JSON.parse((calls.find(([url]) => String(url).endsWith('/verificar'))?.[1] as RequestInit).body as string)
+    expect(verifyBody).toEqual({ cod_sis: '199912543', ci: '00123', id_ambiente: 5 })
+  })
+
+  it('advierte sobre el mes inválido sin impedir la verificación', async () => {
+    mockApi(routes())
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+
+    const sis = await screen.findByLabelText('Código SIS')
+    const verify = screen.getByRole('button', { name: 'Verificar estudiante' })
+    fireEvent.change(sis, { target: { value: '2021' } })
+    expect(verify).toBeDisabled()
+
+    fireEvent.change(sis, { target: { value: '202150001' } })
+    expect(screen.getByText(/El mes del código SIS no está entre 01 y 12/)).toBeInTheDocument()
+    expect(verify).toBeEnabled()
+    fireEvent.click(verify)
+    expect(await screen.findByText('AUTORIZADO')).toBeInTheDocument()
+
+    const calls = vi.mocked(fetch).mock.calls
+    const verifyBody = JSON.parse((calls.find(([url]) => String(url).endsWith('/verificar'))?.[1] as RequestInit).body as string)
+    expect(verifyBody.cod_sis).toBe('202150001')
+  })
+
   it('verifica y confirma usando solo el código SIS', async () => {
     mockApi(routes({
       ...allowed,
