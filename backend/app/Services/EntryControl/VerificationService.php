@@ -28,7 +28,7 @@ class VerificationService
             'estudiante' => null,
             'grupo' => null,
             'ambiente_asignado' => null,
-            'antecedentes' => ['tiene_antecedentes' => false, 'cantidad' => 0, 'resumen' => null],
+            'antecedentes' => ['tiene_antecedentes' => false, 'cantidad' => 0, 'resumen' => null, 'detalles' => []],
             'ingreso_previo' => null,
         ];
 
@@ -44,6 +44,14 @@ class VerificationService
         $result['antecedentes'] = $record['antecedentes'];
         $result['ingreso_previo'] = $record['ingreso_previo'];
 
+        if ($record['grupo'] === null) {
+            return $this->deny($result, 'NO_PERTENECE', 'No figura en los grupos de este examen.');
+        }
+
+        if ($record['estado_habilitacion'] === 'NO_HABILITADO') {
+            return $this->deny($result, 'NO_HABILITADO', 'El estudiante no está habilitado para este examen.');
+        }
+
         $presentedCi = trim((string) ($input['ci'] ?? ''));
         $registeredCi = trim((string) ($record['estudiante']['ci'] ?? ''));
         if ($presentedCi !== '' && $registeredCi !== '' && $presentedCi !== $registeredCi) {
@@ -52,14 +60,6 @@ class VerificationService
                 'CI_NO_COINCIDE',
                 'El CI presentado no coincide con el registrado para este estudiante.'
             );
-        }
-
-        if ($record['grupo'] === null) {
-            return $this->deny($result, 'NO_PERTENECE', 'No figura en los grupos de este examen.');
-        }
-
-        if ($record['estado_habilitacion'] === 'NO_HABILITADO') {
-            return $this->deny($result, 'NO_HABILITADO', 'El estudiante no está habilitado para este examen.');
         }
 
         if ($record['ingreso_previo'] !== null) {

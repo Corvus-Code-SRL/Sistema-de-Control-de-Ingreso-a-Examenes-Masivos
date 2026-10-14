@@ -40,6 +40,13 @@ class IdentificationService
 
         return Student::query()
             ->where($column, 'like', $prefix . '%')
+            ->whereExists(function ($query) use ($examId): void {
+                $query->selectRaw('1')
+                    ->from('grupo_estudiante as gs')
+                    ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
+                    ->whereColumn('gs.id_estudiante', 'estudiante.id_estudiante')
+                    ->where('gx.id_examen', $examId);
+            })
             ->orderBy($column)
             ->limit(10)
             ->get(['id_estudiante', 'cod_sis', 'nombre', 'apellido_paterno', 'apellido_materno'])

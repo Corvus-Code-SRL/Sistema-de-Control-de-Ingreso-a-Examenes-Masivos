@@ -68,7 +68,7 @@ class EntryControlSnapshotService
 
         $assignedRooms = $this->assignRooms(array_keys($membersByStudent), $rooms);
         $entries = $this->entries($examId);
-        $risks = $this->risks(array_keys($membersByStudent));
+        $risks = $this->risks();
         $career = DB::table('carrera')->where('id_carrera', $exam->id_carrera)->value('nombre');
 
         $controllers = [
@@ -490,30 +490,29 @@ class EntryControlSnapshotService
             })->all();
     }
 
-    private function risks(array $studentIds): array
+    private function risks(): array
     {
-        if ($studentIds === []) {
-            return [];
-        }
-
         $rows = DB::table('central_riesgo as cr')
             ->join('reporte_estudiante as re', 're.id_reporte_est', '=', 'cr.id_reporte_est')
             ->join('tipo_falta as tf', 'tf.id_falta', '=', 're.id_tipo_falta')
-            ->whereIn('cr.id_estudiante', $studentIds)
             ->orderBy('cr.id_estudiante')
             ->orderByDesc('cr.fecha_registro')
-            ->get(['cr.id_estudiante', 'tf.nombre']);
+            ->get(['cr.id_estudiante', 'tf.nombre', 'cr.fecha_registro']);
 
         $grouped = [];
         foreach ($rows as $row) {
-            $grouped[(int) $row->id_estudiante][] = $row->nombre;
+            $grouped[(int) $row->id_estudiante][] = [
+                'tipo' => $row->nombre,
+                'fecha' => substr((string) $row->fecha_registro, 0, 10),
+            ];
         }
 
-        return collect($grouped)->map(function (array $names): array {
+        return collect($grouped)->map(function (array $details): array {
             return [
                 'tiene_antecedentes' => true,
-                'cantidad' => count($names),
-                'resumen' => collect(array_slice($names, 0, 3))->unique()->implode(', '),
+                'cantidad' => count($details),
+                'resumen' => collect(array_slice($details, 0, 3))->pluck('tipo')->unique()->implode(', '),
+                'detalles' => array_slice($details, 0, 3),
             ];
         })->all();
     }
@@ -543,7 +542,7 @@ class EntryControlSnapshotService
 
     private function emptyRisk(): array
     {
-        return ['tiene_antecedentes' => false, 'cantidad' => 0, 'resumen' => null];
+        return ['tiene_antecedentes' => false, 'cantidad' => 0, 'resumen' => null, 'detalles' => []];
     }
 
     private function expirationFor(Exam $exam): Carbon
