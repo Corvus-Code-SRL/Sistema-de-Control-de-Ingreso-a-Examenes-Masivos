@@ -111,6 +111,64 @@ class StudentVerificationTest extends TestCase
             ->assertJsonCount(0, 'data');
     }
 
+    public function test_busca_por_prefijo_sis_y_ci_sin_revelar_el_ci_registrado(): void
+    {
+        $outsideId = DB::table('estudiante')->insertGetId([
+            'cod_sis' => '199912543',
+            'ci' => '0012345',
+            'nombre' => 'María',
+            'apellido_paterno' => 'Fuera',
+            'apellido_materno' => 'Nómina',
+            'estado' => 'ACTIVO',
+        ], 'id_estudiante');
+        $this->rebuildSnapshot();
+
+        foreach (['sis' => '1999', 'ci' => '0012'] as $field => $prefix) {
+            $matches = $this->getJson($this->url('buscar') . '?' . http_build_query([$field => $prefix]))
+                ->assertOk()
+                ->assertJsonCount(1, 'data')
+                ->assertJsonPath('data.0.id_estudiante', $outsideId)
+                ->assertJsonPath('data.0.cod_sis', '199912543')
+                ->assertJsonPath('data.0.nombre_completo', 'María Fuera Nómina')
+                ->json('data.0');
+
+            $this->assertArrayNotHasKey('ci', $matches);
+        }
+
+        $this->postJson($this->url('verificar'), $this->input(['cod_sis' => '199912543', 'ci' => '0012345']))
+            ->assertOk()
+            ->assertJsonPath('data.veredicto', 'NO_PERTENECE');
+    }
+
+    public function test_busqueda_por_identificador_exige_un_solo_prefijo_numerico(): void
+    {
+        foreach ([
+            ['sis' => '12'],
+            ['sis' => '123x'],
+            ['ci' => '123'],
+            ['ci' => '123a'],
+            ['sis' => '123', 'ci' => '1234'],
+        ] as $query) {
+            $this->getJson($this->url('buscar') . '?' . http_build_query($query))
+                ->assertUnprocessable();
+        }
+
+        $this->actingAs(User::query()->findOrFail($this->otroDocenteId));
+        $this->getJson($this->url('buscar') . '?sis=200')->assertForbidden();
+        $this->getJson($this->url('buscar') . '?ci=1234')->assertForbidden();
+    }
+
+    public function test_busqueda_por_prefijo_limita_los_resultados_a_diez(): void
+    {
+        $this->enrollStudents($this->grupoPropioId, 9);
+        $this->rebuildSnapshot();
+
+        $prefix = substr($this->student->cod_sis, 0, 4);
+        $this->getJson($this->url('buscar') . '?sis=' . $prefix)
+            ->assertOk()
+            ->assertJsonCount(10, 'data');
+    }
+
     public function test_busqueda_por_nombre_conserva_el_limite_de_diez_resultados(): void
     {
         $this->enrollStudents($this->grupoPropioId, 9);
