@@ -20,7 +20,7 @@ use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 /**
- * Crea, modifica y cancela exámenes (HU-24).
+ * Gestiona el registro y las operaciones sobre exámenes.
  *
  * El examen pertenece a un par materia-carrera y queda asociado al docente que lo
  * crea. Solo mientras está PROGRAMADO admite cambios o cancelación: desde que se
@@ -395,6 +395,22 @@ class ExamService
                 ->map(fn ($row) => "El ambiente {$row->nro_aula} ya está reservado para "
                     . "«{$row->nombre_examen}» en ese horario.")
                 ->all();
+        }
+
+        if ($ignoredExamId === null) {
+            $totalStudents = DB::table('grupo_estudiante')
+                ->whereIn('id_grupo', $data['grupos'])
+                ->count();
+
+            $totalCapacity = Classroom::query()
+                ->whereIn('id_ambiente', $data['ambientes'])
+                ->sum('capacidad');
+
+            if ($totalCapacity < $totalStudents) {
+                $warnings['capacidad_insuficiente'] = [
+                    "La capacidad ({$totalCapacity}) es menor que los estudiantes de los grupos ({$totalStudents})",
+                ];
+            }
         }
 
         return $warnings;

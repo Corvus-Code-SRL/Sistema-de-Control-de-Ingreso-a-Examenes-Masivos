@@ -375,4 +375,53 @@ class CreateExamTest extends TestCase
             'duracion'      => 45,
         ]))->assertCreated()->assertJsonPath('data.hora_fin', '00:15');
     }
+
+    public function test_advierte_capacidad_insuficiente_sin_crear_examen(): void
+    {
+        DB::table('ambiente')
+            ->where('id_ambiente', $this->aulaId)
+            ->update(['capacidad' => 40]);
+
+        $this->enrollStudents($this->grupoPropioId, 53);
+
+        $response = $this->postJson(self::URL, $this->validPayload())
+            ->assertStatus(409)
+            ->assertJsonPath(
+                'errors.capacidad_insuficiente.0',
+                'La capacidad (40) es menor que los estudiantes de los grupos (55)'
+            );
+
+        $this->assertSame(0, Exam::count());
+    }
+
+    public function test_permite_confirmar_capacidad_insuficiente(): void
+    {
+        DB::table('ambiente')
+            ->where('id_ambiente', $this->aulaId)
+            ->update(['capacidad' => 40]);
+
+        $this->enrollStudents($this->grupoPropioId, 53);
+
+        $this->postJson(self::URL, $this->validPayload([
+            'confirmar_advertencias' => true,
+        ]))
+            ->assertCreated()
+            ->assertJsonPath('data.estado', Exam::PROGRAMADO);
+
+        $this->assertSame(1, Exam::count());
+    }
+
+    public function test_no_advierte_cuando_la_capacidad_es_igual_a_la_nomina(): void
+    {
+        DB::table('ambiente')
+            ->where('id_ambiente', $this->aulaId)
+            ->update(['capacidad' => 55]);
+
+        $this->enrollStudents($this->grupoPropioId, 53);
+
+        $this->postJson(self::URL, $this->validPayload())
+            ->assertCreated();
+
+        $this->assertSame(1, Exam::count());
+    }
 }
