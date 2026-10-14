@@ -71,3 +71,39 @@ describe('VerificationResult CI', () => {
     expect(screen.getByRole('button', { name: 'Siguiente estudiante' })).toBeInTheDocument()
   })
 })
+
+describe('VerificationResult inscripción y riesgo', () => {
+  it('muestra la ficha y la alerta de un alumno ajeno sin permitir confirmar', () => {
+    render(<VerificationResult
+      result={{
+        ...result,
+        veredicto: 'NO_PERTENECE',
+        autorizado: false,
+        grupo: null,
+        motivo: 'No figura en los grupos de este examen.',
+        antecedentes: {
+          tiene_antecedentes: true,
+          cantidad: 1,
+          resumen: 'Suplantación',
+          detalles: [{ tipo: 'Suplantación', fecha: '2026-10-13' }],
+        },
+      }}
+      busy={false} onConfirm={() => {}} onReject={() => {}} onNext={() => {}}
+    />)
+
+    expect(screen.getByText('Adriana Arnez Céspedes')).toBeInTheDocument()
+    expect(screen.getByText('No inscrito en este examen')).toBeInTheDocument()
+    expect(screen.getByText('Suplantación · 2026-10-13')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Aceptar ingreso' })).not.toBeInTheDocument()
+  })
+
+  it('identifica al inscrito no habilitado sin perder su ficha', () => {
+    render(<VerificationResult
+      result={{ ...result, veredicto: 'NO_HABILITADO', autorizado: false }}
+      busy={false} onConfirm={() => {}} onReject={() => {}} onNext={() => {}}
+    />)
+
+    expect(screen.getByText('No habilitado para este examen')).toBeInTheDocument()
+    expect(screen.getByText('Adriana Arnez Céspedes')).toBeInTheDocument()
+  })
+})

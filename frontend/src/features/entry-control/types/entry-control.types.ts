@@ -46,7 +46,7 @@ export interface Verification {
   estudiante: EntryStudent | null
   grupo: { id_grupo: number; num_grupo: string } | null
   ambiente_asignado: EntryRoom | null
-  antecedentes: { tiene_antecedentes: boolean; cantidad: number; resumen: string | null }
+  antecedentes: { tiene_antecedentes: boolean; cantidad: number; resumen: string | null; detalles?: { tipo: string; fecha: string }[] }
   ingreso_previo: PreviousEntry | null
 }
 

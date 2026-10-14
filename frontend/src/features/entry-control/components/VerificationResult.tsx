@@ -47,7 +47,7 @@ function StudentDetails({ result }: { result: Verification }) {
   return <div className="rounded-lg border bg-card p-4">
     <div className="flex items-center gap-3">
       <StudentPhoto key={`${student.id_estudiante}:${student.foto_url ?? ''}`} student={student} />
-      <div className="min-w-0"><p className="font-semibold">{student.nombre_completo}</p><p className="text-xs text-muted-foreground">Estudiante inscrito</p></div>
+      <div className="min-w-0"><p className="font-semibold">{student.nombre_completo}</p><p className="text-xs text-muted-foreground">{result.grupo === null ? 'No inscrito en este examen' : result.veredicto === 'NO_HABILITADO' ? 'No habilitado para este examen' : 'Estudiante inscrito'}</p></div>
     </div>
     <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
       <div><dt className="text-xs text-muted-foreground">Código SIS</dt><dd className="sciem-tnum font-medium">{student.cod_sis}</dd></div>
@@ -71,7 +71,7 @@ export function VerificationResult({ result, busy, onConfirm, onReject, onNext }
     <StudentDetails result={result} />
     {result.ambiente_asignado && result.veredicto === 'AULA_INCORRECTA' && <p className="flex items-center gap-2 rounded-lg border border-warn-border bg-warn-soft p-3 text-sm font-medium text-warn-fg"><DoorOpen className="size-4" />Dirija al estudiante a {result.ambiente_asignado.nro_aula}.</p>}
     {result.ingreso_previo && <div className="rounded-lg border border-danger/25 bg-card p-4 text-sm"><p className="font-semibold text-danger-fg">Ingreso ya registrado</p><p className="mt-1">Hora: {result.ingreso_previo.hora_ingreso ?? '—'} · Ambiente: {result.ingreso_previo.nro_aula ?? '—'}</p><p className="text-muted-foreground">Controló: {result.ingreso_previo.controlador || '—'}</p></div>}
-    {result.antecedentes.tiene_antecedentes && <div className="rounded-lg border border-warn-border bg-warn-soft p-4 text-sm"><p className="flex items-center gap-2 font-semibold text-warn-fg"><ShieldAlert className="size-4" />Central de riesgo · {result.antecedentes.cantidad} antecedente(s)</p><p className="mt-1">{result.antecedentes.resumen}</p><p className="mt-1 text-xs text-warn-fg">La alerta no impide el ingreso; la decisión es de quien controla.</p></div>}
+    {result.antecedentes.tiene_antecedentes && <div className="rounded-lg border border-warn-border bg-warn-soft p-4 text-sm"><p className="flex items-center gap-2 font-semibold text-warn-fg"><ShieldAlert className="size-4" />Central de riesgo · {result.antecedentes.cantidad} antecedente(s)</p><p className="mt-1">{result.antecedentes.resumen}</p>{result.antecedentes.detalles?.length ? <ul className="mt-2 space-y-1">{result.antecedentes.detalles.map((detail, index) => <li key={`${detail.tipo}-${detail.fecha}-${index}`}>{detail.tipo} · {detail.fecha}</li>)}</ul> : null}<p className="mt-1 text-xs text-warn-fg">La alerta no impide el ingreso; la decisión es de quien controla.</p></div>}
     {allowed && <p className="flex items-center gap-2 text-sm text-ok-fg"><AlertTriangle className="size-4" />Compare el nombre y el código SIS con la documentación disponible antes de decidir.</p>}
     <div className="flex flex-col gap-2 sm:flex-row">
       {allowed ? <><Button type="button" variant="outline" className="h-11 flex-1 border-danger/40 text-danger-fg hover:bg-danger-soft" disabled={busy} onClick={onReject}>Rechazar</Button><Button type="button" className="h-11 flex-1" disabled={busy} onClick={onConfirm}>{busy ? 'Registrando…' : 'Aceptar ingreso'}</Button></> :
