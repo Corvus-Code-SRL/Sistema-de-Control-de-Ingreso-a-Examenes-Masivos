@@ -49,8 +49,8 @@ export const CreateExamContainer: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[350px] gap-3 text-[#6C757D]">
-        <Loader2 className="h-7 w-7 animate-spin text-[#005E68]" />
+      <div className="flex flex-col items-center justify-center min-h-[350px] gap-3 text-muted-foreground">
+        <Loader2 className="h-7 w-7 animate-spin text-primary" />
         <p className="text-xs font-medium">Cargando formulario y catálogo de materias...</p>
       </div>
     );
@@ -58,17 +58,17 @@ export const CreateExamContainer: React.FC = () => {
 
   if (createdExam) {
     return (
-      <div className="max-w-3xl mx-auto bg-white rounded-xl border border-[#DDDDDD] p-10 text-center space-y-4">
-        <CheckCircle2 className="h-10 w-10 text-[#15803D] mx-auto" />
-        <h1 className="text-lg font-bold text-[#2C2C2C]">Examen creado</h1>
-        <p className="text-xs text-[#6C757D]">
+      <div className="max-w-3xl mx-auto bg-card rounded-xl border border-border p-10 text-center space-y-4">
+        <CheckCircle2 className="h-10 w-10 text-primary mx-auto" />
+        <h1 className="text-lg font-bold text-foreground">Examen creado</h1>
+        <p className="text-xs text-muted-foreground">
           «{createdExam.nombre_examen}» quedó registrado con sus grupos en estado{' '}
           <strong>Programado</strong> para el {createdExam.fecha} de{' '}
           {createdExam.hora_inicio} a {createdExam.hora_fin}.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-          <Button asChild className="bg-[#005E68] hover:bg-[#00555E] text-white text-xs font-semibold px-6 py-2.5 rounded-lg">
-            <Link to={`/examenes/${createdExam.id_examen}`}>Configurar auxiliares y ambientes</Link>
+          <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold px-6 py-2.5 rounded-lg">
+            <Link to={`/examenes/${createdExam.id_examen}`}>Ver detalle del examen</Link>
           </Button>
           <Button asChild variant="outline" className="text-xs font-semibold px-6 py-2.5 rounded-lg">
             <Link to="/examenes/programados">Ver en Programados</Link>
@@ -99,16 +99,16 @@ export const CreateExamContainer: React.FC = () => {
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[#2C2C2C]">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">
           Configurar nuevo examen
         </h1>
-        <p className="text-xs text-[#6C757D] mt-0.5">
+        <p className="text-xs text-muted-foreground mt-0.5">
           Crear un nuevo examen para la materia seleccionada.
         </p>
       </div>
 
       {apiError && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 text-xs font-medium">
+        <div className="p-4 rounded-xl bg-danger-soft border border-danger/20 text-danger-fg text-xs font-medium">
           {apiError}
         </div>
       )}
@@ -218,7 +218,7 @@ export const CreateExamContainer: React.FC = () => {
         {warnings.length > 0 && (
           <div
             role="alert"
-            className="p-4 rounded-xl bg-[#FFF3C7] border border-[#F2D98A] text-[#7A5800] text-xs space-y-3"
+            className="p-4 rounded-xl bg-warn-soft border border-warn-border text-warn-fg text-xs space-y-3"
           >
             <p className="font-bold flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" /> Revise antes de confirmar
@@ -232,7 +232,7 @@ export const CreateExamContainer: React.FC = () => {
               type="button"
               disabled={submitting}
               onClick={() => submitExam(true)}
-              className="bg-[#9A6F00] hover:bg-[#7A5800] text-white text-xs font-semibold px-4 py-2 rounded-lg"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold px-4 py-2 rounded-lg"
             >
               Crear el examen de todos modos
             </Button>
@@ -245,7 +245,7 @@ export const CreateExamContainer: React.FC = () => {
             variant="outline"
             onClick={() => navigate('/examenes/programados')}
             disabled={submitting}
-            className="bg-white border-[#DDDDDD] text-[#2C2C2C] hover:bg-gray-50 text-xs font-medium px-5 py-2.5 rounded-lg"
+            className="bg-card border-border text-foreground hover:bg-muted text-xs font-medium px-5 py-2.5 rounded-lg"
           >
             Cancelar
           </Button>
@@ -253,7 +253,7 @@ export const CreateExamContainer: React.FC = () => {
           <Button
             type="submit"
             disabled={submitting || warnings.length > 0}
-            className="bg-[#005E68] hover:bg-[#00555E] text-white text-xs font-semibold px-6 py-2.5 rounded-lg shadow-xs flex items-center gap-2"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold px-6 py-2.5 rounded-lg shadow-xs flex items-center gap-2"
           >
             {submitting ? (
               <>

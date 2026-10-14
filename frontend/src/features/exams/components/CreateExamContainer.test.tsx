@@ -92,13 +92,19 @@ describe('CreateExamContainer (HU-024)', () => {
     expect(screen.getByTestId('ubicacion')).toHaveTextContent('/examenes/programados')
   })
 
-  it('tras crear el examen ofrece configurar auxiliares y ambientes en su detalle', async () => {
+  it('tras crear el examen ofrece acceder a su detalle', async () => {
     renderContainer()
-    await userEvent.click(screen.getByRole('button', { name: /guardar examen/i }))
 
-    expect(await screen.findByText('Examen creado')).toBeInTheDocument()
+    await userEvent.click(
+      screen.getByRole('button', { name: /guardar examen/i })
+    )
+
     expect(
-      screen.getByRole('link', { name: 'Configurar auxiliares y ambientes' })
+      await screen.findByText('Examen creado')
+    ).toBeInTheDocument()
+
+    expect(
+      screen.getByRole('link', { name: 'Ver detalle del examen' })
     ).toHaveAttribute('href', '/examenes/77')
   })
 
