@@ -161,25 +161,103 @@ export const ExamForm: React.FC<Props> = ({
           )}
         </div>
 
-        <div className="space-y-1.5">
-          <label htmlFor="ambientes" className="block text-xs font-bold text-[#2C2C2C]">
+        <fieldset className="space-y-2">
+          <legend className="text-xs font-bold text-text">
             Ambiente(s) *
-          </label>
-          <FormSelect
-            id="ambientes"
-            value={formData.ambientes[0] ? String(formData.ambientes[0]) : undefined}
-            placeholder="Seleccionar aula..."
-            invalid={Boolean(errors.ambientes)}
-            options={classrooms.map((room) => ({
-              value: String(room.id_ambiente),
-              label: `Aula ${room.nro_aula} (${room.capacidad} pupitres)`,
-            }))}
-            onValueChange={(value) => updateFormData({ ambientes: [Number(value)] })}
-          />
-          {errors.ambientes && (
-            <p className="text-[11px] text-red-600 font-medium">{errors.ambientes}</p>
+          </legend>
+
+          <div
+            className={`max-h-52 overflow-y-auto rounded-lg border bg-surface ${
+              errors.ambientes
+                ? 'border-danger'
+                : 'border-border-soft'
+            }`}
+          >
+            {classrooms.length === 0 ? (
+              <p className="px-4 py-3 text-xs text-muted-foreground">
+                No hay ambientes disponibles.
+              </p>
+            ) : (
+              classrooms.map((room) => {
+                const selected = formData.ambientes.includes(
+                  room.id_ambiente
+                );
+
+                return (
+                  <label
+                    key={room.id_ambiente}
+                    className="flex cursor-pointer items-center
+                      justify-between gap-3 border-b
+                      border-border-soft px-4 py-3
+                      last:border-b-0 hover:bg-sunken"
+                  >
+                    <span className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={(event) => {
+                          const ambientes = event.target.checked
+                            ? [
+                                ...formData.ambientes,
+                                room.id_ambiente,
+                              ]
+                            : formData.ambientes.filter(
+                                (id) => id !== room.id_ambiente
+                              );
+
+                          updateFormData({ ambientes });
+                        }}
+                        className="h-4 w-4 rounded
+                          border-border-strong accent-brand"
+                      />
+
+                      <span className="text-xs font-medium text-text">
+                        Aula {room.nro_aula}
+                      </span>
+                    </span>
+
+                    <span className="text-xs text-muted-foreground">
+                      {room.capacidad} plazas
+                    </span>
+                  </label>
+                );
+              })
+            )}
+          </div>
+
+          {formData.ambientes.length > 0 && (
+            <div className="flex items-center justify-between
+              rounded-lg bg-sunken px-4 py-3 text-xs"
+            >
+              <span className="font-medium text-text">
+                {formData.ambientes.length}
+                {' '}
+                {formData.ambientes.length === 1
+                  ? 'ambiente seleccionado'
+                  : 'ambientes seleccionados'}
+              </span>
+
+              <span className="font-bold text-brand">
+                Capacidad total:{' '}
+                {classrooms
+                  .filter((room) =>
+                    formData.ambientes.includes(room.id_ambiente)
+                  )
+                  .reduce(
+                    (total, room) => total + room.capacidad,
+                    0
+                  )}
+              </span>
+            </div>
           )}
-        </div>
+
+          {errors.ambientes && (
+            <p className="text-[11px] font-medium text-danger">
+              {errors.ambientes}
+            </p>
+          )}
+        </fieldset>
+
       </div>
     </div>
   );
