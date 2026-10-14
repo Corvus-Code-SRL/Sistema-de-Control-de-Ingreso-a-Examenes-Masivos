@@ -219,4 +219,51 @@ describe('CreateExamContainer (HU-024)', () => {
       )
     ).toBeInTheDocument()
   })
+
+  it('bloquea el guardado normal cuando hay advertencias pendientes', () => {
+    const submitExam = vi.fn()
+
+    hook.overrides = {
+      warnings: [
+        'La capacidad de los ambientes seleccionados es insuficiente.',
+      ],
+      submitExam,
+    }
+
+    renderContainer()
+
+    expect(
+      screen.getByRole('alert')
+    ).toHaveTextContent(
+      'La capacidad de los ambientes seleccionados es insuficiente.'
+    )
+
+    expect(
+      screen.getByRole('button', { name: /guardar examen/i })
+    ).toBeDisabled()
+
+    expect(submitExam).not.toHaveBeenCalled()
+  })
+
+  it('solicita confirmacion explicita antes de registrar con advertencias', async () => {
+    const user = userEvent.setup()
+    const submitExam = vi.fn()
+
+    hook.overrides = {
+      warnings: [
+        'La capacidad de los ambientes seleccionados es insuficiente.',
+      ],
+      submitExam,
+    }
+
+    renderContainer()
+
+    await user.click(
+      screen.getByRole('button', {
+        name: /crear el examen de todos modos/i,
+      })
+    )
+
+    expect(submitExam).toHaveBeenCalledExactlyOnceWith(true)
+  })
 })

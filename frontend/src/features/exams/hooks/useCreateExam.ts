@@ -108,10 +108,21 @@ export function useCreateExam(onSuccess?: (exam: Exam) => void) {
       onSuccess?.(exam)
     } catch (error: unknown) {
       if (error instanceof ApiError && error.status === 409) {
-        setWarnings(Object.values(error.errors).flat())
+        const serverWarnings = Object.values(error.errors)
+          .flat()
+          .filter((message) => typeof message === 'string' && message.trim().length > 0)
+
+        setWarnings(
+          serverWarnings.length > 0
+            ? serverWarnings
+            : [error.message || 'El examen requiere confirmación antes de registrarse.']
+        )
       } else {
         const message =
-          error instanceof Error ? error.message : 'Ocurrió un error al registrar el examen'
+          error instanceof Error
+            ? error.message
+            : 'Ocurrió un error al registrar el examen'
+
         setSubmitError(message)
       }
     } finally {
