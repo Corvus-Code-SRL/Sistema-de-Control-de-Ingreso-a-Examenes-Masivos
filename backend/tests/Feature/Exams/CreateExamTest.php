@@ -3,6 +3,7 @@
 namespace Tests\Feature\Exams;
 
 use App\Models\Exam;
+use App\Models\AuditLog;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -423,5 +424,43 @@ class CreateExamTest extends TestCase
             ->assertCreated();
 
         $this->assertSame(1, Exam::count());
+    }
+
+    public function test_registrar_examen_genera_bitacora_crear(): void
+    {
+        $response = $this->postJson(self::URL, $this->validPayload())
+            ->assertCreated();
+
+        $examId = $response->json('data.id_examen');
+
+        $log = AuditLog::query()
+            ->where('tabla_afectada', 'examen')
+            ->sole();
+
+        $this->assertSame(
+            (int) DB::table('accion')
+                ->where('operacion', 'CREAR')
+                ->value('id_accion'),
+            $log->id_accion
+        );
+
+        $this->assertNotNull($log->id_accion);
+        $this->assertSame($this->docenteId, $log->id_usuario);
+        $this->assertNull($log->antiguo_valor);
+
+        $this->assertSame(
+            $examId,
+            $log->nuevo_valor['id_examen']
+        );
+
+        $this->assertEquals(
+            [$this->aulaId],
+            $log->nuevo_valor['ambientes']
+        );
+
+        $this->assertEquals(
+            [$this->grupoPropioId],
+            $log->nuevo_valor['grupos']
+        );
     }
 }

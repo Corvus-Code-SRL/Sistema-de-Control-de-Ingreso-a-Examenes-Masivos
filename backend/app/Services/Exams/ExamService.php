@@ -167,7 +167,25 @@ class ExamService
 
             $exam->classrooms()->attach($data['ambientes']);
 
-            return $this->groupService->assignGroups($exam, $data['grupos'], $teacherId);
+            $this->groupService->assignGroups(
+                $exam,
+                $data['grupos'],
+                $teacherId
+            );
+
+            $after = $exam->getAttributes();
+            $after['ambientes'] = $data['ambientes'];
+            $after['grupos'] = $data['grupos'];
+
+            $this->auditLog->registrar(
+                'CREAR',
+                'examen',
+                null,
+                $after,
+                $teacherId
+            );
+
+            return $exam;
         });
 
         return $this->loadDetail($exam);
@@ -190,6 +208,12 @@ class ExamService
                 throw new ExamStateException($this->notEditableMessage($exam->estado));
             }
 
+            $before = $exam->getAttributes();
+            $before['ambientes'] = $exam->classrooms()
+                ->pluck('ambiente.id_ambiente')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
             $attributes = $this->prepareAttributes($data, $teacherId);
 
             $this->lockSchedules($teacherId, $data['ambientes']);
@@ -198,6 +222,20 @@ class ExamService
             $exam->update($attributes);
             $this->releaseRemovedClassrooms($exam, $data['ambientes']);
             $exam->classrooms()->sync($data['ambientes']);
+
+            $after = $exam->getAttributes();
+            $after['ambientes'] = $exam->classrooms()
+                ->pluck('ambiente.id_ambiente')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $this->auditLog->registrar(
+                'MODIFICAR',
+                'examen',
+                $before,
+                $after,
+                $teacherId
+            );
 
             return $exam;
         });
