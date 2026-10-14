@@ -111,7 +111,7 @@ class StudentVerificationTest extends TestCase
             ->assertJsonCount(0, 'data');
     }
 
-    public function test_busca_por_prefijo_sis_y_ci_sin_revelar_el_ci_registrado(): void
+    public function test_sugerencias_solo_incluyen_la_nomina_y_sis_manual_muestra_al_ajeno(): void
     {
         $outsideId = DB::table('estudiante')->insertGetId([
             'cod_sis' => '199912543',
@@ -123,21 +123,73 @@ class StudentVerificationTest extends TestCase
         ], 'id_estudiante');
         $this->rebuildSnapshot();
 
-        foreach (['sis' => '1999', 'ci' => '0012'] as $field => $prefix) {
-            $matches = $this->getJson($this->url('buscar') . '?' . http_build_query([$field => $prefix]))
+        foreach (['sis' => '1999', 'ci' => '0012', 'nombre' => 'María Fuera'] as $field => $prefix) {
+            $this->getJson($this->url('buscar') . '?' . http_build_query([$field => $prefix]))
                 ->assertOk()
-                ->assertJsonCount(1, 'data')
-                ->assertJsonPath('data.0.id_estudiante', $outsideId)
-                ->assertJsonPath('data.0.cod_sis', '199912543')
-                ->assertJsonPath('data.0.nombre_completo', 'María Fuera Nómina')
-                ->json('data.0');
-
-            $this->assertArrayNotHasKey('ci', $matches);
+                ->assertJsonCount(0, 'data');
         }
 
-        $this->postJson($this->url('verificar'), $this->input(['cod_sis' => '199912543', 'ci' => '0012345']))
+        foreach (['sis' => substr($this->student->cod_sis, 0, 4), 'ci' => substr($this->student->ci, 0, 4)] as $field => $prefix) {
+            $matches = $this->getJson($this->url('buscar') . '?' . http_build_query([$field => $prefix]))
+                ->assertOk()
+                ->json('data');
+            $this->assertContains($this->student->id_estudiante, array_column($matches, 'id_estudiante'));
+            foreach ($matches as $match) {
+                $this->assertArrayNotHasKey('ci', $match);
+            }
+        }
+
+        $this->postJson($this->url('verificar'), $this->input(['cod_sis' => '199912543', 'ci' => '9999999']))
             ->assertOk()
-            ->assertJsonPath('data.veredicto', 'NO_PERTENECE');
+            ->assertJsonPath('data.veredicto', 'NO_PERTENECE')
+            ->assertJsonPath('data.estudiante.id_estudiante', $outsideId)
+            ->assertJsonPath('data.estudiante.nombre_completo', 'María Fuera Nómina')
+            ->assertJsonPath('data.estudiante.ci', '0012345');
+    }
+
+    public function test_sugerencias_excluyen_a_estudiante_de_un_grupo_ajeno(): void
+    {
+        $this->enrollStudents($this->grupoAjenoId, 1);
+        $outside = Student::query()
+            ->join('grupo_estudiante as gs', 'gs.id_estudiante', '=', 'estudiante.id_estudiante')
+            ->where('gs.id_grupo', $this->grupoAjenoId)
+            ->select('estudiante.*')
+            ->firstOrFail();
+        $this->rebuildSnapshot();
+
+        foreach (['sis' => $outside->cod_sis, 'ci' => $outside->ci] as $field => $prefix) {
+            $matches = $this->getJson($this->url('buscar') . '?' . http_build_query([$field => $prefix]))
+                ->assertOk()
+                ->json('data');
+            $this->assertNotContains($outside->id_estudiante, array_column($matches, 'id_estudiante'));
+        }
+
+        $this->postJson($this->url('verificar'), $this->input(['cod_sis' => $outside->cod_sis, 'ci' => $outside->ci]))
+            ->assertOk()
+            ->assertJsonPath('data.veredicto', 'NO_PERTENECE')
+            ->assertJsonPath('data.estudiante.id_estudiante', $outside->id_estudiante);
+    }
+
+    public function test_sugerencias_no_duplican_alumno_inscrito_en_dos_grupos_del_examen(): void
+    {
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $this->exam->id_examen,
+            'id_grupo' => $this->grupoAjenoId,
+        ]);
+        DB::table('grupo_estudiante')->insert([
+            'id_grupo' => $this->grupoAjenoId,
+            'id_estudiante' => $this->student->id_estudiante,
+            'fecha_inscripcion' => '2026-02-15',
+            'estado' => 'ACTIVO',
+        ]);
+        $this->rebuildSnapshot();
+
+        foreach (['sis' => $this->student->cod_sis, 'ci' => $this->student->ci] as $field => $value) {
+            $this->getJson($this->url('buscar') . '?' . http_build_query([$field => $value]))
+                ->assertOk()
+                ->assertJsonCount(1, 'data')
+                ->assertJsonPath('data.0.id_estudiante', $this->student->id_estudiante);
+        }
     }
 
     public function test_busqueda_por_identificador_exige_un_solo_prefijo_numerico(): void
@@ -461,9 +513,10 @@ class StudentVerificationTest extends TestCase
         ]);
         $this->rebuildSnapshot();
 
-        $this->postJson($this->url('verificar'), $this->input())
+        $this->postJson($this->url('verificar'), $this->input(['ci' => '9999999']))
             ->assertOk()
-            ->assertJsonPath('data.veredicto', 'NO_HABILITADO');
+            ->assertJsonPath('data.veredicto', 'NO_HABILITADO')
+            ->assertJsonPath('data.estudiante.id_estudiante', $this->student->id_estudiante);
         $this->postJson($this->url('confirmar-ingreso'), [
             'id_estudiante' => $this->student->id_estudiante,
             'ci' => $this->student->ci,
@@ -561,7 +614,64 @@ class StudentVerificationTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.veredicto', 'AUTORIZADO')
             ->assertJsonPath('data.antecedentes.cantidad', 1)
-            ->assertJsonPath('data.antecedentes.tiene_antecedentes', true);
+            ->assertJsonPath('data.antecedentes.tiene_antecedentes', true)
+            ->assertJsonPath('data.antecedentes.detalles.0.tipo', 'Suplantacion');
+
+        $this->postJson($this->url('confirmar-ingreso'), [
+            'id_estudiante' => $this->student->id_estudiante,
+            'id_ambiente' => $this->aulaId,
+        ])->assertCreated();
+    }
+
+    public function test_alumno_ajeno_con_riesgo_muestra_alerta_al_docente_y_auxiliar_sin_autorizar(): void
+    {
+        $outsideId = DB::table('estudiante')->insertGetId([
+            'cod_sis' => '199912543',
+            'ci' => '0012345',
+            'nombre' => 'María',
+            'apellido_paterno' => 'Fuera',
+            'estado' => 'ACTIVO',
+        ], 'id_estudiante');
+        DB::table('examen_auxiliar')->insert([
+            'id_examen' => $this->exam->id_examen,
+            'id_usuario' => $this->otroDocenteId,
+            'id_usuario_docente_habilita' => $this->docenteId,
+            'id_ambiente' => $this->aulaId,
+        ]);
+        $this->rebuildSnapshot();
+
+        $reasonId = DB::table('tipo_falta')->insertGetId(['nombre' => 'Suplantacion'], 'id_falta');
+        $reportId = DB::table('reporte_estudiante')->insertGetId([
+            'id_estudiante' => $outsideId,
+            'id_examen' => $this->exam->id_examen,
+            'id_tipo_falta' => $reasonId,
+            'id_usuario_reportante' => $this->docenteId,
+            'evidencia_url' => 'https://example.test/evidencia',
+            'evidencia_public_id' => 'test-ajeno',
+            'estado' => 'APROBADO',
+            'fecha_revision' => now(),
+            'id_usuario_revisor' => $this->docenteId,
+        ], 'id_reporte_est');
+        DB::table('central_riesgo')->insert([
+            'id_reporte_est' => $reportId,
+            'id_estudiante' => $outsideId,
+            'fecha_registro' => '2026-10-13 09:15:00',
+        ]);
+        $this->rebuildSnapshot();
+
+        foreach ([$this->docenteId, $this->otroDocenteId] as $controllerId) {
+            $this->actingAs(User::query()->findOrFail($controllerId));
+            $this->postJson($this->url('verificar'), [
+                'cod_sis' => '199912543',
+                'id_ambiente' => $this->aulaId,
+            ])->assertOk()
+                ->assertJsonPath('data.veredicto', 'NO_PERTENECE')
+                ->assertJsonPath('data.autorizado', false)
+                ->assertJsonPath('data.estudiante.id_estudiante', $outsideId)
+                ->assertJsonPath('data.antecedentes.cantidad', 1)
+                ->assertJsonPath('data.antecedentes.detalles.0.tipo', 'Suplantacion')
+                ->assertJsonPath('data.antecedentes.detalles.0.fecha', '2026-10-13');
+        }
     }
 
     public function test_auxiliar_solo_puede_controlar_su_ambiente(): void
