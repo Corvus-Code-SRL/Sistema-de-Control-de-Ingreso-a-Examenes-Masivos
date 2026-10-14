@@ -46,9 +46,7 @@ export function IdentificationForm(props: Props) {
             <IdentifierSuggestions examId={props.examId} field="ci" query={props.ci} disabled={props.disabled} onSelect={select} />
           </div>
         </div>
-        <div className="border-t border-border pt-4">
-          <StudentSearch examId={props.examId} onSelect={select} disabled={props.disabled} />
-        </div>
+        <StudentSearch examId={props.examId} onSelect={select} disabled={props.disabled} />
         <Button type="submit" className="h-12 w-full text-sm" disabled={props.disabled || props.busy || !isValidSis(props.sis)}>
           {props.busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <ArrowRight className="size-4" aria-hidden="true" />}
           {props.busy ? 'Verificando…' : 'Verificar estudiante'}
