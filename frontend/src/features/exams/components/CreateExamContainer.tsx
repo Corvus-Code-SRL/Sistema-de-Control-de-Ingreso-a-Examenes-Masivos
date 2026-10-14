@@ -15,6 +15,7 @@ export const CreateExamContainer: React.FC = () => {
     formData,
     options,
     subjectGroups,
+    totalStudents,
     loading,
     submitting,
     apiError,
@@ -32,6 +33,19 @@ export const CreateExamContainer: React.FC = () => {
       subject.id_carrera === formData.materia?.id_carrera &&
       subject.id_materia === formData.materia?.id_materia
   );
+
+  const totalCapacity = options.ambientes
+    .filter((room) => formData.ambientes.includes(room.id_ambiente))
+    .reduce((total, room) => total + Number(room.capacidad), 0);
+
+  const hasSelectedRooms = formData.ambientes.length > 0;
+  const hasSelectedGroups = formData.grupos.length > 0;
+
+  const capacityDeficit =
+    hasSelectedRooms && hasSelectedGroups
+      ? Math.max(0, totalStudents - totalCapacity)
+      : 0;
+
 
   if (loading) {
     return (
@@ -116,6 +130,90 @@ export const CreateExamContainer: React.FC = () => {
           errors={validation.errors}
           onToggleGroup={toggleGroup}
         />
+
+        {(hasSelectedRooms || hasSelectedGroups) && (
+          <section
+            aria-label="Resumen de capacidad del examen"
+            aria-live="polite"
+            className="rounded-xl border border-border-soft bg-surface p-6 space-y-4"
+          >
+            <div>
+              <h2 className="text-base font-bold text-text">
+                Resumen de capacidad
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Compare las plazas disponibles con los estudiantes
+                de los grupos seleccionados.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-lg bg-sunken p-4">
+                <p className="text-xs text-muted-foreground">
+                  Capacidad total
+                </p>
+                <p className="mt-1 text-xl font-bold text-text">
+                  {totalCapacity}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  plazas disponibles
+                </p>
+              </div>
+
+              <div className="rounded-lg bg-sunken p-4">
+                <p className="text-xs text-muted-foreground">
+                  Estudiantes
+                </p>
+                <p className="mt-1 text-xl font-bold text-text">
+                  {totalStudents}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  inscritos en los grupos
+                </p>
+              </div>
+
+              <div className="rounded-lg bg-sunken p-4">
+                <p className="text-xs text-muted-foreground">
+                  Plazas faltantes
+                </p>
+                <p
+                  className={`mt-1 text-xl font-bold ${
+                    capacityDeficit > 0 ? 'text-danger' : 'text-text'
+                  }`}
+                >
+                  {capacityDeficit}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  respecto a los estudiantes
+                </p>
+              </div>
+            </div>
+
+            {hasSelectedRooms && hasSelectedGroups && capacityDeficit > 0 && (
+              <div
+                role="status"
+                className="flex items-start gap-2 rounded-lg border border-border-soft p-3"
+              >
+                <AlertTriangle
+                  aria-hidden="true"
+                  className="h-4 w-4 shrink-0 text-danger"
+                />
+                <p className="text-xs text-text">
+                  La capacidad seleccionada es insuficiente para
+                  todos los estudiantes. El servidor solicitará
+                  confirmación antes de registrar el examen.
+                </p>
+              </div>
+            )}
+
+            {(!hasSelectedRooms || !hasSelectedGroups) && (
+              <p className="text-xs text-muted-foreground">
+                Seleccione ambientes y grupos para completar
+                la comparación de capacidad.
+              </p>
+            )}
+          </section>
+        )}
 
         {warnings.length > 0 && (
           <div
