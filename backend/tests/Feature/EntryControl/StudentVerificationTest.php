@@ -217,25 +217,27 @@ class StudentVerificationTest extends TestCase
         $this->getJson($this->url('buscar') . '?ci=1234')->assertForbidden();
     }
 
-    public function test_busqueda_por_prefijo_limita_los_resultados_a_diez(): void
+    public function test_busqueda_por_sis_y_ci_limita_los_resultados_a_cinco(): void
     {
         $this->enrollStudents($this->grupoPropioId, 9);
         $this->rebuildSnapshot();
 
-        $prefix = substr($this->student->cod_sis, 0, 4);
-        $this->getJson($this->url('buscar') . '?sis=' . $prefix)
-            ->assertOk()
-            ->assertJsonCount(10, 'data');
+        foreach (['sis' => $this->student->cod_sis, 'ci' => $this->student->ci] as $field => $value) {
+            $prefix = substr($value, 0, 4);
+            $this->getJson($this->url('buscar') . '?' . http_build_query([$field => $prefix]))
+                ->assertOk()
+                ->assertJsonCount(5, 'data');
+        }
     }
 
-    public function test_busqueda_por_nombre_conserva_el_limite_de_diez_resultados(): void
+    public function test_busqueda_por_nombre_limita_los_resultados_a_cinco(): void
     {
         $this->enrollStudents($this->grupoPropioId, 9);
         $this->rebuildSnapshot();
 
         $this->getJson($this->url('buscar') . '?nombre=Estudiante')
             ->assertOk()
-            ->assertJsonCount(10, 'data');
+            ->assertJsonCount(5, 'data');
     }
 
     public function test_verificacion_por_sis_devuelve_la_foto_opcional_del_estudiante(): void

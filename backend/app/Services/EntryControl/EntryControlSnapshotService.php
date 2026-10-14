@@ -295,7 +295,7 @@ class EntryControlSnapshotService
             }
             unset($student['nombre_busqueda']);
             $matches[] = $student;
-            if (count($matches) === 10) {
+            if (count($matches) === 5) {
                 break;
             }
         }

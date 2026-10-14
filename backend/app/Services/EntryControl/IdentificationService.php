@@ -48,7 +48,7 @@ class IdentificationService
                     ->where('gx.id_examen', $examId);
             })
             ->orderBy($column)
-            ->limit(10)
+            ->limit(5)
             ->get($field === 'ci'
                 ? ['id_estudiante', 'cod_sis', 'ci', 'nombre', 'apellido_paterno', 'apellido_materno']
                 : ['id_estudiante', 'cod_sis', 'nombre', 'apellido_paterno', 'apellido_materno'])
