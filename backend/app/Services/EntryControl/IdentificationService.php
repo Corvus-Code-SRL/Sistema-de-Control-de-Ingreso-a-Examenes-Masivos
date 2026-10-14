@@ -49,14 +49,24 @@ class IdentificationService
             })
             ->orderBy($column)
             ->limit(10)
-            ->get(['id_estudiante', 'cod_sis', 'nombre', 'apellido_paterno', 'apellido_materno'])
-            ->map(fn (Student $student) => [
-                'id_estudiante' => (int) $student->id_estudiante,
-                'cod_sis' => $student->cod_sis,
-                'nombre_completo' => trim(
-                    $student->nombre . ' ' . $student->apellido_paterno . ' ' . $student->apellido_materno
-                ),
-            ])
+            ->get($field === 'ci'
+                ? ['id_estudiante', 'cod_sis', 'ci', 'nombre', 'apellido_paterno', 'apellido_materno']
+                : ['id_estudiante', 'cod_sis', 'nombre', 'apellido_paterno', 'apellido_materno'])
+            ->map(function (Student $student) use ($field): array {
+                $match = [
+                    'id_estudiante' => (int) $student->id_estudiante,
+                    'cod_sis' => $student->cod_sis,
+                    'nombre_completo' => trim(
+                        $student->nombre . ' ' . $student->apellido_paterno . ' ' . $student->apellido_materno
+                    ),
+                ];
+
+                if ($field === 'ci') {
+                    $match['ci'] = $student->ci;
+                }
+
+                return $match;
+            })
             ->all();
     }
 }

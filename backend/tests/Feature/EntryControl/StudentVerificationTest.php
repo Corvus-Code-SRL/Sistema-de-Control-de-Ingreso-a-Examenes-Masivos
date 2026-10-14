@@ -135,7 +135,14 @@ class StudentVerificationTest extends TestCase
                 ->json('data');
             $this->assertContains($this->student->id_estudiante, array_column($matches, 'id_estudiante'));
             foreach ($matches as $match) {
-                $this->assertArrayNotHasKey('ci', $match);
+                if ($field === 'ci') {
+                    $this->assertStringStartsWith($prefix, $match['ci']);
+                    if ($match['id_estudiante'] === $this->student->id_estudiante) {
+                        $this->assertSame($this->student->ci, $match['ci']);
+                    }
+                } else {
+                    $this->assertArrayNotHasKey('ci', $match);
+                }
             }
         }
 
