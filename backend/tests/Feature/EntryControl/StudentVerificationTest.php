@@ -552,6 +552,47 @@ class StudentVerificationTest extends TestCase
         $this->getJson($this->url('buscar') . '?nombre=Estudiante')->assertForbidden();
     }
 
+    public function test_sis_de_nueve_digitos_admite_anio_1999_y_mes_no_valido(): void
+    {
+        foreach (['199912543', '202150001'] as $code) {
+            $this->student->update(['cod_sis' => $code]);
+            $this->rebuildSnapshot();
+
+            $this->postJson($this->url('verificar'), $this->input(['cod_sis' => $code]))
+                ->assertOk()
+                ->assertJsonPath('data.veredicto', 'AUTORIZADO');
+        }
+    }
+
+    public function test_sis_y_ci_deben_contener_solo_digitos_con_las_longitudes_permitidas(): void
+    {
+        foreach (['12345678', '1234567890', '2023A9201', '20230920_'] as $code) {
+            $this->postJson($this->url('verificar'), $this->input(['cod_sis' => $code]))
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('cod_sis')
+                ->assertJsonPath('errors.cod_sis.0', 'El código SIS debe tener exactamente 9 dígitos.');
+        }
+
+        foreach (['12A45', '12345678901'] as $ci) {
+            $this->postJson($this->url('verificar'), $this->input(['ci' => $ci]))
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('ci')
+                ->assertJsonPath('errors.ci.0', 'El CI solo puede contener hasta 10 dígitos.');
+
+            foreach (['confirmar-ingreso', 'rechazar-ingreso'] as $action) {
+                $this->postJson($this->url($action), [
+                    'id_estudiante' => $this->student->id_estudiante,
+                    'id_ambiente' => $this->aulaId,
+                    'ci' => $ci,
+                    'motivo' => 'OTRO',
+                ])->assertUnprocessable()->assertJsonValidationErrors('ci');
+            }
+        }
+
+        $this->assertSame(0, DB::table('intento_ingreso')->count());
+        $this->assertSame(0, DB::table('examen_estudiante')->count());
+    }
+
     public function test_solicitud_mal_formada_no_crea_intento(): void
     {
         $this->postJson($this->url('verificar'), $this->input([

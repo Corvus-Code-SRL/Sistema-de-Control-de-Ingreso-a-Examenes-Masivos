@@ -229,7 +229,9 @@ trait SeedsAcademicCatalog
         $alreadyEnrolled = DB::table('grupo_estudiante')->where('id_grupo', $groupId)->count();
 
         for ($i = $alreadyEnrolled + 1; $i <= $alreadyEnrolled + $count; $i++) {
-            $code = $groupId . str_pad((string) $i, 4, '0', STR_PAD_LEFT);
+            $year = 2000 + intdiv($groupId - 1, 12);
+            $month = (($groupId - 1) % 12) + 1;
+            $code = sprintf('%04d%02d%03d', $year, $month, $i);
 
             $studentId = DB::table('estudiante')->insertGetId([
                 'cod_sis' => $code,
