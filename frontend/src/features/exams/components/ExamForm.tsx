@@ -54,7 +54,7 @@ export const ExamForm: React.FC<Props> = ({
       </h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
           <label htmlFor="nombre_examen" className="block text-xs font-bold text-foreground">
             Nombre del examen *
           </label>
@@ -64,7 +64,7 @@ export const ExamForm: React.FC<Props> = ({
             placeholder="Ej. Primer Parcial"
             value={formData.nombre_examen}
             onChange={(e) => updateFormData({ nombre_examen: e.target.value })}
-            className={`w-full px-3.5 py-2.5 bg-card border ${errors.nombre_examen ? 'border-danger' : 'border-border'
+            className={`h-8 w-full min-w-0 px-3.5 bg-card border ${errors.nombre_examen ? 'border-danger' : 'border-border'
               } rounded-lg text-xs outline-none focus:border-ring text-foreground placeholder:text-muted-foreground transition-colors`}
           />
           {errors.nombre_examen && (
@@ -72,12 +72,13 @@ export const ExamForm: React.FC<Props> = ({
           )}
         </div>
 
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
           <label htmlFor="categoria" className="block text-xs font-bold text-foreground">
             Categoría *
           </label>
           <FormSelect
             id="categoria"
+            className="h-8 min-w-0 data-[size=default]:h-8"
             value={formData.categoria}
             placeholder="Seleccionar categoría"
             options={[
@@ -105,7 +106,7 @@ export const ExamForm: React.FC<Props> = ({
                 aria-invalid={Boolean(errors.fecha) || undefined}
                 aria-describedby={errors.fecha ? 'fecha-error' : undefined}
                 className={cn(
-                  'h-11 w-full min-w-0 justify-between gap-2 border-input bg-background px-3.5 text-left text-xs font-medium',
+                  'h-8 w-full min-w-0 justify-between gap-2 border-input bg-background px-3.5 text-left text-xs font-medium',
                   !selectedDate && 'text-muted-foreground'
                 )}
               >
@@ -132,12 +133,13 @@ export const ExamForm: React.FC<Props> = ({
           )}
         </div>
 
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
           <label htmlFor="materia" className="block text-xs font-bold text-foreground">
             Materia *
           </label>
           <FormSelect
             id="materia"
+            className="h-8 min-w-0 data-[size=default]:h-8"
             value={formData.materia ? pairKey(formData.materia) : undefined}
             placeholder="Seleccionar materia..."
             invalid={Boolean(errors.materia)}
@@ -159,7 +161,7 @@ export const ExamForm: React.FC<Props> = ({
           )}
         </div>
 
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
           <label htmlFor="duracion" className="block text-xs font-bold text-foreground">
             Duración (min) *
           </label>
@@ -175,7 +177,7 @@ export const ExamForm: React.FC<Props> = ({
               const val = e.target.value;
               updateFormData({ duracion: val === '' ? 0 : parseInt(val, 10) || 0 });
             }}
-            className={`w-full px-3.5 py-2.5 bg-card border ${errors.duracion ? 'border-danger' : 'border-border'
+            className={`h-8 w-full min-w-0 px-3.5 bg-card border ${errors.duracion ? 'border-danger' : 'border-border'
               } rounded-lg text-xs outline-none focus:border-ring text-foreground placeholder:text-muted-foreground transition-colors`}
           />
           {errors.duracion && (
@@ -208,7 +210,7 @@ export const ExamForm: React.FC<Props> = ({
               },
             }}
           >
-            <TimePickerTrigger className="h-11 w-full min-w-0 border-input bg-background px-3.5 text-xs font-medium" />
+            <TimePickerTrigger className="h-8 w-full min-w-0 border-input bg-background px-3.5 text-xs font-medium" />
             <TimePickerContent collisionPadding={12} className="max-w-[calc(100vw-1.5rem)]" />
           </TimePicker>
           {errors.hora_inicio && (
@@ -216,12 +218,13 @@ export const ExamForm: React.FC<Props> = ({
           )}
         </div>
 
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
           <label htmlFor="ambientes" className="block text-xs font-bold text-foreground">
             Ambiente(s) *
           </label>
           <FormSelect
             id="ambientes"
+            className="h-8 min-w-0 data-[size=default]:h-8"
             value={formData.ambientes[0] ? String(formData.ambientes[0]) : undefined}
             placeholder="Seleccionar aula..."
             invalid={Boolean(errors.ambientes)}
