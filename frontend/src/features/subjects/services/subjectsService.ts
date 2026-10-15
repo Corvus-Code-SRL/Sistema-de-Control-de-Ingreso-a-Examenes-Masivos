@@ -150,8 +150,9 @@ export async function assignSubjectToCareer(
 }
 
 /**
- * Ofertas del período, de cualquier estado, ordenadas por carrera y materia. Con `careerId` el
- * servidor solo devuelve las de esa carrera; `careers` trae siempre las del selector del período.
+ * Ofertas del período, de cualquier estado, de la asignada más recientemente a la más antigua; el
+ * orden lo fija el servidor y no se reordena aquí. Con `careerId` el servidor solo devuelve las de
+ * esa carrera; `careers` trae siempre las del selector del período.
  */
 export async function getSubjectCareerAssignments(
   periodId: number,

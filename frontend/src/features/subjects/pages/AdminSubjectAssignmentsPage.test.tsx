@@ -105,7 +105,9 @@ function stubBackend({ periods = [periodo2, periodo1], periodsStatus = 200 }: Ba
 
     if (path === '/administracion/asignaciones') {
       const careerId = url.searchParams.get('id_carrera')
-      const rows = [...(baseOffers[periodId] ?? []), ...created.filter((item) => String(item.id_periodo) === periodId)]
+      // Como el servidor: lo asignado más recientemente va primero, antes de lo que ya estaba.
+      const newestFirst = created.filter((item) => String(item.id_periodo) === periodId).reverse()
+      const rows = [...newestFirst, ...(baseOffers[periodId] ?? [])]
 
       return {
         body: {
@@ -298,6 +300,18 @@ describe('AdminSubjectAssignmentsPage — lista y filtro por carrera', () => {
     expect(within(rows[1]).getByText('Inactivo')).toBeInTheDocument()
   })
 
+  it('muestra las filas en el orden del servidor, sin reordenarlas por carrera', async () => {
+    stubBackend()
+
+    renderPage('/materias/asignaciones?periodo=6')
+    await screen.findByText('Hidráulica')
+
+    const rows = tableRows()
+
+    expect(within(rows[0]).getByText('Ingenieria de Sistemas')).toBeInTheDocument()
+    expect(within(rows[1]).getByText('Ingenieria Civil')).toBeInTheDocument()
+  })
+
   it('no ofrece editar, habilitar, deshabilitar ni eliminar asignaciones', async () => {
     stubBackend()
 
@@ -485,6 +499,51 @@ describe('AdminSubjectAssignmentsPage — asignar', () => {
       id_periodo: 6,
     })
     expect(requestsTo(api.calls, '/administracion/asignaciones')).toHaveLength(2)
+  })
+
+  it('tras confirmar, la nueva asignación es la primera fila de la lista', async () => {
+    stubBackend()
+
+    renderPage('/materias/asignaciones?periodo=6')
+    await screen.findByText('Hidráulica')
+
+    expect(within(tableRows()[0]).getByText('Álgebra Lineal')).toBeInTheDocument()
+
+    await chooseCareerAndSubject('2008057 · Cálculo I')
+    await userEvent.click(screen.getByRole('button', { name: 'Asignar materia' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar asignación' }))
+
+    await screen.findByText('Materia asignada: Cálculo I → Ingenieria de Sistemas (2/2026)')
+
+    await waitFor(() => expect(tableRows()).toHaveLength(3))
+
+    const first = within(tableRows()[0])
+
+    expect(first.getByText('Ingenieria de Sistemas')).toBeInTheDocument()
+    expect(first.getByText('2008057')).toBeInTheDocument()
+    expect(first.getByText('Cálculo I')).toBeInTheDocument()
+    expect(first.getByText('Activo')).toBeInTheDocument()
+    expect(within(tableRows()[1]).getByText('Álgebra Lineal')).toBeInTheDocument()
+    expect(within(tableRows()[2]).getByText('Hidráulica')).toBeInTheDocument()
+  })
+
+  it('con el filtro igual a la carrera asignada, la nueva fila también queda primera', async () => {
+    stubBackend()
+
+    renderPage('/materias/asignaciones?periodo=6&carrera=3')
+    await screen.findByText('Álgebra Lineal', { selector: 'td' })
+
+    await chooseCareerAndSubject('2008057 · Cálculo I')
+    await userEvent.click(screen.getByRole('button', { name: 'Asignar materia' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar asignación' }))
+
+    await screen.findByText('Materia asignada: Cálculo I → Ingenieria de Sistemas (2/2026)')
+
+    await waitFor(() => expect(tableRows()).toHaveLength(2))
+
+    expect(within(tableRows()[0]).getByText('Cálculo I')).toBeInTheDocument()
+    expect(within(tableRows()[1]).getByText('Álgebra Lineal')).toBeInTheDocument()
+    expect(currentUrl()).toBe('/materias/asignaciones?periodo=6&carrera=3')
   })
 
   it('el período y el filtro de la URL sobreviven a una asignación', async () => {
