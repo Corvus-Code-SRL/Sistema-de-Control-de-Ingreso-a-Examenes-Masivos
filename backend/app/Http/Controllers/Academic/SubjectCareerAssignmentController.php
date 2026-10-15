@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Academic;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Academic\ListAssignableSubjectsRequest;
 use App\Http\Requests\Academic\ListSubjectCareerAssignmentsRequest;
 use App\Http\Requests\Academic\StoreSubjectCareerRequest;
 use App\Http\Resources\Academic\CareerResource;
+use App\Http\Resources\Academic\PeriodResource;
 use App\Http\Resources\Academic\SubjectCareerAssignmentResource;
 use App\Http\Resources\Academic\SubjectResource;
 use App\Models\Career;
@@ -38,24 +40,29 @@ class SubjectCareerAssignmentController extends Controller
         );
     }
 
-    public function assignableSubjects(Career $career): AnonymousResourceCollection
-    {
-        $this->authorize('viewAny', SubjectCareer::class);
+    public function assignableSubjects(
+        ListAssignableSubjectsRequest $request,
+        Career $career
+    ): AnonymousResourceCollection {
+        $period = $this->service->activePeriod((int) $request->validated()['id_periodo']);
 
         return SubjectResource::collection(
-            $this->service->listAssignableSubjects($career)
+            $this->service->listAssignableSubjects($career, $period)
         );
     }
 
     public function index(ListSubjectCareerAssignmentsRequest $request): AnonymousResourceCollection
     {
-        $careerId = $request->validated()['id_carrera'] ?? null;
+        $validated = $request->validated();
+        $careerId = $validated['id_carrera'] ?? null;
+        $period = $this->service->activePeriod((int) $validated['id_periodo']);
 
         return SubjectCareerAssignmentResource::collection(
-            $this->service->listAssignments($careerId === null ? null : (int) $careerId)
+            $this->service->listAssignments($period, $careerId === null ? null : (int) $careerId)
         )->additional([
             'meta' => [
-                'carreras' => CareerResource::collection($this->service->listAssignedCareers())->resolve(),
+                'periodo' => (new PeriodResource($period))->resolve(),
+                'carreras' => CareerResource::collection($this->service->listCareersForPeriod($period))->resolve(),
             ],
         ]);
     }
@@ -64,15 +71,18 @@ class SubjectCareerAssignmentController extends Controller
         StoreSubjectCareerRequest $request,
         Career $career
     ): JsonResponse {
-        $assignment = $this->service->assign(
+        $validated = $request->validated();
+
+        $offering = $this->service->assign(
             $career,
-            (int) $request->validated()['id_materia'],
+            (int) $validated['id_materia'],
+            (int) $validated['id_periodo'],
             (string) $this->currentUser->id()
         );
 
         return ApiResponse::created(
-            new SubjectCareerAssignmentResource($assignment),
-            'Materia asignada a la carrera correctamente.'
+            new SubjectCareerAssignmentResource($offering),
+            'Materia asignada a la carrera en el período correctamente.'
         );
     }
 }
