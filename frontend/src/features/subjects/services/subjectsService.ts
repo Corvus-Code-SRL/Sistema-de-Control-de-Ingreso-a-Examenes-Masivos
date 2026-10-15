@@ -1,6 +1,8 @@
 import { apiClient, apiPost } from '@/lib/api-client'
 import type { PageRequest } from '@/types/api.types'
 import type {
+  AcademicPeriod,
+  AcademicPeriodsResponse,
   AdminCareersResponse,
   AdminSubjectSummary,
   AssignableSubjectsResponse,
@@ -105,22 +107,35 @@ export async function getAdminCareers(
 }
 
 /**
- * Obtiene las materias activas que todavía no están vinculadas a la carrera.
+ * Períodos académicos disponibles (activos), del más reciente al más antiguo.
+ *
+ * TODO(Sprint 4): features/groups tiene su propia copia (periodsService); mover ambas a un módulo
+ * compartido cuando el selector de período deje de ser de dos features.
+ */
+export async function getAcademicPeriods(signal?: AbortSignal): Promise<AcademicPeriod[]> {
+  const response = await apiClient<AcademicPeriodsResponse>('/periodos', { signal })
+
+  return response.data
+}
+
+/**
+ * Obtiene las materias activas que la carrera todavía no ofrece en el período.
  */
 export async function getAssignableSubjects(
   careerId: number,
+  periodId: number,
   signal?: AbortSignal
 ): Promise<AssignableSubjectsResponse['data']> {
   const response = await apiClient<AssignableSubjectsResponse>(
     `/administracion/carreras/${careerId}/materias-asignables`,
-    { signal }
+    { query: { id_periodo: periodId }, signal }
   )
 
   return response.data
 }
 
 /**
- * Asigna una materia existente a una carrera.
+ * Ofrece una materia existente a una carrera en un período.
  */
 export async function assignSubjectToCareer(
   careerId: number,
@@ -135,17 +150,17 @@ export async function assignSubjectToCareer(
 }
 
 /**
- * Pares materia-carrera de cualquier estado, ordenados por carrera y materia.
- * Con `careerId` el servidor solo devuelve los de esa carrera; `careers` siempre trae
- * todas las que tienen pares, para armar el selector.
+ * Ofertas del período, de cualquier estado, ordenadas por carrera y materia. Con `careerId` el
+ * servidor solo devuelve las de esa carrera; `careers` trae siempre las del selector del período.
  */
 export async function getSubjectCareerAssignments(
+  periodId: number,
   careerId: number | null = null,
   signal?: AbortSignal
 ): Promise<SubjectCareerAssignmentsResult> {
   const response = await apiClient<SubjectCareerAssignmentsResponse>(
     '/administracion/asignaciones',
-    { query: { id_carrera: careerId ?? undefined }, signal }
+    { query: { id_periodo: periodId, id_carrera: careerId ?? undefined }, signal }
   )
 
   return { assignments: response.data, careers: response.meta.carreras }
