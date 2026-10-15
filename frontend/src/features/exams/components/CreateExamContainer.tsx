@@ -4,12 +4,21 @@ import { useCreateExam } from '../hooks/useCreateExam';
 import { ExamForm } from './ExamForm';
 import { AssignGroupsForm } from './AssignGroupsForm';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { AlertTriangle, CheckCircle2, Loader2, Save } from 'lucide-react';
 import { Exam } from '../types/exams.types';
 
 export const CreateExamContainer: React.FC = () => {
   const navigate = useNavigate();
   const [createdExam, setCreatedExam] = useState<Exam | null>(null);
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
 
   const {
     formData,
@@ -22,6 +31,7 @@ export const CreateExamContainer: React.FC = () => {
     warnings,
     updateFormData,
     resetFormData,
+    dismissWarnings,
     validateForm,
     toggleGroup,
     submitExam,
@@ -56,44 +66,21 @@ export const CreateExamContainer: React.FC = () => {
     );
   }
 
-  if (createdExam) {
-    return (
-      <div className="max-w-3xl mx-auto bg-card rounded-xl border border-border p-10 text-center space-y-4">
-        <CheckCircle2 className="h-10 w-10 text-primary mx-auto" />
-        <h1 className="text-lg font-bold text-foreground">Examen creado</h1>
-        <p className="text-xs text-muted-foreground">
-          «{createdExam.nombre_examen}» quedó registrado con sus grupos en estado{' '}
-          <strong>Programado</strong> para el {createdExam.fecha} de{' '}
-          {createdExam.hora_inicio} a {createdExam.hora_fin}.
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-          <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold px-6 py-2.5 rounded-lg">
-            <Link to={`/examenes/${createdExam.id_examen}`}>Ver detalle del examen</Link>
-          </Button>
-          <Button asChild variant="outline" className="text-xs font-semibold px-6 py-2.5 rounded-lg">
-            <Link to="/examenes/programados">Ver en Programados</Link>
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              resetFormData();
-              setCreatedExam(null);
-            }}
-            className="text-xs font-medium px-4 py-2.5 rounded-lg"
-          >
-            Crear otro examen
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validation.isValid) {
-      submitExam();
+
+    if (submitting || createdExam || warnings.length > 0) {
+      return;
     }
+
+    // Mostrar errores únicamente después de intentar guardar.
+    setShowValidationErrors(true);
+
+    if (!validation.isValid) {
+      return;
+    }
+
+    void submitExam();
   };
 
   return (
@@ -118,7 +105,7 @@ export const CreateExamContainer: React.FC = () => {
           formData={formData}
           subjects={options.materias}
           classrooms={options.ambientes}
-          errors={validation.errors}
+          errors={showValidationErrors ? validation.errors : {}}
           warnings={validation.warnings}
           updateFormData={updateFormData}
         />
@@ -127,7 +114,7 @@ export const CreateExamContainer: React.FC = () => {
           selectedSubject={selectedSubject}
           availableGroups={subjectGroups}
           selectedGroupIds={formData.grupos}
-          errors={validation.errors}
+          errors={showValidationErrors ? validation.errors : {}}
           onToggleGroup={toggleGroup}
         />
 
@@ -215,30 +202,6 @@ export const CreateExamContainer: React.FC = () => {
           </section>
         )}
 
-        {warnings.length > 0 && (
-          <div
-            role="alert"
-            className="p-4 rounded-xl bg-warn-soft border border-warn-border text-warn-fg text-xs space-y-3"
-          >
-            <p className="font-bold flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" /> Revise antes de confirmar
-            </p>
-            <ul className="list-disc pl-5 space-y-1">
-              {warnings.map((warning) => (
-                <li key={warning}>{warning}</li>
-              ))}
-            </ul>
-            <Button
-              type="button"
-              disabled={submitting}
-              onClick={() => submitExam(true)}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold px-4 py-2 rounded-lg"
-            >
-              Crear el examen de todos modos
-            </Button>
-          </div>
-        )}
-
         <div className="flex items-center justify-end gap-3 pt-2">
           <Button
             type="button"
@@ -267,6 +230,163 @@ export const CreateExamContainer: React.FC = () => {
           </Button>
         </div>
       </form>
+
+      {/* Modal de confirmación de advertencias */}
+      <Dialog
+        open={warnings.length > 0 && !createdExam}
+        onOpenChange={(open) => {
+          if (!open && !submitting) {
+            dismissWarnings();
+          }
+        }}
+      >
+        <DialogContent
+          showCloseButton={false}
+          className="sm:max-w-lg"
+          onEscapeKeyDown={(event) => {
+            if (submitting) event.preventDefault();
+          }}
+          onInteractOutside={(event) => {
+            if (submitting) event.preventDefault();
+          }}
+        >
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-warn-soft">
+                <AlertTriangle
+                  className="size-5 text-warn-fg"
+                  aria-hidden="true"
+                />
+              </div>
+
+              <DialogTitle>
+                Revise antes de confirmar
+              </DialogTitle>
+            </div>
+
+            <DialogDescription className="pt-2">
+              Se detectaron situaciones que requieren su
+              confirmación antes de registrar el examen.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[40vh] overflow-y-auto rounded-lg border border-warn-border bg-warn-soft p-4">
+            <ul className="list-disc space-y-3 pl-5 text-sm text-warn-fg">
+              {warnings.map((warning, index) => (
+                <li key={`${index}-${warning}`}>
+                  {warning}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={submitting}
+              onClick={dismissWarnings}
+            >
+              Volver al formulario
+            </Button>
+
+            <Button
+              type="button"
+              disabled={submitting}
+              onClick={() => void submitExam(true)}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Registrando...
+                </>
+              ) : (
+                'Crear de todos modos'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de registro exitoso */}
+      <Dialog
+        open={createdExam !== null}
+        onOpenChange={() => {
+          // La creación ya terminó: el usuario debe elegir
+          // una de las tres acciones explícitas.
+        }}
+      >
+        <DialogContent
+          showCloseButton={false}
+          className="sm:max-w-lg"
+          onEscapeKeyDown={(event) => event.preventDefault()}
+          onInteractOutside={(event) => event.preventDefault()}
+        >
+          <DialogHeader>
+            <div className="flex justify-center pb-2">
+              <div className="flex size-14 items-center justify-center rounded-full bg-brand-soft">
+                <CheckCircle2
+                  className="size-8 text-brand"
+                  aria-hidden="true"
+                />
+              </div>
+            </div>
+
+            <DialogTitle className="text-center text-lg">
+              Examen creado correctamente
+            </DialogTitle>
+
+            <DialogDescription className="text-center">
+              El examen se registró exitosamente y se encuentra
+              en estado Programado.
+            </DialogDescription>
+          </DialogHeader>
+
+          {createdExam && (
+            <>
+              <div className="rounded-lg border border-border-soft bg-sunken p-4 text-sm">
+                <p className="font-semibold text-text">
+                  {createdExam.nombre_examen}
+                </p>
+
+                <p className="mt-2 text-muted-foreground">
+                  Fecha: {createdExam.fecha}
+                </p>
+
+                <p className="text-muted-foreground">
+                  Horario: {createdExam.hora_inicio} – {createdExam.hora_fin}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-2">
+                <Button asChild>
+                  <Link to={`/examenes/${createdExam.id_examen}`}>
+                    Ver detalle del examen
+                  </Link>
+                </Button>
+
+                <Button asChild variant="outline">
+                  <Link to="/examenes/programados">
+                    Ver en Programados
+                  </Link>
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    resetFormData();
+                    setShowValidationErrors(false);
+                    setCreatedExam(null);
+                  }}
+                >
+                  Crear otro examen
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -100,7 +100,9 @@ describe('CreateExamContainer (HU-024)', () => {
     )
 
     expect(
-      await screen.findByText('Examen creado')
+      await screen.findByRole('dialog', {
+        name: 'Examen creado correctamente',
+      })
     ).toBeInTheDocument()
 
     expect(
@@ -238,14 +240,19 @@ describe('CreateExamContainer (HU-024)', () => {
 
     renderContainer()
 
-    expect(
-      screen.getByRole('alert')
-    ).toHaveTextContent(
+    const dialog = screen.getByRole('dialog', {
+      name: 'Revise antes de confirmar',
+    })
+
+    expect(dialog).toHaveTextContent(
       'La capacidad de los ambientes seleccionados es insuficiente.'
     )
 
     expect(
-      screen.getByRole('button', { name: /guardar examen/i })
+      screen.getByRole('button', {
+        name: /guardar examen/i,
+        hidden: true,
+      })
     ).toBeDisabled()
 
     expect(submitExam).not.toHaveBeenCalled()
@@ -264,12 +271,62 @@ describe('CreateExamContainer (HU-024)', () => {
 
     renderContainer()
 
+    const dialog = screen.getByRole('dialog', {
+      name: 'Revise antes de confirmar',
+    })
+
     await user.click(
-      screen.getByRole('button', {
-        name: /crear el examen de todos modos/i,
+      within(dialog).getByRole('button', {
+        name: /crear de todos modos/i,
       })
     )
 
     expect(submitExam).toHaveBeenCalledExactlyOnceWith(true)
+  })
+
+  it('no muestra errores de validacion antes de intentar guardar', () => {
+    hook.overrides = {
+      validateForm: () => ({
+        isValid: false,
+        errors: {
+          nombre_examen: 'El nombre del examen es obligatorio.',
+        },
+        warnings: {},
+      }),
+    }
+
+    renderContainer()
+
+    expect(
+      screen.queryByText('El nombre del examen es obligatorio.')
+    ).not.toBeInTheDocument()
+  })
+
+  it('muestra errores de validacion al intentar guardar', async () => {
+    const user = userEvent.setup()
+    const submitExam = vi.fn()
+
+    hook.overrides = {
+      validateForm: () => ({
+        isValid: false,
+        errors: {
+          nombre_examen: 'El nombre del examen es obligatorio.',
+        },
+        warnings: {},
+      }),
+      submitExam,
+    }
+
+    renderContainer()
+
+    await user.click(
+      screen.getByRole('button', { name: /guardar examen/i })
+    )
+
+    expect(
+      screen.getByText('El nombre del examen es obligatorio.')
+    ).toBeInTheDocument()
+
+    expect(submitExam).not.toHaveBeenCalled()
   })
 })
