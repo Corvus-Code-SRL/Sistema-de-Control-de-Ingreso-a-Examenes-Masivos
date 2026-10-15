@@ -21,7 +21,7 @@ class EntryAttemptService
 
     public function recordDenied(int $examId, array $input, User $actor, array $verdict): void
     {
-        if ($verdict['autorizado'] || $verdict['veredicto'] === 'AULA_NO_ASIGNADA') {
+        if ($verdict['autorizado'] || in_array($verdict['veredicto'], ['AULA_NO_ASIGNADA', 'AUXILIAR_EXAMEN'], true)) {
             return;
         }
 

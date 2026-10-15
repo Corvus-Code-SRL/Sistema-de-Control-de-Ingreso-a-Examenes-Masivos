@@ -78,6 +78,77 @@ class StudentVerificationTest extends TestCase
         $this->assertSame(0, DB::table('intento_ingreso')->count());
     }
 
+    public function test_sis_de_auxiliar_del_examen_muestra_su_ficha_sin_registrar_intento_ni_ingreso(): void
+    {
+        DB::table('examen_auxiliar')->insert([
+            'id_examen' => $this->exam->id_examen,
+            'id_usuario' => $this->otroDocenteId,
+            'id_usuario_docente_habilita' => $this->docenteId,
+            'id_ambiente' => $this->otraAulaId,
+        ]);
+        $assistant = User::query()->findOrFail($this->otroDocenteId);
+        $this->getJson($this->url('buscar') . '?sis=' . substr($assistant->cod_sis, 0, 4))
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+        $before = $this->getJson($this->url('estado'))->assertOk()->json('data');
+
+        $this->postJson($this->url('verificar'), [
+            'cod_sis' => $assistant->cod_sis,
+            'id_ambiente' => $this->aulaId,
+        ])->assertOk()
+            ->assertJsonPath('data.veredicto', 'AUXILIAR_EXAMEN')
+            ->assertJsonPath('data.autorizado', false)
+            ->assertJsonPath('data.estudiante', null)
+            ->assertJsonPath('data.auxiliar.cod_sis', $assistant->cod_sis)
+            ->assertJsonPath('data.auxiliar.nombre_completo', $assistant->nombre_completo)
+            ->assertJsonPath('data.auxiliar.ambiente_asignado.nro_aula', '692B');
+
+        $after = $this->getJson($this->url('estado'))->assertOk()->json('data');
+        $this->assertSame($before['version'], $after['version']);
+        $this->assertSame($before['ingresados'], $after['ingresados']);
+        $this->assertSame($before['pendientes'], $after['pendientes']);
+        $this->assertSame(0, DB::table('examen_estudiante')->count());
+        $this->assertSame(0, DB::table('intento_ingreso')->count());
+        $this->assertSame(0, DB::table('log')->where('tabla_afectada', 'intento_ingreso')->count());
+    }
+
+    public function test_sis_de_auxiliar_de_otro_examen_no_revela_su_ficha(): void
+    {
+        $otherExam = $this->createExam([], [$this->aulaId]);
+        DB::table('examen_auxiliar')->insert([
+            'id_examen' => $otherExam->id_examen,
+            'id_usuario' => $this->otroDocenteId,
+            'id_usuario_docente_habilita' => $this->docenteId,
+            'id_ambiente' => $this->aulaId,
+        ]);
+        $assistant = User::query()->findOrFail($this->otroDocenteId);
+
+        $this->postJson($this->url('verificar'), [
+            'cod_sis' => $assistant->cod_sis,
+            'id_ambiente' => $this->aulaId,
+        ])->assertOk()
+            ->assertJsonPath('data.veredicto', 'NO_ENCONTRADO')
+            ->assertJsonPath('data.auxiliar', null);
+    }
+
+    public function test_estudiante_tiene_prioridad_si_comparte_sis_con_auxiliar(): void
+    {
+        $assistant = User::query()->findOrFail($this->otroDocenteId);
+        $assistant->update(['cod_sis' => $this->student->cod_sis]);
+        DB::table('examen_auxiliar')->insert([
+            'id_examen' => $this->exam->id_examen,
+            'id_usuario' => $this->otroDocenteId,
+            'id_usuario_docente_habilita' => $this->docenteId,
+            'id_ambiente' => $this->otraAulaId,
+        ]);
+
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.veredicto', 'AUTORIZADO')
+            ->assertJsonPath('data.estudiante.id_estudiante', $this->student->id_estudiante)
+            ->assertJsonPath('data.auxiliar', null);
+    }
+
     public function test_busca_nombres_sin_distinguir_tildes_ni_mayusculas(): void
     {
         $this->student->update([

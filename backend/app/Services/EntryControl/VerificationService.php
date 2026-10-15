@@ -26,6 +26,7 @@ class VerificationService
             'motivo' => '',
             'autorizado' => false,
             'estudiante' => null,
+            'auxiliar' => null,
             'grupo' => null,
             'ambiente_asignado' => null,
             'antecedentes' => ['tiene_antecedentes' => false, 'cantidad' => 0, 'resumen' => null, 'detalles' => []],
@@ -33,6 +34,16 @@ class VerificationService
         ];
 
         if ($identified['veredicto'] !== 'IDENTIFICADO') {
+            $assistant = isset($input['cod_sis'])
+                ? $this->identification->assistantBySis($examId, (string) $input['cod_sis'])
+                : null;
+            if ($assistant !== null) {
+                $result['veredicto'] = 'AUXILIAR_EXAMEN';
+                $result['motivo'] = 'El SIS corresponde a un auxiliar de este examen. No se registra ingreso de estudiante.';
+                $result['auxiliar'] = $assistant;
+                return $result;
+            }
+
             $result['motivo'] = 'No se encontró al estudiante.';
             return $result;
         }

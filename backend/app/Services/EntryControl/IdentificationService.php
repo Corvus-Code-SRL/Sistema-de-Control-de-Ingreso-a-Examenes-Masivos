@@ -4,6 +4,7 @@ namespace App\Services\EntryControl;
 
 use App\Models\Student;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 class IdentificationService
 {
@@ -25,6 +26,45 @@ class IdentificationService
         }
 
         return ['veredicto' => 'IDENTIFICADO', 'registro' => $record];
+    }
+
+    public function assistantBySis(int $examId, string $sis): ?array
+    {
+        $assistant = DB::table('examen_auxiliar as ea')
+            ->join('usuario as u', 'u.id_usuario', '=', 'ea.id_usuario')
+            ->where('ea.id_examen', $examId)
+            ->where('u.cod_sis', $sis)
+            ->where('u.estado', User::ESTADO_ACTIVO)
+            ->first(['u.cod_sis', 'u.nombre', 'u.apellido_paterno', 'u.apellido_materno', 'ea.id_ambiente']);
+
+        if ($assistant === null) {
+            return null;
+        }
+
+        $rooms = DB::table('examen_ambiente as ea')
+            ->join('ambiente as a', 'a.id_ambiente', '=', 'ea.id_ambiente')
+            ->where('ea.id_examen', $examId)
+            ->orderBy('ea.id_ambiente')
+            ->get(['ea.id_ambiente', 'a.nro_aula'])
+            ->map(fn ($room): array => [
+                'id_ambiente' => (int) $room->id_ambiente,
+                'nro_aula' => $room->nro_aula,
+            ])->all();
+        $roomId = EntryControlSnapshotService::controlRoomOf(
+            $assistant->id_ambiente === null ? null : (int) $assistant->id_ambiente,
+            $rooms
+        );
+        $room = collect($rooms)->firstWhere('id_ambiente', $roomId);
+
+        return [
+            'cod_sis' => $assistant->cod_sis,
+            'nombre_completo' => trim(implode(' ', array_filter([
+                $assistant->nombre,
+                $assistant->apellido_paterno,
+                $assistant->apellido_materno,
+            ]))),
+            'ambiente_asignado' => $room,
+        ];
     }
 
     public function searchByName(int $examId, User $actor, string $name): array
