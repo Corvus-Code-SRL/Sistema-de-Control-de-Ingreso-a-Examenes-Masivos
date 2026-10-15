@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { navigationByArea } from './navigation'
 
 function labelsOf(area: keyof typeof navigationByArea): string[] {
-  return navigationByArea[area].flatMap((group) => group.items.map((item) => item.label))
+  return navigationByArea[area].flatMap((group) =>
+    group.items.flatMap((item) => [item.label, ...(item.children ?? []).map((child) => child.label)])
+  )
 }
 
 describe('navigationByArea', () => {
@@ -30,12 +32,24 @@ describe('navigationByArea', () => {
     expect(incidencias?.to).toBeUndefined()
   })
 
-  it('el administrador tiene una sola entrada Materias y ninguna de Asignar materia', () => {
+  it('el administrador tiene un encabezado Materias sin enlace con Asignaciones y Catálogo debajo', () => {
     const items = navigationByArea.administrador.flatMap((group) => group.items)
+    const header = items.find((item) => item.label === 'Materias')
 
     expect(items.filter((item) => item.label === 'Materias')).toHaveLength(1)
-    expect(items.find((item) => item.label === 'Materias')).toMatchObject({ to: '/materias' })
+    expect(header?.to).toBeUndefined()
+    expect(header?.children?.map((child) => [child.label, child.to])).toEqual([
+      ['Asignaciones', '/materias/asignaciones'],
+      ['Catálogo', '/materias/catalogo'],
+    ])
     expect(items.find((item) => item.label === 'Asignar materia')).toBeUndefined()
-    expect(items.some((item) => item.to === '/materias/asignar')).toBe(false)
+    expect(items.some((item) => item.to === '/materias/asignar' || item.to === '/materias')).toBe(false)
+  })
+
+  it('la navegación del docente conserva Materias como enlace directo a /materias', () => {
+    const items = navigationByArea.docente.flatMap((group) => group.items)
+
+    expect(items.find((item) => item.label === 'Materias')).toMatchObject({ to: '/materias' })
+    expect(items.some((item) => item.children !== undefined)).toBe(false)
   })
 })

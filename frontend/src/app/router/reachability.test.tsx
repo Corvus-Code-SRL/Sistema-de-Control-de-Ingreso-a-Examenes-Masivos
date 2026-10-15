@@ -57,8 +57,10 @@ describe('alcance por clics desde el menú lateral', () => {
   const areas = Object.keys(navigationByArea) as Area[]
 
   for (const area of areas) {
+    // Un encabezado con hijos no navega: sus destinos son los hijos.
     const linkable = navigationByArea[area]
       .flatMap((group) => group.items)
+      .flatMap((item) => item.children ?? [item])
       .filter((item) => item.to)
 
     it.each(linkable.map((item) => [item.label, item.to as string]))(
