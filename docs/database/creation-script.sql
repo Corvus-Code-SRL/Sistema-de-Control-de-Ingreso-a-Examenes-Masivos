@@ -3,9 +3,9 @@
 --   * examen.minutos_apertura (0 a 30, por defecto 10): minutos previos a la hora de inicio
 --     en que abre el control de ingreso.
 --   * Trigger que solo permite pasar a CANCELADO desde PROGRAMADO.
---   * Tablas grupo_auxiliar y examen_auxiliar (HU-08, HU-09). examen_auxiliar.id_ambiente
+--   * Tablas grupo_auxiliar y examen_auxiliar. examen_auxiliar.id_ambiente
 --     queda atado a los ambientes del propio examen.
---   * Ya incorporados en V4 tras la HU-21 y la HU-24: estudiante.ci admite NULL y examen
+--   * Ya incorporados en V4: estudiante.ci admite NULL y examen
 --     tiene id_usuario_docente, id_carrera, id_materia y estado (public.estado_examen).
 --   * periodo.gestion es smallint entre 1900 y 2200.
 -- Versión 4 (public). Cambios respecto de V3:
@@ -111,6 +111,7 @@ CREATE TABLE public.estudiante (
     cod_sis              varchar(15) NOT NULL,
     -- NULL hasta la primera verificación (EX04): la nómina no trae el CI.
     ci                   varchar(10),
+    foto_url             text,
     nombre               varchar(50) NOT NULL,
     apellido_paterno     varchar(30) NOT NULL,
     apellido_materno     varchar(30),
