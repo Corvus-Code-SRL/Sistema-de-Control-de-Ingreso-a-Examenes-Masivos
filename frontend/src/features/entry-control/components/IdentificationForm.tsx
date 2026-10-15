@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { StudentSearch } from './StudentSearch'
 import { IdentifierSuggestions } from './IdentifierSuggestions'
 import type { StudentMatch } from '../types/entry-control.types'
-import { CI_MAX_LENGTH, hasInvalidSisMonth, isValidSis, SIS_LENGTH } from '../utils/identificationValidation'
+import { CI_MAX_LENGTH, isValidSis, SIS_LENGTH } from '../utils/identificationValidation'
 
 interface Props {
   examId: number
@@ -23,7 +23,6 @@ interface Props {
 export function IdentificationForm(props: Props) {
   function submit(event: FormEvent) { event.preventDefault(); props.onVerify() }
   function select(student: StudentMatch) { props.onSelect(student) }
-  const invalidMonth = hasInvalidSisMonth(props.sis)
 
   return (
     <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6" aria-labelledby="verify-heading">
@@ -35,9 +34,7 @@ export function IdentificationForm(props: Props) {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="entry-sis">Código SIS</Label>
-            <Input id="entry-sis" inputMode="numeric" autoComplete="off" value={props.sis} onChange={(event) => props.onSisChange(event.target.value)} placeholder="Ej: 202301903" className="h-12 sciem-tnum text-base" maxLength={SIS_LENGTH} aria-describedby={invalidMonth ? 'entry-sis-hint entry-sis-month' : 'entry-sis-hint'} disabled={props.disabled} required />
-            
-            {/* {invalidMonth && <p id="entry-sis-month" role="status" className="text-xs text-warn-fg">El código SIS no existe. Puede continuar con la verificación.</p>} */}
+            <Input id="entry-sis" inputMode="numeric" autoComplete="off" value={props.sis} onChange={(event) => props.onSisChange(event.target.value)} placeholder="Ej: 202301903" className="h-12 sciem-tnum text-base" maxLength={SIS_LENGTH} disabled={props.disabled} required />
             <IdentifierSuggestions examId={props.examId} field="sis" query={props.sis} disabled={props.disabled} onSelect={select} />
           </div>
           <div className="space-y-1.5">

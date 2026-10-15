@@ -117,7 +117,7 @@ describe('EntryControlPage', () => {
     expect(verifyBody).toEqual({ cod_sis: '199912543', ci: '00123', id_ambiente: 5 })
   })
 
-  it('advierte sobre el mes inválido sin impedir la verificación', async () => {
+  it('permite verificar un SIS de nueve dígitos sin validar el mes', async () => {
     mockApi(routes())
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
 
@@ -127,7 +127,6 @@ describe('EntryControlPage', () => {
     expect(verify).toBeDisabled()
 
     fireEvent.change(sis, { target: { value: '202150001' } })
-    expect(screen.getByText(/El mes del código SIS no está entre 01 y 12/)).toBeInTheDocument()
     expect(verify).toBeEnabled()
     fireEvent.click(verify)
     expect(await screen.findByText('AUTORIZADO')).toBeInTheDocument()
