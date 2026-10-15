@@ -89,9 +89,11 @@ class SubjectCareerAssignmentService
     }
 
     /**
-     * Ofertas del período, de cualquier estado, ordenadas por carrera y materia. La carrera y la
-     * materia viajan con un join y se cargan en dos consultas fijas; el período, ya resuelto, se
-     * comparte entre todas las filas.
+     * Ofertas del período, de cualquier estado, de la más reciente a la más antigua. La fecha de
+     * registro tiene precisión de segundos, así que las que empatan (p. ej. las sembradas) quedan
+     * por carrera, código de materia e ids, en un orden estable. La carrera y la materia viajan con
+     * un join y se cargan en dos consultas fijas; el período, ya resuelto, se comparte entre todas
+     * las filas.
      */
     public function listAssignments(Period $period, ?int $careerId = null): Collection
     {
@@ -105,8 +107,10 @@ class SubjectCareerAssignmentService
                 fn ($query) => $query->where('oferta_academica.id_carrera', $careerId)
             )
             ->with(['career', 'subject'])
+            ->orderByDesc('oferta_academica.fecha_registro')
             ->orderBy('carrera.nombre')
-            ->orderBy('materia.nombre')
+            ->orderBy('materia.codigo')
+            ->orderBy('oferta_academica.id_carrera')
             ->orderBy('oferta_academica.id_materia')
             ->get();
 
