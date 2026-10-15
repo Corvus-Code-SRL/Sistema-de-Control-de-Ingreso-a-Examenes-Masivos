@@ -32,6 +32,12 @@ export interface EntryStudent extends StudentMatch {
   foto_url: string | null
 }
 
+export interface EntryAssistant {
+  cod_sis: string
+  nombre_completo: string
+  ambiente_asignado: EntryRoom | null
+}
+
 export interface PreviousEntry {
   registrado_en: string | null
   hora_ingreso: string | null
@@ -45,6 +51,7 @@ export interface Verification {
   motivo: string
   autorizado: boolean
   estudiante: EntryStudent | null
+  auxiliar?: EntryAssistant | null
   grupo: { id_grupo: number; num_grupo: string } | null
   ambiente_asignado: EntryRoom | null
   antecedentes: { tiene_antecedentes: boolean; cantidad: number; resumen: string | null; detalles?: { tipo: string; fecha: string }[] }

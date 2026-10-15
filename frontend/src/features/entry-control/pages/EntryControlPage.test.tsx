@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { mockApi } from '@/test/http'
 import { renderWithRouter } from '@/test/render'
 import { EntryControlPage } from './EntryControlPage'
-import type { EntryContext } from '../types/entry-control.types'
+import type { EntryContext, Verification } from '../types/entry-control.types'
 
 const context: EntryContext = {
   id_examen: 7, nombre_examen: 'Primer parcial', fecha: '2026-09-29',
@@ -21,7 +21,7 @@ const allowed = { veredicto: 'AUTORIZADO', motivo: 'Inscrito en un grupo del exa
   ambiente_asignado: { id_ambiente: 5, nro_aula: '691A' },
   antecedentes: { tiene_antecedentes: false, cantidad: 0, resumen: null }, ingreso_previo: null }
 
-function routes(verdict = allowed, examContext = context): Parameters<typeof mockApi>[0] {
+function routes(verdict: Verification = allowed, examContext = context): Parameters<typeof mockApi>[0] {
   return [
     { matches: (url: string) => url.endsWith('/contexto'), body: { data: examContext } },
     { matches: (url: string) => url.includes('/estado'), body: { data: examContext.estado === 'PROGRAMADO' ? { estado: 'PROGRAMADO', motivo_apertura: null } : status } },
@@ -72,6 +72,28 @@ describe('EntryControlPage', () => {
     const verifyBody = JSON.parse((calls.find(([url]) => String(url).endsWith('/verificar'))?.[1] as RequestInit).body as string)
     expect(verifyBody).toEqual({ cod_sis: '202309201', ci: '9456781', id_ambiente: 5 })
     await waitFor(() => expect(calls.some(([url]) => String(url).endsWith('/confirmar-ingreso'))).toBe(true))
+  })
+
+  it('muestra la ficha de un auxiliar sin permitir confirmar ingreso', async () => {
+    mockApi(routes({
+      ...allowed, veredicto: 'AUXILIAR_EXAMEN', autorizado: false, estudiante: null,
+      auxiliar: { cod_sis: '200100002', nombre_completo: 'Ana López', ambiente_asignado: { id_ambiente: 6, nro_aula: '692B' } },
+      grupo: null, ambiente_asignado: null,
+      motivo: 'El SIS corresponde a un auxiliar de este examen. No se registra ingreso de estudiante.',
+    }))
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+
+    fireEvent.change(await screen.findByLabelText('Código SIS'), { target: { value: '200100002' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar estudiante' }))
+
+    expect(await screen.findByText('AUXILIAR DEL EXAMEN')).toBeInTheDocument()
+    expect(screen.getByText('Ana López')).toBeInTheDocument()
+    expect(screen.getByText('692B')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Aceptar ingreso' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Intento registrado con hora/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Nueva verificación' })).toBeInTheDocument()
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith('/confirmar-ingreso'))).toBe(false)
   })
 
   it('filtra letras de SIS y CI al pegar y conserva los ceros iniciales del CI', async () => {
