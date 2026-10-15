@@ -30,6 +30,8 @@ final class TestDataIds
     public const CAREER_INFORMATICS = 9102;
     public const CAREER_ECONOMICS = 9103;
     public const CAREER_BUSINESS = 9104;
+    /** Carrera activa sin pares ni ofertas en ningún período, ver AssignmentSampleTestDataSeeder. */
+    public const CAREER_NO_OFFERINGS_SAMPLE = 9105;
 
     // materia.id_materia
     public const SUBJECT_CALCULUS = 9201;
@@ -40,6 +42,8 @@ final class TestDataIds
     public const SUBJECT_MICROECONOMICS = 9206;
     public const SUBJECT_ACCOUNTING = 9207;
     public const SUBJECT_ARCHIVED = 9208;
+    /** Electiva de muestra de HU-006: ofertada solo en 1/2026, ver AssignmentSampleTestDataSeeder. */
+    public const SUBJECT_ELECTIVE_SAMPLE = 9209;
 
     // gestion.id_gestion
     public const YEAR_2025 = 9311;

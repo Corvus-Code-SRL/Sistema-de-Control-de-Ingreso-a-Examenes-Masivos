@@ -3,11 +3,51 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { AREA_LABELS, LOGIN_PATH, useAuth, useCurrentUser } from '@/features/auth'
 import { cn } from '@/lib/utils'
-import { navigationByArea } from './navigation'
+import { navigationByArea, type NavItem } from './navigation'
 
 interface AppSidebarProps {
   /** Al navegar en móvil hay que cerrar el panel que contiene el menú. */
   onNavigate?: () => void
+}
+
+interface SidebarLinkProps {
+  item: NavItem
+  onNavigate?: () => void
+}
+
+/** Un destino de la navegación: enlace si tiene `to`, y si no, un ítem deshabilitado que lo avisa. */
+function SidebarLink({ item, onNavigate }: SidebarLinkProps) {
+  if (!item.to) {
+    return (
+      <span
+        aria-disabled="true"
+        title="Disponible en una próxima entrega"
+        className="flex h-10 cursor-not-allowed items-center gap-3 rounded-md px-3 text-sm font-medium text-sb-group/70"
+      >
+        <item.icon className="size-4 shrink-0" aria-hidden="true" />
+        <span className="flex-1 truncate">{item.label}</span>
+      </span>
+    )
+  }
+
+  return (
+    <NavLink
+      to={item.to}
+      end={item.end}
+      onClick={onNavigate}
+      className={({ isActive }) =>
+        cn(
+          'flex h-10 items-center gap-3 rounded-md px-3 text-sm transition-colors',
+          isActive
+            ? 'bg-brand font-semibold text-white'
+            : 'font-medium text-sidebar-foreground hover:bg-sb-hover'
+        )
+      }
+    >
+      <item.icon className="size-4 shrink-0" aria-hidden="true" />
+      <span className="flex-1 truncate">{item.label}</span>
+    </NavLink>
+  )
 }
 
 /**
@@ -52,32 +92,26 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
             <ul className="space-y-0.5">
               {group.items.map((item) => (
                 <li key={item.label}>
-                  {item.to ? (
-                    <NavLink
-                      to={item.to}
-                      end={item.end}
-                      onClick={onNavigate}
-                      className={({ isActive }) =>
-                        cn(
-                          'flex h-10 items-center gap-3 rounded-md px-3 text-sm transition-colors',
-                          isActive
-                            ? 'bg-brand font-semibold text-white'
-                            : 'font-medium text-sidebar-foreground hover:bg-sb-hover'
-                        )
-                      }
-                    >
-                      <item.icon className="size-4 shrink-0" aria-hidden="true" />
-                      <span className="flex-1 truncate">{item.label}</span>
-                    </NavLink>
+                  {item.children ? (
+                    <div>
+                      <span className="flex h-10 items-center gap-3 px-3 text-sm font-medium text-sidebar-foreground">
+                        <item.icon className="size-4 shrink-0" aria-hidden="true" />
+                        <span className="flex-1 truncate">{item.label}</span>
+                      </span>
+
+                      <ul
+                        aria-label={item.label}
+                        className="ml-5 space-y-0.5 border-l border-sidebar-border pl-2"
+                      >
+                        {item.children.map((child) => (
+                          <li key={child.label}>
+                            <SidebarLink item={child} onNavigate={onNavigate} />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   ) : (
-                    <span
-                      aria-disabled="true"
-                      title="Disponible en una próxima entrega"
-                      className="flex h-10 cursor-not-allowed items-center gap-3 rounded-md px-3 text-sm font-medium text-sb-group/70"
-                    >
-                      <item.icon className="size-4 shrink-0" aria-hidden="true" />
-                      <span className="flex-1 truncate">{item.label}</span>
-                    </span>
+                    <SidebarLink item={item} onNavigate={onNavigate} />
                   )}
                 </li>
               ))}

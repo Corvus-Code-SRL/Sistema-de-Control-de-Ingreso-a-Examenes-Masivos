@@ -80,12 +80,15 @@ export function AppShell({
                   // El separador es hermano del item, no hijo: ambos son <li>.
                   <Fragment key={`${crumb.label}-${index}`}>
                     <BreadcrumbItem>
-                      {crumb.to && index < breadcrumbs.length - 1 ? (
+                      {index === breadcrumbs.length - 1 ? (
+                        <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                      ) : crumb.to ? (
                         <Link to={crumb.to} className="hover:text-foreground">
                           {crumb.label}
                         </Link>
                       ) : (
-                        <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                        // Grupo sin pantalla propia: texto, no «página actual» (solo lo es la última miga).
+                        <span>{crumb.label}</span>
                       )}
                     </BreadcrumbItem>
 
