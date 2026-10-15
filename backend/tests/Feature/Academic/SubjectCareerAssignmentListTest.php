@@ -225,13 +225,35 @@ class SubjectCareerAssignmentListTest extends TestCase
         $this->getJson($this->url())->assertOk()->assertJsonPath('data', []);
     }
 
-    public function test_ordena_por_carrera_y_luego_por_materia(): void
+    /** `fecha_registro` toma `now()`, igual para todo el test: se fija para controlar la recencia. */
+    private function registeredAt(Career $career, Subject $subject, string $at, ?int $periodId = null): void
+    {
+        DB::table('oferta_academica')
+            ->where('id_carrera', $career->id_carrera)
+            ->where('id_materia', $subject->id_materia)
+            ->where('id_gestion_periodo', $periodId ?? $this->periodId)
+            ->update(['fecha_registro' => $at]);
+    }
+
+    /** @return string[] «Carrera/Materia» de cada fila, en el orden recibido. */
+    private function labels(array $rows): array
+    {
+        return array_map(
+            fn (array $row): string => $row['carrera']['nombre'] . '/' . $row['materia']['nombre'],
+            $rows
+        );
+    }
+
+    public function test_ordena_de_la_mas_reciente_a_la_mas_antigua_entre_carreras(): void
     {
         $systems = $this->career('Ingenieria de Sistemas', 'SIS');
         $civil = $this->career('Ingenieria Civil', 'CIV');
-        $this->offer($systems, 'Redes', '2008010');
-        $this->offer($systems, 'Algebra', '2008011');
-        $this->offer($civil, 'Topografia', '2008012');
+        $networks = $this->offer($systems, 'Redes', '2008010');
+        $algebra = $this->offer($systems, 'Algebra', '2008011');
+        $surveying = $this->offer($civil, 'Topografia', '2008012');
+        $this->registeredAt($systems, $algebra, '2026-03-01 10:00:00-04');
+        $this->registeredAt($civil, $surveying, '2026-03-01 11:00:00-04');
+        $this->registeredAt($systems, $networks, '2026-03-01 12:00:00-04');
 
         $this->actAsAdministrator();
 
@@ -239,11 +261,118 @@ class SubjectCareerAssignmentListTest extends TestCase
 
         $this->assertSame(
             [
+                'Ingenieria de Sistemas/Redes',
                 'Ingenieria Civil/Topografia',
                 'Ingenieria de Sistemas/Algebra',
-                'Ingenieria de Sistemas/Redes',
             ],
-            array_map(fn (array $row): string => $row['carrera']['nombre'] . '/' . $row['materia']['nombre'], $rows)
+            $this->labels($rows)
+        );
+    }
+
+    public function test_el_empate_de_fecha_se_resuelve_por_carrera_y_codigo_de_materia_de_forma_estable(): void
+    {
+        $systems = $this->career('Ingenieria de Sistemas', 'SIS');
+        $civil = $this->career('Ingenieria Civil', 'CIV');
+        $networks = $this->offer($systems, 'Redes', '2008010');
+        $algebra = $this->offer($systems, 'Algebra', '2008011');
+        $surveying = $this->offer($civil, 'Topografia', '2008012');
+        $sameInstant = '2026-03-01 10:00:00-04';
+        $this->registeredAt($systems, $networks, $sameInstant);
+        $this->registeredAt($systems, $algebra, $sameInstant);
+        $this->registeredAt($civil, $surveying, $sameInstant);
+
+        $this->actAsAdministrator();
+
+        $first = $this->labels($this->getJson($this->url())->assertOk()->json('data'));
+        $second = $this->labels($this->getJson($this->url())->assertOk()->json('data'));
+
+        // Redes (2008010) va antes que Algebra (2008011): desempata el código, no el nombre.
+        $this->assertSame(
+            [
+                'Ingenieria Civil/Topografia',
+                'Ingenieria de Sistemas/Redes',
+                'Ingenieria de Sistemas/Algebra',
+            ],
+            $first
+        );
+        $this->assertSame($first, $second);
+    }
+
+    public function test_conserva_el_orden_por_recientes_con_el_filtro_de_carrera(): void
+    {
+        $systems = $this->career('Ingenieria de Sistemas', 'SIS');
+        $civil = $this->career('Ingenieria Civil', 'CIV');
+        $networks = $this->offer($systems, 'Redes', '2008010');
+        $algebra = $this->offer($systems, 'Algebra', '2008011');
+        $surveying = $this->offer($civil, 'Topografia', '2008012');
+        $this->registeredAt($systems, $algebra, '2026-03-01 10:00:00-04');
+        $this->registeredAt($civil, $surveying, '2026-03-01 11:00:00-04');
+        $this->registeredAt($systems, $networks, '2026-03-01 12:00:00-04');
+
+        $this->actAsAdministrator();
+
+        $rows = $this->getJson($this->url(['id_carrera' => $systems->id_carrera]))
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->json('data');
+
+        $this->assertSame(
+            ['Ingenieria de Sistemas/Redes', 'Ingenieria de Sistemas/Algebra'],
+            $this->labels($rows)
+        );
+    }
+
+    public function test_el_orden_por_recientes_se_aplica_dentro_de_cada_periodo(): void
+    {
+        $systems = $this->career('Ingenieria de Sistemas', 'SIS');
+        $civil = $this->career('Ingenieria Civil', 'CIV');
+        $networks = $this->offer($systems, 'Redes', '2008010');
+        $surveying = $this->offer($civil, 'Topografia', '2008012');
+        $this->offerExisting($systems, $networks, RecordStatus::ACTIVE, $this->otherPeriodId);
+        $this->offerExisting($civil, $surveying, RecordStatus::ACTIVE, $this->otherPeriodId);
+
+        $this->registeredAt($systems, $networks, '2026-03-01 10:00:00-04');
+        $this->registeredAt($civil, $surveying, '2026-03-01 09:00:00-04');
+        $this->registeredAt($systems, $networks, '2026-08-01 08:00:00-04', $this->otherPeriodId);
+        $this->registeredAt($civil, $surveying, '2026-08-01 13:00:00-04', $this->otherPeriodId);
+
+        $this->actAsAdministrator();
+
+        $this->assertSame(
+            ['Ingenieria de Sistemas/Redes', 'Ingenieria Civil/Topografia'],
+            $this->labels($this->getJson($this->url())->assertOk()->json('data'))
+        );
+        $this->assertSame(
+            ['Ingenieria Civil/Topografia', 'Ingenieria de Sistemas/Redes'],
+            $this->labels($this->getJson($this->url([], $this->otherPeriodId))->assertOk()->json('data'))
+        );
+    }
+
+    public function test_la_asignacion_recien_confirmada_aparece_primera_en_el_listado(): void
+    {
+        $systems = $this->career('Ingenieria de Sistemas', 'SIS');
+        $civil = $this->career('Ingenieria Civil', 'CIV');
+        $surveying = $this->offer($civil, 'Topografia', '2008012');
+        $networks = $this->offer($systems, 'Redes', '2008010');
+        $this->registeredAt($civil, $surveying, '2026-01-10 08:00:00-04');
+        $this->registeredAt($systems, $networks, '2026-01-10 09:00:00-04');
+        $calculus = $this->subject('Calculo I', '2008057');
+
+        $this->actAsAdministrator();
+
+        $this->postJson("/api/administracion/carreras/{$systems->id_carrera}/materias", [
+            'id_materia' => $calculus->id_materia,
+            'id_periodo' => $this->periodId,
+        ])->assertCreated();
+
+        $rows = $this->getJson($this->url())->assertOk()->assertJsonCount(3, 'data')->json('data');
+
+        $this->assertSame($systems->id_carrera, $rows[0]['id_carrera']);
+        $this->assertSame($calculus->id_materia, $rows[0]['id_materia']);
+        $this->assertSame(RecordStatus::ACTIVE, $rows[0]['estado']);
+        $this->assertSame(
+            ['Ingenieria de Sistemas/Calculo I', 'Ingenieria de Sistemas/Redes', 'Ingenieria Civil/Topografia'],
+            $this->labels($rows)
         );
     }
 
