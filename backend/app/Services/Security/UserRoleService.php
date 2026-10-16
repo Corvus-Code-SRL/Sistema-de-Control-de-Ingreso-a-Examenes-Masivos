@@ -121,11 +121,19 @@ class UserRoleService
         return $this->hasActiveRole($userId, Role::DOCENTE);
     }
 
+    /** ¿La cuenta indicada está ACTIVA y tiene hoy alguno de los roles dados? Sin cuenta, nunca. */
+    public function hasAnyActiveRole(?string $userId, array $roleNames): bool
+    {
+        return $this->hasActiveRole($userId, $roleNames);
+    }
+
     /**
      * Una cuenta INACTIVA no ejerce su rol aunque conserve un token vigente: el token se emite al
      * iniciar sesión y la cuenta puede deshabilitarse después.
+     *
+     * @param  string|array<int, string>  $roleNames
      */
-    private function hasActiveRole(?string $userId, string $roleName): bool
+    private function hasActiveRole(?string $userId, $roleNames): bool
     {
         if ($userId === null) {
             return false;
@@ -133,7 +141,7 @@ class UserRoleService
 
         return User::whereKey($userId)
             ->activos()
-            ->whereHas('activeRoles', fn ($query) => $query->where('nombre_rol', $roleName))
+            ->whereHas('activeRoles', fn ($query) => $query->whereIn('nombre_rol', (array) $roleNames))
             ->exists();
     }
 
