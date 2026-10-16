@@ -54,7 +54,7 @@ export interface Verification {
   auxiliar?: EntryAssistant | null
   grupo: { id_grupo: number; num_grupo: string } | null
   ambiente_asignado: EntryRoom | null
-  antecedentes: { tiene_antecedentes: boolean; cantidad: number; resumen: string | null; detalles?: { tipo: string; fecha: string }[] }
+  antecedentes: { total: number; latest: { tipo_falta: string; fecha_registro: string } | null }
   ingreso_previo: PreviousEntry | null
 }
 
@@ -117,5 +117,14 @@ export interface OpenEntryExam {
   fecha: string | null
   hora_inicio: string | null
   materia: string | null
+  carrera: string | null
   ambientes: string[]
+  rol_controlador: 'DOCENTE' | 'AUXILIAR'
+  id_ambiente_asignado: number | null
+  ambiente_asignado: string | null
+  apertura_programada_en: string
+  motivo_apertura: EntryOpeningFailure | null
+  total: number
+  ingresados: number
+  pendientes: number
 }

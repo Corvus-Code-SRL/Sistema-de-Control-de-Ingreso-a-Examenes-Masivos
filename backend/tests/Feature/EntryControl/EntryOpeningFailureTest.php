@@ -40,6 +40,10 @@ class EntryOpeningFailureTest extends TestCase
         $this->runOpeningJob();
 
         $this->assertFailure($exam, 'SIN_NOMINA', 'El examen no tiene estudiantes en su nómina.');
+        $this->getJson('/api/control-ingreso/examenes')
+            ->assertOk()
+            ->assertJsonPath('data.0.motivo_apertura.codigo', 'SIN_NOMINA')
+            ->assertJsonPath('data.0.total', 0);
         $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
         $this->assertFalse(app(RoomAssignmentService::class)->hasPreparedSnapshot($exam->id_examen));
     }
