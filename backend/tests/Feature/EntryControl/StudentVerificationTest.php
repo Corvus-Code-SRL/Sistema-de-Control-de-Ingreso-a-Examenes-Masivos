@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\EntryControl\RoomAssignmentService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\Concerns\SeedsExamCatalog;
@@ -370,6 +371,31 @@ class StudentVerificationTest extends TestCase
             ->assertJsonCount(1, 'data');
 
         $this->assertSame([], $queries);
+    }
+
+    public function test_snapshot_anterior_sin_antecedentes_no_rompe_la_verificacion(): void
+    {
+        $cache = Cache::store(config('sciem.entry_control_cache_store', 'redis'));
+        $token = $cache->get("entry-control:{$this->exam->id_examen}:active");
+        $key = "entry-control:{$this->exam->id_examen}:{$token}:student:{$this->student->id_estudiante}";
+        $record = $cache->get($key);
+        unset($record['antecedentes']);
+        $cache->put($key, $record, now()->addHour());
+
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.antecedentes.total', 0)
+            ->assertJsonPath('data.antecedentes.latest', null);
+
+        $record['antecedentes'] = [
+            'cantidad' => 1,
+            'detalles' => [['tipo' => 'Suplantacion', 'fecha' => '2026-10-13']],
+        ];
+        $cache->put($key, $record, now()->addHour());
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.antecedentes.total', 1)
+            ->assertJsonPath('data.antecedentes.latest.tipo_falta', 'Suplantacion');
     }
 
     public function test_ci_diferente_bloquea_la_verificacion_y_registra_el_intento(): void

@@ -52,7 +52,14 @@ class VerificationService
         $result['estudiante'] = $record['estudiante'];
         $result['grupo'] = $record['grupo'];
         $result['ambiente_asignado'] = $record['ambiente_asignado'];
-        $result['antecedentes'] = $record['antecedentes'];
+        $risk = $record['antecedentes'] ?? [];
+        $result['antecedentes'] = isset($risk['total']) ? $risk : [
+            'total' => (int) ($risk['cantidad'] ?? 0),
+            'latest' => isset($risk['detalles'][0]) ? [
+                'tipo_falta' => $risk['detalles'][0]['tipo'],
+                'fecha_registro' => $risk['detalles'][0]['fecha'],
+            ] : null,
+        ];
         $result['ingreso_previo'] = $record['ingreso_previo'];
 
         if ($record['grupo'] === null) {
