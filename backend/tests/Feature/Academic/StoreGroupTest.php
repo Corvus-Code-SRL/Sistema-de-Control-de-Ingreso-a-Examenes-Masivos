@@ -3,6 +3,8 @@
 namespace Tests\Feature\Academic;
 
 use App\Models\Group;
+use App\Models\AuditLog;
+use Database\Seeders\ActionSeeder;
 use App\Support\RecordStatus;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -21,12 +23,13 @@ class StoreGroupTest extends TestCase
     use DatabaseTransactions;
     use SeedsAssistantManagement;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
+   protected function setUp(): void
+{
+    parent::setUp();
 
-        $this->seedAcademicCatalog();
-    }
+    $this->seedAcademicCatalog();
+    $this->seed(ActionSeeder::class);
+}
 
     private function payload(array $overrides = []): array
     {
@@ -40,6 +43,7 @@ class StoreGroupTest extends TestCase
     /** CA 1, 5 y 6: queda asociado al par, con el docente que actúa, y la respuesta lo confirma. */
     public function test_registra_un_grupo_dentro_del_par_materia_carrera(): void
     {
+        $logsAntes = AuditLog::count();
         $response = $this->postJson('/api/grupos', $this->payload());
 
         $response->assertStatus(201);
@@ -52,13 +56,18 @@ class StoreGroupTest extends TestCase
         $response->assertJsonPath('data.materia.id_carrera', $this->sistemasId);
         $response->assertJsonPath('data.materia.id_materia', $this->calculoId);
 
-        $this->assertDatabaseHas('grupo', [
-            'id_carrera' => $this->sistemasId,
-            'id_materia' => $this->calculoId,
-            'num_grupo' => 'NUEVO',
-            'id_gestion_periodo' => $this->periodoActivoId,
-            'id_usuario_docente' => $this->docenteId,
-        ]);
+       $this->assertDatabaseHas('grupo', [
+    'id_carrera' => $this->sistemasId,
+    'id_materia' => $this->calculoId,
+    'num_grupo' => 'NUEVO',
+    'id_gestion_periodo' => $this->periodoActivoId,
+    'id_usuario_docente' => $this->docenteId,
+]);
+
+$this->assertSame(
+    $logsAntes + 1,
+    AuditLog::count()
+);
     }
 
     /**
