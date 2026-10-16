@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\ReportStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -16,8 +18,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property int $id_tipo_falta
  * @property string $id_usuario_reportante
  * @property string|null $descripcion
- * @property string $evidencia_url
- * @property string $evidencia_public_id
+ * @property string|null $evidencia_url nulo junto con evidencia_public_id: hay evidencia completa o ninguna
+ * @property string|null $evidencia_public_id
+ * @property int|null $id_intento intento de ingreso que originó el reporte; un intento origina como máximo uno
  * @property \Carbon\Carbon $fecha_reporte
  * @property string $estado
  * @property \Carbon\Carbon|null $fecha_revision
@@ -34,6 +37,7 @@ class StudentReport extends Model
         'id_estudiante' => 'int',
         'id_examen' => 'int',
         'id_tipo_falta' => 'int',
+        'id_intento' => 'int',
         'id_usuario_reportante' => 'string',
         'fecha_reporte' => 'datetime',
         'fecha_revision' => 'datetime',
@@ -44,6 +48,7 @@ class StudentReport extends Model
         'id_estudiante',
         'id_examen',
         'id_tipo_falta',
+        'id_intento',
         'id_usuario_reportante',
         'descripcion',
         'evidencia_url',
@@ -70,6 +75,11 @@ class StudentReport extends Model
         return $this->belongsTo(IncidentType::class, 'id_tipo_falta', 'id_falta');
     }
 
+    public function entryAttempt(): BelongsTo
+    {
+        return $this->belongsTo(EntryAttempt::class, 'id_intento', 'id_intento');
+    }
+
     public function userReviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'id_usuario_revisor', 'id_usuario');
@@ -90,5 +100,10 @@ class StudentReport extends Model
     public function riskCenter(): HasOne
     {
         return $this->hasOne(RiskCenter::class, 'id_reporte_est', 'id_reporte_est');
+    }
+
+    public function scopePending(Builder $query): Builder
+    {
+        return $query->where('estado', ReportStatus::PENDING);
     }
 }
