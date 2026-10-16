@@ -99,7 +99,7 @@ export type StatusResponse = EntryStatus | PendingEntryStatus | {
 export type RejectionReason = 'DOCUMENTO_NO_VALIDO' | 'IDENTIDAD_DUDOSA' | 'DECISION_CONTROLADOR' | 'OTRO'
 
 export interface VerificationInput {
-  cod_sis: string
+  cod_sis?: string
   ci?: string
   id_ambiente: number
 }

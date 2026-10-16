@@ -60,7 +60,7 @@ describe('EntryControlPage', () => {
     expect(await screen.findByText(/Usted controla en/)).toBeInTheDocument()
     expect(screen.queryByLabelText('Ambiente de control')).not.toBeInTheDocument()
     await user.type(screen.getByLabelText('Código SIS'), '202309201')
-    await user.type(screen.getByLabelText('Carnet de identidad (opcional)'), '9456781')
+    await user.type(screen.getByLabelText('Carnet de identidad (CI)'), '9456781')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Verificar estudiante' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: 'Verificar estudiante' }))
     expect(await screen.findByText('AUTORIZADO', {}, { timeout: 3000 })).toBeInTheDocument()
@@ -101,7 +101,7 @@ describe('EntryControlPage', () => {
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
 
     const sis = await screen.findByLabelText('Código SIS')
-    const ci = screen.getByLabelText('Carnet de identidad (opcional)')
+    const ci = screen.getByLabelText('Carnet de identidad (CI)')
     const verify = screen.getByRole('button', { name: 'Verificar estudiante' })
 
     fireEvent.change(sis, { target: { value: '19a9912543x' } })
@@ -156,7 +156,7 @@ describe('EntryControlPage', () => {
     expect(screen.getByRole('button', { name: 'Verificar estudiante' })).toBeEnabled()
   })
 
-  it('sugiere solo números de CI sin cambiar las sugerencias SIS ni autocompletar el CI', async () => {
+  it('sugiere solo números de CI y permite elegirlo sin SIS', async () => {
     mockApi([
       ...routes(),
       { matches: (url) => url.includes('/buscar?ci=9456'), body: { data: [{
@@ -167,14 +167,14 @@ describe('EntryControlPage', () => {
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
 
     const sis = await screen.findByLabelText('Código SIS')
-    const ci = screen.getByLabelText('Carnet de identidad (opcional)')
+    const ci = screen.getByLabelText('Carnet de identidad (CI)')
     fireEvent.change(ci, { target: { value: '9456' } })
     const suggestion = await screen.findByRole('button', { name: '9456781' })
     expect(suggestion).not.toHaveTextContent('Carlos Daniel Rocha Mendoza')
     expect(suggestion).not.toHaveTextContent('202309201')
     fireEvent.click(suggestion)
-    expect(sis).toHaveValue('202309201')
-    expect(ci).toHaveValue('9456')
+    expect(sis).toHaveValue('')
+    expect(ci).toHaveValue('9456781')
     expect(screen.queryByRole('list', { name: 'Sugerencias por CI' })).not.toBeInTheDocument()
 
     fireEvent.change(ci, { target: { value: '945' } })
@@ -203,11 +203,35 @@ describe('EntryControlPage', () => {
     fireEvent.change(await screen.findByLabelText('Código SIS'), { target: { value: '202' } })
     expect(within(await screen.findByRole('list', { name: 'Sugerencias por código SIS' })).getAllByRole('listitem')).toHaveLength(5)
 
-    fireEvent.change(screen.getByLabelText('Carnet de identidad (opcional)'), { target: { value: '9456' } })
+    fireEvent.change(screen.getByLabelText('Carnet de identidad (CI)'), { target: { value: '9456' } })
     expect(within(await screen.findByRole('list', { name: 'Sugerencias por CI' })).getAllByRole('listitem')).toHaveLength(5)
 
     fireEvent.change(screen.getByLabelText('Buscar estudiante por nombre'), { target: { value: 'Estudiante' } })
     expect(within(await screen.findByRole('list', { name: 'Coincidencias de estudiantes' })).getAllByRole('listitem')).toHaveLength(5)
+  })
+
+  it('verifica y confirma usando solo el CI', async () => {
+    mockApi(routes())
+    const user = userEvent.setup()
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+
+    const sis = await screen.findByLabelText('Código SIS')
+    const ci = screen.getByLabelText('Carnet de identidad (CI)')
+    const verify = screen.getByRole('button', { name: 'Verificar estudiante' })
+    expect(verify).toBeDisabled()
+    await user.type(ci, '9456781')
+    expect(sis).toHaveValue('')
+    expect(verify).toBeEnabled()
+    await user.click(verify)
+    expect(await screen.findByText('AUTORIZADO')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Aceptar ingreso' }))
+    expect(await screen.findByText(/Ingreso registrado:/)).toBeInTheDocument()
+
+    const calls = vi.mocked(fetch).mock.calls
+    const verifyBody = JSON.parse((calls.find(([url]) => String(url).endsWith('/verificar'))?.[1] as RequestInit).body as string)
+    const confirmBody = JSON.parse((calls.find(([url]) => String(url).endsWith('/confirmar-ingreso'))?.[1] as RequestInit).body as string)
+    expect(verifyBody).toEqual({ ci: '9456781', id_ambiente: 5 })
+    expect(confirmBody).toEqual({ id_estudiante: 19, ci: '9456781', id_ambiente: 5 })
   })
 
   it('verifica y confirma usando solo el código SIS', async () => {
@@ -219,7 +243,7 @@ describe('EntryControlPage', () => {
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
 
     await user.type(await screen.findByLabelText('Código SIS'), '202309201')
-    expect(screen.getByLabelText('Carnet de identidad (opcional)')).toHaveValue('')
+    expect(screen.getByLabelText('Carnet de identidad (CI)')).toHaveValue('')
     await user.click(screen.getByRole('button', { name: 'Verificar estudiante' }))
     expect(await screen.findByText('AUTORIZADO')).toBeInTheDocument()
     expect(screen.getByText('No registrado')).toBeInTheDocument()
@@ -248,7 +272,7 @@ describe('EntryControlPage', () => {
     await user.type(screen.getByLabelText('Buscar estudiante por nombre'), 'Carlos')
     await user.click(await screen.findByRole('button', { name: /Carlos Daniel Rocha Mendoza/ }))
     expect(screen.getByLabelText('Código SIS')).toHaveValue('202309201')
-    await user.type(screen.getByLabelText('Carnet de identidad (opcional)'), '9456781')
+    await user.type(screen.getByLabelText('Carnet de identidad (CI)'), '9456781')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Verificar estudiante' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: 'Verificar estudiante' }))
     await screen.findByText('AUTORIZADO', {}, { timeout: 3000 })
@@ -434,7 +458,7 @@ describe('EntryControlPage', () => {
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
     await screen.findByLabelText('Código SIS')
     await user.type(screen.getByLabelText('Código SIS'), '202309201')
-    await user.type(screen.getByLabelText('Carnet de identidad (opcional)'), '9456781')
+    await user.type(screen.getByLabelText('Carnet de identidad (CI)'), '9456781')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Verificar estudiante' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: 'Verificar estudiante' }))
 

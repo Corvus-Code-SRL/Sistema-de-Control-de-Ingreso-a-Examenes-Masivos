@@ -33,18 +33,27 @@ export function useStudentVerification(examId: number, roomId: number | null, on
     setError(null)
   }
 
-  function choose(student: StudentMatch) {
-    setSis(digitsOnly(student.cod_sis, SIS_LENGTH))
+  function choose(student: StudentMatch, field: 'sis' | 'ci') {
+    if (field === 'ci') {
+      setSis('')
+      setCi(digitsOnly(student.ci ?? '', CI_MAX_LENGTH))
+    } else {
+      setSis(digitsOnly(student.cod_sis, SIS_LENGTH))
+    }
     setResult(null)
     setError(null)
   }
 
   function input(): VerificationInput | null {
-    if (!roomId || !sis) {
-      setError('Seleccione un ambiente e ingrese el código SIS.')
+    if (!roomId) {
+      setError('Seleccione un ambiente de control.')
       return null
     }
-    if (!isValidSis(sis)) {
+    if (!sis && !ci) {
+      setError('Ingrese un código SIS o un CI.')
+      return null
+    }
+    if (sis && !isValidSis(sis)) {
       setError('El código SIS debe tener exactamente 9 dígitos.')
       return null
     }
@@ -52,7 +61,7 @@ export function useStudentVerification(examId: number, roomId: number | null, on
       setError('El CI solo puede contener hasta 10 dígitos.')
       return null
     }
-    return { cod_sis: sis, id_ambiente: roomId, ...(ci ? { ci } : {}) }
+    return { id_ambiente: roomId, ...(sis ? { cod_sis: sis } : {}), ...(ci ? { ci } : {}) }
   }
 
   async function verify() {

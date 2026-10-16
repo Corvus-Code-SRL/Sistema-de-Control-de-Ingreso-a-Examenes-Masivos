@@ -7,7 +7,7 @@ interface Props {
   field: 'sis' | 'ci'
   query: string
   disabled: boolean
-  onSelect: (student: StudentMatch) => void
+  onSelect: (student: StudentMatch, field: 'sis' | 'ci') => void
 }
 
 export function IdentifierSuggestions({ examId, field, query, disabled, onSelect }: Props) {
@@ -74,9 +74,9 @@ export function IdentifierSuggestions({ examId, field, query, disabled, onSelect
                 type="button"
                 className="flex w-full flex-wrap items-center justify-between gap-1 px-3 py-2.5 text-left hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={() => {
-                  setSelectedQuery(field === 'sis' ? student.cod_sis : query)
+                  setSelectedQuery(field === 'sis' ? student.cod_sis : student.ci ?? query)
                   setMatches([])
-                  onSelect(student)
+                  onSelect(student, field)
                 }}
               >
                 {field === 'ci' ? (
