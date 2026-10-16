@@ -4,6 +4,7 @@ namespace App\Services\Security;
 
 use App\Models\Action;
 use App\Models\AuditLog;
+use LogicException;
 
 class AuditLogService
 {
@@ -26,10 +27,19 @@ class AuditLogService
         ]);
     }
 
-    private function resolverAccion(string $operacion): ?int
-    {
-        return Action::where('operacion', $operacion)->value('id_accion');
+    private function resolverAccion(string $operacion): int
+{
+    $idAccion = Action::where('operacion', $operacion)
+        ->value('id_accion');
+
+    if ($idAccion === null) {
+        throw new LogicException(
+            "La operación de auditoría '{$operacion}' no está registrada."
+        );
     }
+
+    return (int) $idAccion;
+}
 
     /** Quita contraseñas y datos sensibles antes de persistir. */
     private function limpiar(?array $datos): ?array
