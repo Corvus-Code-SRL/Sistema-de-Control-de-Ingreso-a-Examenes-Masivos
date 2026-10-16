@@ -1698,3 +1698,25 @@ ALTER INDEX public.unq_gestion_periodo_activo RENAME TO unq_gestion_periodo_vige
 
 UPDATE public.periodo SET nombre = 'Semestre 1' WHERE codigo = 1;
 UPDATE public.periodo SET nombre = 'Semestre 2' WHERE codigo = 2;
+
+--
+-- Versión 10: base de la Central de Riesgo de estudiantes (2026_10_15_000000_prepare_risk_center_foundation)
+--   * reporte_estudiante.id_intento vincula el reporte con el intento de ingreso que lo originó
+--     (UNIQUE: un intento origina como máximo un reporte; varios NULL sí se admiten).
+--   * La evidencia pasa a ser opcional, pero completa o ausente: no puede haber una URL sin public_id.
+--   * La coherencia reporte <-> intento <-> examen <-> estudiante la valida el servicio de HU-042.
+
+ALTER TABLE public.reporte_estudiante ADD COLUMN id_intento bigint;
+
+ALTER TABLE public.reporte_estudiante
+    ALTER COLUMN evidencia_url DROP NOT NULL,
+    ALTER COLUMN evidencia_public_id DROP NOT NULL;
+
+ALTER TABLE public.reporte_estudiante
+    ADD CONSTRAINT unq_reporte_estudiante_id_intento
+        UNIQUE (id_intento),
+    ADD CONSTRAINT fk_reporte_estudiante_intento
+        FOREIGN KEY (id_intento)
+        REFERENCES public.intento_ingreso(id_intento),
+    ADD CONSTRAINT chk_reporte_estudiante_evidencia
+        CHECK ((evidencia_url IS NULL) = (evidencia_public_id IS NULL));
