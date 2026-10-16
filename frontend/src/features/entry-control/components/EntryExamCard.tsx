@@ -6,13 +6,14 @@ import type { EntryContext, EntryStatus } from '../types/entry-control.types'
 interface Props {
   context: EntryContext
   status: EntryStatus | null
+  stale?: boolean
   roomId: number | null
   onRoomChange: (id: number) => void
   roomDisabled?: boolean
   ended?: boolean
 }
 
-export function EntryExamCard({ context, status, roomId, onRoomChange, roomDisabled = false, ended = false }: Props) {
+export function EntryExamCard({ context, status, stale = false, roomId, onRoomChange, roomDisabled = false, ended = false }: Props) {
   const room = context.ambientes.find((item) => item.id_ambiente === roomId)
   const isAssistant = context.rol_controlador === 'AUXILIAR'
   const isOpen = context.estado === 'EN_INGRESO' && !ended
@@ -43,7 +44,10 @@ export function EntryExamCard({ context, status, roomId, onRoomChange, roomDisab
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-sunken" role="progressbar" aria-label="Estudiantes ingresados" aria-valuenow={status?.ingresados ?? 0} aria-valuemax={status?.total ?? 0}>
             <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${status?.total ? Math.min(100, status.ingresados / status.total * 100) : 0}%` }} />
           </div>
-          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><Users className="size-3.5" aria-hidden="true" />{status?.pendientes ?? '—'} pendientes</p>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Users className="size-3.5" aria-hidden="true" />{status?.pendientes ?? '—'} pendientes</p>
+            {status && !stale && !ended && <p className="flex items-center gap-2 text-xs font-semibold text-ok-fg"><span className="size-2 rounded-full bg-ok" aria-hidden="true" />En vivo</p>}
+          </div>
         </div>
         <div className="min-w-44">
           {isAssistant ? (
