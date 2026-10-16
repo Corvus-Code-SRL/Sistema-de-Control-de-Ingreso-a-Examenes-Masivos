@@ -22,6 +22,8 @@ class ActionSeeder extends Seeder
             ['operacion' => 'HABILITAR_AUXILIAR_EXAMEN', 'tipo_operacion' => 'INSERT', 'descripcion' => 'Habilitación de un auxiliar para un examen'],
             ['operacion' => 'QUITAR_AUXILIAR_GRUPO', 'tipo_operacion' => 'UPDATE', 'descripcion' => 'Baja de un auxiliar de un grupo'],
             ['operacion' => 'QUITAR_AUXILIAR_EXAMEN', 'tipo_operacion' => 'DELETE', 'descripcion' => 'Retiro de la habilitación de un auxiliar en un examen'],
+            ['operacion' => 'APROBAR_REPORTE', 'tipo_operacion' => 'UPDATE', 'descripcion' => 'Aprobación de un reporte de falta'],
+            ['operacion' => 'RECHAZAR_REPORTE', 'tipo_operacion' => 'UPDATE', 'descripcion' => 'Rechazo de un reporte de falta'],
         ];
 
         foreach ($acciones as $accion) {
