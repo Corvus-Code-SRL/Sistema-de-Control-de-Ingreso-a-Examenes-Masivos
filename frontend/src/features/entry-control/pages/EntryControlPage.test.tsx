@@ -258,13 +258,13 @@ describe('EntryControlPage', () => {
     expect(confirmBody).toEqual({ id_estudiante: 19, id_ambiente: 5 })
   })
 
-  it('busca por nombre y registra el rechazo con motivo', async () => {
+  it('busca por nombre, registra el rechazo y abre el modal de reporte', async () => {
     mockApi([
       ...routes(),
       { matches: (url) => url.includes('/buscar'), body: { data: [{
         id_estudiante: student.id_estudiante, cod_sis: student.cod_sis, nombre_completo: student.nombre_completo,
       }] } },
-      { matches: (url) => url.endsWith('/rechazar-ingreso'), status: 201, body: { data: { registrado: true } } },
+      { matches: (url) => url.endsWith('/rechazar-ingreso'), status: 201, body: { data: { registrado: true, id_intento: 123 } } },
     ])
     const user = userEvent.setup()
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
@@ -278,15 +278,40 @@ describe('EntryControlPage', () => {
     await user.click(screen.getByRole('button', { name: 'Verificar estudiante' }))
     await screen.findByText('AUTORIZADO', {}, { timeout: 3000 })
     await user.click(screen.getByRole('button', { name: 'Rechazar' }))
-    await user.type(screen.getByLabelText('Observación (opcional)'), 'Foto distinta')
-    await user.click(screen.getByRole('button', { name: 'Registrar intento' }))
-
-    expect(await screen.findByText('Intento rechazado y registrado.')).toBeInTheDocument()
+    const dialog = await screen.findByRole('dialog', { name: 'Reportar incidencia' })
+    expect(screen.queryByLabelText('Motivo')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Registrar intento' })).not.toBeInTheDocument()
+    expect(within(dialog).getByText('El formulario de la HU-042 todavía no está disponible. El intento de ingreso ya quedó registrado.')).toBeInTheDocument()
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(within(dialog).getByText('Estudiante: Carlos Daniel Rocha Mendoza')).toBeInTheDocument()
+    expect(within(dialog).getByText('Examen 7, estudiante 19, ambiente 5, intento 123')).toBeInTheDocument()
+    expect(screen.getByText('AUTORIZADO')).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Volver al control de ingreso' }))
+    expect(screen.queryByText('INGRESO RECHAZADO')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Código SIS')).toHaveValue('')
     const calls = vi.mocked(fetch).mock.calls
     const verifyBody = JSON.parse((calls.find(([url]) => String(url).endsWith('/verificar'))?.[1] as RequestInit).body as string)
     const rejectBody = JSON.parse((calls.find(([url]) => String(url).endsWith('/rechazar-ingreso'))?.[1] as RequestInit).body as string)
     expect(verifyBody).toEqual({ cod_sis: '202309201', ci: '9456781', id_ambiente: 5 })
-    expect(rejectBody).toEqual({ id_estudiante: 19, ci: '9456781', id_ambiente: 5, motivo: 'IDENTIDAD_DUDOSA', observacion: 'Foto distinta' })
+    expect(rejectBody).toEqual({ id_estudiante: 19, ci: '9456781', id_ambiente: 5, motivo: 'DECISION_CONTROLADOR' })
+  })
+
+  it('abre el modal de HU-042 para un ingreso duplicado', async () => {
+    mockApi(routes({ ...allowed, veredicto: 'DUPLICADO', autorizado: false,
+      motivo: 'El estudiante ya registró su ingreso.' }))
+    const user = userEvent.setup()
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+
+    await user.type(await screen.findByLabelText('Código SIS'), '202309201')
+    await user.click(screen.getByRole('button', { name: 'Verificar estudiante' }))
+    expect(await screen.findByText('INGRESO DUPLICADO')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Reportar incidencia' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Reportar incidencia' })
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(within(dialog).getByText('Examen 7, estudiante 19, ambiente 5')).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Volver al control de ingreso' }))
+    expect(screen.queryByRole('dialog', { name: 'Reportar incidencia' })).not.toBeInTheDocument()
+    expect(screen.getByText('INGRESO DUPLICADO')).toBeInTheDocument()
   })
 
   it('muestra que no hay coincidencias solo después de recibir la búsqueda', async () => {

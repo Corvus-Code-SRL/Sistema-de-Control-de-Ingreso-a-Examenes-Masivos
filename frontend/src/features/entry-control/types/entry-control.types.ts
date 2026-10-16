@@ -48,6 +48,7 @@ export interface PreviousEntry {
 
 export interface Verification {
   veredicto: string
+  id_intento?: number
   motivo: string
   autorizado: boolean
   estudiante: EntryStudent | null

@@ -111,20 +111,19 @@ export function useStudentVerification(examId: number, roomId: number | null, on
   }
 
   async function reject(motivo: RejectionReason, observacion: string) {
-    if (!result?.autorizado || !result.estudiante || !roomId) return false
+    if (!result?.autorizado || !result.estudiante || !roomId) return null
     setBusy('reject')
     setError(null)
     try {
-      await entryControlService.reject(examId, {
+      const rejected = await entryControlService.reject(examId, {
         ...actionInput(result.estudiante.id_estudiante, roomId),
         motivo, observacion: observacion.trim() || undefined,
       })
       setNotice('Intento rechazado y registrado.')
-      reset()
-      return true
+      return rejected.id_intento
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo registrar el rechazo.')
-      return false
+      return null
     } finally {
       setBusy(null)
     }

@@ -55,8 +55,9 @@ export const entryControlService = {
 
   async reject(examId: number, input: EntryActionInput & {
     motivo: RejectionReason; observacion?: string
-  }): Promise<void> {
-    await apiPost(`${base(examId)}/rechazar-ingreso`, input)
+  }): Promise<{ id_intento: number }> {
+    const response = await apiPost<DataResponse<{ id_intento: number }>>(`${base(examId)}/rechazar-ingreso`, input)
+    return response.data
   },
 }
 

@@ -5,8 +5,8 @@ import { AppShell } from '@/components/layout/AppShell'
 import { Button } from '@/components/ui/button'
 import { EntryExamCard } from '../components/EntryExamCard'
 import { IdentificationForm } from '../components/IdentificationForm'
+import { IncidentReportHandoffDialog } from '../components/IncidentReportHandoffDialog'
 import { RecentEntries } from '../components/RecentEntries'
-import { RejectEntryDialog } from '../components/RejectEntryDialog'
 import { VerificationResult } from '../components/VerificationResult'
 import { useEntryStatus } from '../hooks/useEntryStatus'
 import { useStudentVerification } from '../hooks/useStudentVerification'
@@ -21,7 +21,8 @@ export function EntryControlPage() {
 function EntryControlContent({ examId }: { examId: number }) {
   const { context, status, openingFailure, loading, error, statusError, ended, refresh, reload } = useEntryStatus(examId)
   const [roomId, setRoomId] = useState<number | null>(null)
-  const [rejectOpen, setRejectOpen] = useState(false)
+  const [incidentOpen, setIncidentOpen] = useState(false)
+  const [incidentAttemptId, setIncidentAttemptId] = useState<number | null>(null)
   const verification = useStudentVerification(examId, roomId, () => { void refresh(true) })
 
   useEffect(() => {
@@ -31,6 +32,18 @@ function EntryControlContent({ examId }: { examId: number }) {
 
   const open = context?.estado === 'EN_INGRESO' && !ended
   const hasRoom = roomId !== null && context?.ambientes.some((room) => room.id_ambiente === roomId)
+
+  function reportIncidence(attemptId?: number) {
+    if (verification.result?.estudiante && roomId) {
+      setIncidentAttemptId(attemptId ?? verification.result.id_intento ?? null)
+      setIncidentOpen(true)
+    }
+  }
+
+  async function rejectAndReport() {
+    const attemptId = await verification.reject('DECISION_CONTROLADOR', '')
+    if (attemptId !== null) reportIncidence(attemptId)
+  }
 
   return <AppShell mobileTitle="Control de ingreso" mobileSubtitle={context?.nombre_examen} breadcrumbs={[{ label: 'Control de ingreso', to: '/control-ingreso' }, { label: context?.nombre_examen ?? 'Examen' }]}>
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -53,10 +66,10 @@ function EntryControlContent({ examId }: { examId: number }) {
           <IdentificationForm examId={examId} sis={verification.sis} ci={verification.ci} disabled={!open || !hasRoom || verification.busy !== null} busy={verification.busy === 'verify'} onSisChange={verification.changeSis} onCiChange={verification.changeCi} onSelect={verification.choose} onVerify={() => void verification.verify()} />
         </div>
         <div className="space-y-5">
-          {verification.result ? <VerificationResult result={verification.result} presentedCi={verification.ci} subjectName={context.materia} busy={verification.busy !== null} onConfirm={() => void verification.confirm()} onReject={() => setRejectOpen(true)} onNext={verification.reset} /> : <RecentEntries entries={status?.ultimos_ingresos ?? []} />}
+          {verification.result ? <VerificationResult result={verification.result} presentedCi={verification.ci} subjectName={context.materia} busy={verification.busy !== null} onConfirm={() => void verification.confirm()} onReject={() => void rejectAndReport()} onReport={() => reportIncidence()} onNext={verification.reset} /> : <RecentEntries entries={status?.ultimos_ingresos ?? []} />}
         </div>
       </div>}
-      {open && verification.result && <RejectEntryDialog open={rejectOpen} studentName={verification.result.estudiante?.nombre_completo ?? 'este estudiante'} error={verification.error} busy={verification.busy === 'reject'} onClose={() => setRejectOpen(false)} onConfirm={verification.reject} />}
+      <IncidentReportHandoffDialog open={incidentOpen} studentName={verification.result?.estudiante?.nombre_completo ?? ''} examId={examId} studentId={verification.result?.estudiante?.id_estudiante ?? 0} roomId={roomId ?? 0} attemptId={incidentAttemptId} onClose={() => { setIncidentOpen(false); if (verification.result?.autorizado) verification.reset() }} />
     </>}
   </AppShell>
 }
