@@ -29,7 +29,7 @@ class VerificationService
             'auxiliar' => null,
             'grupo' => null,
             'ambiente_asignado' => null,
-            'antecedentes' => ['tiene_antecedentes' => false, 'cantidad' => 0, 'resumen' => null, 'detalles' => []],
+            'antecedentes' => ['total' => 0, 'latest' => null],
             'ingreso_previo' => null,
         ];
 

@@ -5,6 +5,7 @@ namespace App\Services\EntryControl;
 use App\Models\Exam;
 use App\Models\User;
 use App\Services\Exams\ExamTimingService;
+use App\Services\RiskCenter\Academic\RiskCenterQueryService;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Cache\Repository;
@@ -24,10 +25,12 @@ class EntryControlSnapshotService
     public const UNASSIGNED_ROOM_MESSAGE = 'Asigne un ambiente a este auxiliar antes de abrir el control.';
 
     private ExamTimingService $timing;
+    private RiskCenterQueryService $riskCenter;
 
-    public function __construct(ExamTimingService $timing)
+    public function __construct(ExamTimingService $timing, RiskCenterQueryService $riskCenter)
     {
         $this->timing = $timing;
+        $this->riskCenter = $riskCenter;
     }
 
     public function stage(Exam $exam): string
@@ -68,7 +71,7 @@ class EntryControlSnapshotService
 
         $assignedRooms = $this->assignRooms(array_keys($membersByStudent), $rooms);
         $entries = $this->entries($examId);
-        $risks = $this->risks();
+        $risks = $this->riskCenter->summariesForSnapshot();
         $career = DB::table('carrera')->where('id_carrera', $exam->id_carrera)->value('nombre');
 
         $controllers = [
@@ -81,10 +84,20 @@ class EntryControlSnapshotService
             ->join('usuario as u', 'u.id_usuario', '=', 'ea.id_usuario')
             ->where('ea.id_examen', $examId)
             ->where('u.estado', User::ESTADO_ACTIVO)
-            ->get(['ea.id_usuario', 'ea.id_ambiente']);
+            ->get(['ea.id_usuario', 'ea.id_ambiente', 'u.cod_sis', 'u.nombre', 'u.apellido_paterno', 'u.apellido_materno']);
         $unassigned = [];
+        $assistantRecords = [];
         foreach ($auxiliaries as $auxiliary) {
             $roomId = $this->controlRoomOf($auxiliary->id_ambiente, $rooms);
+            $assistantRecords[sha1((string) $auxiliary->cod_sis)] = [
+                'cod_sis' => $auxiliary->cod_sis,
+                'nombre_completo' => trim(implode(' ', array_filter([
+                    $auxiliary->nombre,
+                    $auxiliary->apellido_paterno,
+                    $auxiliary->apellido_materno,
+                ]))),
+                'ambiente_asignado' => collect($rooms)->firstWhere('id_ambiente', $roomId),
+            ];
 
             if ($roomId === null) {
                 $unassigned[] = (string) $auxiliary->id_usuario;
@@ -111,6 +124,9 @@ class EntryControlSnapshotService
         $students = DB::table('estudiante')->orderBy('id_estudiante')->get();
         $search = [];
         $values = [$this->key($examId, $token, 'meta') => $meta];
+        foreach ($assistantRecords as $sisHash => $assistant) {
+            $values[$this->key($examId, $token, 'assistant', $sisHash)] = $assistant;
+        }
 
         foreach ($students as $student) {
             $studentId = (int) $student->id_estudiante;
@@ -135,17 +151,21 @@ class EntryControlSnapshotService
                 'grupo' => $group,
                 'estado_habilitacion' => $entry['estado_habilitacion'] ?? null,
                 'ambiente_asignado' => $assignedRooms[$studentId] ?? null,
-                'antecedentes' => $risks[$studentId] ?? $this->emptyRisk(),
+                'antecedentes' => $risks[$studentId] ?? ['total' => 0, 'latest' => null],
                 'ingreso_previo' => $entry['ingreso_previo'] ?? null,
             ];
 
             $values[$this->key($examId, $token, 'student', $studentId)] = $payload;
             $values[$this->key($examId, $token, 'sis', sha1((string) $student->cod_sis))] = $studentId;
+            if ($student->ci !== null) {
+                $values[$this->key($examId, $token, 'ci', sha1((string) $student->ci))] = $studentId;
+            }
 
             if ($group !== null) {
                 $search[] = [
                     'id_estudiante' => $studentId,
                     'cod_sis' => $student->cod_sis,
+                    'ci' => $student->ci,
                     'nombre_completo' => $fullName,
                     'nombre_busqueda' => $this->normalizeName($fullName),
                 ];
@@ -274,6 +294,22 @@ class EntryControlSnapshotService
         return $studentId === null ? null : $this->studentById($examId, (int) $studentId, $token);
     }
 
+    public function studentByCi(int $examId, string $ci): ?array
+    {
+        $token = $this->activeTokenOrFail($examId);
+        $studentId = $this->cache()->get($this->key($examId, $token, 'ci', sha1($ci)));
+
+        return $studentId === null ? null : $this->studentById($examId, (int) $studentId, $token);
+    }
+
+    public function assistantBySis(int $examId, string $sis): ?array
+    {
+        $token = $this->activeTokenOrFail($examId);
+        $assistant = $this->cache()->get($this->key($examId, $token, 'assistant', sha1($sis)));
+
+        return is_array($assistant) ? $assistant : null;
+    }
+
     public function studentById(int $examId, int $studentId, ?string $token = null): ?array
     {
         $token = $token ?? $this->activeTokenOrFail($examId);
@@ -293,7 +329,7 @@ class EntryControlSnapshotService
             if (mb_strpos($student['nombre_busqueda'], $needle) === false) {
                 continue;
             }
-            unset($student['nombre_busqueda']);
+            unset($student['nombre_busqueda'], $student['ci']);
             $matches[] = $student;
             if (count($matches) === 5) {
                 break;
@@ -301,6 +337,27 @@ class EntryControlSnapshotService
         }
 
         return $matches;
+    }
+
+    public function searchByNumberPrefix(int $examId, User $actor, string $field, string $prefix): array
+    {
+        $this->assertCanControl($examId, $actor);
+        $token = $this->activeTokenOrFail($examId);
+        $column = $field === 'sis' ? 'cod_sis' : 'ci';
+        $matches = array_values(array_filter(
+            $this->cache()->get($this->key($examId, $token, 'search'), []),
+            fn (array $student): bool => str_starts_with((string) ($student[$column] ?? ''), $prefix)
+        ));
+        usort($matches, fn (array $left, array $right): int => strcmp($left[$column], $right[$column]));
+
+        return array_map(function (array $student) use ($field): array {
+            unset($student['nombre_busqueda']);
+            if ($field !== 'ci') {
+                unset($student['ci']);
+            }
+
+            return $student;
+        }, array_slice($matches, 0, 5));
     }
 
     /** Aplica el mismo mapa de tildes de SubjectService a ambos lados de la búsqueda literal. */
@@ -490,33 +547,6 @@ class EntryControlSnapshotService
             })->all();
     }
 
-    private function risks(): array
-    {
-        $rows = DB::table('central_riesgo as cr')
-            ->join('reporte_estudiante as re', 're.id_reporte_est', '=', 'cr.id_reporte_est')
-            ->join('tipo_falta as tf', 'tf.id_falta', '=', 're.id_tipo_falta')
-            ->orderBy('cr.id_estudiante')
-            ->orderByDesc('cr.fecha_registro')
-            ->get(['cr.id_estudiante', 'tf.nombre', 'cr.fecha_registro']);
-
-        $grouped = [];
-        foreach ($rows as $row) {
-            $grouped[(int) $row->id_estudiante][] = [
-                'tipo' => $row->nombre,
-                'fecha' => substr((string) $row->fecha_registro, 0, 10),
-            ];
-        }
-
-        return collect($grouped)->map(function (array $details): array {
-            return [
-                'tiene_antecedentes' => true,
-                'cantidad' => count($details),
-                'resumen' => collect(array_slice($details, 0, 3))->pluck('tipo')->unique()->implode(', '),
-                'detalles' => array_slice($details, 0, 3),
-            ];
-        })->all();
-    }
-
     private function assignRooms(array $studentIds, array $rooms): array
     {
         sort($studentIds, SORT_NUMERIC);
@@ -538,11 +568,6 @@ class EntryControlSnapshotService
         }
 
         return $assigned;
-    }
-
-    private function emptyRisk(): array
-    {
-        return ['tiene_antecedentes' => false, 'cantidad' => 0, 'resumen' => null, 'detalles' => []];
     }
 
     private function expirationFor(Exam $exam): Carbon
