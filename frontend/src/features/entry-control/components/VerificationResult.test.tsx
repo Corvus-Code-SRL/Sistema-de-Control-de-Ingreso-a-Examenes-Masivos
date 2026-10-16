@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { VerificationResult } from './VerificationResult'
 import type { Verification } from '../types/entry-control.types'
 
@@ -34,10 +34,10 @@ function mockImage(naturalWidth: number) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('VerificationResult fotografía', () => {
-  it('muestra las iniciales y Sin fotografía cuando el estudiante no tiene foto', () => {
+  it('muestra las iniciales cuando el estudiante no tiene foto', () => {
     renderResult(null)
     expect(screen.getByText('AA')).toBeInTheDocument()
-    expect(screen.getByText('Sin fotografía')).toBeInTheDocument()
+    expect(screen.queryByText('Sin fotografía')).not.toBeInTheDocument()
     expect(screen.getByText('No ingresado')).toBeInTheDocument()
     expect(screen.getByText('Aula 691A')).toBeInTheDocument()
     expect(screen.queryByRole('img', { name: /Fotografía de/ })).not.toBeInTheDocument()
@@ -52,11 +52,11 @@ describe('VerificationResult fotografía', () => {
     expect(screen.queryByText('Sin fotografía')).not.toBeInTheDocument()
   })
 
-  it('regresa a iniciales y Sin fotografía si la imagen no carga', async () => {
+  it('regresa a las iniciales si la imagen no carga', async () => {
     mockImage(0)
     renderResult('https://minio.example.invalid/estudiantes/9501.webp')
-    expect(await screen.findByText('Sin fotografía')).toBeInTheDocument()
-    expect(screen.getByText('AA')).toBeInTheDocument()
+    expect(await screen.findByText('AA')).toBeInTheDocument()
+    expect(screen.queryByText('Sin fotografía')).not.toBeInTheDocument()
   })
 })
 
@@ -83,6 +83,28 @@ describe('VerificationResult CI', () => {
     expect(screen.getByText('CI').nextElementSibling).toHaveTextContent('1234567 · registrado: 7100001')
     expect(screen.queryByRole('button', { name: 'Aceptar ingreso' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Siguiente estudiante' })).toBeInTheDocument()
+  })
+})
+
+describe('VerificationResult reporte de incidencia', () => {
+  it('ofrece reportar un ingreso duplicado y conserva siguiente estudiante', () => {
+    const onReport = vi.fn()
+    render(<VerificationResult
+      result={{ ...result, veredicto: 'DUPLICADO', autorizado: false }}
+      busy={false} onConfirm={() => {}} onReject={() => {}} onNext={() => {}} onReport={onReport}
+    />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reportar incidencia' }))
+    expect(onReport).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: 'Siguiente estudiante' })).toBeInTheDocument()
+  })
+
+  it('no ofrece reportar cuando no se identificó a un estudiante', () => {
+    render(<VerificationResult
+      result={{ ...result, veredicto: 'NO_ENCONTRADO', autorizado: false, estudiante: null }}
+      busy={false} onConfirm={() => {}} onReject={() => {}} onNext={() => {}} onReport={() => {}}
+    />)
+    expect(screen.queryByRole('button', { name: 'Reportar incidencia' })).not.toBeInTheDocument()
   })
 })
 

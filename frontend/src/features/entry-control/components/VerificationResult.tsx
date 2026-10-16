@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, CheckCircle2, CircleX, DoorOpen, RotateCcw, ShieldAlert, UserRound } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, CircleX, DoorOpen, Flag, RotateCcw, ShieldAlert, UserRound } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import type { EntryStudent, Verification } from '../types/entry-control.types'
@@ -10,6 +10,7 @@ interface Props {
   onConfirm: () => void
   onReject: () => void
   onNext: () => void
+  onReport?: () => void
   presentedCi?: string
   subjectName?: string | null
 }
@@ -28,7 +29,7 @@ function StudentPhoto({ student }: { student: EntryStudent }) {
   const [imageFailed, setImageFailed] = useState(false)
   const initials = student.nombre_completo.split(' ').slice(0, 2).map((part) => part[0]).join('').toUpperCase()
 
-  return <div className="flex shrink-0 flex-col items-center gap-1">
+  return <div className="flex shrink-0 self-center flex-col items-center gap-1">
     <Avatar className="rounded-lg after:rounded-lg" style={{ width: 96, height: 120 }}>
       {student.foto_url && <AvatarImage
         src={student.foto_url}
@@ -39,7 +40,6 @@ function StudentPhoto({ student }: { student: EntryStudent }) {
       />}
       <AvatarFallback className="rounded-lg bg-brand-soft text-lg font-semibold text-brand-deep">{initials}</AvatarFallback>
     </Avatar>
-    {(!student.foto_url || imageFailed) && <span className="text-xs text-muted-foreground">Sin fotografía</span>}
   </div>
 }
 
@@ -81,9 +81,10 @@ function AssistantDetails({ result }: { result: Verification }) {
   </div>
 }
 
-export function VerificationResult({ result, busy, onConfirm, onReject, onNext, presentedCi, subjectName }: Props) {
+export function VerificationResult({ result, busy, onConfirm, onReject, onNext, onReport, presentedCi, subjectName }: Props) {
   const allowed = result.autorizado
   const isAssistant = result.veredicto === 'AUXILIAR_EXAMEN' && result.auxiliar != null
+  const canReport = !allowed && result.estudiante != null && result.veredicto !== 'AULA_NO_ASIGNADA'
   const Icon = allowed ? CheckCircle2 : isAssistant ? UserRound : CircleX
   return <section aria-live="polite" aria-labelledby="entry-verdict" className={`space-y-4 rounded-xl border p-4 shadow-sm sm:p-6 ${allowed ? 'border-ok/30 bg-ok-soft/35' : isAssistant ? 'border-border bg-card' : 'border-danger/25 bg-danger-soft/35'}`}>
     <div className="flex gap-3">
@@ -101,8 +102,10 @@ export function VerificationResult({ result, busy, onConfirm, onReject, onNext, 
     </div>}
     {allowed && <p className="flex items-center gap-2 text-sm text-ok-fg"><AlertTriangle className="size-4" />Compare el nombre y el código SIS con la documentación disponible antes de decidir.</p>}
     <div className="flex flex-col gap-2 sm:flex-row">
-      {allowed ? <><Button type="button" variant="outline" className="h-11 flex-1 border-danger/40 text-danger-fg hover:bg-danger-soft" disabled={busy} onClick={onReject}>Rechazar</Button><Button type="button" className="h-11 flex-1" disabled={busy} onClick={onConfirm}>{busy ? 'Registrando…' : 'Aceptar ingreso'}</Button></> :
-        <Button type="button" variant="outline" className="h-11 w-full" onClick={onNext}><RotateCcw className="size-4" />{isAssistant ? 'Nueva verificación' : 'Siguiente estudiante'}</Button>}
+      {allowed ? <><Button type="button" variant="outline" className="h-11 flex-1 border-danger/40 text-danger-fg hover:bg-danger-soft" disabled={busy} onClick={onReject}>Rechazar</Button><Button type="button" className="h-11 flex-1" disabled={busy} onClick={onConfirm}>{busy ? 'Registrando…' : 'Aceptar ingreso'}</Button></> : <>
+        {canReport && onReport && <Button type="button" variant="outline" className="h-11 flex-1 border-danger/40 text-danger-fg hover:bg-danger-soft" disabled={busy} onClick={onReport}><Flag className="size-4" />Reportar incidencia</Button>}
+        <Button type="button" variant="outline" className="h-11 flex-1" onClick={onNext}><RotateCcw className="size-4" />{isAssistant ? 'Nueva verificación' : 'Siguiente estudiante'}</Button>
+      </>}
     </div>
   </section>
 }
