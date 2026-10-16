@@ -9,6 +9,8 @@ import {
   GraduationCap,
   History,
   Home,
+  Library,
+  Link2,
   PlaySquare,
   ScrollText,
   ShieldCheck,
@@ -25,6 +27,11 @@ export interface NavItem {
   to?: string
   /** Solo se marca activo con la ruta exacta; hace falta cuando otro ítem cuelga de la misma ruta. */
   end?: boolean
+  /**
+   * Sub-ítems. Un ítem con hijos es un encabezado sin enlace (no lleva `to`): solo sus hijos
+   * navegan.
+   */
+  children?: NavItem[]
 }
 
 export interface NavGroup {
@@ -86,9 +93,9 @@ const navegacionAuxiliar: NavGroup[] = [
 /**
  * Navegación lateral del administrador.
  *
- * Cuentas, Materias (catálogo y asignaciones, en pestañas) y Ambientes tienen pantallas disponibles.
- * Facultades, carreras y bitácora permanecen deshabilitadas hasta sus
- * respectivas historias.
+ * Cuentas, Materias (Asignaciones, HU-006, y Catálogo, en dos vistas bajo un encabezado) y
+ * Ambientes tienen pantallas disponibles. Facultades, carreras y bitácora permanecen
+ * deshabilitadas hasta sus respectivas historias.
  */
 const navegacionAdministrador: NavGroup[] = [
   { items: [{ label: 'Inicio', icon: Home }] },
@@ -96,7 +103,14 @@ const navegacionAdministrador: NavGroup[] = [
     label: 'Administración',
     items: [
       { label: 'Cuentas', icon: Users, to: '/cuentas' },
-      { label: 'Materias', icon: BookOpen, to: '/materias' },
+      {
+        label: 'Materias',
+        icon: BookOpen,
+        children: [
+          { label: 'Asignaciones', icon: Link2, to: '/materias/asignaciones' },
+          { label: 'Catálogo', icon: Library, to: '/materias/catalogo' },
+        ],
+      },
       { label: 'Facultades', icon: Building2 },
       { label: 'Ambientes', icon: DoorOpen, to: '/ambientes' },
       { label: 'Carreras', icon: GraduationCap },

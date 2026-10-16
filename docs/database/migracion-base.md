@@ -11,7 +11,8 @@ estructural posterior va en una migración nueva (`php artisan make:migration ..
 sección «CAMBIOS POSTERIORES A LA BASE» (hoy: la migración `2026_09_29_000001` de HU-11, las dos de HU-001,
 `2026_10_11_000001` y `2026_10_11_000002`, y las tres de gestión y período, `2026_10_12_000001`,
 `2026_10_12_000002` y `2026_10_12_000003`, que agregan `gestion`, `gestion_periodo` y `oferta_academica` y
-renombran `activo` a `vigente`; ver `periodo-vigente.md`).
+renombran `activo` a `vigente`; ver `periodo-vigente.md`, y `2026_10_15_000000`, que prepara `reporte_estudiante` para la
+Central de Riesgo: `id_intento` UNIQUE con FK a `intento_ingreso` y evidencia opcional pero completa o ausente).
 
 Sustituye a las seis migraciones parciales anteriores (`create_enum_types`, `create_rol_table`,
 `create_usuario_table`, `create_usuario_rol_table`, `create_accion_table`, `create_log_table`), que solo

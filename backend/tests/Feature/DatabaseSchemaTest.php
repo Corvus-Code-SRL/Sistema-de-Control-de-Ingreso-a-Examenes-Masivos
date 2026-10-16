@@ -6,11 +6,13 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\SeedsRiskCenterRecords;
 use Tests\TestCase;
 
 class DatabaseSchemaTest extends TestCase
 {
     use DatabaseTransactions;
+    use SeedsRiskCenterRecords;
 
     public function testItUsesOnlyTestDatabase(): void
     {
@@ -450,6 +452,94 @@ class DatabaseSchemaTest extends TestCase
         );
         $this->assertStringContainsString('ALTER COLUMN apellido_paterno TYPE varchar(60)', $script);
         $this->assertStringContainsString('ALTER COLUMN apellido_materno TYPE varchar(60)', $script);
+    }
+
+    public function testReporteEstudianteEvidenceColumnsAreNullable(): void
+    {
+        $columns = DB::select(
+            "select column_name, is_nullable from information_schema.columns
+             where table_schema = 'public' and table_name = 'reporte_estudiante'
+               and column_name in ('evidencia_url', 'evidencia_public_id')"
+        );
+
+        $this->assertCount(2, $columns);
+
+        foreach ($columns as $column) {
+            $this->assertSame('YES', $column->is_nullable, $column->column_name);
+        }
+    }
+
+    public function testReporteEstudianteIdIntentoIsABigintLinkedToTheEntryAttempt(): void
+    {
+        $column = DB::selectOne(
+            "select data_type, is_nullable from information_schema.columns
+             where table_schema = 'public' and table_name = 'reporte_estudiante' and column_name = 'id_intento'"
+        );
+
+        $this->assertNotNull($column);
+        $this->assertSame('bigint', $column->data_type);
+        $this->assertSame('YES', $column->is_nullable);
+
+        $fixture = $this->createReportingContext();
+        $attemptId = $this->insertEntryAttempt($fixture);
+
+        // Varios reportes sin intento conviven (NULL no choca con UNIQUE).
+        $this->insertStudentReport($fixture);
+        $this->insertStudentReport($fixture);
+        $this->assertSame(2, DB::table('reporte_estudiante')->whereNull('id_intento')->count());
+
+        $this->insertStudentReport($fixture, ['id_intento' => $attemptId]);
+
+        // Un intento origina como máximo un reporte.
+        $this->assertRejected(fn () => $this->insertStudentReport($fixture, ['id_intento' => $attemptId]));
+
+        // El intento debe existir.
+        $this->assertRejected(fn () => $this->insertStudentReport($fixture, ['id_intento' => 999999999]));
+    }
+
+    public function testReporteEstudianteEvidenceIsAllOrNothing(): void
+    {
+        $fixture = $this->createReportingContext();
+
+        $this->insertStudentReport($fixture, ['evidencia_url' => null, 'evidencia_public_id' => null]);
+        $this->insertStudentReport($fixture, [
+            'evidencia_url' => 'evidencias/reportes/1.png',
+            'evidencia_public_id' => 'evidencias/reportes/1.png',
+        ]);
+
+        $this->assertRejected(fn () => $this->insertStudentReport($fixture, [
+            'evidencia_url' => 'evidencias/reportes/2.png',
+            'evidencia_public_id' => null,
+        ]));
+        $this->assertRejected(fn () => $this->insertStudentReport($fixture, [
+            'evidencia_url' => null,
+            'evidencia_public_id' => 'evidencias/reportes/2.png',
+        ]));
+    }
+
+    public function testCreationScriptDeclaresTheRiskCenterFoundation(): void
+    {
+        $script = file_get_contents(base_path('../docs/database/creation-script.sql'));
+
+        $constraints = collect(DB::select(
+            "select conname from pg_constraint
+             where conrelid = 'public.reporte_estudiante'::regclass
+               and conname in (
+                   'unq_reporte_estudiante_id_intento',
+                   'fk_reporte_estudiante_intento',
+                   'chk_reporte_estudiante_evidencia'
+               )"
+        ))->pluck('conname');
+
+        $this->assertCount(3, $constraints);
+
+        foreach ($constraints as $name) {
+            $this->assertStringContainsString($name, $script, "El script no declara {$name}.");
+        }
+
+        $this->assertStringContainsString('ADD COLUMN id_intento bigint', $script);
+        $this->assertStringContainsString('ALTER COLUMN evidencia_url DROP NOT NULL', $script);
+        $this->assertStringContainsString('ALTER COLUMN evidencia_public_id DROP NOT NULL', $script);
     }
 
     /** Corre la operación en un savepoint: la base debe rechazarla sin abortar la transacción del test. */

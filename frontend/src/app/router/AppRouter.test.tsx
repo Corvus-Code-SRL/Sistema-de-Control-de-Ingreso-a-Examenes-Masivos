@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { mockApiWith } from '@/test/http'
 import { TOKEN_STORAGE_KEY, meBody, type AccountKey } from '@/test/authFixtures'
@@ -68,39 +68,60 @@ describe('AppRouter — materias del administrador', () => {
     window.localStorage.clear()
   })
 
-  it('un Administrador entra a Materias y abre en la pestaña Catálogo', async () => {
+  it('/materias/asignaciones abre la vista de Asignaciones del Administrador', async () => {
     stubBackend('administrador')
 
-    const app = renderApp('/materias')
+    const app = renderApp('/materias/asignaciones')
 
-    expect(await screen.findByRole('tab', { name: 'Catálogo' })).toHaveAttribute('aria-selected', 'true')
-    expect(app.pathname).toBe('/materias')
+    expect(await screen.findByRole('heading', { name: 'Asignaciones de materias' })).toBeInTheDocument()
+    expect(app.pathname).toBe('/materias/asignaciones')
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument()
   })
 
-  it('/materias/asignar redirige a la pestaña Asignaciones', async () => {
+  it('/materias/catalogo abre la vista del catálogo, sin pestañas', async () => {
     stubBackend('administrador')
 
-    const app = renderApp('/materias/asignar')
+    const app = renderApp('/materias/catalogo')
 
-    await waitFor(() => expect(app.pathname).toBe('/materias'))
-    expect(await screen.findByRole('tab', { name: 'Asignaciones' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('tab', { name: 'Catálogo' })).toHaveAttribute('aria-selected', 'false')
+    expect(await screen.findByRole('heading', { name: 'Catálogo de materias' })).toBeInTheDocument()
+    expect(app.pathname).toBe('/materias/catalogo')
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument()
   })
 
-  it('la navegación del Administrador solo enlaza Materias a /materias', async () => {
+  it.each([['/materias'], ['/materias?tab=catalogo'], ['/materias?tab=asignaciones'], ['/materias/asignar']])(
+    'el Administrador que abre %s llega a Asignaciones',
+    async (route) => {
+      stubBackend('administrador')
+
+      const app = renderApp(route)
+
+      await waitFor(() => expect(app.pathname).toBe('/materias/asignaciones'))
+      expect(await screen.findByRole('heading', { name: 'Asignaciones de materias' })).toBeInTheDocument()
+    }
+  )
+
+  it('la redirección conserva ?carrera= y descarta ?tab=', async () => {
     stubBackend('administrador')
 
-    renderApp('/materias/asignar')
+    const app = renderApp('/materias?tab=asignaciones&carrera=4')
 
-    await screen.findByRole('tab', { name: 'Asignaciones' })
+    await waitFor(() => expect(app.pathname).toBe('/materias/asignaciones'))
+    expect(await screen.findByRole('heading', { name: 'Asignaciones de materias' })).toBeInTheDocument()
+  })
 
-    const hrefs = screen
-      .getAllByRole('link', { name: 'Materias' })
-      .map((link) => link.getAttribute('href'))
-      .filter((href) => href !== null)
+  it('la navegación del Administrador no enlaza /materias: Materias es solo un encabezado', async () => {
+    stubBackend('administrador')
 
-    expect(new Set(hrefs)).toEqual(new Set(['/materias']))
-    expect(screen.queryByRole('link', { name: 'Asignar materia' })).not.toBeInTheDocument()
+    renderApp('/materias/asignaciones')
+
+    await screen.findByRole('heading', { name: 'Asignaciones de materias' })
+
+    const menu = within(screen.getByRole('navigation', { name: 'Navegación principal' }))
+
+    expect(menu.queryByRole('link', { name: 'Materias' })).not.toBeInTheDocument()
+    expect(menu.getByRole('link', { name: 'Asignaciones' })).toHaveAttribute('href', '/materias/asignaciones')
+    expect(menu.getByRole('link', { name: 'Catálogo' })).toHaveAttribute('href', '/materias/catalogo')
+    expect(menu.queryByRole('link', { name: 'Asignar materia' })).not.toBeInTheDocument()
   })
 
   it('la edición de materias ya no tiene ruta: /materias/:id/editar cae en la home del área', async () => {
@@ -119,8 +140,20 @@ describe('AppRouter — materias del administrador', () => {
 
     await waitFor(() => expect(app.pathname).toBe('/materias'))
 
-    expect(screen.queryByRole('tab', { name: 'Asignaciones' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Asignaciones de materias' })).not.toBeInTheDocument()
   })
+
+  it.each([['/materias/asignaciones'], ['/materias/catalogo']])(
+    'un Docente que navega a %s vuelve a su lista de materias',
+    async (route) => {
+      stubBackend('docente')
+
+      const app = renderApp(route)
+
+      await waitFor(() => expect(app.pathname).toBe('/materias'))
+      expect(screen.queryByRole('heading', { name: 'Catálogo de materias' })).not.toBeInTheDocument()
+    }
+  )
 })
 
 describe('AppRouter — control de ingreso por área', () => {

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import type { Area } from '@/features/auth'
@@ -26,23 +26,52 @@ function renderSidebar(area: Area, route: string) {
 }
 
 describe('AppSidebar', () => {
-  it('administrador: muestra una sola entrada Materias y ninguna de Asignar materia', () => {
-    renderSidebar('administrador', '/materias')
+  it('administrador: Materias es un encabezado sin enlace con Asignaciones y Catálogo debajo', () => {
+    renderSidebar('administrador', '/materias/asignaciones')
 
-    expect(screen.getAllByRole('link', { name: 'Materias' })).toHaveLength(1)
-    expect(screen.getByRole('link', { name: 'Materias' })).toHaveAttribute('href', '/materias')
+    expect(screen.getByText('Materias')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Materias' })).not.toBeInTheDocument()
+    expect(screen.getByText('Materias').closest('a')).toBeNull()
+    expect(screen.getByText('Materias').closest('[aria-disabled]')).toBeNull()
+
+    const group = screen.getByRole('list', { name: 'Materias' })
+
+    expect(
+      within(group)
+        .getAllByRole('link')
+        .map((link) => [link.textContent, link.getAttribute('href')])
+    ).toEqual([
+      ['Asignaciones', '/materias/asignaciones'],
+      ['Catálogo', '/materias/catalogo'],
+    ])
     expect(screen.queryByRole('link', { name: /asignar materia/i })).not.toBeInTheDocument()
-    expect(screen.queryByText(/asignar materia/i)).not.toBeInTheDocument()
   })
 
-  it('administrador: Materias se resalta en el catálogo y en la pestaña de asignaciones', () => {
-    renderSidebar('administrador', '/materias')
-    expect(screen.getByRole('link', { name: 'Materias' })).toHaveAttribute('aria-current', 'page')
+  it('administrador: se resalta solo el sub-ítem de la vista abierta', () => {
+    renderSidebar('administrador', '/materias/asignaciones')
+
+    expect(screen.getByRole('link', { name: 'Asignaciones' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Catálogo' })).not.toHaveAttribute('aria-current')
   })
 
-  it('administrador: Materias sigue resaltada con ?tab=asignaciones', () => {
-    renderSidebar('administrador', '/materias?tab=asignaciones')
-    expect(screen.getByRole('link', { name: 'Materias' })).toHaveAttribute('aria-current', 'page')
+  it('administrador: en el catálogo se resalta Catálogo', () => {
+    renderSidebar('administrador', '/materias/catalogo')
+
+    expect(screen.getByRole('link', { name: 'Catálogo' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Asignaciones' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('administrador: Asignaciones sigue resaltada con ?periodo= y ?carrera=', () => {
+    renderSidebar('administrador', '/materias/asignaciones?periodo=6&carrera=3')
+
+    expect(screen.getByRole('link', { name: 'Asignaciones' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('docente: Materias sigue siendo un enlace directo a /materias', () => {
+    renderSidebar('docente', '/materias')
+
+    expect(screen.getByRole('link', { name: 'Materias' })).toHaveAttribute('href', '/materias')
+    expect(screen.queryByRole('link', { name: 'Asignaciones' })).not.toBeInTheDocument()
   })
 
   it('docente: Incidencias queda deshabilitada con su tooltip y sin número', () => {

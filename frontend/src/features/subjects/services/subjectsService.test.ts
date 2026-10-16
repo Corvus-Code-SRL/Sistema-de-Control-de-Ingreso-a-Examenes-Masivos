@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   assignSubjectToCareer,
+  getAcademicPeriods,
   getAdminCareers,
   getAdminSubjects,
   getAssignableSubjects,
@@ -137,37 +138,63 @@ describe('getAdminSubjects', () => {
   })
 })
 
+describe('getAcademicPeriods', () => {
+  it('consulta /periodos y devuelve los períodos con su etiqueta', async () => {
+    const periods = [
+      { id_periodo: 6, etiqueta: '2/2026', nombre_periodo: 'Semestre 2', gestion: 2026, vigente: false },
+      { id_periodo: 5, etiqueta: '1/2026', nombre_periodo: 'Semestre 1', gestion: 2026, vigente: true },
+    ]
+
+    mockApiOnce({ body: { data: periods, meta: { id_periodo_activo: 5 } } })
+
+    await expect(getAcademicPeriods()).resolves.toEqual(periods)
+
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+
+    expect(String(url)).toContain('/periodos')
+    expect(init.method).toBe('GET')
+  })
+})
+
 describe('getSubjectCareerAssignments', () => {
-  const pair = {
+  const periodo = { id_periodo: 5, etiqueta: '1/2026', nombre_periodo: 'Semestre 1', gestion: 2026, vigente: true }
+
+  const offering = {
     id_carrera: 3,
     id_materia: 10,
+    id_periodo: 5,
     estado: 'ACTIVO',
     carrera: { id_carrera: 3, nombre: 'Ingenieria de Sistemas', codigo: 'SIS', id_facultad: 1 },
     materia: { id_materia: 10, nombre: 'Redes', codigo: '2008001', descripcion: null, estado: 'ACTIVO' },
+    periodo,
   }
 
-  it('consulta todos los pares sin filtro', async () => {
-    mockApiOnce({ body: { data: [pair], meta: { carreras: [pair.carrera] } } })
+  it('consulta las ofertas del período, sin filtro de carrera', async () => {
+    mockApiOnce({ body: { data: [offering], meta: { carreras: [offering.carrera], periodo } } })
 
-    await expect(getSubjectCareerAssignments()).resolves.toEqual({
-      assignments: [pair],
-      careers: [pair.carrera],
+    await expect(getSubjectCareerAssignments(5)).resolves.toEqual({
+      assignments: [offering],
+      careers: [offering.carrera],
     })
 
     const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+    const params = new URL(String(url)).searchParams
 
     expect(String(url)).toContain('/administracion/asignaciones')
-    expect(String(url)).not.toContain('id_carrera')
+    expect(params.get('id_periodo')).toBe('5')
+    expect(params.has('id_carrera')).toBe(false)
   })
 
-  it('filtra por carrera con id_carrera', async () => {
-    mockApiOnce({ body: { data: [pair], meta: { carreras: [pair.carrera] } } })
+  it('filtra por carrera con id_carrera, junto al período', async () => {
+    mockApiOnce({ body: { data: [offering], meta: { carreras: [offering.carrera], periodo } } })
 
-    await getSubjectCareerAssignments(3)
+    await getSubjectCareerAssignments(5, 3)
 
     const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+    const params = new URL(String(url)).searchParams
 
-    expect(new URL(String(url)).searchParams.get('id_carrera')).toBe('3')
+    expect(params.get('id_carrera')).toBe('3')
+    expect(params.get('id_periodo')).toBe('5')
   })
 })
 
@@ -204,7 +231,7 @@ describe('getAdminCareers', () => {
 })
 
 describe('getAssignableSubjects', () => {
-  it('consulta las materias asignables de la carrera indicada', async () => {
+  it('consulta las materias asignables de la carrera en el período indicado', async () => {
     mockApiOnce({
       body: {
         data: [
@@ -219,13 +246,12 @@ describe('getAssignableSubjects', () => {
       },
     })
 
-    const subjects = await getAssignableSubjects(3)
+    const subjects = await getAssignableSubjects(3, 5)
 
     const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
 
-    expect(String(url)).toContain(
-      '/administracion/carreras/3/materias-asignables'
-    )
+    expect(String(url)).toContain('/administracion/carreras/3/materias-asignables')
+    expect(new URL(String(url)).searchParams.get('id_periodo')).toBe('5')
     expect(init.method).toBe('GET')
     expect(subjects[0].id_materia).toBe(10)
     expect(subjects[0].nombre).toBe('Inteligencia Artificial')
@@ -233,12 +259,13 @@ describe('getAssignableSubjects', () => {
 })
 
 describe('assignSubjectToCareer', () => {
-  it('envia la materia por POST a la carrera indicada', async () => {
+  it('envia la materia y el período por POST a la carrera indicada', async () => {
     mockApiOnce({
       body: {
         data: {
           id_carrera: 3,
           id_materia: 10,
+          id_periodo: 5,
           estado: 'ACTIVO',
           carrera: {
             id_carrera: 3,
@@ -253,54 +280,39 @@ describe('assignSubjectToCareer', () => {
             descripcion: null,
             estado: 'ACTIVO',
           },
+          periodo: { id_periodo: 5, etiqueta: '1/2026', nombre_periodo: 'Semestre 1', gestion: 2026, vigente: true },
         },
-        mensaje: 'Materia asignada a la carrera correctamente.',
+        mensaje: 'Materia asignada a la carrera en el período correctamente.',
       },
     })
 
-    const response = await assignSubjectToCareer(3, {
-      id_materia: 10,
-    })
+    const response = await assignSubjectToCareer(3, { id_materia: 10, id_periodo: 5 })
 
     const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
 
     expect(String(url)).toContain('/administracion/carreras/3/materias')
     expect(init.method).toBe('POST')
-    expect(init.body).toBe(
-      JSON.stringify({
-        id_materia: 10,
-      })
-    )
+    expect(init.body).toBe(JSON.stringify({ id_materia: 10, id_periodo: 5 }))
     expect(response.data.id_carrera).toBe(3)
     expect(response.data.id_materia).toBe(10)
-    expect(response.mensaje).toBe(
-      'Materia asignada a la carrera correctamente.'
-    )
+    expect(response.data.periodo.etiqueta).toBe('1/2026')
   })
 
-  it('conserva el error 422 cuando la materia ya esta asignada', async () => {
+  it('conserva el error 422 cuando la materia ya esta asignada en el período', async () => {
     mockApiOnce({
       status: 422,
       body: {
         message: 'The given data was invalid.',
         errors: {
-          id_materia: [
-            'La materia ya está asignada a la carrera seleccionada.',
-          ],
+          id_materia: ['La materia ya está asignada a la carrera en este período.'],
         },
       },
     })
 
-    await expect(
-      assignSubjectToCareer(3, {
-        id_materia: 10,
-      })
-    ).rejects.toMatchObject({
+    await expect(assignSubjectToCareer(3, { id_materia: 10, id_periodo: 5 })).rejects.toMatchObject({
       status: 422,
       errors: {
-        id_materia: [
-          'La materia ya está asignada a la carrera seleccionada.',
-        ],
+        id_materia: ['La materia ya está asignada a la carrera en este período.'],
       },
     })
   })

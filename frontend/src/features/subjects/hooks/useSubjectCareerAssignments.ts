@@ -4,36 +4,45 @@ import { getSubjectCareerAssignments } from '../services/subjectsService'
 import type { SubjectCareerAssignmentsResult } from '../types/subject.types'
 
 interface AssignmentsSnapshot extends SubjectCareerAssignmentsResult {
+  periodId: number | null
   careerId: number | null
 }
 
 /**
- * Pares materia-carrera de la pestaña Asignaciones.
+ * Ofertas de la vista Asignaciones: las del período, con filtro opcional por carrera.
  *
- * Sin carrera trae todos; con `careerId` el servidor devuelve solo los de esa carrera. Al cambiar el
- * filtro oculta de inmediato las filas del filtro anterior. `careers` son las carreras con al menos
- * un par, que no dependen del filtro: se conservan mientras llega la respuesta del nuevo filtro.
- * `reload` vuelve a pedir la lista conservando el filtro, que es lo que hace aparecer una
- * asignación recién creada.
+ * Sin período (todavía no se resolvió cuál es el vigente) no consulta y queda cargando. Al cambiar
+ * el período o la carrera oculta de inmediato las filas del filtro anterior, y una respuesta
+ * tardía de un filtro viejo nunca pisa la del actual: cada petición se aborta al cambiar y además
+ * el resultado se descarta si su período o carrera ya no son los pedidos. `careers` son las del
+ * selector del período; se conservan mientras llega la respuesta del nuevo filtro.
  */
-export function useSubjectCareerAssignments(careerId: number | null) {
+export function useSubjectCareerAssignments(periodId: number | null, careerId: number | null) {
   const resource = useAsyncResource<AssignmentsSnapshot>(
     useCallback(
-      async (signal) => ({
-        careerId,
-        ...(await getSubjectCareerAssignments(careerId, signal)),
-      }),
-      [careerId]
+      async (signal) => {
+        if (periodId === null) {
+          return { periodId, careerId, assignments: [], careers: [] }
+        }
+
+        return {
+          periodId,
+          careerId,
+          ...(await getSubjectCareerAssignments(periodId, careerId, signal)),
+        }
+      },
+      [periodId, careerId]
     ),
-    [careerId]
+    [periodId, careerId]
   )
 
-  const belongsToCurrentFilter = resource.data?.careerId === careerId
+  const belongsToCurrentFilter =
+    resource.data?.periodId === periodId && resource.data?.careerId === careerId
 
   const status =
     resource.error !== null
       ? 'error'
-      : resource.status === 'success' && belongsToCurrentFilter
+      : periodId !== null && resource.status === 'success' && belongsToCurrentFilter
         ? 'success'
         : 'loading'
 

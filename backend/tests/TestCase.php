@@ -13,6 +13,11 @@ abstract class TestCase extends BaseTestCase
 {
     use CreatesApplication;
 
+    private const TEST_DATABASE = 'sciem_test';
+
+    // «postgres» es el nombre del servicio de Docker del equipo.
+    private const TEST_HOSTS = ['127.0.0.1', 'localhost', '::1', 'postgres'];
+
     /** El esquema de pruebas se reconstruye desde la migración base y las posteriores. */
     private static bool $schemaLoaded = false;
 
@@ -71,15 +76,34 @@ abstract class TestCase extends BaseTestCase
     {
         $connection = $app->make('db')->connection();
 
-        if ($connection->getDatabaseName() !== 'sciem_test'
-            || $connection->getDriverName() !== 'pgsql'
-            || ! in_array($connection->getConfig('host'), ['postgres', '127.0.0.1', 'localhost', '::1'], true)) {
-            throw new RuntimeException(
-                'Las pruebas solo pueden reiniciar la base de datos sciem_test en PostgreSQL local.'
-            );
-        }
+        self::assertTestDatabase($connection->getDatabaseName(), $connection->getConfig('host'));
 
         $connection->unprepared('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
         $app->make(\Illuminate\Contracts\Console\Kernel::class)->call('migrate', ['--force' => true]);
+    }
+
+    /**
+     * La suite borra y recrea el esquema completo, así que solo corre contra una base llamada
+     * sciem_test cuyo host sea local (127.0.0.1, localhost, ::1) o el servicio de Docker «postgres».
+     * Cualquier otra combinación aborta antes de ejecutar nada; el mensaje nunca incluye credenciales.
+     *
+     * @param  mixed  $host
+     */
+    public static function assertTestDatabase(?string $database, $host): void
+    {
+        $validHost = is_string($host) && in_array(strtolower(trim($host)), self::TEST_HOSTS, true);
+
+        if ($database === self::TEST_DATABASE && $validHost) {
+            return;
+        }
+
+        throw new RuntimeException(sprintf(
+            'Pruebas abortadas: la base «%s» en el host «%s» no es la de pruebas. Se exige DB_DATABASE=%s '
+            . 'y DB_HOST en [%s]. No se modificó nada.',
+            $database ?? '(sin nombre)',
+            is_string($host) ? $host : '(sin host)',
+            self::TEST_DATABASE,
+            implode(', ', self::TEST_HOSTS)
+        ));
     }
 }

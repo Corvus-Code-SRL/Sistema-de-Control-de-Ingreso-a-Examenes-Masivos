@@ -23,7 +23,7 @@ Route::get(
     [SubjectGroupController::class, 'index']
 );
 
-// HU-06: asignar una materia existente a una carrera.
+// HU-006: asignar una materia existente a una carrera en un período (id_periodo obligatorio).
 Route::prefix('administracion')
     ->group(function () {
         Route::get(
