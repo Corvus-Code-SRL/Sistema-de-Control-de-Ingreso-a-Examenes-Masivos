@@ -460,6 +460,108 @@ class StudentVerificationTest extends TestCase
         ]);
     }
 
+    public function test_solo_ci_permite_verificar_y_confirmar_sin_conocer_el_sis(): void
+    {
+        $this->student->update(['ci' => '0012345']);
+        $this->rebuildSnapshot();
+
+        $this->postJson($this->url('verificar'), [
+            'ci' => '0012345',
+            'id_ambiente' => $this->aulaId,
+        ])->assertOk()
+            ->assertJsonPath('data.veredicto', 'AUTORIZADO')
+            ->assertJsonPath('data.estudiante.id_estudiante', $this->student->id_estudiante)
+            ->assertJsonPath('data.estudiante.ci', '0012345');
+
+        $this->postJson($this->url('confirmar-ingreso'), [
+            'id_estudiante' => $this->student->id_estudiante,
+            'ci' => '0012345',
+            'id_ambiente' => $this->aulaId,
+        ])->assertCreated()->assertJsonPath('data.veredicto', 'INGRESO_REGISTRADO');
+
+        $this->assertDatabaseHas('examen_estudiante', [
+            'id_examen' => $this->exam->id_examen,
+            'id_estudiante' => $this->student->id_estudiante,
+            'estado_ingreso' => 'INGRESO',
+        ]);
+    }
+
+    public function test_ci_manual_de_estudiante_ajeno_muestra_ficha_pero_no_autoriza(): void
+    {
+        $outsideId = DB::table('estudiante')->insertGetId([
+            'cod_sis' => '199912543',
+            'ci' => '0098765',
+            'nombre' => 'María',
+            'apellido_paterno' => 'Fuera',
+            'apellido_materno' => 'Nómina',
+            'estado' => 'ACTIVO',
+        ], 'id_estudiante');
+        $this->rebuildSnapshot();
+
+        $this->getJson($this->url('buscar') . '?ci=0098')->assertOk()->assertJsonCount(0, 'data');
+        $this->postJson($this->url('verificar'), [
+            'ci' => '0098765',
+            'id_ambiente' => $this->aulaId,
+        ])->assertOk()
+            ->assertJsonPath('data.veredicto', 'NO_PERTENECE')
+            ->assertJsonPath('data.autorizado', false)
+            ->assertJsonPath('data.estudiante.id_estudiante', $outsideId);
+
+        $this->assertDatabaseHas('intento_ingreso', [
+            'id_estudiante' => $outsideId,
+            'cod_sis' => '199912543',
+            'ci_presentado' => '0098765',
+            'motivo' => 'NO_PERTENECE',
+        ]);
+        $this->assertSame(0, DB::table('examen_estudiante')->count());
+    }
+
+    public function test_ci_desconocido_no_revela_ficha_y_registra_intento_sin_sis(): void
+    {
+        $this->postJson($this->url('verificar'), [
+            'ci' => '9876543210',
+            'id_ambiente' => $this->aulaId,
+        ])->assertOk()
+            ->assertJsonPath('data.veredicto', 'NO_ENCONTRADO')
+            ->assertJsonPath('data.estudiante', null);
+
+        $this->assertDatabaseHas('intento_ingreso', [
+            'id_estudiante' => null,
+            'cod_sis' => null,
+            'ci_presentado' => '9876543210',
+            'motivo' => 'NO_ENCONTRADO',
+        ]);
+    }
+
+    public function test_ci_parcial_no_identifica_a_un_estudiante(): void
+    {
+        $this->postJson($this->url('verificar'), [
+            'ci' => substr($this->student->ci, 0, 4),
+            'id_ambiente' => $this->aulaId,
+        ])->assertOk()
+            ->assertJsonPath('data.veredicto', 'NO_ENCONTRADO')
+            ->assertJsonPath('data.estudiante', null);
+    }
+
+    public function test_sis_con_ci_de_otra_ficha_no_cambia_al_estudiante_identificado(): void
+    {
+        $other = Student::query()
+            ->join('grupo_estudiante as gs', 'gs.id_estudiante', '=', 'estudiante.id_estudiante')
+            ->where('gs.id_grupo', $this->grupoPropioId)
+            ->where('estudiante.id_estudiante', '!=', $this->student->id_estudiante)
+            ->select('estudiante.*')
+            ->firstOrFail();
+
+        $this->postJson($this->url('verificar'), [
+            'cod_sis' => $this->student->cod_sis,
+            'ci' => $other->ci,
+            'id_ambiente' => $this->aulaId,
+        ])->assertOk()
+            ->assertJsonPath('data.veredicto', 'CI_NO_COINCIDE')
+            ->assertJsonPath('data.estudiante.id_estudiante', $this->student->id_estudiante)
+            ->assertJsonPath('data.autorizado', false);
+    }
+
     public function test_estudiante_de_otro_grupo_no_puede_ingresar(): void
     {
         $this->enrollStudents($this->grupoAjenoId, 1);
@@ -850,7 +952,7 @@ class StudentVerificationTest extends TestCase
         $this->postJson($this->url('verificar'), [
             'id_estudiante' => $this->student->id_estudiante,
             'id_ambiente' => $this->aulaId,
-        ])->assertUnprocessable()->assertJsonValidationErrors('cod_sis');
+        ])->assertUnprocessable()->assertJsonValidationErrors(['cod_sis', 'ci']);
 
         $this->assertSame(0, DB::table('intento_ingreso')->count());
     }

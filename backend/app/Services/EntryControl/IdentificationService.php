@@ -17,9 +17,14 @@ class IdentificationService
 
     public function identify(int $examId, array $input): array
     {
-        $record = isset($input['id_estudiante'])
-            ? $this->snapshots->studentById($examId, (int) $input['id_estudiante'])
-            : $this->snapshots->studentBySis($examId, (string) $input['cod_sis']);
+        if (isset($input['id_estudiante'])) {
+            $record = $this->snapshots->studentById($examId, (int) $input['id_estudiante']);
+        } elseif (! empty($input['cod_sis'])) {
+            $record = $this->snapshots->studentBySis($examId, (string) $input['cod_sis']);
+        } else {
+            $studentId = Student::query()->where('ci', (string) $input['ci'])->value('id_estudiante');
+            $record = $studentId === null ? null : $this->snapshots->studentById($examId, (int) $studentId);
+        }
 
         if ($record === null) {
             return ['veredicto' => 'NO_ENCONTRADO', 'registro' => null];
