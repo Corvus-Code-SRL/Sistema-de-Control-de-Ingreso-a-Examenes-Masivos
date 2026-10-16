@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * Mapea public.central_riesgo.
  *
+ * Solo los reportes APROBADOS tienen fila aquí, y `id_estudiante` es el del reporte: la base no lo
+ * impone, lo garantiza el servicio de aprobación de HU-045.
+ *
  * @property int $id_cr_estudiante
  * @property int $id_reporte_est
  * @property int $id_estudiante

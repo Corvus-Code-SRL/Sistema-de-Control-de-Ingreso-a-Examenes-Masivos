@@ -93,6 +93,7 @@ class TestDataSeeder extends Seeder
                 GroupTestDataSeeder::class,
                 AssignmentSampleTestDataSeeder::class,
                 ExamTestDataSeeder::class,
+                RiskCenterTestDataSeeder::class,
             ]);
         });
     }

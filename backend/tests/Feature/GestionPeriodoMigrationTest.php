@@ -331,7 +331,9 @@ class GestionPeriodoMigrationTest extends TestCase
 
         $this->assertNotFalse($start, 'El script no tiene el bloque de la Versión 8.');
 
-        $block = substr($script, $start);
+        // Solo los bloques de gestión y período (Versiones 8 y 9); las versiones siguientes tocan otras tablas.
+        $end = strpos($script, '-- Versión 10:');
+        $block = $end === false ? substr($script, $start) : substr($script, $start, $end - $start);
 
         DB::beginTransaction();
 
