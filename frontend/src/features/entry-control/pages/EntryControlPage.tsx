@@ -42,7 +42,7 @@ function EntryControlContent({ examId }: { examId: number }) {
     {!loading && error && <div role="alert" className="rounded-xl border border-danger/30 bg-danger-soft p-5"><p className="font-medium text-danger-fg">No se pudo abrir el control de ingreso</p><p className="mt-1 text-sm">{error}</p><Button variant="outline" className="mt-4" onClick={() => void reload()}>Reintentar</Button></div>}
 
     {!loading && context && <>
-      <div className={verification.result && !ended ? 'hidden lg:block' : ''}><EntryExamCard context={context} status={status} roomId={roomId} roomDisabled={verification.busy !== null || ended} ended={ended} onRoomChange={(id) => { setRoomId(id); verification.reset() }} /></div>
+      <div className={verification.result && !ended ? 'hidden lg:block' : ''}><EntryExamCard context={context} status={status} stale={statusError !== null} roomId={roomId} roomDisabled={verification.busy !== null || ended} ended={ended} onRoomChange={(id) => { setRoomId(id); verification.reset() }} /></div>
       {!open && <div role="status" className="rounded-lg border border-warn-border bg-warn-soft p-4 text-sm text-warn-fg">{ended ? 'El control de ingreso ha terminado.' : openingFailure?.mensaje ?? `El control de ingreso no está abierto. Estado del examen: ${context.estado.replace(/_/g, ' ')}.`}</div>}
       {!hasRoom && !openingFailure && <div role="alert" className="rounded-lg border border-danger/30 bg-danger-soft p-4 text-sm text-danger-fg">No hay un ambiente de control asignado. Solicite al docente que asigne uno.</div>}
       {statusError && <div role="alert" className="rounded-lg border border-warn-border bg-warn-soft p-3 text-sm text-warn-fg">{open ? 'No se pudo actualizar el contador' : 'No se pudo actualizar el estado del control'}: {statusError}</div>}
@@ -53,7 +53,7 @@ function EntryControlContent({ examId }: { examId: number }) {
           <IdentificationForm examId={examId} sis={verification.sis} ci={verification.ci} disabled={!open || !hasRoom || verification.busy !== null} busy={verification.busy === 'verify'} onSisChange={verification.changeSis} onCiChange={verification.changeCi} onSelect={verification.choose} onVerify={() => void verification.verify()} />
         </div>
         <div className="space-y-5">
-          {verification.result ? <VerificationResult result={verification.result} busy={verification.busy !== null} onConfirm={() => void verification.confirm()} onReject={() => setRejectOpen(true)} onNext={verification.reset} /> : <RecentEntries entries={status?.ultimos_ingresos ?? []} />}
+          {verification.result ? <VerificationResult result={verification.result} presentedCi={verification.ci} subjectName={context.materia} busy={verification.busy !== null} onConfirm={() => void verification.confirm()} onReject={() => setRejectOpen(true)} onNext={verification.reset} /> : <RecentEntries entries={status?.ultimos_ingresos ?? []} />}
         </div>
       </div>}
       {open && verification.result && <RejectEntryDialog open={rejectOpen} studentName={verification.result.estudiante?.nombre_completo ?? 'este estudiante'} error={verification.error} busy={verification.busy === 'reject'} onClose={() => setRejectOpen(false)} onConfirm={verification.reject} />}

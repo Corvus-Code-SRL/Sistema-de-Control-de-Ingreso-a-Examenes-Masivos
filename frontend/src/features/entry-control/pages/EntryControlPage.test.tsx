@@ -19,7 +19,7 @@ const student = { id_estudiante: 19, cod_sis: '202309201', ci: '9456781' as stri
 const allowed = { veredicto: 'AUTORIZADO', motivo: 'Inscrito en un grupo del examen.', autorizado: true,
   estudiante: student, grupo: { id_grupo: 1, num_grupo: '1' },
   ambiente_asignado: { id_ambiente: 5, nro_aula: '691A' },
-  antecedentes: { tiene_antecedentes: false, cantidad: 0, resumen: null }, ingreso_previo: null }
+  antecedentes: { total: 0, latest: null }, ingreso_previo: null }
 
 function routes(verdict: Verification = allowed, examContext = context): Parameters<typeof mockApi>[0] {
   return [
@@ -46,6 +46,7 @@ describe('EntryControlPage', () => {
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
 
     const room = await screen.findByText('Ambiente 691A')
+    expect(screen.getByText('En vivo')).toBeInTheDocument()
     const row = room.closest('li') as HTMLLIElement
     expect(within(row).getByText('Carlos Rocha Mendoza')).toBeInTheDocument()
     expect(within(row).getByText(/por Ana López/)).toBeInTheDocument()
@@ -246,7 +247,7 @@ describe('EntryControlPage', () => {
     expect(screen.getByLabelText('Carnet de identidad (CI)')).toHaveValue('')
     await user.click(screen.getByRole('button', { name: 'Verificar estudiante' }))
     expect(await screen.findByText('AUTORIZADO')).toBeInTheDocument()
-    expect(screen.getByText('No registrado')).toBeInTheDocument()
+    expect(screen.getByText('No ingresado')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Aceptar ingreso' }))
     expect(await screen.findByText(/Ingreso registrado:/)).toBeInTheDocument()
 
