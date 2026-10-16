@@ -72,7 +72,8 @@ class StudentVerificationTest extends TestCase
         $this->postJson($this->url('verificar'), $this->input())
             ->assertOk()
             ->assertJsonPath('data.veredicto', 'AUTORIZADO')
-            ->assertJsonPath('data.antecedentes.tiene_antecedentes', false);
+            ->assertJsonPath('data.antecedentes.total', 0)
+            ->assertJsonPath('data.antecedentes.latest', null);
 
         $this->assertSame(0, DB::table('examen_estudiante')->count());
         $this->assertSame(0, DB::table('intento_ingreso')->count());
@@ -87,6 +88,7 @@ class StudentVerificationTest extends TestCase
             'id_ambiente' => $this->otraAulaId,
         ]);
         $assistant = User::query()->findOrFail($this->otroDocenteId);
+        $this->rebuildSnapshot();
         $this->getJson($this->url('buscar') . '?sis=' . substr($assistant->cod_sis, 0, 4))
             ->assertOk()
             ->assertJsonCount(0, 'data');
@@ -348,16 +350,24 @@ class StudentVerificationTest extends TestCase
         }
     }
 
-    public function test_verificacion_autorizada_se_resuelve_sin_consultas_sql(): void
+    public function test_verificacion_autorizada_no_consulta_postgresql(): void
     {
         $queries = [];
         DB::listen(function ($query) use (&$queries): void {
             $queries[] = $query->sql;
         });
 
-        $this->postJson($this->url('verificar'), $this->input())
+        foreach ([
+            $this->input(),
+            ['ci' => $this->student->ci, 'id_ambiente' => $this->aulaId],
+        ] as $input) {
+            $this->postJson($this->url('verificar'), $input)
+                ->assertOk()
+                ->assertJsonPath('data.veredicto', 'AUTORIZADO');
+        }
+        $this->getJson($this->url('buscar') . '?ci=' . $this->student->ci)
             ->assertOk()
-            ->assertJsonPath('data.veredicto', 'AUTORIZADO');
+            ->assertJsonCount(1, 'data');
 
         $this->assertSame([], $queries);
     }
@@ -789,15 +799,44 @@ class StudentVerificationTest extends TestCase
         DB::table('central_riesgo')->insert([
             'id_reporte_est' => $reportId,
             'id_estudiante' => $this->student->id_estudiante,
+            'fecha_registro' => '2026-10-13 09:15:00',
         ]);
         $this->rebuildSnapshot();
 
         $this->postJson($this->url('verificar'), $this->input())
             ->assertOk()
             ->assertJsonPath('data.veredicto', 'AUTORIZADO')
-            ->assertJsonPath('data.antecedentes.cantidad', 1)
-            ->assertJsonPath('data.antecedentes.tiene_antecedentes', true)
-            ->assertJsonPath('data.antecedentes.detalles.0.tipo', 'Suplantacion');
+            ->assertJsonPath('data.antecedentes.total', 1)
+            ->assertJsonPath('data.antecedentes.latest.tipo_falta', 'Suplantacion')
+            ->assertJsonPath('data.antecedentes.latest.fecha_registro', '2026-10-13');
+
+        $secondReportId = DB::table('reporte_estudiante')->insertGetId([
+            'id_estudiante' => $this->student->id_estudiante,
+            'id_examen' => $this->exam->id_examen,
+            'id_tipo_falta' => $reasonId,
+            'id_usuario_reportante' => $this->docenteId,
+            'evidencia_url' => 'https://example.test/segunda-evidencia',
+            'evidencia_public_id' => 'test-segundo',
+            'estado' => 'APROBADO',
+            'fecha_revision' => now(),
+            'id_usuario_revisor' => $this->docenteId,
+        ], 'id_reporte_est');
+        DB::table('central_riesgo')->insert([
+            'id_reporte_est' => $secondReportId,
+            'id_estudiante' => $this->student->id_estudiante,
+            'fecha_registro' => '2026-10-14 09:15:00',
+        ]);
+
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.antecedentes.total', 1);
+
+        $this->rebuildSnapshot();
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.veredicto', 'AUTORIZADO')
+            ->assertJsonPath('data.antecedentes.total', 2)
+            ->assertJsonPath('data.antecedentes.latest.fecha_registro', '2026-10-14');
 
         $this->postJson($this->url('confirmar-ingreso'), [
             'id_estudiante' => $this->student->id_estudiante,
@@ -850,9 +889,9 @@ class StudentVerificationTest extends TestCase
                 ->assertJsonPath('data.veredicto', 'NO_PERTENECE')
                 ->assertJsonPath('data.autorizado', false)
                 ->assertJsonPath('data.estudiante.id_estudiante', $outsideId)
-                ->assertJsonPath('data.antecedentes.cantidad', 1)
-                ->assertJsonPath('data.antecedentes.detalles.0.tipo', 'Suplantacion')
-                ->assertJsonPath('data.antecedentes.detalles.0.fecha', '2026-10-13');
+                ->assertJsonPath('data.antecedentes.total', 1)
+                ->assertJsonPath('data.antecedentes.latest.tipo_falta', 'Suplantacion')
+                ->assertJsonPath('data.antecedentes.latest.fecha_registro', '2026-10-13');
         }
     }
 
