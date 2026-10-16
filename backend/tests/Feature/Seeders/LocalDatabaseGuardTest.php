@@ -7,6 +7,7 @@ use Database\Seeders\TestData\AccountTestDataSeeder;
 use Database\Seeders\TestData\CatalogTestDataSeeder;
 use Database\Seeders\TestData\ExamTestDataSeeder;
 use Database\Seeders\TestData\GroupTestDataSeeder;
+use Database\Seeders\TestData\RiskCenterTestDataSeeder;
 use Database\Seeders\TestData\TestDataSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -100,6 +101,7 @@ class LocalDatabaseGuardTest extends TestCase
             'AccountTestDataSeeder' => [AccountTestDataSeeder::class, 'usuario'],
             'GroupTestDataSeeder' => [GroupTestDataSeeder::class, 'estudiante'],
             'ExamTestDataSeeder' => [ExamTestDataSeeder::class, 'examen'],
+            'RiskCenterTestDataSeeder' => [RiskCenterTestDataSeeder::class, 'estudiante'],
         ];
     }
 

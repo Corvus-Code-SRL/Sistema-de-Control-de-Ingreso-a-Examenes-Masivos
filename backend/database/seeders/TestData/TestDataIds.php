@@ -45,6 +45,17 @@ final class TestDataIds
     /** Electiva de muestra de HU-006: ofertada solo en 1/2026, ver AssignmentSampleTestDataSeeder. */
     public const SUBJECT_ELECTIVE_SAMPLE = 9209;
 
+    // estudiante.id_estudiante (GroupTestDataSeeder siembra del 9501 al 9524)
+    public const STUDENT_JOSE_PEREZ = 9525;
+
+    // intento_ingreso.id_intento, reporte_estudiante.id_reporte_est y central_riesgo.id_cr_estudiante
+    public const ENTRY_ATTEMPT_FIRST = 9901;
+    public const ENTRY_ATTEMPT_LAST = 9911;
+    public const STUDENT_REPORT_FIRST = 9921;
+    public const STUDENT_REPORT_LAST = 9929;
+    public const RISK_CENTER_FIRST = 9941;
+    public const RISK_CENTER_LAST = 9945;
+
     // gestion.id_gestion
     public const YEAR_2025 = 9311;
     public const YEAR_2026 = 9312;

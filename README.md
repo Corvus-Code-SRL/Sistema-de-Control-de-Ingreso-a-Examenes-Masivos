@@ -330,8 +330,13 @@ Los códigos SIS siguen el formato de cada tipo de cuenta: el Administrador es a
 | Examen cancelado, sin reserva efectiva de horario | 9804, Base de Datos I/Sistemas, 16-10-2026 a las 14:00 | HU-06 |
 | Estados que bloquean edición y cancelación | 9805 EN_INGRESO, 9806 EN_CURSO, 9807 FINALIZADO | HU-06 |
 | Examen que cruza medianoche | 9808, Programación/Sistemas, 17-10-2026 de 23:00 a 01:00 (120 minutos) | HU-06 |
+| Intento de ingreso rechazado con reporte | 9901–9909: cada uno originó un reporte (9921–9929) de los exámenes 9807 y 9805, controlados por Daniela Ferrufino e Iván Choque | HU-042 |
+| Intento rechazado de un estudiante identificado, sin reporte | 9910, Diego Delgadillo en el examen 9807 | HU-042 |
+| Intento de un estudiante que no figura en el sistema | 9911, motivo `NO_ENCONTRADO`, `cod_sis` `202199999`, sin `id_estudiante` | HU-042 |
+| Reportes en los tres estados, con y sin evidencia | 2 PENDIENTE, 2 RECHAZADO y 5 APROBADO; los revisa Marcelo Quiroga. Los que tienen evidencia apuntan a `evidencias/reportes/<id>.<ext>` del disco público, donde el seeder deja un archivo mínimo si el path está libre (nunca pisa uno existente) | HU-045 |
+| Central de riesgo con reincidentes | 5 filas (9941–9945) de 3 estudiantes y los 4 tipos de falta: José Pérez Mamani (`202150025`, id 9525), Camila Camacho y Bruno Balderrama | HU-046 |
 
-Periodos: `2-2025` (9301), `1-2026` (9302) y `2-2026` (9303, el activo). Hay 24 estudiantes, repartidos entre 2 y 6 por grupo. Los ocho exámenes (9801–9808) tienen un ambiente y un grupo del mismo par cada uno. Sus fechas y estados son fijos: no avanzan con el reloj. Cuando esas fechas queden en el pasado, el formulario de HU-06 rechazará reutilizarlas para crear o editar; actualizar el conjunto compartido de forma coordinada si se necesita otro calendario.
+Periodos: `2-2025` (9301), `1-2026` (9302) y `2-2026` (9303, el activo). Hay 25 estudiantes, repartidos entre 2 y 7 por grupo (José Pérez Mamani, 9525, se suma a los grupos 9401 y 9407 solo con `RiskCenterTestDataSeeder`, que también habilita a los dos auxiliares en los exámenes 9805 y 9807). Los ocho exámenes (9801–9808) tienen un ambiente y un grupo del mismo par cada uno. Sus fechas y estados son fijos: no avanzan con el reloj. Cuando esas fechas queden en el pasado, el formulario de HU-06 rechazará reutilizarlas para crear o editar; actualizar el conjunto compartido de forma coordinada si se necesita otro calendario.
 
 ### Cómo retirarlos
 
@@ -341,7 +346,7 @@ Todos los ids numéricos de prueba están en el rango 9000–9999 y todos los uu
 
 | Seeder | Qué hace | ¿Base compartida? |
 | --- | --- | --- |
-| `ActionSeeder` | Catálogo `accion`: las 12 acciones de la bitácora, en MAYÚSCULAS. `updateOrInsert` por `operacion`. | **Sí**, siempre con `--class` |
+| `ActionSeeder` | Catálogo `accion`: las 14 acciones de la bitácora, en MAYÚSCULAS (incluye `APROBAR_REPORTE` y `RECHAZAR_REPORTE`). `updateOrInsert` por `operacion`. | **Sí**, siempre con `--class` |
 | `IncidentTypeSeeder` | Catálogo `tipo_falta`: 4 tipos de falta. Solo inserta los que faltan y nunca actualiza: una fila existente con otra descripción se deja como está. | **Sí**, siempre con `--class` |
 | `RoleSeeder`, `ExamTypeSeeder` | Catálogos `rol` y `tipo_examen`. Usan `updateOrInsert`: reescriben la descripción o la categoría si cambiaron. | Ya aplicados; no repetir sin necesidad |
 | `UserSeeder`, `AdministratorAccountSeeder` | La cuenta de sistema que firma la bitácora de seeders y comandos (`SCIEM_USUARIO_PRUEBA`, vía `SystemActor`). `UserSeeder` sobrescribe su nombre y su SIS (`000000000`) y le deja una contraseña inutilizable: es una cuenta de firma, nadie puede iniciar sesión con ella (RNF-02); conserva el rol Administrador. | Solo local |
@@ -383,7 +388,7 @@ La migración `2026_10_04_000000_delete_legacy_accion_rows` borra del catálogo 
 5. Verificación:
 
     ```sql
-    select count(*) from accion;                                             -- 12
+    select count(*) from accion;                                             -- 12, o 14 si ya corrió ActionSeeder con las acciones de reportes
     select min(id_accion), max(id_accion) from accion;                       -- 5 y 16
     select count(*) from accion
      where operacion in ('Crear', 'Actualizar', 'Leer', 'Desactivar');       -- 0
