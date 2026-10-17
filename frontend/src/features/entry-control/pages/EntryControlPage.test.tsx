@@ -1,7 +1,7 @@
-import { act, screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { mockApi } from '@/test/http'
+import { mockApi, mockApiWith } from '@/test/http'
 import { renderWithRouter } from '@/test/render'
 import { EntryControlPage } from './EntryControlPage'
 
@@ -22,6 +22,7 @@ const allowed = { veredicto: 'AUTORIZADO', motivo: 'Inscrito en un grupo del exa
 
 function routes(verdict = allowed, examContext = context) {
   return [
+    { matches: (url: string) => url.includes('/intentos?'), body: { data: [] } },
     { matches: (url: string) => url.endsWith('/contexto'), body: { data: examContext } },
     { matches: (url: string) => url.includes('/estado'), body: { data: status } },
     { matches: (url: string) => url.endsWith('/verificar'), body: { data: verdict } },
@@ -81,7 +82,7 @@ describe('EntryControlPage', () => {
       { matches: (url) => url.includes('/buscar'), body: { data: [{
         id_estudiante: student.id_estudiante, cod_sis: student.cod_sis, nombre_completo: student.nombre_completo,
       }] } },
-      { matches: (url) => url.endsWith('/rechazar-ingreso'), status: 201, body: { data: { registrado: true } } },
+      { matches: (url) => url.endsWith('/rechazar-ingreso'), status: 201, body: { data: { registrado: true, id_intento: 30, motivo: 'IDENTIDAD_DUDOSA' } } },
     ])
     const user = userEvent.setup()
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
@@ -128,7 +129,7 @@ describe('EntryControlPage', () => {
         renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
       })
       expect(screen.getByText(/El control de ingreso no está abierto/)).toBeInTheDocument()
-      apiRoutes[0].body = { data: context }
+      apiRoutes.find((route) => route.matches('/contexto'))!.body = { data: context }
 
       await act(async () => { await vi.advanceTimersByTimeAsync(15000) })
       expect(screen.getByLabelText('Código SIS')).toBeInTheDocument()
@@ -186,5 +187,61 @@ describe('EntryControlPage', () => {
     await screen.findByText(/Usted controla en/)
 
     expect(screen.getAllByText('Primer parcial').length).toBeGreaterThan(0)
+  })
+})
+
+
+describe('HU-042 integración con el rechazo', () => {
+  it('conserva el identificador del rechazo manual y envía ese intento a revisión', async () => {
+    let reported = false
+    const apiRoutes = routes()
+    mockApiWith((request) => {
+      if (request.url.endsWith('/rechazar-ingreso')) return { status: 201,
+        body: { data: { registrado: true, id_intento: 30, motivo: 'IDENTIDAD_DUDOSA' } } }
+      if (request.url.endsWith('/tipos-falta')) return {
+        body: { data: [{ id_falta: 4, nombre: 'Suplantación', descripcion: null }] } }
+      if (request.url.endsWith('/intentos/30/reporte')) {
+        reported = true
+        return { status: 201, body: { data: { id_reporte_est: 100, id_intento: 30, estado: 'PENDIENTE' } } }
+      }
+      if (request.url.includes('/intentos?')) return { body: { data: [{
+        id_intento: 30, estudiante: student, ambiente: { id_ambiente: 5, nro_aula: '691A' },
+        motivo: 'IDENTIDAD_DUDOSA', observacion: null, registrado_en: '2026-10-16T14:00:00Z', reportado: reported,
+      }] } }
+      return apiRoutes.find((route) => route.matches(request.url))
+    })
+    const user = userEvent.setup()
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+    await user.type(await screen.findByLabelText('Código SIS'), '202309201')
+    await user.click(screen.getByRole('button', { name: 'Verificar estudiante' }))
+    await user.click(await screen.findByRole('button', { name: 'Rechazar' }))
+    await user.click(screen.getByRole('button', { name: 'Registrar intento' }))
+    await user.click(await screen.findByRole('button', { name: 'Reportar incidencia' }))
+    const modal = await screen.findByRole('dialog', { name: 'Reportar incidencia' })
+    expect(within(modal).getByText(student.nombre_completo)).toBeInTheDocument()
+    await waitFor(() => expect(within(modal).getByRole('combobox')).toBeEnabled())
+    await user.click(within(modal).getByRole('combobox'))
+    await user.click(screen.getByRole('option', { name: 'Suplantación' }))
+    await user.type(within(modal).getByRole('textbox', { name: 'Descripción' }), 'La fotografía no coincide con el documento.')
+    await user.click(within(modal).getByRole('button', { name: 'Enviar a revisión' }))
+    expect(await screen.findByText('Enviado a revisión del docente')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Reportar incidencia' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Ya reportado' })).toBeDisabled()
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('/intentos/30/reporte'))).toHaveLength(1)
+  })
+
+  it('abre el reporte de un rechazo automático con estudiante identificado', async () => {
+    mockApi([
+      ...routes({ ...allowed, autorizado: false, veredicto: 'NO_HABILITADO', id_intento: 31 } as typeof allowed),
+      { matches: (url) => url.endsWith('/tipos-falta'), body: { data: [] } },
+    ])
+    const user = userEvent.setup()
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+    await user.type(await screen.findByLabelText('Código SIS'), '202309201')
+    await user.click(screen.getByRole('button', { name: 'Verificar estudiante' }))
+    await user.click(await screen.findByRole('button', { name: 'Reportar incidencia' }))
+    expect(await screen.findByRole('dialog', { name: 'Reportar incidencia' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith('/reporte'))).toBe(false)
   })
 })
