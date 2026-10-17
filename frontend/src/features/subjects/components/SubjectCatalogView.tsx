@@ -11,11 +11,11 @@ import { AdminSubjectsTable } from './AdminSubjectsTable'
 const SEARCH_DEBOUNCE_MS = 300
 
 /**
- * Pestaña Catálogo: lista de solo lectura con búsqueda por código o nombre.
+ * Vista Catálogo: lista de solo lectura con búsqueda por código o nombre.
  *
  * No ofrece crear, editar ni borrar: las materias vienen del catálogo institucional.
  */
-export function SubjectCatalogTab() {
+export function SubjectCatalogView() {
   const [input, setInput] = useState('')
   const [search, setSearch] = useState('')
 

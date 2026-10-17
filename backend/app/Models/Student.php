@@ -43,6 +43,11 @@ class Student extends Model
         $this->attributes['cod_sis'] = is_string($value) ? SisCode::normalize($value) : $value;
     }
 
+    public function getNombreCompletoAttribute(): string
+    {
+        return trim("{$this->nombre} {$this->apellido_paterno} {$this->apellido_materno}");
+    }
+
     public function groups(): BelongsToMany
     {
         return $this->belongsToMany(Group::class, 'grupo_estudiante', 'id_estudiante', 'id_grupo')

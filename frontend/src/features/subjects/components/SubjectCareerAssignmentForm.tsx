@@ -1,10 +1,12 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   AlertCircle,
   CheckCircle2,
+  Info,
   Link2,
   Loader2,
 } from 'lucide-react'
+import { SearchableSelect } from '@/components/common/SearchableSelect'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
@@ -34,18 +36,33 @@ import {
 import { useAdminCareers } from '../hooks/useAdminCareers'
 import { useAssignableSubjects } from '../hooks/useAssignableSubjects'
 import { useSubjectCareerAssignment } from '../hooks/useSubjectCareerAssignment'
-import type { SubjectCareerAssignment } from '../types/subject.types'
+import type { AcademicPeriod, SubjectCareerAssignment } from '../types/subject.types'
 
 interface SubjectCareerAssignmentFormProps {
+  /** Período sobre el que se asigna: lo elige la vista, el formulario no lo cambia. */
+  period: AcademicPeriod
+  /**
+   * Si no es `null`, el período es de solo consulta: el formulario se muestra deshabilitado con este
+   * aviso y no consulta materias asignables. Solo el período vigente admite escritura.
+   */
+  readOnlyNotice?: string | null
   /** Se llama tras una asignación confirmada con éxito, para que la vista refresque su lista. */
   onAssigned?: (assignment: SubjectCareerAssignment) => void
 }
 
 /**
- * Formulario administrativo para vincular una materia existente
- * del catálogo institucional con una carrera activa.
+ * Formulario administrativo (HU-006) para ofrecer una materia existente del catálogo
+ * institucional a una carrera activa en un período.
+ *
+ * Nada se guarda hasta confirmar en el diálogo. Al cambiar de período se descartan la materia
+ * elegida y el mensaje de éxito (las opciones dependen del período); la carrera se conserva.
  */
-export function SubjectCareerAssignmentForm({ onAssigned }: SubjectCareerAssignmentFormProps) {
+export function SubjectCareerAssignmentForm({
+  period,
+  readOnlyNotice = null,
+  onAssigned,
+}: SubjectCareerAssignmentFormProps) {
+  const readOnly = readOnlyNotice !== null
   const [careerId, setCareerId] = useState<number | null>(null)
   const [subjectId, setSubjectId] = useState<number | null>(null)
   const [confirmationOpen, setConfirmationOpen] = useState(false)
@@ -63,9 +80,17 @@ export function SubjectCareerAssignmentForm({ onAssigned }: SubjectCareerAssignm
     status: subjectsStatus,
     error: subjectsError,
     reload: reloadSubjects,
-  } = useAssignableSubjects(careerId)
+  } = useAssignableSubjects(careerId, readOnly ? null : period.id_periodo)
 
   const assignment = useSubjectCareerAssignment()
+  const resetAssignment = assignment.reset
+
+  useEffect(() => {
+    setSubjectId(null)
+    setSuccessMessage(null)
+    setConfirmationOpen(false)
+    resetAssignment()
+  }, [period.id_periodo, resetAssignment])
 
   const selectedCareer =
     careers.find((career) => career.id_carrera === careerId) ?? null
@@ -73,10 +98,20 @@ export function SubjectCareerAssignmentForm({ onAssigned }: SubjectCareerAssignm
   const selectedSubject =
     subjects.find((subject) => subject.id_materia === subjectId) ?? null
 
+  const subjectOptions = useMemo(
+    () =>
+      subjects.map((subject) => ({
+        value: String(subject.id_materia),
+        label: `${subject.codigo} · ${subject.nombre}`,
+      })),
+    [subjects]
+  )
+
   const isSubmitting = assignment.status === 'submitting'
 
   const assignmentError =
     assignment.error?.errors.id_materia?.[0] ??
+    assignment.error?.errors.id_periodo?.[0] ??
     assignment.error?.message ??
     null
 
@@ -112,6 +147,7 @@ export function SubjectCareerAssignmentForm({ onAssigned }: SubjectCareerAssignm
 
     const created = await assignment.submit(careerId, {
       id_materia: subjectId,
+      id_periodo: period.id_periodo,
     })
 
     if (!created) {
@@ -119,7 +155,7 @@ export function SubjectCareerAssignmentForm({ onAssigned }: SubjectCareerAssignm
     }
 
     setSuccessMessage(
-      `${created.materia.nombre} fue asignada a ${created.carrera.nombre}.`
+      `Materia asignada: ${created.materia.nombre} → ${created.carrera.nombre} (${created.periodo.etiqueta})`
     )
 
     setSubjectId(null)
@@ -142,6 +178,13 @@ export function SubjectCareerAssignmentForm({ onAssigned }: SubjectCareerAssignm
     }
   }
 
+  const subjectPlaceholder =
+    careerId === null
+      ? 'Selecciona primero una carrera'
+      : subjectsStatus === 'loading'
+        ? 'Cargando materias...'
+        : 'Selecciona una materia'
+
   return (
     <>
       <form onSubmit={handleSubmit}>
@@ -150,12 +193,23 @@ export function SubjectCareerAssignmentForm({ onAssigned }: SubjectCareerAssignm
             <CardTitle>Asignar materia a una carrera</CardTitle>
 
             <CardDescription>
-              Selecciona una carrera y una materia existente del catálogo
-              institucional para crear la asignación.
+              Selecciona una carrera y una materia existente del catálogo institucional para
+              ofrecerla en el período {period.etiqueta}.
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-5">
+            {readOnly && (
+              <div
+                role="status"
+                className="flex items-start gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2.5 text-sm text-muted-foreground"
+              >
+                <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+
+                <span>{readOnlyNotice}</span>
+              </div>
+            )}
+
             {successMessage && (
               <div
                 role="status"
@@ -197,6 +251,7 @@ export function SubjectCareerAssignmentForm({ onAssigned }: SubjectCareerAssignm
                   value={careerId === null ? '' : String(careerId)}
                   onValueChange={handleCareerChange}
                   disabled={
+                    readOnly ||
                     careersStatus === 'loading' ||
                     careersStatus === 'error' ||
                     careers.length === 0
@@ -238,61 +293,35 @@ export function SubjectCareerAssignmentForm({ onAssigned }: SubjectCareerAssignm
               <div className="space-y-2">
                 <Label htmlFor="subject-select">Materia</Label>
 
-                <Select
-                  value={subjectId === null ? '' : String(subjectId)}
+                <SearchableSelect
+                  id="subject-select"
+                  label="Materia"
+                  value={subjectId === null ? null : String(subjectId)}
+                  options={subjectOptions}
                   onValueChange={handleSubjectChange}
+                  placeholder={subjectPlaceholder}
                   disabled={
+                    readOnly ||
                     careerId === null ||
                     subjectsStatus === 'loading' ||
-                    subjectsStatus === 'error' ||
-                    subjects.length === 0
+                    subjectsStatus === 'error'
                   }
-                >
-                  <SelectTrigger
-                    id="subject-select"
-                    className="w-full"
-                    aria-label="Materia"
-                    aria-invalid={
-                      assignment.error?.errors.id_materia
-                        ? true
-                        : undefined
-                    }
-                  >
-                    <SelectValue
-                      placeholder={
-                        careerId === null
-                          ? 'Selecciona primero una carrera'
-                          : subjectsStatus === 'loading'
-                            ? 'Cargando materias...'
-                            : 'Selecciona una materia'
-                      }
-                    />
-                  </SelectTrigger>
+                  invalid={Boolean(assignment.error?.errors.id_materia)}
+                />
 
-                  <SelectContent>
-                    {subjects.map((subject) => (
-                      <SelectItem
-                        key={subject.id_materia}
-                        value={String(subject.id_materia)}
-                      >
-                        {subject.codigo} · {subject.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {careerId !== null &&
+                {!readOnly &&
+                  careerId !== null &&
                   subjectsStatus === 'success' &&
                   subjects.length === 0 && (
                     <p className="text-xs text-muted-foreground">
-                      No hay materias activas pendientes de asignación para
-                      esta carrera.
+                      No hay materias activas pendientes de asignación para esta carrera en{' '}
+                      {period.etiqueta}.
                     </p>
                   )}
               </div>
             </div>
 
-            {subjectsStatus === 'error' && subjectsError && (
+            {!readOnly && subjectsStatus === 'error' && subjectsError && (
               <Alert className="border-danger-border bg-danger-soft text-danger-fg">
                 <AlertCircle className="size-4" />
 
@@ -316,6 +345,7 @@ export function SubjectCareerAssignmentForm({ onAssigned }: SubjectCareerAssignm
             <Button
               type="submit"
               disabled={
+                readOnly ||
                 !selectedCareer ||
                 !selectedSubject ||
                 isSubmitting
@@ -337,7 +367,7 @@ export function SubjectCareerAssignmentForm({ onAssigned }: SubjectCareerAssignm
             <DialogTitle>Confirmar asignación</DialogTitle>
 
             <DialogDescription>
-              Verifica la carrera y la materia antes de continuar.
+              Verifica la carrera, la materia y el período antes de continuar.
             </DialogDescription>
           </DialogHeader>
 
@@ -360,6 +390,16 @@ export function SubjectCareerAssignmentForm({ onAssigned }: SubjectCareerAssignm
 
                 <p className="font-medium text-foreground">
                   {selectedSubject.codigo} · {selectedSubject.nombre}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">
+                  Período
+                </p>
+
+                <p className="font-medium text-foreground">
+                  {period.etiqueta}
                 </p>
               </div>
             </div>

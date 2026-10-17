@@ -139,6 +139,8 @@ class CatalogTestDataSeeder extends Seeder
 
         $offerings = DB::table('materia_carrera')
             ->where('estado', 'ACTIVO')
+            // La electiva de muestra de HU-006 se oferta aparte, solo en 1/2026.
+            ->where('id_materia', '!=', Ids::SUBJECT_ELECTIVE_SAMPLE)
             ->whereIn('id_carrera', [
                 Ids::CAREER_SYSTEMS,
                 Ids::CAREER_INFORMATICS,

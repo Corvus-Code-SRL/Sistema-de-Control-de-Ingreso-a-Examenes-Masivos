@@ -79,6 +79,8 @@ function jsonResponse({
 
       return body
     },
+    // Un cuerpo Blob simula la entrega de un archivo (evidencia); cualquier otro se serializa.
+    blob: async () => (body instanceof Blob ? body : new Blob([JSON.stringify(body)])),
   } as Response
 }
 

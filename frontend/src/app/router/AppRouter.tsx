@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom'
 import { LoadingState } from '@/components/common/LoadingState'
 import { MyAssignmentsPage, MyAssistantsPage } from '@/features/assistants'
 import {
@@ -17,8 +17,10 @@ import { EntryControlPage, OpenEntryControlsPage } from '@/features/entry-contro
 import { CreateExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
 import { CourseDetailPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
 import { ClassroomsPage } from '@/features/classrooms'
+import { RiskCenterPage } from '@/features/risk-center/academic'
 import {
-  AdminSubjectsPage,
+  AdminSubjectAssignmentsPage,
+  AdminSubjectCatalogPage,
   SubjectsPage,
 } from '@/features/subjects'
 import { CuentaDetallePage, CuentasPage } from '@/features/users'
@@ -60,6 +62,10 @@ function DocenteRoutes() {
         path="/examenes/:examId/control-ingreso"
         element={guarded('ingreso.operar', <EntryControlPage />)}
       />
+      <Route
+        path="/central-riesgo/:id?"
+        element={guarded('riesgo.consultar', <RiskCenterPage />)}
+      />
       <Route path="*" element={<Navigate to="/materias" replace />} />
     </Routes>
   )
@@ -85,10 +91,27 @@ function AuxiliarRoutes() {
 }
 
 /**
+ * Las URLs anteriores de Materias (`/materias`, `?tab=`, `/materias/asignar`) llevan a la vista de
+ * Asignaciones. Solo se conserva `?carrera=`: el resto era de las pestañas y ya no existe.
+ */
+function AssignmentsRedirect() {
+  const [searchParams] = useSearchParams()
+  const career = searchParams.get('carrera')
+
+  const target =
+    career === null
+      ? '/materias/asignaciones'
+      : `/materias/asignaciones?carrera=${encodeURIComponent(career)}`
+
+  return <Navigate to={target} replace />
+}
+
+/**
  * Rutas de la administración del catálogo institucional.
  *
- * Cuentas y Materias tienen pantallas disponibles. Facultades y carreras
- * permanecen pendientes de sus respectivas historias de usuario.
+ * Cuentas, Materias (Asignaciones y Catálogo), Ambientes y la Central de riesgo (solo lectura)
+ * tienen pantallas disponibles.
+ * Facultades y carreras permanecen pendientes de sus respectivas historias de usuario.
  */
 function AdministradorRoutes() {
   return (
@@ -100,13 +123,19 @@ function AdministradorRoutes() {
         element={guarded('administracion.gestionar', <CuentaDetallePage />)}
       />
       <Route path="/ambientes" element={guarded('administracion.gestionar', <ClassroomsPage />)} />
+      <Route path="/materias" element={<AssignmentsRedirect />} />
+      <Route path="/materias/asignar" element={<AssignmentsRedirect />} />
       <Route
-        path="/materias"
-        element={guarded('administracion.gestionar', <AdminSubjectsPage />)}
+        path="/materias/asignaciones"
+        element={guarded('administracion.gestionar', <AdminSubjectAssignmentsPage />)}
       />
       <Route
-        path="/materias/asignar"
-        element={<Navigate to="/materias?tab=asignaciones" replace />}
+        path="/materias/catalogo"
+        element={guarded('administracion.gestionar', <AdminSubjectCatalogPage />)}
+      />
+      <Route
+        path="/central-riesgo/:id?"
+        element={guarded('riesgo.consultar', <RiskCenterPage />)}
       />
 
       <Route path="*" element={<Navigate to="/cuentas" replace />} />

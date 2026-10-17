@@ -77,16 +77,35 @@ export interface SubjectData {
   estado: string
 }
 
-export interface SubjectCareerAssignmentPayload {
-  id_materia: number
+/** Un período académico (gestion_periodo) tal como lo entrega `GET /periodos`. */
+export interface AcademicPeriod {
+  id_periodo: number
+  /** Etiqueta UMSS lista para mostrar: «1/2026», «2/2026», «0/2026». */
+  etiqueta: string
+  nombre_periodo: string
+  gestion: number
+  vigente: boolean
 }
 
+export interface AcademicPeriodsResponse {
+  data: AcademicPeriod[]
+  meta: { id_periodo_activo: number | null }
+}
+
+export interface SubjectCareerAssignmentPayload {
+  id_materia: number
+  id_periodo: number
+}
+
+/** Una oferta académica: un par materia-carrera ofrecido en un período. `estado` es el de la oferta. */
 export interface SubjectCareerAssignment {
   id_carrera: number
   id_materia: number
+  id_periodo: number
   estado: string
   carrera: Career
   materia: SubjectData
+  periodo: AcademicPeriod
 }
 
 export interface SubjectCareerAssignmentResponse {
@@ -104,11 +123,14 @@ export interface AssignableSubjectsResponse {
 
 export interface SubjectCareerAssignmentsResponse {
   data: SubjectCareerAssignment[]
-  /** `carreras`: las que tienen al menos un par, por nombre, sin importar el filtro pedido. */
-  meta: { carreras: Career[] }
+  /**
+   * `carreras`: todas las activas más las inactivas con ofertas en el período, por nombre, sin
+   * importar el filtro pedido.
+   */
+  meta: { carreras: Career[]; periodo: AcademicPeriod }
 }
 
-/** Pares de la lista más las carreras que alimentan su selector. */
+/** Ofertas del período más las carreras que alimentan el selector del filtro. */
 export interface SubjectCareerAssignmentsResult {
   assignments: SubjectCareerAssignment[]
   careers: Career[]
