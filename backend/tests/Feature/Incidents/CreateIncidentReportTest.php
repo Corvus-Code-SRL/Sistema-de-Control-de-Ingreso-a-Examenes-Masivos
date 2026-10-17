@@ -34,6 +34,7 @@ class CreateIncidentReportTest extends TestCase
         parent::setUp();
         $this->seedExamCatalog();
         $this->seed(IncidentTypeSeeder::class);
+        Storage::fake('local');
         Storage::fake('public');
         $this->exam = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId, $this->otraAulaId]);
         $this->context = [
@@ -93,23 +94,30 @@ class CreateIncidentReportTest extends TestCase
         $this->postJson($this->url(), $this->payload())->assertCreated();
     }
 
-    public function testStoresEvidenceOnPublicDisk(): void
+    public function testStoresEvidenceOnLocalDiskWithRiskCenterPath(): void
     {
         $response = $this->post($this->url(), $this->payload([
-            'evidencia' => UploadedFile::fake()->image('documento.jpg'),
+            'evidencia' => UploadedFile::fake()->image('documento.png'),
         ]), ['Accept' => 'application/json'])->assertCreated();
 
         $report = StudentReport::query()->findOrFail($response->json('data.id_reporte_est'));
-        Storage::disk('public')->assertExists($report->evidencia_public_id);
-        $this->assertStringStartsWith('reportes-estudiantes/', $report->evidencia_public_id);
-        $this->assertSame(Storage::disk('public')->url($report->evidencia_public_id), $report->evidencia_url);
+        Storage::disk('local')->assertExists($report->evidencia_public_id);
+        $this->assertStringStartsWith('evidencias/reportes/', $report->evidencia_public_id);
+        $this->assertSame($report->evidencia_public_id, $report->evidencia_url);
+        $this->assertSame([], Storage::disk('public')->allFiles());
     }
 
     public function testAcceptsPdfEvidence(): void
     {
-        $this->post($this->url(), $this->payload([
+        $response = $this->post($this->url(), $this->payload([
             'evidencia' => UploadedFile::fake()->create('documento.pdf', 100, 'application/pdf'),
         ]), ['Accept' => 'application/json'])->assertCreated();
+
+        $report = StudentReport::query()->findOrFail($response->json('data.id_reporte_est'));
+        Storage::disk('local')->assertExists($report->evidencia_public_id);
+        $this->assertStringStartsWith('evidencias/reportes/', $report->evidencia_public_id);
+        $this->assertSame($report->evidencia_public_id, $report->evidencia_url);
+        $this->assertSame([], Storage::disk('public')->allFiles());
     }
 
     public function testRejectsInvalidOrOversizedEvidence(): void
@@ -123,6 +131,7 @@ class CreateIncidentReportTest extends TestCase
         }
 
         $this->assertSame(0, StudentReport::query()->count());
+        $this->assertSame([], Storage::disk('local')->allFiles());
         $this->assertSame([], Storage::disk('public')->allFiles());
     }
 
@@ -238,6 +247,7 @@ class CreateIncidentReportTest extends TestCase
         }
 
         $this->assertSame(0, StudentReport::query()->count());
+        $this->assertSame([], Storage::disk('local')->allFiles());
         $this->assertSame([], Storage::disk('public')->allFiles());
     }
 
