@@ -1,7 +1,7 @@
 import { apiClient, apiPost } from '@/lib/api-client'
 import type {
   EntryActionInput, EntryContext, EntryStatus, OpenEntryExam, RejectionReason, StatusResponse,
-  StudentMatch, Verification, VerificationInput,
+  StudentMatch, Verification, VerificationInput, RejectionResponse, RejectedAttempt,
 } from '../types/entry-control.types'
 
 interface DataResponse<T> { data: T }
@@ -43,8 +43,16 @@ export const entryControlService = {
 
   async reject(examId: number, input: EntryActionInput & {
     motivo: RejectionReason; observacion?: string
-  }): Promise<void> {
-    await apiPost(`${base(examId)}/rechazar-ingreso`, input)
+  }): Promise<RejectionResponse> {
+    const response = await apiPost<DataResponse<RejectionResponse>>(`${base(examId)}/rechazar-ingreso`, input)
+    return response.data
+  },
+
+  async rejectedAttempts(examId: number, roomId: number, signal?: AbortSignal): Promise<RejectedAttempt[]> {
+    const response = await apiClient<DataResponse<RejectedAttempt[]>>(`${base(examId)}/intentos`, {
+      query: { id_ambiente: roomId }, signal,
+    })
+    return response.data
   },
 }
 

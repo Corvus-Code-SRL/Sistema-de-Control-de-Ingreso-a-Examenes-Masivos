@@ -40,6 +40,9 @@ export interface PreviousEntry {
 }
 
 export interface Verification {
+  registrado_en?: string | null
+  id_intento?: number | null
+  reportado?: boolean
   veredicto: string
   motivo: string
   autorizado: boolean
@@ -100,4 +103,31 @@ export interface OpenEntryExam {
   hora_inicio: string | null
   materia: string | null
   ambientes: string[]
+}
+
+export interface RejectionResponse {
+  registrado_en?: string
+  registrado: boolean
+  id_intento: number
+  motivo: string
+}
+
+export interface RejectedAttempt {
+  cod_sis?: string | null
+  id_intento: number
+  estudiante: StudentMatch | null
+  ambiente: EntryRoom
+  motivo: string
+  observacion: string | null
+  registrado_en: string
+  reportado: boolean
+}
+
+export interface CurrentRejectedAttempt {
+  registeredAt?: string | null
+  attemptId: number
+  student: StudentMatch
+  roomId: number
+  reason: string
+  reported: boolean
 }

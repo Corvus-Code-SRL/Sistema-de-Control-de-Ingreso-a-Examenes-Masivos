@@ -9,10 +9,15 @@ interface Props {
   onConfirm: () => void
   onReject: () => void
   onNext: () => void
+  onReport?: () => void
+  reported?: boolean
+  roomName?: string
+  rejectionTime?: string
 }
 
 function verdictLabel(value: string): string {
   const labels: Record<string, string> = {
+    RECHAZADO_MANUAL: 'INGRESO RECHAZADO',
     AUTORIZADO: 'AUTORIZADO', NO_ENCONTRADO: 'NO AUTORIZADO',
     NO_PERTENECE: 'NO AUTORIZADO',
     NO_HABILITADO: 'NO HABILITADO', DUPLICADO: 'INGRESO DUPLICADO',
@@ -41,7 +46,7 @@ function StudentDetails({ result }: { result: Verification }) {
   </div>
 }
 
-export function VerificationResult({ result, busy, onConfirm, onReject, onNext }: Props) {
+export function VerificationResult({ result, busy, onConfirm, onReject, onNext, onReport, reported, roomName, rejectionTime }: Props) {
   const allowed = result.autorizado
   const Icon = allowed ? CheckCircle2 : CircleX
   return <section aria-live="polite" aria-labelledby="entry-verdict" className={`space-y-4 rounded-xl border p-4 shadow-sm sm:p-6 ${allowed ? 'border-ok/30 bg-ok-soft/35' : 'border-danger/25 bg-danger-soft/35'}`}>
@@ -51,13 +56,19 @@ export function VerificationResult({ result, busy, onConfirm, onReject, onNext }
     </div>
     {!allowed && result.veredicto !== 'AULA_NO_ASIGNADA' && <p className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground">Intento registrado con hora, ambiente y controlador.</p>}
     <StudentDetails result={result} />
+    {!allowed && roomName && <p className="text-sm text-muted-foreground">Ambiente: {roomName}{rejectionTime ? ` · ${rejectionTime}` : ''}</p>}
     {result.ambiente_asignado && result.veredicto === 'AULA_INCORRECTA' && <p className="flex items-center gap-2 rounded-lg border border-warn-border bg-warn-soft p-3 text-sm font-medium text-warn-fg"><DoorOpen className="size-4" />Dirija al estudiante a {result.ambiente_asignado.nro_aula}.</p>}
     {result.ingreso_previo && <div className="rounded-lg border border-danger/25 bg-card p-4 text-sm"><p className="font-semibold text-danger-fg">Ingreso ya registrado</p><p className="mt-1">Hora: {result.ingreso_previo.hora_ingreso ?? '—'} · Ambiente: {result.ingreso_previo.nro_aula ?? '—'}</p><p className="text-muted-foreground">Controló: {result.ingreso_previo.controlador || '—'}</p></div>}
     {result.antecedentes.tiene_antecedentes && <div className="rounded-lg border border-warn-border bg-warn-soft p-4 text-sm"><p className="flex items-center gap-2 font-semibold text-warn-fg"><ShieldAlert className="size-4" />Central de riesgo · {result.antecedentes.cantidad} antecedente(s)</p><p className="mt-1">{result.antecedentes.resumen}</p><p className="mt-1 text-xs text-warn-fg">La alerta no impide el ingreso; la decisión es de quien controla.</p></div>}
     {allowed && <p className="flex items-center gap-2 text-sm text-ok-fg"><AlertTriangle className="size-4" />Compare el nombre y el código SIS con la documentación disponible antes de decidir.</p>}
     <div className="flex flex-col gap-2 sm:flex-row">
       {allowed ? <><Button type="button" variant="outline" className="h-11 flex-1 border-danger/40 text-danger-fg hover:bg-danger-soft" disabled={busy} onClick={onReject}>Rechazar</Button><Button type="button" className="h-11 flex-1" disabled={busy} onClick={onConfirm}>{busy ? 'Registrando…' : 'Aceptar ingreso'}</Button></> :
-        <Button type="button" variant="outline" className="h-11 w-full" onClick={onNext}><RotateCcw className="size-4" />Siguiente estudiante</Button>}
+        <>
+          {onReport && <Button type="button" className="h-11 flex-1" disabled={busy || reported} onClick={onReport}>
+            <ShieldAlert className="size-4" />{reported ? 'Ya reportado' : 'Reportar incidencia'}
+          </Button>}
+          <Button type="button" variant="outline" className="h-11 flex-1" onClick={onNext}><RotateCcw className="size-4" />Siguiente estudiante</Button>
+        </>}
     </div>
   </section>
 }

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { rejectionLabel } from '../components/entryAttemptPresentation'
 import { ApiError } from '@/lib/api-client'
 import { entryControlService } from '../services/entryControlService'
-import type { EntryActionInput, RejectionReason, StudentMatch, Verification, VerificationInput } from '../types/entry-control.types'
+import type { CurrentRejectedAttempt, EntryActionInput, RejectionReason, StudentMatch, Verification, VerificationInput } from '../types/entry-control.types'
 
 export function useStudentVerification(examId: number, roomId: number | null, onChange: () => void) {
+  const [rejectedAttempt, setRejectedAttempt] = useState<CurrentRejectedAttempt | null>(null)
   const [sis, setSis] = useState('')
   const [ci, setCi] = useState('')
   const [result, setResult] = useState<Verification | null>(null)
@@ -11,9 +13,10 @@ export function useStudentVerification(examId: number, roomId: number | null, on
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  useEffect(() => { setResult(null); setError(null) }, [roomId])
+  useEffect(() => { setResult(null); setError(null); setRejectedAttempt(null) }, [roomId])
 
   function reset() {
+    setRejectedAttempt(null)
     setSis('')
     setCi('')
     setResult(null)
@@ -21,18 +24,21 @@ export function useStudentVerification(examId: number, roomId: number | null, on
   }
 
   function changeSis(value: string) {
+    setRejectedAttempt(null)
     setSis(value.trim())
     setResult(null)
     setError(null)
   }
 
   function changeCi(value: string) {
+    setRejectedAttempt(null)
     setCi(value.trim())
     setResult(null)
     setError(null)
   }
 
   function choose(student: StudentMatch) {
+    setRejectedAttempt(null)
     setSis(student.cod_sis)
     setResult(null)
     setError(null)
@@ -49,11 +55,20 @@ export function useStudentVerification(examId: number, roomId: number | null, on
   async function verify() {
     const payload = input()
     if (!payload) return
+    setRejectedAttempt(null)
     setBusy('verify')
     setError(null)
     setNotice(null)
     try {
-      setResult(await entryControlService.verify(examId, payload))
+      const verdict = await entryControlService.verify(examId, payload)
+      setResult(verdict)
+      if (!verdict.autorizado && verdict.id_intento && verdict.estudiante) {
+        setRejectedAttempt({
+          attemptId: verdict.id_intento, student: verdict.estudiante, registeredAt: verdict.registrado_en,
+          roomId: payload.id_ambiente, reason: verdict.motivo, reported: verdict.reportado ?? false,
+        })
+      }
+      if (!verdict.autorizado) onChange()
     } catch (cause) {
       setResult(null)
       setError(cause instanceof Error ? cause.message : 'No se pudo verificar al estudiante.')
@@ -97,12 +112,20 @@ export function useStudentVerification(examId: number, roomId: number | null, on
     setBusy('reject')
     setError(null)
     try {
-      await entryControlService.reject(examId, {
+      const rejection = await entryControlService.reject(examId, {
         ...actionInput(result.estudiante.id_estudiante, roomId),
         motivo, observacion: observacion.trim() || undefined,
       })
+      const student = result.estudiante
       setNotice('Intento rechazado y registrado.')
-      reset()
+      setResult({ ...result, autorizado: false, veredicto: 'RECHAZADO_MANUAL', motivo: rejectionLabel(rejection.motivo) })
+      if (rejection.registrado && rejection.id_intento) {
+        setRejectedAttempt({
+          attemptId: rejection.id_intento, student, roomId, registeredAt: rejection.registrado_en,
+          reason: rejectionLabel(rejection.motivo), reported: false,
+        })
+      }
+      onChange()
       return true
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo registrar el rechazo.')
@@ -112,5 +135,9 @@ export function useStudentVerification(examId: number, roomId: number | null, on
     }
   }
 
-  return { sis, ci, result, busy, error, notice, setNotice, changeSis, changeCi, choose, verify, confirm, reject, reset }
+  function markReported(attemptId: number) {
+    setRejectedAttempt((current) => current?.attemptId === attemptId ? { ...current, reported: true } : current)
+  }
+
+  return { rejectedAttempt, markReported, sis, ci, result, busy, error, notice, setNotice, changeSis, changeCi, choose, verify, confirm, reject, reset }
 }
