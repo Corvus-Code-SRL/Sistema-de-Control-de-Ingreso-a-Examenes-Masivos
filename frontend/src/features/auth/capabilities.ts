@@ -13,14 +13,18 @@ import type { Area, RoleName } from './types/auth.types'
 
 const AUXILIAR_CAPABILITIES = ['ingreso.operar', 'incidencias.registrar'] as const
 
+/** La Central de Riesgo es institucional y de solo lectura: la consultan el Docente y el Administrador, no el Auxiliar. */
+const RISK_CENTER_CAPABILITIES = ['riesgo.consultar'] as const
+
 const DOCENTE_CAPABILITIES = [
   ...AUXILIAR_CAPABILITIES,
   'examenes.gestionar',
   'grupos.gestionar',
   'auxiliares.gestionar',
+  ...RISK_CENTER_CAPABILITIES,
 ] as const
 
-const ADMINISTRADOR_CAPABILITIES = ['administracion.gestionar'] as const
+const ADMINISTRADOR_CAPABILITIES = ['administracion.gestionar', ...RISK_CENTER_CAPABILITIES] as const
 
 export type Capability =
   | (typeof AUXILIAR_CAPABILITIES)[number]
