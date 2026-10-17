@@ -74,9 +74,4 @@ class EntryAttempt extends Model
     {
         return $this->hasOne(StudentReport::class, 'id_intento', 'id_intento');
     }
-
-    public function classroom(): BelongsTo
-    {
-        return $this->belongsTo(Classroom::class, 'id_ambiente', 'id_ambiente');
-    }
 }

@@ -9,10 +9,10 @@ use App\Models\RiskCenter;
 use App\Models\StudentReport;
 use App\Services\Security\AuditLogService;
 use App\Support\ReportStatus;
+use App\Support\Storage\EvidenceStorage;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Lista, encuentra y revisa reportes de estudiante (HU-045).
@@ -25,9 +25,12 @@ class IncidentReportService
 {
     private AuditLogService $auditLog;
 
-    public function __construct(AuditLogService $auditLog)
+    private EvidenceStorage $evidence;
+
+    public function __construct(AuditLogService $auditLog, EvidenceStorage $evidence)
     {
         $this->auditLog = $auditLog;
+        $this->evidence = $evidence;
     }
 
     /**
@@ -64,6 +67,19 @@ class IncidentReportService
         $report = $this->resolveReport($teacherId, $reporte);
 
         return $this->toDto($report);
+    }
+
+    /**
+     * Ruta interna de la evidencia, tras validar que el reporte es del docente.
+     *
+     * @throws IncidentReportNotFoundException
+     * @throws IncidentOwnershipException
+     */
+    public function findEvidencePublicId(string $teacherId, string $reporte): ?string
+    {
+        $report = $this->resolveReport($teacherId, $reporte);
+
+        return $report->evidencia_public_id;
     }
 
     /**
@@ -294,8 +310,8 @@ class IncidentReportService
                 'rol' => $r->userReporter?->rolActivo()?->nombre_rol ?? '',
             ],
 
-            'fecha_reporte' => $r->fecha_reporte?->toIso8601String(),
-            'hora_reporte'  => $r->fecha_reporte?->format('H:i'),
+            'fecha_reporte' => $r->fecha_reporte?->utc()->toIso8601String(),
+            'hora_reporte'  => $r->fecha_reporte?->utc()->format('H:i'),
 
             'ambiente' => $r->entryAttempt?->classroom
                 ? [
@@ -324,7 +340,7 @@ class IncidentReportService
             'revisor' => $r->userReviewer
                 ? [
                     'nombre_completo'      => trim("{$r->userReviewer->nombre} {$r->userReviewer->apellido_paterno}"),
-                    'fecha_revision'       => $r->fecha_revision?->toIso8601String(),
+                    'fecha_revision'       => $r->fecha_revision?->utc()->toIso8601String(),
                     'observacion_revision' => $r->observacion_revision,
                 ]
                 : null,
@@ -334,8 +350,8 @@ class IncidentReportService
     }
 
     /**
-     * Resuelve el archivo de evidencia con el APP_URL actual, ignorando la URL guardada
-     * (que puede tener un host viejo). El peso y el tipo se calculan al vuelo.
+     * La evidencia se describe con EvidenceStorage (misma abstracción que la CR) y se
+     * sirve por una ruta autenticada; nunca se expone una URL pública.
      */
     private function evidenciaDto(StudentReport $r): ?array
     {
@@ -343,9 +359,14 @@ class IncidentReportService
             return null;
         }
 
-        $disk = Storage::disk('public');
-        $publicId = $r->evidencia_public_id;
-        $extension = strtolower(pathinfo($publicId, PATHINFO_EXTENSION));
+        $desc = $this->evidence->describe($r->evidencia_public_id);
+
+        if ($desc === null) {
+            return null;
+        }
+
+        $nombre = $desc['nombre_archivo'];
+        $extension = strtolower(pathinfo($nombre, PATHINFO_EXTENSION));
 
         $tipo = match ($extension) {
             'png', 'jpg', 'jpeg', 'gif', 'webp' => 'imagen',
@@ -353,27 +374,13 @@ class IncidentReportService
             default                              => 'archivo',
         };
 
-        $bytes = $disk->exists($publicId) ? $disk->size($publicId) : null;
-
         return [
-            'url'    => $disk->url($publicId),
-            'nombre' => basename($publicId),
-            'tipo'   => $tipo,
-            'peso'   => $bytes !== null ? $this->formatBytes($bytes) : null,
+            'nombre'       => $nombre,
+            'tipo'         => $tipo,
+            'tamano_bytes' => $desc['tamano_bytes'],
+            'disponible'   => $desc['disponible'],
+            'url' => "/docente/incidencias/estudiante-{$r->id_reporte_est}/evidencia",        
         ];
-    }
-
-    private function formatBytes(int $bytes): string
-    {
-        if ($bytes < 1024) {
-            return "{$bytes} B";
-        }
-
-        if ($bytes < 1024 * 1024) {
-            return round($bytes / 1024, 1) . ' KB';
-        }
-
-        return round($bytes / (1024 * 1024), 1) . ' MB';
     }
 
     private function motivoLegible(string $motivo): string
