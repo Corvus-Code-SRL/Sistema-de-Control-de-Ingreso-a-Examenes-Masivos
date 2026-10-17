@@ -76,8 +76,7 @@ class IncidentReportService
                     throw new LogicException('Falta la acción CREAR requerida por la bitácora.');
                 }
 
-                $stored = $file === null ? null : $this->evidence->store($file);
-                $evidencePath = $stored['path'] ?? null;
+                $evidencePath = $file === null ? null : $this->evidence->store($file);
 
                 $report = StudentReport::create([
                     'id_estudiante' => $attempt->id_estudiante,
@@ -86,7 +85,7 @@ class IncidentReportService
                     'id_tipo_falta' => $input['id_tipo_falta'],
                     'id_usuario_reportante' => $actor->id_usuario,
                     'descripcion' => trim($input['descripcion']),
-                    'evidencia_url' => $stored['url'] ?? null,
+                    'evidencia_url' => $evidencePath,
                     'evidencia_public_id' => $evidencePath,
                     'estado' => ReportStatus::PENDING,
                     'fecha_reporte' => now('UTC'),

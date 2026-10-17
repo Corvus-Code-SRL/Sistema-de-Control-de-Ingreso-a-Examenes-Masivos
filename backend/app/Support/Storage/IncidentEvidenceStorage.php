@@ -5,30 +5,23 @@ namespace App\Support\Storage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
-use Throwable;
 
-/** Almacena evidencia opcional en el disco público definido por el proyecto. */
+/** Guarda evidencia privada con la ruta relativa que consulta la Central de Riesgo. */
 class IncidentEvidenceStorage
 {
-    public function store(UploadedFile $file): array
+    public function store(UploadedFile $file): string
     {
-        $disk = Storage::disk('public');
-        $path = $disk->putFile('reportes-estudiantes', $file);
+        $path = Storage::disk('local')->putFile('evidencias/reportes', $file, ['visibility' => 'private']);
 
         if (! is_string($path) || $path === '') {
             throw new RuntimeException('No se pudo guardar la evidencia.');
         }
 
-        try {
-            return ['path' => $path, 'url' => $disk->url($path)];
-        } catch (Throwable $exception) {
-            $disk->delete($path);
-            throw $exception;
-        }
+        return $path;
     }
 
     public function delete(string $path): void
     {
-        Storage::disk('public')->delete($path);
+        Storage::disk('local')->delete($path);
     }
 }
