@@ -70,4 +70,22 @@ return [
 
     'nomina_max_filas' => (int) env('SCIEM_NOMINA_MAX_FILAS', 2000),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Discos de las evidencias de reportes
+    |--------------------------------------------------------------------------
+    |
+    | reporte_estudiante.evidencia_public_id guarda la ruta relativa del archivo,
+    | siempre dentro de evidencias/. La Central de Riesgo lo busca en estos discos,
+    | en orden: primero el privado (storage/app, donde HU-042 guardará lo nuevo) y
+    | luego el público (donde el seeder de prueba dejó los archivos). El archivo se
+    | lee del disco y se sirve por la API: no depende de storage:link ni de APP_URL.
+    |
+    */
+
+    'evidencia_discos' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('SCIEM_EVIDENCIA_DISCOS', 'local,public'))
+    ))),
+
 ];

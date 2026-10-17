@@ -3,18 +3,17 @@ import {
   BookOpen,
   Building2,
   CalendarClock,
-  ClipboardList,
   DoorOpen,
-  FileSearch,
   GraduationCap,
   History,
   Home,
   Library,
   Link2,
   PlaySquare,
-  ScrollText,
+  ShieldAlert,
   ShieldCheck,
   SquarePen,
+  UserSearch,
   Users
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -42,8 +41,8 @@ export interface NavGroup {
 /**
  * Navegación lateral del docente.
  *
- * Materias, Mis cursos, Nuevo examen y Programados (HU-24/HU-25) existen. El
- * resto se lista para dar la forma completa del producto, pero sin destino: un
+ * Materias, Mis cursos, Nuevo examen, Programados (HU-24/HU-25) y Registros de la Central de
+ * Riesgo (HU-046) existen. El resto se lista para dar la forma completa del producto, pero sin destino: un
  * enlace que no lleva a ninguna parte confunde más que uno visiblemente pendiente.
  */
 const navegacionDocente: NavGroup[] = [
@@ -70,8 +69,8 @@ const navegacionDocente: NavGroup[] = [
   {
     label: 'Central de riesgo',
     items: [
-      { label: 'Verificar antecedentes', icon: FileSearch },
-      { label: 'Registros', icon: ClipboardList }
+      { label: 'Verificar antecedentes', icon: UserSearch },
+      { label: 'Registros', icon: ShieldAlert, to: '/central-riesgo' }
     ]
   }
 ]
@@ -94,8 +93,8 @@ const navegacionAuxiliar: NavGroup[] = [
  * Navegación lateral del administrador.
  *
  * Cuentas, Materias (Asignaciones, HU-006, y Catálogo, en dos vistas bajo un encabezado) y
- * Ambientes tienen pantallas disponibles. Facultades, carreras y bitácora permanecen
- * deshabilitadas hasta sus respectivas historias.
+ * Ambientes tienen pantallas disponibles, y Supervisión agrupa la Central de riesgo (HU-046).
+ * Facultades, carreras y bitácora permanecen deshabilitadas hasta sus respectivas historias.
  */
 const navegacionAdministrador: NavGroup[] = [
   { items: [{ label: 'Inicio', icon: Home }] },
@@ -113,8 +112,14 @@ const navegacionAdministrador: NavGroup[] = [
       },
       { label: 'Facultades', icon: Building2 },
       { label: 'Ambientes', icon: DoorOpen, to: '/ambientes' },
-      { label: 'Carreras', icon: GraduationCap },
-      { label: 'Bitácora', icon: ScrollText }
+      { label: 'Carreras', icon: GraduationCap }
+    ]
+  },
+  {
+    label: 'Supervisión',
+    items: [
+      { label: 'Central de riesgo', icon: ShieldAlert, to: '/central-riesgo' },
+      { label: 'Bitácora', icon: History }
     ]
   }
 ]

@@ -54,6 +54,11 @@ class EntryAttempt extends Model
         return $this->belongsTo(Exam::class, 'id_examen', 'id_examen');
     }
 
+    public function classroom(): BelongsTo
+    {
+        return $this->belongsTo(Classroom::class, 'id_ambiente', 'id_ambiente');
+    }
+
     public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class, 'id_estudiante', 'id_estudiante');
