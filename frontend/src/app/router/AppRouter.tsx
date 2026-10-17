@@ -17,6 +17,7 @@ import { EntryControlPage, OpenEntryControlsPage } from '@/features/entry-contro
 import { CreateExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
 import { CourseDetailPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
 import { ClassroomsPage } from '@/features/classrooms'
+import { RiskCenterPage } from '@/features/risk-center/academic'
 import {
   AdminSubjectAssignmentsPage,
   AdminSubjectCatalogPage,
@@ -63,6 +64,10 @@ function DocenteRoutes() {
         element={guarded('ingreso.operar', <EntryControlPage />)}
       />
       <Route path="/incidencias" element={guarded('examenes.gestionar', <IncidentsPage />)} />
+      <Route
+        path="/central-riesgo/:id?"
+        element={guarded('riesgo.consultar', <RiskCenterPage />)}
+      />
       <Route path="*" element={<Navigate to="/materias" replace />} />
     </Routes>
   )
@@ -106,7 +111,8 @@ function AssignmentsRedirect() {
 /**
  * Rutas de la administración del catálogo institucional.
  *
- * Cuentas, Materias (Asignaciones y Catálogo) y Ambientes tienen pantallas disponibles.
+ * Cuentas, Materias (Asignaciones y Catálogo), Ambientes y la Central de riesgo (solo lectura)
+ * tienen pantallas disponibles.
  * Facultades y carreras permanecen pendientes de sus respectivas historias de usuario.
  */
 function AdministradorRoutes() {
@@ -128,6 +134,10 @@ function AdministradorRoutes() {
       <Route
         path="/materias/catalogo"
         element={guarded('administracion.gestionar', <AdminSubjectCatalogPage />)}
+      />
+      <Route
+        path="/central-riesgo/:id?"
+        element={guarded('riesgo.consultar', <RiskCenterPage />)}
       />
 
       <Route path="*" element={<Navigate to="/cuentas" replace />} />

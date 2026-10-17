@@ -77,6 +77,81 @@ trait SeedsRiskCenterRecords
         ], $overrides), 'id_intento');
     }
 
+    protected function insertStudent(string $name, string $paternal, ?string $maternal, string $sisCode): int
+    {
+        return DB::table('estudiante')->insertGetId([
+            'cod_sis' => $sisCode,
+            'nombre' => $name,
+            'apellido_paterno' => $paternal,
+            'apellido_materno' => $maternal,
+            'estado' => 'ACTIVO',
+        ], 'id_estudiante');
+    }
+
+    /**
+     * Carrera y materia con su par activo, para que un examen pueda apuntar a ambas.
+     *
+     * @return array{id_carrera: int, id_materia: int}
+     */
+    protected function insertCareerSubjectPair(string $careerName, string $subjectName): array
+    {
+        $code = strtoupper(substr(uniqid(), -6));
+
+        $facultyId = DB::table('facultad')->insertGetId(
+            ['nombre' => 'Facultad ' . $code, 'codigo' => 'F' . $code, 'estado' => 'ACTIVO'],
+            'id_facultad'
+        );
+        $careerId = DB::table('carrera')->insertGetId(
+            ['nombre' => $careerName, 'codigo' => 'C' . $code, 'estado' => 'ACTIVO', 'id_facultad' => $facultyId],
+            'id_carrera'
+        );
+        $subjectId = DB::table('materia')->insertGetId(
+            ['nombre' => $subjectName, 'codigo' => 'M' . $code, 'estado' => 'ACTIVO'],
+            'id_materia'
+        );
+        DB::table('materia_carrera')->insert([
+            'id_carrera' => $careerId,
+            'id_materia' => $subjectId,
+            'nivel_semestre' => '3',
+            'obligatoria' => true,
+            'estado' => 'ACTIVO',
+        ]);
+
+        return ['id_carrera' => $careerId, 'id_materia' => $subjectId];
+    }
+
+    protected function insertFaultType(string $name): int
+    {
+        return DB::table('tipo_falta')->insertGetId(['nombre' => $name], 'id_falta');
+    }
+
+    /**
+     * Reporte APROBADO con su fila en la central de riesgo. El reportante y el aprobador son la cuenta del
+     * contexto, salvo lo que se indique en $reportOverrides; `fecha_registro` es la fecha de la revisión.
+     *
+     * @return array{id_reporte_est: int, id_cr_estudiante: int}
+     */
+    protected function insertApprovedRecord(
+        array $context,
+        array $reportOverrides = [],
+        string $registeredAt = '2026-10-02 12:00:00+00'
+    ): array {
+        $reportId = $this->insertStudentReport($context, array_merge([
+            'estado' => 'APROBADO',
+            'fecha_reporte' => $registeredAt,
+            'fecha_revision' => $registeredAt,
+            'id_usuario_revisor' => $context['id_usuario'],
+        ], $reportOverrides));
+
+        $recordId = DB::table('central_riesgo')->insertGetId([
+            'id_reporte_est' => $reportId,
+            'id_estudiante' => $reportOverrides['id_estudiante'] ?? $context['id_estudiante'],
+            'fecha_registro' => $registeredAt,
+        ], 'id_cr_estudiante');
+
+        return ['id_reporte_est' => $reportId, 'id_cr_estudiante' => $recordId];
+    }
+
     /** Reporte PENDIENTE sin evidencia ni intento, salvo lo que se indique en $overrides. */
     protected function insertStudentReport(array $context, array $overrides = []): int
     {

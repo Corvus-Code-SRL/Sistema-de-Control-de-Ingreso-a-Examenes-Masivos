@@ -24,6 +24,13 @@ describe('capacidades por rol', () => {
     expect(hasCapability('Auxiliar', 'administracion.gestionar')).toBe(false)
   })
 
+  it('la Central de Riesgo la consultan el Docente y el Administrador, no el Auxiliar', () => {
+    expect(hasCapability('Docente', 'riesgo.consultar')).toBe(true)
+    expect(hasCapability('Administrador', 'riesgo.consultar')).toBe(true)
+    expect(hasCapability('Auxiliar', 'riesgo.consultar')).toBe(false)
+    expect(hasCapability(null, 'riesgo.consultar')).toBe(false)
+  })
+
   it('un rol desconocido o ausente no concede nada', () => {
     expect(capabilitiesOf('Invitado')).toEqual([])
     expect(capabilitiesOf(null)).toEqual([])
