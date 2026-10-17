@@ -10,6 +10,8 @@ interface DataPaginationProps {
   /** Sustantivo de lo que se lista, para el resumen: «de 64 materias». */
   itemLabel: string
   disabled?: boolean
+  /** Texto antes del rango; vacío da «1–3 de 3 registros». */
+  summaryPrefix?: string
 }
 
 /**
@@ -26,6 +28,7 @@ export function DataPagination({
   onPageChange,
   itemLabel,
   disabled = false,
+  summaryPrefix = 'Mostrando ',
 }: DataPaginationProps) {
   if (total === 0) return null
 
@@ -38,7 +41,8 @@ export function DataPagination({
       className="flex flex-col gap-3 border-t border-border-soft px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
     >
       <p className="text-sm text-muted-foreground" aria-live="polite">
-        Mostrando {first}–{last} de {total} {itemLabel}
+        {summaryPrefix}
+        {first}–{last} de {total} {itemLabel}
       </p>
 
       <div className="flex items-center gap-1">

@@ -52,4 +52,34 @@ describe('navigationByArea', () => {
     expect(items.find((item) => item.label === 'Materias')).toMatchObject({ to: '/materias' })
     expect(items.some((item) => item.children !== undefined)).toBe(false)
   })
+
+  it('el docente tiene Registros hacia /central-riesgo y Verificar antecedentes sin destino', () => {
+    const items = navigationByArea.docente.flatMap((group) => group.items)
+
+    expect(items.find((item) => item.label === 'Registros')).toMatchObject({ to: '/central-riesgo' })
+    expect(items.find((item) => item.label === 'Verificar antecedentes')?.to).toBeUndefined()
+  })
+
+  it('el administrador tiene el grupo Supervisión con Central de riesgo y la Bitácora pendiente', () => {
+    const group = navigationByArea.administrador.find((candidate) => candidate.label === 'Supervisión')
+    const administration = navigationByArea.administrador.find((candidate) => candidate.label === 'Administración')
+
+    expect(group?.items.map((item) => [item.label, item.to])).toEqual([
+      ['Central de riesgo', '/central-riesgo'],
+      ['Bitácora', undefined],
+    ])
+    expect(administration?.items.map((item) => item.label)).not.toContain('Bitácora')
+    expect(administration?.items.map((item) => item.label)).toEqual([
+      'Cuentas',
+      'Materias',
+      'Facultades',
+      'Ambientes',
+      'Carreras',
+    ])
+  })
+
+  it('el auxiliar no tiene acceso a la Central de riesgo', () => {
+    expect(labelsOf('auxiliar')).not.toContain('Registros')
+    expect(labelsOf('auxiliar')).not.toContain('Central de riesgo')
+  })
 })

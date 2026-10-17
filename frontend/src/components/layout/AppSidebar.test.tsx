@@ -91,4 +91,40 @@ describe('AppSidebar', () => {
     expect(screen.queryByRole('link', { name: 'Incidencias' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Historial' })).not.toBeInTheDocument()
   })
+
+  it('docente: Registros de la Central de riesgo lleva a /central-riesgo y Verificar antecedentes sigue pendiente', () => {
+    renderSidebar('docente', '/central-riesgo')
+
+    expect(screen.getByRole('link', { name: 'Registros' })).toHaveAttribute('href', '/central-riesgo')
+    expect(screen.getByRole('link', { name: 'Registros' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.queryByRole('link', { name: 'Verificar antecedentes' })).not.toBeInTheDocument()
+    expect(screen.getByText('Verificar antecedentes').closest('span[aria-disabled]')).not.toBeNull()
+  })
+
+  it('docente: Registros sigue resaltado con el detalle abierto', () => {
+    renderSidebar('docente', '/central-riesgo/9941?tipo=3')
+
+    expect(screen.getByRole('link', { name: 'Registros' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('administrador: el grupo Supervisión trae Central de riesgo y la Bitácora deshabilitada', () => {
+    renderSidebar('administrador', '/central-riesgo')
+
+    expect(screen.getByText('Supervisión')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Central de riesgo' })).toHaveAttribute('href', '/central-riesgo')
+    expect(screen.getByRole('link', { name: 'Central de riesgo' })).toHaveAttribute('aria-current', 'page')
+
+    const bitacora = screen.getByText('Bitácora').closest('span[aria-disabled]')
+
+    expect(bitacora).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.queryByRole('link', { name: 'Bitácora' })).not.toBeInTheDocument()
+  })
+
+  it('auxiliar: no ve la Central de riesgo', () => {
+    renderSidebar('auxiliar', '/mis-examenes')
+
+    expect(screen.queryByText(/central de riesgo/i)).not.toBeInTheDocument()
+    expect(screen.queryByText('Registros')).not.toBeInTheDocument()
+    expect(screen.queryByText('Supervisión')).not.toBeInTheDocument()
+  })
 })
