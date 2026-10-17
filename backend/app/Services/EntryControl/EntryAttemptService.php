@@ -16,13 +16,13 @@ class EntryAttemptService
         $this->verification = $verification;
     }
 
-    public function recordDenied(int $examId, array $input, User $actor, array $verdict): void
+    public function recordDenied(int $examId, array $input, User $actor, array $verdict): ?int
     {
         if ($verdict['autorizado'] || $verdict['veredicto'] === 'AULA_NO_ASIGNADA') {
-            return;
+            return null;
         }
 
-        $this->insert($examId, $input, $actor, $verdict['veredicto'], null, $verdict);
+        return $this->insert($examId, $input, $actor, $verdict['veredicto'], null, $verdict);
     }
 
     public function reject(Exam $exam, array $input, User $actor): array
@@ -42,7 +42,12 @@ class EntryAttemptService
             $verdict
         );
 
-        return ['registrado' => true, 'id_intento' => $id, 'motivo' => $input['motivo']];
+        return [
+            'registrado' => true,
+            'id_intento' => $id,
+            'motivo' => $input['motivo'],
+            'registrado_en' => Carbon::now('UTC')->toIso8601String(),
+        ];
     }
 
     private function insert(

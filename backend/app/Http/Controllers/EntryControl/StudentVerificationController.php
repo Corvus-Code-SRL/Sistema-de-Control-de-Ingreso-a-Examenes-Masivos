@@ -34,7 +34,8 @@ class StudentVerificationController extends Controller
     ): JsonResponse {
         $input = $request->validated();
         $verdict = $verification->verify((int) $examen, $input, $request->user());
-        $attempts->recordDenied((int) $examen, $input, $request->user(), $verdict);
+        $verdict['id_intento'] = $attempts->recordDenied((int) $examen, $input, $request->user(), $verdict);
+        $verdict['registrado_en'] = $verdict['id_intento'] === null ? null : now('UTC')->toIso8601String();
 
         return ApiResponse::success(new StudentVerificationResource($verdict));
     }

@@ -93,6 +93,18 @@ class EntryAccessService
         ];
     }
 
+    public function assertCanControlRoom(Exam $exam, int $roomId, User $actor): void
+    {
+        $context = $this->context($exam, $actor);
+        $roomIds = array_column($context['ambientes'], 'id_ambiente');
+
+        if (! in_array($roomId, $roomIds, true)
+            || ($context['rol_controlador'] === 'AUXILIAR'
+                && $context['id_ambiente_asignado'] !== $roomId)) {
+            throw new AuthorizationException('No tiene permiso para controlar este ambiente.');
+        }
+    }
+
     public function assertCanControl(Exam $exam, User $actor): void
     {
         if ($actor->estado !== User::ESTADO_ACTIVO || $exam->id_carrera === null) {
@@ -124,7 +136,7 @@ class EntryAccessService
     }
 
     /**
-     * Ambiente donde controla el auxiliar: el que le asignó el docente (HU-09) o, si no tiene y
+     * Ambiente donde controla el auxiliar: el que le asignó el docente (HU-029) o, si no tiene y
      * el examen tiene un solo ambiente, ese. Se resuelve al consultar y nunca se escribe.
      */
     private function assistantRoomId(Exam $exam, User $actor): ?int
