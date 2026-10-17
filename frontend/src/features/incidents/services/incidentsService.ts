@@ -5,12 +5,7 @@ import type {
   IncidentDetailResponse,
 } from '../types/incident.types'
 
-/**
- * Lista las incidencias del docente autenticado.
- *
- * @param filter  'pendiente' | 'aprobada' | 'rechazada' | 'todas'
- * @param examId  Opcional: filtra por examen.
- */
+/** Lista las incidencias del docente autenticado. */
 export async function listIncidents(
   filter: IncidentFilter,
   examId?: number,
@@ -25,7 +20,7 @@ export async function listIncidents(
   })
 }
 
-/** Detalle de una incidencia. `reportId` es `estudiante-123` o `postulante-45`. */
+/** Detalle de una incidencia. `reportId` es `estudiante-123`. */
 export async function getIncident(
   reportId: string,
   signal?: AbortSignal
@@ -55,4 +50,18 @@ export async function rejectIncident(
     `/docente/incidencias/${reportId}/rechazar`,
     { observacion }
   )
+}
+
+/**
+ * Descarga la evidencia con el token; el endpoint es autenticado.
+ *
+ * `apiClient` con `responseType: 'blob'` entrega el archivo. `evidenceUrl` es
+ * relativo a `/api` (lo devuelve el backend en `incidencia.evidencia.url`).
+ */
+export function getIncidentEvidence(
+  reportId: string,
+  evidenceUrl: string,
+  signal?: AbortSignal
+): Promise<Blob> {
+  return apiClient<Blob>(evidenceUrl, { responseType: 'blob', signal })
 }

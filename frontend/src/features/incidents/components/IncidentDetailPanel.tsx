@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { ArrowLeft, Check, FileImage, X } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowLeft, Check, FileImage, FileX, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -7,14 +7,16 @@ import { Toast } from '@/components/ui/toast'
 import { LoadingState } from '@/components/common/LoadingState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { useAsyncResource } from '@/hooks/useAsyncResource'
+import { formatFileSize } from '@/features/risk-center/academic/utils/format'
 import { ApproveIncidentModal } from './ApproveIncidentModal'
 import { RejectIncidentModal } from './RejectIncidentModal'
 import { IncidentStateBadge } from './IncidentStateBadge'
 import { approveIncident, getIncident, rejectIncident } from '../services/incidentsService'
+import { useIncidentEvidenceDownload } from '../hooks/useIncidentEvidenceDownload'
 import type { IncidentReport } from '../types/incident.types'
 
 interface IncidentDetailPanelProps {
-  incidentId: string                // CAMBIO: recibe el id, no el objeto
+  incidentId: string
   onReviewed: () => void
   onBack?: () => void
 }
@@ -141,29 +143,10 @@ export function IncidentDetailPanel({ incidentId, onReviewed, onBack }: Incident
 
           {/* Evidencia */}
           {incident.evidencia ? (
-            <div className="flex flex-col gap-2">
-                <p className="sciem-label">Evidencia</p>
-                <a
-                href={incident.evidencia.url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-3 rounded-lg border border-border px-3.5 py-3 hover:bg-sunken"
-                >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
-                    <FileImage className="size-4" aria-hidden="true" />
-                </span>
-                <div className="flex-1 min-w-0">
-                    <p className="truncate text-sm font-medium">{incident.evidencia.nombre}</p>
-                    <p className="text-xs text-muted-foreground">
-                    {incident.evidencia.peso && `${incident.evidencia.peso} · `}
-                    {incident.evidencia.tipo} · ver en tamaño completo
-                    </p>
-                </div>
-                </a>
-            </div>
-            ) : (
+            <EvidenceBlock incident={incident} />
+          ) : (
             <p className="text-sm text-muted-foreground">Sin evidencia adjunta.</p>
-            )}
+          )}
 
           {/* Bloque de decisión (revisada) */}
           {!isPending && incident.revisor && (
@@ -240,6 +223,60 @@ export function IncidentDetailPanel({ incidentId, onReviewed, onBack }: Incident
         />
       )}
     </>
+  )
+}
+
+/* ===================================================================== */
+
+function EvidenceBlock({ incident }: { incident: IncidentReport }) {
+  const ev = incident.evidencia!
+  const { open, status, message } = useIncidentEvidenceDownload(
+    incident.id,
+    ev.url,
+    ev.nombre
+  )
+
+  if (!ev.disponible) {
+    return (
+      <div className="flex flex-col gap-2">
+        <p className="sciem-label">Evidencia</p>
+        <p className="flex items-start gap-2 text-sm text-muted-foreground">
+          <FileX className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>
+            {ev.nombre}
+            <span className="block text-xs">El archivo de la evidencia no está disponible.</span>
+          </span>
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="sciem-label">Evidencia</p>
+      <button
+        type="button"
+        onClick={open}
+        disabled={status === 'loading'}
+        className="flex items-center gap-3 rounded-lg border border-border px-3.5 py-3 text-left hover:bg-sunken disabled:opacity-60"
+      >
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
+          <FileImage className="size-4" aria-hidden="true" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="truncate text-sm font-medium">{ev.nombre}</p>
+          <p className="text-xs text-muted-foreground">
+            {ev.tamano_bytes !== null && `${formatFileSize(ev.tamano_bytes)} · `}
+            {ev.tipo} · {status === 'loading' ? 'Abriendo…' : 'ver en tamaño completo'}
+          </p>
+        </div>
+      </button>
+      {status === 'error' && message && (
+        <p role="alert" className="text-xs text-danger-fg">
+          {message}
+        </p>
+      )}
+    </div>
   )
 }
 
