@@ -55,7 +55,8 @@ class IncidentReportShowTest extends TestCase
             ->assertJsonPath('data.intento.hora_intento', '09:15')
             ->assertJsonPath('data.evidencia.nombre', 'test.png')
             ->assertJsonPath('data.evidencia.tipo', 'imagen')
-            ->assertJsonPath('data.evidencia.peso', '1 KB')
+            ->assertJsonPath('data.evidencia.tamano_bytes', 1024)
+            ->assertJsonPath('data.evidencia.disponible', true)
             ->assertJsonPath('data.revisor', null)
             ->assertJsonPath('data.en_central_riesgo', false);
     }
