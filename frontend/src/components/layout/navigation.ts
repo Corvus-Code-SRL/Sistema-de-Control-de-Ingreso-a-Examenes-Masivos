@@ -3,18 +3,17 @@ import {
   BookOpen,
   Building2,
   CalendarClock,
-  ClipboardList,
   DoorOpen,
-  FileSearch,
   GraduationCap,
   History,
   Home,
   Library,
   Link2,
   PlaySquare,
-  ScrollText,
+  ShieldAlert,
   ShieldCheck,
   SquarePen,
+  UserSearch,
   Users
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -70,8 +69,8 @@ const navegacionDocente: NavGroup[] = [
   {
     label: 'Central de riesgo',
     items: [
-      { label: 'Verificar antecedentes', icon: FileSearch },
-      { label: 'Registros', icon: ClipboardList, to: '/central-riesgo' }
+      { label: 'Verificar antecedentes', icon: UserSearch },
+      { label: 'Registros', icon: ShieldAlert, to: '/central-riesgo' }
     ]
   }
 ]
@@ -119,8 +118,8 @@ const navegacionAdministrador: NavGroup[] = [
   {
     label: 'Supervisión',
     items: [
-      { label: 'Central de riesgo', icon: ClipboardList, to: '/central-riesgo' },
-      { label: 'Bitácora', icon: ScrollText }
+      { label: 'Central de riesgo', icon: ShieldAlert, to: '/central-riesgo' },
+      { label: 'Bitácora', icon: History }
     ]
   }
 ]
