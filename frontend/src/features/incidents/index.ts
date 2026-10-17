@@ -1,2 +1,2 @@
 // API pública del feature incidents
-export {};
+export { IncidentsPage } from './pages/IncidentsPage'
