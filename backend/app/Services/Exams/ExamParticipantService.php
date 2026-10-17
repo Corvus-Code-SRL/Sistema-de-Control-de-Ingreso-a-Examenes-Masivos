@@ -1,7 +1,8 @@
 <?php
 
 namespace App\Services\Exams;
-
+use App\Models\AuditLog;
+use App\Models\Exam;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -60,17 +61,53 @@ class ExamParticipantService
         );
     }
 
-    /**
-     * @return array{esperados: int, ingresados: int, pendientes: int}
-     */
-    public function counts(int $examId): array
-    {
-        return [
-            'esperados' => $this->countOf($this->expected($examId)),
-            'ingresados' => $this->entered($examId)->count(),
-            'pendientes' => $this->countOf($this->pending($examId)),
-        ];
+   /**
+ * @return array{esperados: int, ingresados: int, pendientes: int}
+ */
+public function counts(int $examId): array
+{
+    $exam = Exam::query()->findOrFail($examId);
+
+    if ($exam->estado === Exam::FINALIZADO) {
+        $log = AuditLog::query()
+            ->where('tabla_afectada', 'examen')
+            ->where('nuevo_valor->id_examen', $examId)
+            ->whereHas('accion', function ($query) {
+                $query->where('operacion', 'FINALIZAR');
+            })
+            ->orderByDesc('id_log')
+            ->first();
+
+        $historical = $log ? $log->nuevo_valor : null;
+
+        if (
+            is_array($historical)
+            && isset(
+                $historical['estudiantes_esperados'],
+                $historical['ingresados_a_tiempo'],
+                $historical['ingresados_con_retraso']
+            )
+        ) {
+            $expected = (int) $historical['estudiantes_esperados'];
+
+            $entered = (int) $historical['ingresados_a_tiempo']
+                + (int) $historical['ingresados_con_retraso'];
+
+            return [
+                'esperados' => $expected,
+                'ingresados' => $entered,
+                'pendientes' => max(0, $expected - $entered),
+            ];
+        }
     }
+
+    // Exámenes activos o antiguos sin estadísticas históricas.
+    return [
+        'esperados' => $this->countOf($this->expected($examId)),
+        'ingresados' => $this->entered($examId)->count(),
+        'pendientes' => $this->countOf($this->pending($examId)),
+    ];
+}
 
     private function countOf(Builder $query): int
     {
