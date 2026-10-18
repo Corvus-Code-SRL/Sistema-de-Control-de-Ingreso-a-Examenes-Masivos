@@ -1,4 +1,4 @@
-import { screen, waitForElementToBeRemoved } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { mockApi } from '@/test/http'
 import { renderWithRouter } from '@/test/render'
@@ -39,8 +39,14 @@ function mockExam(estado: ExamStatus) {
 }
 
 async function renderDetail() {
-  renderWithRouter(<ExamDetailPage />, { route: '/examenes/9', path: '/examenes/:examId' })
-  await waitForElementToBeRemoved(() => screen.queryAllByRole('status')[0])
+  renderWithRouter(<ExamDetailPage />, {
+    route: '/examenes/9',
+    path: '/examenes/:examId',
+  })
+
+  await screen.findByRole('heading', {
+    name: /información general/i,
+  })
 }
 
 describe('ExamDetailPage: texto de solo lectura (HU-024)', () => {
@@ -74,12 +80,33 @@ describe('ExamDetailPage: texto de solo lectura (HU-024)', () => {
     expect(await screen.findByText(/está en curso/i)).toBeInTheDocument()
   })
 
-  it('un examen programado se edita: no muestra el aviso de solo lectura', async () => {
+  it('muestra un examen PROGRAMADO en modo consulta', async () => {
     mockExam('PROGRAMADO')
     await renderDetail()
 
-    expect(await screen.findByRole('button', { name: /guardar información general/i })).toBeInTheDocument()
-    expect(screen.queryByText(/quedaron fijos/i)).not.toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', {
+        name: /información general/i,
+      })
+    ).toBeInTheDocument()
+
+    expect(
+      screen.getByRole('button', {
+        name: /editar examen/i,
+      })
+    ).toBeInTheDocument()
+
+    expect(
+      screen.queryByRole('button', {
+        name: /guardar información general/i,
+      })
+    ).not.toBeInTheDocument()
+
+    expect(
+      screen.queryByRole('button', {
+        name: /guardar grupos/i,
+      })
+    ).not.toBeInTheDocument()
   })
 
   it('muestra las acciones de auxiliares y ambientes cuando está PROGRAMADO', async () => {
@@ -115,4 +142,15 @@ describe('ExamDetailPage: texto de solo lectura (HU-024)', () => {
       ).not.toBeInTheDocument()
     }
   )
+
+  it('conserva el acceso al control de ingreso', async () => {
+    mockExam('EN_INGRESO')
+    await renderDetail()
+
+    expect(
+      screen.getByRole('button', {
+        name: /controlar ingreso/i,
+      })
+    ).toBeInTheDocument()
+  })
 })
