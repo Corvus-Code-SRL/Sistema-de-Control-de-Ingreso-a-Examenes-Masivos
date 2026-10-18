@@ -1,9 +1,10 @@
 <?php
 
-use App\Http\Controllers\EntryControl\EntryControlStatusController;
 use App\Http\Controllers\EntryControl\EntryAttemptController;
+use App\Http\Controllers\EntryControl\EntryControlStatusController;
 use App\Http\Controllers\EntryControl\StudentEntryController;
 use App\Http\Controllers\EntryControl\StudentVerificationController;
+use App\Http\Controllers\Incidents\IncidentReportController;
 use Illuminate\Support\Facades\Route;
 
 // El control de ingreso registra QUÉ cuenta verifica cada ingreso. Quién puede controlar cada
@@ -11,10 +12,12 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('control-ingreso')->group(function () {
     Route::get('/examenes', [EntryControlStatusController::class, 'openExams'])
         ->name('control-ingreso.examenes.index');
-    Route::prefix('examenes/{examen}')->where(['examen' => '[0-9]+'])->group(function () {
+    Route::prefix('examenes/{examen}')->where(['examen' => '[0-9]{1,9}'])->group(function () {
         Route::get('/intentos', [EntryAttemptController::class, 'index'])
-            ->where('examen', '[0-9]{1,9}')
             ->name('control-ingreso.examenes.intentos');
+        Route::post('/intentos/{intento}/reporte', [IncidentReportController::class, 'store'])
+            ->where('intento', '[0-9]{1,9}')
+            ->name('control-ingreso.intentos.reporte.store');
         Route::get('/contexto', [EntryControlStatusController::class, 'context'])
             ->name('control-ingreso.examenes.contexto');
         Route::get('/buscar', [StudentVerificationController::class, 'search'])

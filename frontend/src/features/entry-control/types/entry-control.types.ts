@@ -22,13 +22,20 @@ export interface StudentMatch {
   id_estudiante: number
   cod_sis: string
   nombre_completo: string
+  ci?: string | null
 }
 
 export interface EntryStudent extends StudentMatch {
   ci: string | null
   ci_pendiente: boolean
   carrera: string | null
-  foto_url: string | null // Reservado para una futura fuente de fotografías.
+  foto_url: string | null
+}
+
+export interface EntryAssistant {
+  cod_sis: string
+  nombre_completo: string
+  ambiente_asignado: EntryRoom | null
 }
 
 export interface PreviousEntry {
@@ -40,16 +47,17 @@ export interface PreviousEntry {
 }
 
 export interface Verification {
-  registrado_en?: string | null
-  id_intento?: number | null
-  reportado?: boolean
   veredicto: string
+  id_intento?: number | null
+  registrado_en?: string | null
+  reportado?: boolean
   motivo: string
   autorizado: boolean
   estudiante: EntryStudent | null
+  auxiliar?: EntryAssistant | null
   grupo: { id_grupo: number; num_grupo: string } | null
   ambiente_asignado: EntryRoom | null
-  antecedentes: { tiene_antecedentes: boolean; cantidad: number; resumen: string | null }
+  antecedentes: { total: number; latest: { tipo_falta: string; fecha_registro: string } | null }
   ingreso_previo: PreviousEntry | null
 }
 
@@ -75,7 +83,17 @@ export interface EntryStatus {
   conectados?: unknown[]
 }
 
-export type StatusResponse = EntryStatus | {
+export interface EntryOpeningFailure {
+  codigo: 'SIN_NOMINA' | 'SIN_AMBIENTES' | 'CAPACIDAD_INSUFICIENTE'
+  mensaje: string
+}
+
+export interface PendingEntryStatus {
+  estado: 'PROGRAMADO'
+  motivo_apertura: EntryOpeningFailure | null
+}
+
+export type StatusResponse = EntryStatus | PendingEntryStatus | {
   sin_cambios: true
   version: string
   conectados?: unknown[]
@@ -84,7 +102,7 @@ export type StatusResponse = EntryStatus | {
 export type RejectionReason = 'DOCUMENTO_NO_VALIDO' | 'IDENTIDAD_DUDOSA' | 'DECISION_CONTROLADOR' | 'OTRO'
 
 export interface VerificationInput {
-  cod_sis: string
+  cod_sis?: string
   ci?: string
   id_ambiente: number
 }
@@ -102,7 +120,16 @@ export interface OpenEntryExam {
   fecha: string | null
   hora_inicio: string | null
   materia: string | null
+  carrera: string | null
   ambientes: string[]
+  rol_controlador: 'DOCENTE' | 'AUXILIAR'
+  id_ambiente_asignado: number | null
+  ambiente_asignado: string | null
+  apertura_programada_en: string
+  motivo_apertura: EntryOpeningFailure | null
+  total: number
+  ingresados: number
+  pendientes: number
 }
 
 export interface RejectionResponse {

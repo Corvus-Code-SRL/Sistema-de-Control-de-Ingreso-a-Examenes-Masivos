@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $id_estudiante
  * @property string $cod_sis
  * @property string|null $ci
+ * @property string|null $foto_url
  * @property string $nombre
  * @property string $apellido_paterno
  * @property string|null $apellido_materno
@@ -29,6 +30,7 @@ class Student extends Model
     protected $fillable = [
         'cod_sis',
         'ci',
+        'foto_url',
         'nombre',
         'apellido_paterno',
         'apellido_materno',
@@ -41,6 +43,11 @@ class Student extends Model
     public function setCodSisAttribute($value): void
     {
         $this->attributes['cod_sis'] = is_string($value) ? SisCode::normalize($value) : $value;
+    }
+
+    public function getNombreCompletoAttribute(): string
+    {
+        return trim("{$this->nombre} {$this->apellido_paterno} {$this->apellido_materno}");
     }
 
     public function groups(): BelongsToMany

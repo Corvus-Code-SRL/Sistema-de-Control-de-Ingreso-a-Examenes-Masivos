@@ -9,6 +9,7 @@ use App\Models\Student;
 use App\Models\StudentReport;
 use App\Models\User;
 use App\Services\Security\AuditLogService;
+use App\Services\EntryControl\RoomAssignmentService;
 use Database\Seeders\IncidentTypeSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
@@ -91,7 +92,62 @@ class CreateIncidentReportTest extends TestCase
     {
         $this->assertSame(0, DB::table('grupo_examen')->where('id_examen', $this->exam->id_examen)->count());
         DB::table('intento_ingreso')->where('id_intento', $this->attemptId)->update(['motivo' => 'NO_PERTENECE']);
-        $this->postJson($this->url(), $this->payload())->assertCreated();
+        $this->postJson($this->url(), $this->payload())->assertCreated()
+            ->assertJsonPath('data.estado', 'PENDIENTE');
+        $this->assertDatabaseHas('reporte_estudiante', [
+            'id_intento' => $this->attemptId,
+            'id_estudiante' => $this->context['id_estudiante'],
+            'estado' => 'PENDIENTE',
+        ]);
+    }
+
+    /** @dataProvider outsideStudentIdentifiers */
+    public function testReportsAutomaticOutsideStudentRejection(string $identifier): void
+    {
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $this->exam->id_examen,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
+        $outside = Student::create([
+            'cod_sis' => '199912543',
+            'ci' => '0012345',
+            'nombre' => 'María',
+            'apellido_paterno' => 'Fuera',
+            'estado' => 'ACTIVO',
+        ]);
+        app(RoomAssignmentService::class)->prepare($this->exam->id_examen);
+
+        $verification = $this->postJson(
+            "/api/control-ingreso/examenes/{$this->exam->id_examen}/verificar",
+            [$identifier => $outside->{$identifier}, 'id_ambiente' => $this->aulaId]
+        )->assertOk()
+            ->assertJsonPath('data.veredicto', 'NO_PERTENECE')
+            ->assertJsonPath('data.autorizado', false)
+            ->assertJsonPath('data.estudiante.id_estudiante', $outside->id_estudiante);
+
+        $attemptId = $verification->json('data.id_intento');
+        $this->assertIsInt($attemptId);
+        $this->assertDatabaseHas('intento_ingreso', [
+            'id_intento' => $attemptId,
+            'id_estudiante' => $outside->id_estudiante,
+            'motivo' => 'NO_PERTENECE',
+        ]);
+        $response = $this->postJson($this->url($attemptId), $this->payload())
+            ->assertCreated()
+            ->assertJsonPath('data.estado', 'PENDIENTE')
+            ->assertJsonPath('data.id_intento', $attemptId);
+        $this->assertDatabaseHas('reporte_estudiante', [
+            'id_reporte_est' => $response->json('data.id_reporte_est'),
+            'id_intento' => $attemptId,
+            'id_estudiante' => $outside->id_estudiante,
+            'estado' => 'PENDIENTE',
+        ]);
+        $this->assertSame(0, DB::table('central_riesgo')->count());
+    }
+
+    public function outsideStudentIdentifiers(): array
+    {
+        return [['cod_sis'], ['ci']];
     }
 
     public function testStoresEvidenceOnLocalDiskWithRiskCenterPath(): void

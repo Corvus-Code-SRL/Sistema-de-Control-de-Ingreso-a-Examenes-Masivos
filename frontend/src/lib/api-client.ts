@@ -176,6 +176,11 @@ export interface ApiClientOptions {
    */
   skipAuth?: boolean
   /**
+   * Cómo se lee una respuesta correcta: `json` (por defecto) o `blob`, para entregar un archivo
+   * —como una evidencia— que solo se puede pedir con el token. Los errores siempre llegan como JSON.
+   */
+  responseType?: 'json' | 'blob'
+  /**
    * La petición lleva el token, pero un 401 lo resuelve quien la hace y no pone la app en
    * «sesión expirada» (rehidratar la sesión y cerrarla).
    */
@@ -284,7 +289,7 @@ export async function apiClient<TResponse>(
     }
 
     try {
-      return (await response.json()) as TResponse
+      return (options.responseType === 'blob' ? await response.blob() : await response.json()) as TResponse
     } catch (cause) {
       throw interrupted(cause)
     }

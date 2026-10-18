@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { mockApiWith } from '@/test/http'
+import { detailOf, faultTypes, records } from '@/test/riskCenterFixtures'
 import { TOKEN_STORAGE_KEY, meBody, type AccountKey } from '@/test/authFixtures'
 import { renderApp } from '@/test/renderApp'
 
@@ -188,5 +189,102 @@ describe('AppRouter — control de ingreso por área', () => {
     expect(
       screen.queryByRole('heading', { name: 'Control de ingreso' })
     ).not.toBeInTheDocument()
+  })
+})
+
+describe('AppRouter — Central de Riesgo por área', () => {
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  /** Sesión de la cuenta indicada y una Central de Riesgo vacía, salvo el detalle 9945. */
+  function stubRiskCenter(session: AccountKey | null) {
+    if (session) {
+      window.localStorage.setItem(TOKEN_STORAGE_KEY, 'tok')
+    }
+
+    return mockApiWith(({ url }) => {
+      if (url.endsWith('/auth/yo')) {
+        return session ? { body: meBody(session) } : { status: 401, body: { message: 'Unauthenticated.' } }
+      }
+
+      if (/\/central-riesgo\/\d+$/.test(url)) {
+        return { body: { data: detailOf(9945) } }
+      }
+
+      if (url.includes('/central-riesgo')) {
+        return {
+          body: { data: records, meta: { current_page: 1, last_page: 1, per_page: 10, total: records.length } },
+        }
+      }
+
+      if (url.endsWith('/tipos-falta')) {
+        return { body: { data: faultTypes } }
+      }
+
+      return { body: { data: [] } }
+    })
+  }
+
+  it.each([
+    ['un Docente', 'docente'],
+    ['un Administrador', 'administrador'],
+  ] as const)('%s entra a la Central de Riesgo', async (_label, account) => {
+    stubRiskCenter(account)
+
+    const app = renderApp('/central-riesgo')
+
+    expect(await screen.findByRole('heading', { name: 'Central de Riesgo' })).toBeInTheDocument()
+    expect(app.pathname).toBe('/central-riesgo')
+    expect(await screen.findByRole('table')).toBeInTheDocument()
+  })
+
+  it('un Auxiliar que navega a /central-riesgo vuelve a la home de su área', async () => {
+    stubRiskCenter('auxiliar')
+
+    const app = renderApp('/central-riesgo')
+
+    await waitFor(() => expect(app.pathname).toBe('/mis-examenes'))
+    expect(screen.queryByRole('heading', { name: 'Central de Riesgo' })).not.toBeInTheDocument()
+  })
+
+  it('un Auxiliar tampoco abre un detalle por enlace directo', async () => {
+    stubRiskCenter('auxiliar')
+
+    const app = renderApp('/central-riesgo/9945')
+
+    await waitFor(() => expect(app.pathname).toBe('/mis-examenes'))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('sin sesión la Central de Riesgo lleva al login', async () => {
+    stubRiskCenter(null)
+
+    const app = renderApp('/central-riesgo')
+
+    await waitFor(() => expect(app.pathname).toBe('/login'))
+  })
+
+  it('un enlace directo al detalle abre el listado con el panel', async () => {
+    stubRiskCenter('administrador')
+
+    const app = renderApp('/central-riesgo/9945')
+
+    expect(await screen.findByRole('dialog', { name: 'Registro de la Central de Riesgo' })).toBeInTheDocument()
+    expect(app.pathname).toBe('/central-riesgo/9945')
+  })
+
+  it('el Docente llega desde «Registros» y el Administrador desde «Supervisión › Central de riesgo»', async () => {
+    stubRiskCenter('docente')
+    const docente = renderApp('/materias')
+
+    expect(await screen.findByRole('link', { name: 'Registros' })).toHaveAttribute('href', '/central-riesgo')
+
+    docente.unmount()
+    stubRiskCenter('administrador')
+    renderApp('/cuentas')
+
+    expect(await screen.findByRole('link', { name: 'Central de riesgo' })).toHaveAttribute('href', '/central-riesgo')
+    expect(screen.getByText('Supervisión')).toBeInTheDocument()
   })
 })

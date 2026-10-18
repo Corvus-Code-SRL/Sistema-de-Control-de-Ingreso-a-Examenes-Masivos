@@ -1,2 +1,2 @@
 // API pública del feature risk-center/academic
-export {};
+export { RiskCenterPage } from './pages/RiskCenterPage'

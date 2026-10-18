@@ -16,6 +16,7 @@ class StudentVerificationResource extends JsonResource
             'motivo' => $this['motivo'],
             'autorizado' => $this['autorizado'],
             'estudiante' => $this['estudiante'],
+            'auxiliar' => $this['auxiliar'],
             'grupo' => $this['grupo'],
             'ambiente_asignado' => $this['ambiente_asignado'],
             'antecedentes' => $this['antecedentes'],

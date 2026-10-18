@@ -59,7 +59,7 @@ export function RecentRejectedAttempts({ examId, examName, roomId, refreshVersio
           type="button" variant="outline" size="sm" disabled={attempt.reportado}
           onClick={() => {
             if (!attempt.estudiante || attempt.reportado) return
-            onReport({ examId, examName, attemptId: attempt.id_intento, student: attempt.estudiante,
+            onReport({ examId, examName, roomId: attempt.ambiente.id_ambiente, attemptId: attempt.id_intento, student: attempt.estudiante,
               roomName: attempt.ambiente.nro_aula, reason: rejectionLabel(attempt.motivo), timeLabel: attemptTime(attempt.registrado_en) })
           }}
         >{attempt.reportado ? 'Ya reportado' : 'Reportar incidencia'}</Button> :

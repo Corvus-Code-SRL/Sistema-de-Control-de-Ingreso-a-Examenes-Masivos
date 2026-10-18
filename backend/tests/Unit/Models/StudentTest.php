@@ -57,6 +57,7 @@ class StudentTest extends TestCase
         $this->assertSame([
             'cod_sis',
             'ci',
+            'foto_url',
             'nombre',
             'apellido_paterno',
             'apellido_materno',

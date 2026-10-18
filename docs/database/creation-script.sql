@@ -1499,11 +1499,11 @@ CREATE INDEX idx_examen_auxiliar_docente_habilita
 ---------------------------------------------------
 -- Cada bloque es el SQL equivalente de una migración posterior a
 -- 2026_09_25_000000_create_baseline_schema. Hasta aquí el archivo es idéntico a
--- backend/database/schema/baseline.sql (que nunca se edita); lo que sigue refleja el
+-- backend/database/schema/baseline.sql (sin cambiar sus sentencias SQL); lo que sigue refleja el
 -- esquema que queda después de correr todas las migraciones. DatabaseSchemaTest verifica
 -- ambas cosas.
 --
--- Versión 6: HU-11 (2026_09_29_000001_add_student_entry_audit_and_attempts)
+-- Versión 6: HU-011 (2026_09_29_000001_add_student_entry_audit_and_attempts)
 --   * examen_estudiante registra el ambiente, el controlador y el instante del ingreso.
 --   * intento_ingreso guarda los intentos rechazados del control de ingreso.
 
@@ -1720,3 +1720,9 @@ ALTER TABLE public.reporte_estudiante
         REFERENCES public.intento_ingreso(id_intento),
     ADD CONSTRAINT chk_reporte_estudiante_evidencia
         CHECK ((evidencia_url IS NULL) = (evidencia_public_id IS NULL));
+
+--
+-- Versión 11: fotografía opcional del estudiante (HU-032)
+--             (2026_10_13_000001_add_foto_url_to_estudiante)
+
+ALTER TABLE public.estudiante ADD COLUMN foto_url text;

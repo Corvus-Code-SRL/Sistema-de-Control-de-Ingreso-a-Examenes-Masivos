@@ -19,11 +19,16 @@ class StudentVerificationController extends Controller
         $examen,
         IdentificationService $identification
     ): JsonResponse {
-        return ApiResponse::success($identification->searchByName(
-            (int) $examen,
-            $request->user(),
-            $request->validated()['nombre']
-        ));
+        $input = $request->validated();
+
+        return ApiResponse::success(isset($input['nombre'])
+            ? $identification->searchByName((int) $examen, $request->user(), $input['nombre'])
+            : $identification->searchByNumberPrefix(
+                (int) $examen,
+                $request->user(),
+                isset($input['sis']) ? 'sis' : 'ci',
+                $input['sis'] ?? $input['ci']
+            ));
     }
 
     public function verify(
@@ -34,8 +39,8 @@ class StudentVerificationController extends Controller
     ): JsonResponse {
         $input = $request->validated();
         $verdict = $verification->verify((int) $examen, $input, $request->user());
-        $verdict['id_intento'] = $attempts->recordDenied((int) $examen, $input, $request->user(), $verdict);
-        $verdict['registrado_en'] = $verdict['id_intento'] === null ? null : now('UTC')->toIso8601String();
+        $attempt = $attempts->recordDenied((int) $examen, $input, $request->user(), $verdict);
+        $verdict = array_merge($verdict, $attempt ?? []);
 
         return ApiResponse::success(new StudentVerificationResource($verdict));
     }

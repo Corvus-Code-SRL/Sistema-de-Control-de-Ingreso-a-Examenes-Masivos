@@ -7,6 +7,7 @@ export interface IncidentType {
 export interface ReportIncidentContext {
   examId: number
   examName: string
+  roomId: number
   attemptId: number
   student: { id_estudiante: number; cod_sis: string; nombre_completo: string }
   roomName: string

@@ -5,7 +5,7 @@ import { mockApiWith } from '@/test/http'
 import { ReportIncidentDialog } from './ReportIncidentDialog'
 
 const context = {
-  examId: 7, examName: 'Primer parcial', attemptId: 30,
+  examId: 7, examName: 'Primer parcial', roomId: 5, attemptId: 30,
   student: { id_estudiante: 19, cod_sis: '202309201', nombre_completo: 'Carlos Rocha' },
   roomName: '691A', reason: 'Identidad dudosa',
 }
