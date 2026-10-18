@@ -284,6 +284,7 @@ class IncidentReportService
                 'codigo'  => $r->student->cod_sis ?? '',
                 'grupo'   => null,
                 'carrera' => null,
+                'foto_url' => $r->student?->foto_url,
             ],
 
             'examen' => [

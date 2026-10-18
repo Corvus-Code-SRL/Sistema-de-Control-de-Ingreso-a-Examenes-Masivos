@@ -13,7 +13,7 @@ import { RejectIncidentModal } from './RejectIncidentModal'
 import { IncidentStateBadge } from './IncidentStateBadge'
 import { approveIncident, getIncident, rejectIncident } from '../services/incidentsService'
 import { useIncidentEvidenceDownload } from '../hooks/useIncidentEvidenceDownload'
-import type { IncidentReport } from '../types/incident.types'
+import type { IncidentPerson, IncidentReport } from '../types/incident.types'
 
 interface IncidentDetailPanelProps {
   incidentId: string
@@ -90,9 +90,7 @@ export function IncidentDetailPanel({ incidentId, onReviewed, onBack }: Incident
 
           {/* Cabecera */}
           <div className="flex items-start gap-4">
-            <div className="flex size-16 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-2xl font-bold text-brand-deep">
-              {getInitials(incident.persona.nombre_completo)}
-            </div>
+              <AvatarPersona persona={incident.persona} />
             <div className="min-w-0 flex-1">
               <p className="sciem-h2 truncate">{incident.persona.nombre_completo}</p>
               <p className="text-sm text-muted-foreground">
@@ -295,4 +293,25 @@ function formatDateTime(iso: string): string {
   const hours = String(d.getHours()).padStart(2, '0')
   const minutes = String(d.getMinutes()).padStart(2, '0')
   return `${day}/${month}/${year} ${hours}:${minutes}`
+}
+
+function AvatarPersona({ persona }: { persona: IncidentPerson }) {
+  const [error, setError] = useState(false)
+
+  if (!persona.foto_url || error) {
+    return (
+      <div className="flex size-16 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-2xl font-bold text-brand-deep">
+        {getInitials(persona.nombre_completo)}
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={persona.foto_url}
+      alt={persona.nombre_completo}
+      className="size-16 shrink-0 rounded-lg object-cover"
+      onError={() => setError(true)}
+    />
+  )
 }

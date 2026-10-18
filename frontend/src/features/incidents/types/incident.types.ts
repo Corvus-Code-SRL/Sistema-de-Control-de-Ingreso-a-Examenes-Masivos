@@ -11,6 +11,7 @@ export interface IncidentPerson {
   codigo: string
   grupo: string | null
   carrera: string | null
+  foto_url: string | null
 }
 
 export interface IncidentExam {
