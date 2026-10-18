@@ -19,11 +19,16 @@ class StudentVerificationController extends Controller
         $examen,
         IdentificationService $identification
     ): JsonResponse {
-        return ApiResponse::success($identification->searchByName(
-            (int) $examen,
-            $request->user(),
-            $request->validated()['nombre']
-        ));
+        $input = $request->validated();
+
+        return ApiResponse::success(isset($input['nombre'])
+            ? $identification->searchByName((int) $examen, $request->user(), $input['nombre'])
+            : $identification->searchByNumberPrefix(
+                (int) $examen,
+                $request->user(),
+                isset($input['sis']) ? 'sis' : 'ci',
+                $input['sis'] ?? $input['ci']
+            ));
     }
 
     public function verify(

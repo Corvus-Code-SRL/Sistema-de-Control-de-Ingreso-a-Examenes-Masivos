@@ -6,6 +6,7 @@ use App\Models\Exam;
 use App\Models\User;
 use App\Exceptions\Exams\ExamStateException;
 use App\Services\Exams\ExamTimingService;
+use App\Support\Cache\EntryOpeningFailureStore;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -13,10 +14,12 @@ use Illuminate\Support\Facades\DB;
 class EntryAccessService
 {
     private ExamTimingService $timing;
+    private EntryOpeningFailureStore $openingFailures;
 
-    public function __construct(ExamTimingService $timing)
+    public function __construct(ExamTimingService $timing, EntryOpeningFailureStore $openingFailures)
     {
         $this->timing = $timing;
+        $this->openingFailures = $openingFailures;
     }
 
     public function openExamsFor(User $actor): array
@@ -27,8 +30,8 @@ class EntryAccessService
 
         $now = Carbon::now(config('sciem.zona_horaria'))->format('Y-m-d H:i:s');
 
-        return Exam::query()
-            ->with(['subject', 'classrooms'])
+        $exams = Exam::query()
+            ->with(['subject', 'career', 'classrooms'])
             ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_INGRESO])
             ->whereNotNull('duracion')
             ->whereRaw(
@@ -53,16 +56,72 @@ class EntryAccessService
                     });
             })
             ->orderBy('fecha')
-            ->get()
-            ->map(fn (Exam $exam) => [
-                'id_examen' => (int) $exam->id_examen,
+            ->orderBy('hora_inicio')
+            ->get();
+
+        $examIds = $exams->pluck('id_examen')->all();
+        $assistantAssignments = DB::table('examen_auxiliar')
+            ->whereIn('id_examen', $examIds)
+            ->where('id_usuario', $actor->id_usuario)
+            ->get(['id_examen', 'id_ambiente'])
+            ->keyBy('id_examen');
+        $rosterTotals = DB::table('grupo_examen as gx')
+            ->join('grupo_estudiante as gs', 'gs.id_grupo', '=', 'gx.id_grupo')
+            ->whereIn('gx.id_examen', $examIds)
+            ->selectRaw('gx.id_examen, count(distinct gs.id_estudiante) as total')
+            ->groupBy('gx.id_examen')
+            ->pluck('total', 'id_examen');
+        $enteredTotals = DB::table('examen_estudiante as ee')
+            ->join('grupo_examen as gx', 'gx.id_examen', '=', 'ee.id_examen')
+            ->join('grupo_estudiante as gs', function ($join): void {
+                $join->on('gs.id_grupo', '=', 'gx.id_grupo')
+                    ->on('gs.id_estudiante', '=', 'ee.id_estudiante');
+            })
+            ->whereIn('ee.id_examen', $examIds)
+            ->whereIn('ee.estado_ingreso', ['INGRESO', 'CON_RETRASO'])
+            ->selectRaw('ee.id_examen, count(distinct ee.id_estudiante) as total')
+            ->groupBy('ee.id_examen')
+            ->pluck('total', 'id_examen');
+
+        return $exams->map(function (Exam $exam) use (
+            $actor, $assistantAssignments, $rosterTotals, $enteredTotals
+        ): array {
+            $examId = (int) $exam->id_examen;
+            $total = (int) ($rosterTotals[$examId] ?? 0);
+            $entered = (int) ($enteredTotals[$examId] ?? 0);
+            $isTeacher = (string) $exam->id_usuario_docente === (string) $actor->id_usuario;
+            $openingAt = $this->timing->startsAt($exam)
+                ->subMinutes((int) $exam->minutos_apertura);
+            $assignedRoomId = $isTeacher ? null : EntryControlSnapshotService::controlRoomOf(
+                $assistantAssignments[$examId]->id_ambiente === null
+                    ? null
+                    : (int) $assistantAssignments[$examId]->id_ambiente,
+                $exam->classrooms->map(fn ($room) => ['id_ambiente' => (int) $room->id_ambiente])->all()
+            );
+
+            return [
+                'id_examen' => $examId,
                 'nombre_examen' => $exam->nombre_examen,
                 'estado' => $exam->estado,
                 'fecha' => $exam->fecha ? $exam->fecha->format('Y-m-d') : null,
                 'hora_inicio' => $exam->hora_inicio ? substr($exam->hora_inicio, 0, 5) : null,
                 'materia' => $exam->subject ? $exam->subject->nombre : null,
+                'carrera' => $exam->career ? $exam->career->nombre : null,
                 'ambientes' => $exam->classrooms->pluck('nro_aula')->values()->all(),
-            ])->all();
+                'rol_controlador' => $isTeacher ? 'DOCENTE' : 'AUXILIAR',
+                'id_ambiente_asignado' => $assignedRoomId,
+                'ambiente_asignado' => $assignedRoomId === null
+                    ? null
+                    : $exam->classrooms->firstWhere('id_ambiente', $assignedRoomId)?->nro_aula,
+                'apertura_programada_en' => $openingAt->toIso8601String(),
+                'motivo_apertura' => $exam->estado === Exam::PROGRAMADO
+                    ? $this->openingFailures->get($examId)
+                    : null,
+                'total' => $total,
+                'ingresados' => $entered,
+                'pendientes' => max(0, $total - $entered),
+            ];
+        })->all();
     }
 
     public function context(Exam $exam, User $actor): array
@@ -124,7 +183,7 @@ class EntryAccessService
     }
 
     /**
-     * Ambiente donde controla el auxiliar: el que le asignó el docente (HU-09) o, si no tiene y
+     * Ambiente donde controla el auxiliar: el que le asignó el docente o, si no tiene y
      * el examen tiene un solo ambiente, ese. Se resuelve al consultar y nunca se escribe.
      */
     private function assistantRoomId(Exam $exam, User $actor): ?int

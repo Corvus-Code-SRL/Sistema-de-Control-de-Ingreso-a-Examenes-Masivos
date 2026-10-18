@@ -2,6 +2,7 @@
 
 namespace App\Services\EntryControl;
 
+use App\Exceptions\EntryControl\EntryOpeningException;
 use App\Models\Exam;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -34,17 +35,32 @@ class RoomAssignmentService
                 ->distinct()
                 ->count('gs.id_estudiante');
 
-            $capacity = (int) DB::table('examen_ambiente as ea')
-                ->join('ambiente as a', 'a.id_ambiente', '=', 'ea.id_ambiente')
-                ->where('ea.id_examen', $examId)
-                ->sum('a.capacidad');
-
-            if ($studentCount === 0 || $capacity === 0) {
-                throw new DomainException('El examen necesita nómina y ambientes para abrir el ingreso.');
+            if ($studentCount === 0) {
+                throw new EntryOpeningException(
+                    EntryOpeningException::MISSING_ROSTER,
+                    'El examen no tiene estudiantes en su nómina.'
+                );
             }
 
+            $rooms = DB::table('examen_ambiente as ea')
+                ->join('ambiente as a', 'a.id_ambiente', '=', 'ea.id_ambiente')
+                ->where('ea.id_examen', $examId)
+                ->selectRaw('count(*) as room_count, coalesce(sum(a.capacidad), 0) as capacity')
+                ->first();
+
+            if ((int) $rooms->room_count === 0) {
+                throw new EntryOpeningException(
+                    EntryOpeningException::MISSING_ROOMS,
+                    'El examen no tiene ambientes asignados.'
+                );
+            }
+
+            $capacity = (int) $rooms->capacity;
             if ($capacity < $studentCount) {
-                throw new DomainException('La capacidad de los ambientes no alcanza para la nómina.');
+                throw new EntryOpeningException(
+                    EntryOpeningException::INSUFFICIENT_CAPACITY,
+                    sprintf('Capacidad %d menor que la nómina de %d.', $capacity, $studentCount)
+                );
             }
 
             $token = $this->snapshots->stage($exam);
