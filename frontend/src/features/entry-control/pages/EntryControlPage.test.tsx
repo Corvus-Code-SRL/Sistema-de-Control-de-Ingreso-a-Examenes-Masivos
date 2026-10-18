@@ -59,6 +59,69 @@ describe('EntryControlPage', () => {
 
     expect(await screen.findByText(/Datos sin actualizar desde \d{2}:\d{2}/)).toBeInTheDocument()
   })
+  it('retira el aviso de datos sin actualizar cuando vuelve la conexión', async () => {
+    mockApi(routes())
+    const firstFetch = globalThis.fetch
+    let offline = false
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (offline && String(input).includes('/estado')) return Promise.reject(new TypeError('Failed to fetch'))
+      return firstFetch(input, init)
+    }))
+    const hidden = Object.getOwnPropertyDescriptor(document, 'hidden')
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false })
+    vi.useFakeTimers()
+    try {
+      await act(async () => {
+        renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+      })
+      expect(screen.getByText('En vivo')).toBeInTheDocument()
+      expect(screen.queryByText(/Datos sin actualizar/)).not.toBeInTheDocument()
+
+      offline = true
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+      expect(screen.getByText(/Datos sin actualizar desde \d{2}:\d{2}/)).toBeInTheDocument()
+      expect(screen.queryByText('En vivo')).not.toBeInTheDocument()
+
+      offline = false
+      await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+      expect(screen.queryByText(/Datos sin actualizar/)).not.toBeInTheDocument()
+      expect(screen.getByText('En vivo')).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+      if (hidden) Object.defineProperty(document, 'hidden', hidden)
+    }
+  })
+
+  it('muestra al estudiante de otro examen con sus antecedentes, sin aceptar y con reporte', async () => {
+    mockApi(routes({
+      veredicto: 'NO_PERTENECE', autorizado: false, motivo: 'No pertenece a los grupos de este examen',
+      estudiante: {
+        id_estudiante: 77, cod_sis: '199912543', ci: '0012345', ci_pendiente: false,
+        nombre_completo: 'María Fuera Nómina', carrera: null, foto_url: null,
+      },
+      grupo: null, ambiente_asignado: null,
+      antecedentes: { total: 1, latest: { tipo_falta: 'Suplantación', fecha_registro: '2026-10-13' } },
+      ingreso_previo: null,
+    }))
+    const user = userEvent.setup()
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+
+    await user.type(await screen.findByLabelText('Código SIS'), '199912543')
+    await user.click(screen.getByRole('button', { name: 'Verificar estudiante' }))
+    expect(await screen.findByText('No pertenece a los grupos de este examen')).toBeInTheDocument()
+    expect(screen.getByText('María Fuera Nómina')).toBeInTheDocument()
+    expect(screen.getByText('199912543')).toBeInTheDocument()
+    expect(screen.getByText('Sin fotografía')).toBeInTheDocument()
+    expect(screen.getByText('Este estudiante tiene un registro en la Central de Riesgo')).toBeInTheDocument()
+    expect(screen.getByText('Suplantación · 2026-10-13')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Aceptar ingreso' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Reportar incidencia' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Reportar incidencia' })
+    expect(within(dialog).getByText('Estudiante: María Fuera Nómina')).toBeInTheDocument()
+    expect(within(dialog).getByText('Examen 7, estudiante 77, ambiente 5')).toBeInTheDocument()
+  })
+
   it('muestra estudiante, ambiente, hora y controlador en los últimos ingresos', async () => {
     const apiRoutes = routes()
     apiRoutes[1].body = { data: {
