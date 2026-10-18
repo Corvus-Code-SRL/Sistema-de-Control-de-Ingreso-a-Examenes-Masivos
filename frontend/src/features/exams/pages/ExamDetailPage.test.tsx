@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { mockApi } from '@/test/http'
 import { renderWithRouter } from '@/test/render'
@@ -150,6 +150,27 @@ describe('ExamDetailPage: texto de solo lectura (HU-024)', () => {
     expect(
       screen.getByRole('button', {
         name: /controlar ingreso/i,
+      })
+    ).toBeInTheDocument()
+  })
+
+  it('ubica las acciones de auxiliares en su sección', async () => {
+    mockExam('PROGRAMADO')
+    await renderDetail()
+
+    const section = screen.getByRole('region', {
+      name: /personal del control de ingreso/i,
+    })
+
+    expect(
+      within(section).getByRole('button', {
+        name: /habilitar auxiliares/i,
+      })
+    ).toBeInTheDocument()
+
+    expect(
+      within(section).getByRole('button', {
+        name: /asignar ambientes/i,
       })
     ).toBeInTheDocument()
   })

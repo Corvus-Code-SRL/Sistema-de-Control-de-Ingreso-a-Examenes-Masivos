@@ -186,24 +186,6 @@ export function ExamDetailPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => navigate('/mis-auxiliares')}
-              >
-                <Users className="size-4" aria-hidden="true" />
-                Habilitar auxiliares
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowEnvironmentInfo(true)}
-              >
-                <Building2 className="size-4" aria-hidden="true" />
-                Asignar ambientes
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
                 className="border-danger/30 text-danger hover:bg-danger-soft"
                 onClick={() => setShowCancelDialog(true)}
               >
@@ -214,9 +196,7 @@ export function ExamDetailPage() {
           ) : exam?.estado === 'EN_INGRESO' ? (
             <Button
               type="button"
-              onClick={() =>
-                navigate(`/examenes/${id}/control-ingreso`)
-              }
+              onClick={() => navigate(`/examenes/${id}/control-ingreso`)}
             >
               <DoorOpen className="size-4" aria-hidden="true" />
               Controlar ingreso
@@ -365,9 +345,51 @@ export function ExamDetailPage() {
           </section>
 
           <section className="space-y-3 rounded-xl border border-border-soft bg-surface p-6">
-            <h2 className="sciem-h3">
-              Personal del control de ingreso
-            </h2>
+            <section
+              aria-label="Personal del control de ingreso"
+              className="space-y-4 rounded-xl border border-border-soft bg-surface p-6"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h2 className="sciem-h3">
+                    Personal del control de ingreso
+                  </h2>
+
+                  <p className="text-sm text-muted-foreground">
+                    Gestión de auxiliares del examen
+                  </p>
+                </div>
+
+                {isProgramado && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => navigate('/mis-auxiliares')}
+                    >
+                      <Users className="size-4" aria-hidden="true" />
+                      Habilitar auxiliares
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowEnvironmentInfo(true)}
+                    >
+                      <Building2 className="size-4" aria-hidden="true" />
+                      Asignar ambientes
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-border-soft pt-4">
+                <p className="text-sm text-muted-foreground">
+                  La habilitación y la asignación de ambientes se
+                  administran desde sus funcionalidades correspondientes.
+                </p>
+              </div>
+            </section>
             <p className="text-sm text-muted-foreground">
               La habilitación de auxiliares y la asignación de sus
               ambientes se gestionan por separado.
