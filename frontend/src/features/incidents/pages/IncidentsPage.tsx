@@ -10,7 +10,7 @@ import { useAsyncResource } from '@/hooks/useAsyncResource'
 import { IncidentsList } from '../components/IncidentsList'
 import { IncidentDetailPanel } from '../components/IncidentDetailPanel'
 import { listIncidents } from '../services/incidentsService'
-import type { IncidentFilter, IncidentReport } from '../types/incident.types'
+import type { IncidentFilter, IncidentReview } from '../types/incident.types'
 
 interface TabDefinition {
   value: IncidentFilter
@@ -40,7 +40,7 @@ export function IncidentsPage() {
     setSelectedId(null)
   }
 
-  const selectedIncident = useMemo<IncidentReport | null>(
+  const selectedIncident = useMemo<IncidentReview | null>(
     () => incidents.find((i) => i.id === selectedId) ?? null,
     [incidents, selectedId]
   )

@@ -11,12 +11,12 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import type { IncidentReport } from '../types/incident.types'
+import type { IncidentReview } from '../types/incident.types'
 
 interface ApproveIncidentModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  incident: IncidentReport
+  incident: IncidentReview
   onConfirm: (observacion: string | null) => Promise<void>
 }
 

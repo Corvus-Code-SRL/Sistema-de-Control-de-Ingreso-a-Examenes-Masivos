@@ -2,7 +2,7 @@
  * HU-045 — Revisar incidencias con doble comprobación
  * ========================================================================= */
 
-export type IncidentType = 'estudiante' | 'postulante'
+export type IncidentSource = 'estudiante' | 'postulante'
 export type IncidentState = 'PENDIENTE' | 'APROBADO' | 'RECHAZADO'
 export type IncidentFilter = 'pendiente' | 'revisada'
 
@@ -60,9 +60,10 @@ export interface IncidentEvidence {
   url: string
 }
 
-export interface IncidentReport {
+/** DTO completo de una incidencia en la vista de revisión (HU-045). */
+export interface IncidentReview {
   id: string
-  tipo: IncidentType
+  tipo: IncidentSource
   estado: IncidentState
   persona: IncidentPerson
   examen: IncidentExam
@@ -80,7 +81,7 @@ export interface IncidentReport {
 }
 
 export interface IncidentListResponse {
-  data: IncidentReport[]
+  data: IncidentReview[]
   meta: {
     total_pendientes: number
     total_revisadas: number
@@ -88,5 +89,5 @@ export interface IncidentListResponse {
 }
 
 export interface IncidentDetailResponse {
-  data: IncidentReport
+  data: IncidentReview
 }

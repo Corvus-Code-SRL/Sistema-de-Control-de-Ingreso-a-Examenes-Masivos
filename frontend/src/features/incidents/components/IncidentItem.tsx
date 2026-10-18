@@ -1,9 +1,9 @@
 import { cn } from '@/lib/utils'
 import { IncidentStateBadge } from './IncidentStateBadge'
-import type { IncidentReport } from '../types/incident.types'
+import type { IncidentReview } from '../types/incident.types'
 
 interface IncidentItemProps {
-  incident: IncidentReport
+  incident: IncidentReview
   isSelected: boolean
   onSelect: () => void
   showDecision: boolean

@@ -13,7 +13,7 @@ import { RejectIncidentModal } from './RejectIncidentModal'
 import { IncidentStateBadge } from './IncidentStateBadge'
 import { approveIncident, getIncident, rejectIncident } from '../services/incidentsService'
 import { useIncidentEvidenceDownload } from '../hooks/useIncidentEvidenceDownload'
-import type { IncidentPerson, IncidentReport } from '../types/incident.types'
+import type { IncidentPerson, IncidentReview } from '../types/incident.types'
 
 interface IncidentDetailPanelProps {
   incidentId: string
@@ -54,7 +54,7 @@ export function IncidentDetailPanel({ incidentId, onReviewed, onBack }: Incident
 
   if (!resource.data) return null
 
-  const incident: IncidentReport = resource.data.data
+  const incident: IncidentReview = resource.data.data
   const isPending = incident.estado === 'PENDIENTE'
 
   async function handleApprove(observacion: string | null) {
@@ -226,7 +226,7 @@ export function IncidentDetailPanel({ incidentId, onReviewed, onBack }: Incident
 
 /* ===================================================================== */
 
-function EvidenceBlock({ incident }: { incident: IncidentReport }) {
+function EvidenceBlock({ incident }: { incident: IncidentReview }) {
   const ev = incident.evidencia!
   const { open, status, message } = useIncidentEvidenceDownload(
     incident.id,

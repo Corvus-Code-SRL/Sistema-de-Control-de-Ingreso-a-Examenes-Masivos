@@ -1,9 +1,9 @@
 import { Card } from '@/components/ui/card'
 import { IncidentItem } from './IncidentItem'
-import type { IncidentFilter, IncidentReport } from '../types/incident.types'
+import type { IncidentFilter, IncidentReview } from '../types/incident.types'
 
 interface IncidentsListProps {
-  incidents: IncidentReport[]
+  incidents: IncidentReview[]
   selectedId: string | null
   onSelect: (id: string) => void
   filter: IncidentFilter

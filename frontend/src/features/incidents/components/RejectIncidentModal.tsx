@@ -12,12 +12,12 @@ import {
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError } from '@/lib/api-client'
-import type { IncidentReport } from '../types/incident.types'
+import type { IncidentReview } from '../types/incident.types'
 
 interface RejectIncidentModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  incident: IncidentReport
+  incident: IncidentReview
   onConfirm: (observacion: string) => Promise<void>
 }
 
