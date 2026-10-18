@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ApiError } from '@/lib/api-client'
 import { entryControlService } from '../services/entryControlService'
 import type { EntryActionInput, RejectionReason, StudentMatch, Verification, VerificationInput } from '../types/entry-control.types'
+import { CI_MAX_LENGTH, digitsOnly, isValidCi, isValidSis, SIS_LENGTH } from '../utils/identificationValidation'
 
 export function useStudentVerification(examId: number, roomId: number | null, onChange: () => void) {
   const [sis, setSis] = useState('')
@@ -21,29 +22,45 @@ export function useStudentVerification(examId: number, roomId: number | null, on
   }
 
   function changeSis(value: string) {
-    setSis(value.trim())
+    setSis(digitsOnly(value, SIS_LENGTH))
     setResult(null)
     setError(null)
   }
 
   function changeCi(value: string) {
-    setCi(value.trim())
+    setCi(digitsOnly(value, CI_MAX_LENGTH))
     setResult(null)
     setError(null)
   }
 
-  function choose(student: StudentMatch) {
-    setSis(student.cod_sis)
+  function choose(student: StudentMatch, field: 'sis' | 'ci') {
+    if (field === 'ci') {
+      setCi(digitsOnly(student.ci ?? '', CI_MAX_LENGTH))
+    } else {
+      setSis(digitsOnly(student.cod_sis, SIS_LENGTH))
+    }
     setResult(null)
     setError(null)
   }
 
   function input(): VerificationInput | null {
-    if (!roomId || !sis) {
-      setError('Seleccione un ambiente e ingrese el código SIS.')
+    if (!roomId) {
+      setError('Seleccione un ambiente de control.')
       return null
     }
-    return { cod_sis: sis, id_ambiente: roomId, ...(ci ? { ci } : {}) }
+    if (!sis && !ci) {
+      setError('Ingrese un código SIS o un CI.')
+      return null
+    }
+    if (sis && !isValidSis(sis)) {
+      setError('El código SIS debe tener exactamente 9 dígitos.')
+      return null
+    }
+    if (!isValidCi(ci)) {
+      setError('El CI solo puede contener hasta 10 dígitos.')
+      return null
+    }
+    return { id_ambiente: roomId, ...(sis ? { cod_sis: sis } : {}), ...(ci ? { ci } : {}) }
   }
 
   async function verify() {
@@ -93,20 +110,19 @@ export function useStudentVerification(examId: number, roomId: number | null, on
   }
 
   async function reject(motivo: RejectionReason, observacion: string) {
-    if (!result?.autorizado || !result.estudiante || !roomId) return false
+    if (!result?.autorizado || !result.estudiante || !roomId) return null
     setBusy('reject')
     setError(null)
     try {
-      await entryControlService.reject(examId, {
+      const rejected = await entryControlService.reject(examId, {
         ...actionInput(result.estudiante.id_estudiante, roomId),
         motivo, observacion: observacion.trim() || undefined,
       })
       setNotice('Intento rechazado y registrado.')
-      reset()
-      return true
+      return rejected.id_intento
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo registrar el rechazo.')
-      return false
+      return null
     } finally {
       setBusy(null)
     }

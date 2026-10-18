@@ -35,6 +35,43 @@ class EntryControlStatusTest extends TestCase
             ->assertJsonStructure(['data' => ['conectados', 'version', 'ultimos_ingresos']]);
     }
 
+    public function test_lista_incluye_progreso_y_apertura_programada_del_examen(): void
+    {
+        $this->seedExamCatalog();
+        $exam = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId]);
+        DB::table('examen')->where('id_examen', $exam->id_examen)->update(['minutos_apertura' => 20]);
+        $exam->refresh();
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
+        $studentId = DB::table('grupo_estudiante')
+            ->where('id_grupo', $this->grupoPropioId)
+            ->value('id_estudiante');
+        DB::table('examen_estudiante')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_estudiante' => $studentId,
+            'id_grupo' => $this->grupoPropioId,
+            'estado_habilitacion' => 'HABILITADO',
+            'estado_ingreso' => 'INGRESO',
+            'hora_ingreso' => '08:00:00',
+        ]);
+
+        $openingAt = app(\App\Services\Exams\ExamTimingService::class)
+            ->startsAt($exam)->subMinutes(20)->toIso8601String();
+
+        $this->actingAs(User::query()->findOrFail($this->docenteId))
+            ->getJson('/api/control-ingreso/examenes')
+            ->assertOk()
+            ->assertJsonPath('data.0.id_examen', $exam->id_examen)
+            ->assertJsonPath('data.0.apertura_programada_en', $openingAt)
+            ->assertJsonPath('data.0.total', 2)
+            ->assertJsonPath('data.0.ingresados', 1)
+            ->assertJsonPath('data.0.pendientes', 1)
+            ->assertJsonPath('data.0.motivo_apertura', null)
+            ->assertJsonPath('data.0.rol_controlador', 'DOCENTE');
+    }
+
     public function test_el_creador_ve_su_examen_programado_sin_poder_verificar_aun(): void
     {
         $this->seedExamCatalog();
@@ -103,7 +140,10 @@ class EntryControlStatusTest extends TestCase
         $this->actingAs(User::query()->findOrFail($this->otroDocenteId))
             ->getJson('/api/control-ingreso/examenes')
             ->assertOk()
-            ->assertJsonPath('data.0.id_examen', $exam->id_examen);
+            ->assertJsonPath('data.0.id_examen', $exam->id_examen)
+            ->assertJsonPath('data.0.rol_controlador', 'AUXILIAR')
+            ->assertJsonPath('data.0.id_ambiente_asignado', $this->aulaId)
+            ->assertJsonPath('data.0.ambiente_asignado', '691A');
 
         $this->getJson("/api/control-ingreso/examenes/{$exam->id_examen}/contexto")
             ->assertOk()
