@@ -35,7 +35,6 @@ export function useStudentVerification(examId: number, roomId: number | null, on
 
   function choose(student: StudentMatch, field: 'sis' | 'ci') {
     if (field === 'ci') {
-      setSis('')
       setCi(digitsOnly(student.ci ?? '', CI_MAX_LENGTH))
     } else {
       setSis(digitsOnly(student.cod_sis, SIS_LENGTH))

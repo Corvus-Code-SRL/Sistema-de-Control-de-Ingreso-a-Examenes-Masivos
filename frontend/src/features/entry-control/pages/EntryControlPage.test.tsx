@@ -211,6 +211,32 @@ describe('EntryControlPage', () => {
     expect(await screen.findByRole('list', { name: 'Sugerencias por CI' })).toBeInTheDocument()
   })
 
+  it('conserva el SIS al seleccionar una sugerencia de CI y verifica ambos datos', async () => {
+    mockApi([
+      ...routes(),
+      { matches: (url) => url.includes('/buscar?ci=9456'), body: { data: [{
+        id_estudiante: 19, cod_sis: '202309201', ci: '9456781',
+        nombre_completo: 'Carlos Daniel Rocha Mendoza',
+      }] } },
+    ])
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+
+    const sis = await screen.findByLabelText('Código SIS')
+    const ci = screen.getByLabelText('Carnet de identidad (CI)')
+    fireEvent.change(sis, { target: { value: '202309201' } })
+    fireEvent.change(ci, { target: { value: '9456' } })
+    fireEvent.click(await screen.findByRole('button', { name: '9456781' }))
+
+    expect(sis).toHaveValue('202309201')
+    expect(ci).toHaveValue('9456781')
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar estudiante' }))
+    expect(await screen.findByText('AUTORIZADO')).toBeInTheDocument()
+
+    const verifyCall = vi.mocked(fetch).mock.calls.find(([url]) => String(url).endsWith('/verificar'))
+    const verifyBody = JSON.parse((verifyCall?.[1] as RequestInit).body as string)
+    expect(verifyBody).toEqual({ cod_sis: '202309201', ci: '9456781', id_ambiente: 5 })
+  })
+
   it('muestra como máximo cinco sugerencias por SIS, CI y nombre', async () => {
     const matches = Array.from({ length: 7 }, (_, index) => ({
       id_estudiante: index + 1,
