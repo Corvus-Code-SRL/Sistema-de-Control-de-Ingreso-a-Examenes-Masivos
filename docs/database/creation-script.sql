@@ -3,9 +3,9 @@
 --   * examen.minutos_apertura (0 a 30, por defecto 10): minutos previos a la hora de inicio
 --     en que abre el control de ingreso.
 --   * Trigger que solo permite pasar a CANCELADO desde PROGRAMADO.
---   * Tablas grupo_auxiliar y examen_auxiliar. examen_auxiliar.id_ambiente
+--   * Tablas grupo_auxiliar y examen_auxiliar (HU-008, HU-009). examen_auxiliar.id_ambiente
 --     queda atado a los ambientes del propio examen.
---   * Ya incorporados en V4: estudiante.ci admite NULL y examen
+--   * Ya incorporados en V4 tras la HU-021 y la HU-024: estudiante.ci admite NULL y examen
 --     tiene id_usuario_docente, id_carrera, id_materia y estado (public.estado_examen).
 --   * periodo.gestion es smallint entre 1900 y 2200.
 -- Versión 4 (public). Cambios respecto de V3:
@@ -57,7 +57,7 @@ CREATE TYPE public.categoria_examen AS ENUM (
 	'ADMISION'
 );
 
--- Ciclo de vida del examen (HU-24). Solo PROGRAMADO y CANCELADO se alcanzan hoy;
+-- Ciclo de vida del examen (HU-024). Solo PROGRAMADO y CANCELADO se alcanzan hoy;
 -- EN_INGRESO, EN_CURSO y FINALIZADO los asignan las historias de control de ingreso.
 CREATE TYPE public.estado_examen AS ENUM (
     'PROGRAMADO',
@@ -111,7 +111,6 @@ CREATE TABLE public.estudiante (
     cod_sis              varchar(15) NOT NULL,
     -- NULL hasta la primera verificación (EX04): la nómina no trae el CI.
     ci                   varchar(10),
-    foto_url             text,
     nombre               varchar(50) NOT NULL,
     apellido_paterno     varchar(30) NOT NULL,
     apellido_materno     varchar(30),
@@ -946,7 +945,7 @@ CREATE TABLE public.grupo_estudiante (
 -- grupo_auxiliar
 ---------------------------------------------------
 
--- Auxiliares que el docente incorpora a sus grupos (HU-08).
+-- Auxiliares que el docente incorpora a sus grupos (HU-008).
 CREATE TABLE public.grupo_auxiliar (
     id_grupo             integer NOT NULL,
     id_usuario           uuid NOT NULL,
@@ -1035,8 +1034,8 @@ CREATE TABLE public.examen_estudiante (
 -- examen_auxiliar
 ---------------------------------------------------
 
--- Auxiliares habilitados para un examen: es lo que les permite registrar ingresos ese día (HU-08).
--- id_ambiente lo asigna la HU-09, por eso admite NULL hasta entonces. Con la clave compuesta
+-- Auxiliares habilitados para un examen: es lo que les permite registrar ingresos ese día (HU-008).
+-- id_ambiente lo asigna la HU-009, por eso admite NULL hasta entonces. Con la clave compuesta
 -- hacia examen_ambiente, el ambiente asignado siempre es uno de los del propio examen
 -- (una clave foránea con algún componente NULL no se verifica).
 CREATE TABLE public.examen_auxiliar (
@@ -1500,11 +1499,11 @@ CREATE INDEX idx_examen_auxiliar_docente_habilita
 ---------------------------------------------------
 -- Cada bloque es el SQL equivalente de una migración posterior a
 -- 2026_09_25_000000_create_baseline_schema. Hasta aquí el archivo es idéntico a
--- backend/database/schema/baseline.sql (que nunca se edita); lo que sigue refleja el
+-- backend/database/schema/baseline.sql (sin cambiar sus sentencias SQL); lo que sigue refleja el
 -- esquema que queda después de correr todas las migraciones. DatabaseSchemaTest verifica
 -- ambas cosas.
 --
--- Versión 6: HU-11 (2026_09_29_000001_add_student_entry_audit_and_attempts)
+-- Versión 6: HU-011 (2026_09_29_000001_add_student_entry_audit_and_attempts)
 --   * examen_estudiante registra el ambiente, el controlador y el instante del ingreso.
 --   * intento_ingreso guarda los intentos rechazados del control de ingreso.
 
@@ -1701,7 +1700,13 @@ UPDATE public.periodo SET nombre = 'Semestre 1' WHERE codigo = 1;
 UPDATE public.periodo SET nombre = 'Semestre 2' WHERE codigo = 2;
 
 --
--- Versión 10: base de la Central de Riesgo de estudiantes (2026_10_15_000000_prepare_risk_center_foundation)
+-- Versión 10: fotografía opcional del estudiante (HU-032)
+--             (2026_10_13_000001_add_foto_url_to_estudiante)
+
+ALTER TABLE public.estudiante ADD COLUMN foto_url text;
+
+--
+-- Versión 11: base de la Central de Riesgo de estudiantes (2026_10_15_000000_prepare_risk_center_foundation)
 --   * reporte_estudiante.id_intento vincula el reporte con el intento de ingreso que lo originó
 --     (UNIQUE: un intento origina como máximo un reporte; varios NULL sí se admiten).
 --   * La evidencia pasa a ser opcional, pero completa o ausente: no puede haber una URL sin public_id.
