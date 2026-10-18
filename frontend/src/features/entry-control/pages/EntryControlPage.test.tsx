@@ -1,7 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { mockApi } from '@/test/http'
+import { mockApi, mockNetworkFailure } from '@/test/http'
 import { renderWithRouter } from '@/test/render'
 import { EntryControlPage } from './EntryControlPage'
 import type { EntryContext, Verification } from '../types/entry-control.types'
@@ -31,6 +31,34 @@ function routes(verdict: Verification = allowed, examContext = context): Paramet
 }
 
 describe('EntryControlPage', () => {
+  it('muestra desde cuándo están desactualizados los datos si se corta la red', async () => {
+    mockApi(routes())
+    const firstFetch = globalThis.fetch
+    let statusCalls = 0
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes('/estado')) {
+        statusCalls += 1
+        if (statusCalls > 1) return Promise.reject(new TypeError('Failed to fetch'))
+      }
+      return firstFetch(input, init)
+    }))
+    renderWithRouter(<EntryControlPage />, {
+      route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso',
+    })
+
+    await screen.findByText('En vivo')
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }))
+    expect(await screen.findByText(/Datos sin actualizar desde \d{2}:\d{2}/)).toBeInTheDocument()
+  })
+
+  it('muestra el aviso de datos desactualizados al entrar sin red', async () => {
+    mockNetworkFailure()
+    renderWithRouter(<EntryControlPage />, {
+      route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso',
+    })
+
+    expect(await screen.findByText(/Datos sin actualizar desde \d{2}:\d{2}/)).toBeInTheDocument()
+  })
   it('muestra estudiante, ambiente, hora y controlador en los últimos ingresos', async () => {
     const apiRoutes = routes()
     apiRoutes[1].body = { data: {
@@ -456,7 +484,7 @@ describe('EntryControlPage', () => {
     const user = userEvent.setup()
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
 
-    expect(await screen.findByText(/No se pudo actualizar el estado del control/)).toBeInTheDocument()
+    expect(await screen.findByText(/Datos sin actualizar desde \d{2}:\d{2}/)).toBeInTheDocument()
     expect(screen.queryByText(/SQLSTATE/)).not.toBeInTheDocument()
     apiRoutes[1].status = 200
     apiRoutes[1].body = { data: { estado: 'PROGRAMADO', motivo_apertura: {

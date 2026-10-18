@@ -21,6 +21,14 @@ export function useEntryStatus(examId: number) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [statusError, setStatusError] = useState<string | null>(null)
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(() => {
+    try {
+      const stored = Number(window.sessionStorage.getItem(`entry-control:${examId}:updated-at`))
+      return stored > 0 ? stored : null
+    } catch {
+      return null
+    }
+  })
   const [pollDelay, setPollDelay] = useState(NORMAL_POLL_MS)
   const [ended, setEnded] = useState(false)
   const version = useRef<string | undefined>(undefined)
@@ -45,6 +53,13 @@ export function useEntryStatus(examId: number) {
       networkFailures.current = 0
       setPollDelay(NORMAL_POLL_MS)
       setStatusError(null)
+      const updatedAt = Date.now()
+      setLastUpdatedAt(updatedAt)
+      try {
+        window.sessionStorage.setItem(`entry-control:${examId}:updated-at`, String(updatedAt))
+      } catch {
+        // El control sigue funcionando aunque el navegador impida guardar este dato.
+      }
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 409) {
         endedRef.current = true
@@ -60,6 +75,7 @@ export function useEntryStatus(examId: number) {
         setPollDelay(NORMAL_POLL_MS)
       }
       setStatusError(message(cause))
+      setLastUpdatedAt((previous) => previous ?? Date.now())
     } finally {
       inFlight.current = false
     }
@@ -85,6 +101,7 @@ export function useEntryStatus(examId: number) {
       }
     } catch (cause) {
       setError(message(cause))
+      setLastUpdatedAt((previous) => previous ?? Date.now())
     } finally {
       setLoading(false)
     }
@@ -138,5 +155,5 @@ export function useEntryStatus(examId: number) {
     return () => { active = false; window.clearInterval(timer) }
   }, [context?.estado, ended, examId, refresh])
 
-  return { context, status, openingFailure, loading, error, statusError, ended, refresh, reload: load }
+  return { context, status, openingFailure, loading, error, statusError, lastUpdatedAt, ended, refresh, reload: load }
 }
