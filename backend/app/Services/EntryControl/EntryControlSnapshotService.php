@@ -6,6 +6,7 @@ use App\Models\Exam;
 use App\Models\User;
 use App\Services\Exams\ExamTimingService;
 use App\Services\RiskCenter\Academic\RiskCenterQueryService;
+use App\Support\Database\AccentInsensitiveSearch;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Cache\Repository;
@@ -17,10 +18,6 @@ use Illuminate\Support\Str;
 class EntryControlSnapshotService
 {
     private const PREFIX = 'entry-control';
-
-    private const ACCENTED = 'ÁÉÍÓÚÜÑáéíóúüñ';
-
-    private const PLAIN = 'AEIOUUNaeiouun';
 
     public const UNASSIGNED_ROOM_MESSAGE = 'Asigne un ambiente a este auxiliar antes de abrir el control.';
 
@@ -363,15 +360,10 @@ class EntryControlSnapshotService
         }, array_slice($matches, 0, 5));
     }
 
-    /** Aplica el mismo mapa de tildes de SubjectService a ambos lados de la búsqueda literal. */
+    /** Normaliza ambos lados de la búsqueda de la misma forma que SubjectService. */
     private function normalizeName(string $name): string
     {
-        $plain = array_combine(
-            preg_split('//u', self::ACCENTED, -1, PREG_SPLIT_NO_EMPTY),
-            str_split(self::PLAIN)
-        );
-
-        return mb_strtolower(strtr(trim($name), $plain));
+        return mb_strtolower(AccentInsensitiveSearch::normalize($name));
     }
 
     public function assignedRoomFor(int $examId, int $studentId): ?object
