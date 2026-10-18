@@ -80,6 +80,7 @@ class GroupTestDataSeeder extends Seeder
         ], self::STUDENTS), ['id_estudiante']);
 
         // Fotografía ficticia local; en producción la URL podrá venir de Cloudinary o MinIO.
+        DB::table('estudiante')->whereIn('id_estudiante', [9503, 9523])->update(['foto_url' => null]);
         DB::table('estudiante')->where('id_estudiante', 9501)->update([
             'foto_url' => '/fotos-prueba/estudiante-9501.jpg',
         ]);
