@@ -19,13 +19,13 @@ class EntryAttemptService
         $this->auditLog = $auditLog;
     }
 
-    public function recordDenied(int $examId, array $input, User $actor, array $verdict): void
+    public function recordDenied(int $examId, array $input, User $actor, array $verdict): ?array
     {
         if ($verdict['autorizado'] || in_array($verdict['veredicto'], ['AULA_NO_ASIGNADA', 'AUXILIAR_EXAMEN'], true)) {
-            return;
+            return null;
         }
 
-        $this->insert($examId, $input, $actor, $verdict['veredicto'], null, $verdict);
+        return $this->insert($examId, $input, $actor, $verdict['veredicto'], null, $verdict);
     }
 
     public function reject(Exam $exam, array $input, User $actor): array
@@ -36,7 +36,7 @@ class EntryAttemptService
             return ['registrado' => false, 'veredicto' => $verdict['veredicto'], 'motivo' => $verdict['motivo']];
         }
 
-        $id = $this->insert(
+        $attempt = $this->insert(
             (int) $exam->id_examen,
             $input,
             $actor,
@@ -45,7 +45,7 @@ class EntryAttemptService
             $verdict
         );
 
-        return ['registrado' => true, 'id_intento' => $id, 'motivo' => $input['motivo']];
+        return array_merge($attempt, ['registrado' => true, 'motivo' => $input['motivo']]);
     }
 
     private function insert(
@@ -55,9 +55,10 @@ class EntryAttemptService
         string $reason,
         ?string $observation,
         array $verdict
-    ): int {
-        return DB::transaction(function () use ($examId, $input, $actor, $reason, $observation, $verdict): int {
+    ): array {
+        return DB::transaction(function () use ($examId, $input, $actor, $reason, $observation, $verdict): array {
             $studentId = $verdict['estudiante']['id_estudiante'] ?? null;
+            $registeredAt = Carbon::now('UTC')->startOfSecond();
             $id = (int) DB::table('intento_ingreso')->insertGetId([
                 'id_examen' => $examId,
                 'id_estudiante' => $studentId,
@@ -67,7 +68,7 @@ class EntryAttemptService
                 'id_usuario_controlador' => $actor->id_usuario,
                 'motivo' => $reason,
                 'observacion' => $observation,
-                'registrado_en' => Carbon::now('UTC')->format('Y-m-d H:i:sP'),
+                'registrado_en' => $registeredAt->format('Y-m-d H:i:sP'),
             ], 'id_intento');
 
             $this->auditLog->registrar('CREAR', 'intento_ingreso', null, [
@@ -77,7 +78,7 @@ class EntryAttemptService
                 'motivo' => $reason,
             ], $actor->id_usuario);
 
-            return $id;
+            return ['id_intento' => $id, 'registrado_en' => $registeredAt->toIso8601String()];
         });
     }
 }
