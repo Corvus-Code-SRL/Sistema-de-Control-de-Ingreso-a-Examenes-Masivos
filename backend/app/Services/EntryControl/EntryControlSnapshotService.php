@@ -71,7 +71,7 @@ class EntryControlSnapshotService
 
         $assignedRooms = $this->assignRooms(array_keys($membersByStudent), $rooms);
         $entries = $this->entries($examId);
-        $risks = $this->riskCenter->summariesForSnapshot();
+        $risks = $this->riskCenter->summariesForSnapshot(array_keys($membersByStudent));
         $career = DB::table('carrera')->where('id_carrera', $exam->id_carrera)->value('nombre');
 
         $controllers = [
@@ -121,7 +121,10 @@ class EntryControlSnapshotService
             'expira_en' => $expiresAt->toIso8601String(),
         ];
 
-        $students = DB::table('estudiante')->orderBy('id_estudiante')->get();
+        $students = DB::table('estudiante')
+            ->whereIn('id_estudiante', array_keys($membersByStudent))
+            ->orderBy('id_estudiante')
+            ->get();
         $search = [];
         $values = [$this->key($examId, $token, 'meta') => $meta];
         foreach ($assistantRecords as $sisHash => $assistant) {

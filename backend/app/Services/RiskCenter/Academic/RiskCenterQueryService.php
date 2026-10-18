@@ -143,15 +143,20 @@ class RiskCenterQueryService
         });
     }
 
-    /** Prepara todos los resúmenes en una sola consulta al abrir el control. */
-    public function summariesForSnapshot(): array
+    /** Prepara solo los resúmenes de la nómina del examen en una consulta. */
+    public function summariesForSnapshot(array $studentIds): array
     {
+        if ($studentIds === []) {
+            return [];
+        }
+
         $rows = DB::table('central_riesgo as cr')
             ->join('reporte_estudiante as re', 're.id_reporte_est', '=', 'cr.id_reporte_est')
             ->join('tipo_falta as tf', 'tf.id_falta', '=', 're.id_tipo_falta')
+            ->whereIn('cr.id_estudiante', $studentIds)
             ->orderBy('cr.id_estudiante')
             ->orderByDesc('cr.fecha_registro')
-            ->orderByDesc('cr.id_reporte_est')
+            ->orderByDesc('cr.id_cr_estudiante')
             ->get(['cr.id_estudiante', 'tf.nombre', 'cr.fecha_registro']);
 
         $summaries = [];

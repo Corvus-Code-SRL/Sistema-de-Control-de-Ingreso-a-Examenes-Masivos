@@ -193,9 +193,17 @@ class StudentVerificationTest extends TestCase
             'nombre' => 'María',
             'apellido_paterno' => 'Fuera',
             'apellido_materno' => 'Nómina',
+            'foto_url' => 'https://example.test/foto-ajena.jpg',
             'estado' => 'ACTIVO',
         ], 'id_estudiante');
         $this->rebuildSnapshot();
+
+        $cache = Cache::store(config('sciem.entry_control_cache_store', 'redis'));
+        $token = $cache->get("entry-control:{$this->exam->id_examen}:active");
+        $prefix = "entry-control:{$this->exam->id_examen}:{$token}";
+        $this->assertFalse($cache->has("{$prefix}:student:{$outsideId}"));
+        $this->assertFalse($cache->has($prefix . ':sis:' . sha1('199912543')));
+        $this->assertFalse($cache->has($prefix . ':ci:' . sha1('0012345')));
 
         foreach (['sis' => '1999', 'ci' => '0012', 'nombre' => 'María Fuera'] as $field => $prefix) {
             $this->getJson($this->url('buscar') . '?' . http_build_query([$field => $prefix]))
@@ -225,7 +233,12 @@ class StudentVerificationTest extends TestCase
             ->assertJsonPath('data.veredicto', 'NO_PERTENECE')
             ->assertJsonPath('data.estudiante.id_estudiante', $outsideId)
             ->assertJsonPath('data.estudiante.nombre_completo', 'María Fuera Nómina')
-            ->assertJsonPath('data.estudiante.ci', '0012345');
+            ->assertJsonPath('data.estudiante.ci', '0012345')
+            ->assertJsonPath('data.estudiante.foto_url', 'https://example.test/foto-ajena.jpg');
+
+        $this->assertFalse($cache->has("{$prefix}:student:{$outsideId}"));
+        $this->assertFalse($cache->has($prefix . ':sis:' . sha1('199912543')));
+        $this->assertFalse($cache->has($prefix . ':ci:' . sha1('0012345')));
     }
 
     public function test_sugerencias_excluyen_a_estudiante_de_un_grupo_ajeno(): void

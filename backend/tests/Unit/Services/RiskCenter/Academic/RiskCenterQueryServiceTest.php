@@ -104,6 +104,45 @@ class RiskCenterQueryServiceTest extends TestCase
         $this->assertSame(0, $this->service->summaryForStudent($this->context['id_estudiante'])['total']);
     }
 
+    public function test_snapshot_limita_antecedentes_y_desempata_por_id_de_central(): void
+    {
+        $otherId = $this->insertStudent('Ajeno', 'Examen', null, '202300003');
+        $this->insertApprovedRecord($this->context, ['id_estudiante' => $otherId]);
+        $date = '2026-09-10 12:00:00+00';
+        $approved = [
+            'estado' => 'APROBADO',
+            'fecha_revision' => $date,
+            'id_usuario_revisor' => $this->context['id_usuario'],
+        ];
+        $olderReportId = $this->insertStudentReport($this->context, $approved + [
+            'id_tipo_falta' => $this->insertFaultType('Mayor id de reporte'),
+        ]);
+        $newerReportId = $this->insertStudentReport($this->context, $approved + [
+            'id_tipo_falta' => $this->insertFaultType('Mayor id de central'),
+        ]);
+        DB::table('central_riesgo')->insert([
+            'id_reporte_est' => $newerReportId,
+            'id_estudiante' => $this->context['id_estudiante'],
+            'fecha_registro' => $date,
+        ]);
+        DB::table('central_riesgo')->insert([
+            'id_reporte_est' => $olderReportId,
+            'id_estudiante' => $this->context['id_estudiante'],
+            'fecha_registro' => $date,
+        ]);
+
+        $summaries = $this->service->summariesForSnapshot([$this->context['id_estudiante']]);
+
+        $this->assertSame([$this->context['id_estudiante']], array_keys($summaries));
+        $this->assertSame(2, $summaries[$this->context['id_estudiante']]['total']);
+        $this->assertSame(
+            'Mayor id de reporte',
+            $summaries[$this->context['id_estudiante']]['latest']['tipo_falta']
+        );
+        $this->assertSame('2026-09-10', $summaries[$this->context['id_estudiante']]['latest']['fecha_registro']);
+        $this->assertSame([], $this->service->summariesForSnapshot([]));
+    }
+
     public function test_se_resuelve_en_una_sola_consulta_sin_importar_cuantos_registros_haya(): void
     {
         foreach (range(1, 5) as $unused) {

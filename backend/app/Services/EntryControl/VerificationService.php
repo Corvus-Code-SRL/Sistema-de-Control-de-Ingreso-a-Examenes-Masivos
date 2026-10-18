@@ -3,18 +3,23 @@
 namespace App\Services\EntryControl;
 
 use App\Models\User;
+use App\Services\RiskCenter\Academic\RiskCenterQueryService;
+use Carbon\Carbon;
 
 class VerificationService
 {
     private EntryControlSnapshotService $snapshots;
     private IdentificationService $identification;
+    private RiskCenterQueryService $riskCenter;
 
     public function __construct(
         EntryControlSnapshotService $snapshots,
-        IdentificationService $identification
+        IdentificationService $identification,
+        RiskCenterQueryService $riskCenter
     ) {
         $this->snapshots = $snapshots;
         $this->identification = $identification;
+        $this->riskCenter = $riskCenter;
     }
 
     public function verify(int $examId, array $input, User $actor): array
@@ -63,6 +68,16 @@ class VerificationService
         $result['ingreso_previo'] = $record['ingreso_previo'];
 
         if ($record['grupo'] === null) {
+            $summary = $this->riskCenter->summaryForStudent((int) $record['estudiante']['id_estudiante']);
+            $latest = $summary['latest'];
+            $result['antecedentes'] = [
+                'total' => $summary['total'],
+                'latest' => $latest === null ? null : [
+                    'tipo_falta' => $latest['tipo_falta']['nombre'],
+                    'fecha_registro' => Carbon::parse($latest['fecha_registro'])->toDateString(),
+                ],
+            ];
+
             return $this->deny($result, 'NO_PERTENECE', 'No figura en los grupos de este examen.');
         }
 
