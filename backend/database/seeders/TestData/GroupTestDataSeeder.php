@@ -81,7 +81,7 @@ class GroupTestDataSeeder extends Seeder
 
         // Fotografía ficticia local; en producción la URL podrá venir de Cloudinary o MinIO.
         DB::table('estudiante')->where('id_estudiante', 9501)->update([
-            'foto_url' => '/fotos-prueba/estudiante-9501.jpg',
+            'foto_url' => '/fotos-prueba/estudiante-9501.png',
         ]);
 
         [$sys, $inf, $eco, $adm] = [
