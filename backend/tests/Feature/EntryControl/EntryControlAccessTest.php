@@ -101,13 +101,15 @@ class EntryControlAccessTest extends TestCase
     public function test_rutas_de_control_rechazan_ids_fuera_de_int4_sin_error_500(): void
     {
         $this->actingAsUser($this->docenteId);
-        $base = '/api/control-ingreso/examenes/2147483648';
+        foreach (['2147483648', '99999999999'] as $id) {
+            $base = "/api/control-ingreso/examenes/{$id}";
 
-        foreach (['contexto', 'buscar', 'estado'] as $action) {
-            $this->getJson("{$base}/{$action}")->assertNotFound();
-        }
-        foreach (['verificar', 'confirmar-ingreso', 'rechazar-ingreso'] as $action) {
-            $this->postJson("{$base}/{$action}", [])->assertNotFound();
+            foreach (['contexto', 'buscar', 'estado'] as $action) {
+                $this->getJson("{$base}/{$action}")->assertNotFound();
+            }
+            foreach (['verificar', 'confirmar-ingreso', 'rechazar-ingreso'] as $action) {
+                $this->postJson("{$base}/{$action}", [])->assertNotFound();
+            }
         }
     }
 
