@@ -68,6 +68,7 @@ describe('VerificationResult CI', () => {
     />)
 
     expect(screen.getByText('CI').nextElementSibling).toHaveTextContent('7100001 · coincide')
+    expect(screen.getByText('Carrera').nextElementSibling).toHaveTextContent('Ingeniería de Sistemas')
     expect(screen.getByText('Grupo 1 · Cálculo I')).toBeInTheDocument()
     expect(screen.getByText('Aula 691A')).toBeInTheDocument()
   })
@@ -115,6 +116,7 @@ describe('VerificationResult inscripción y riesgo', () => {
         ...result,
         veredicto: 'NO_PERTENECE',
         autorizado: false,
+        estudiante: { ...result.estudiante!, carrera: null },
         grupo: null,
         motivo: 'No pertenece a los grupos de este examen',
         antecedentes: {
@@ -127,6 +129,7 @@ describe('VerificationResult inscripción y riesgo', () => {
 
     expect(screen.getByText('Adriana Arnez Céspedes')).toBeInTheDocument()
     expect(screen.getByText('No inscrito en este examen')).toBeInTheDocument()
+    expect(screen.getByText('Carrera').nextElementSibling).toHaveTextContent('No disponible')
     expect(screen.getByText('Este estudiante tiene un registro en la Central de Riesgo')).toBeInTheDocument()
     expect(screen.getByText('Suplantación · 2026-10-13')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Aceptar ingreso' })).not.toBeInTheDocument()

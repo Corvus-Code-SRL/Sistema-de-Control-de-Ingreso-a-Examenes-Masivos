@@ -59,6 +59,7 @@ function StudentDetails({ result, presentedCi, subjectName }: { result: Verifica
         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
           <dt className="text-muted-foreground">Código SIS</dt><dd className="sciem-tnum font-medium">{student.cod_sis}</dd>
           <dt className="text-muted-foreground">CI</dt><dd className="sciem-tnum font-medium">{presentedCi ? <>{presentedCi}{student.ci && (presentedCi === student.ci ? <span className="text-ok-fg"> · coincide</span> : <span className="text-danger-fg"> · registrado: {student.ci}</span>)}</> : 'No ingresado'}</dd>
+          <dt className="text-muted-foreground">Carrera</dt><dd className="font-medium">{student.carrera ?? 'No disponible'}</dd>
           <dt className="text-muted-foreground">Grupo</dt><dd className="font-medium">{result.grupo ? `Grupo ${result.grupo.num_grupo}${subjectName ? ` · ${subjectName}` : ''}` : '—'}</dd>
           <dt className="text-muted-foreground">Ambiente</dt><dd className="font-medium">{result.ambiente_asignado ? `Aula ${result.ambiente_asignado.nro_aula}` : '—'}</dd>
         </dl>
