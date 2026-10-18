@@ -2,8 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Exceptions\EntryControl\EntryOpeningException;
 use App\Models\Exam;
 use App\Services\EntryControl\RoomAssignmentService;
+use App\Support\Cache\EntryOpeningFailureStore;
 use Carbon\Carbon;
 use Throwable;
 use Illuminate\Bus\Queueable;
@@ -18,7 +20,7 @@ class OpenEntryControlJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function handle(RoomAssignmentService $assignments): void
+    public function handle(RoomAssignmentService $assignments, EntryOpeningFailureStore $failures): void
     {
         $timezone = config('sciem.zona_horaria');
         $now = Carbon::now($timezone);
@@ -54,7 +56,24 @@ class OpenEntryControlJob implements ShouldQueue
 
             try {
                 $assignments->prepare((int) $exam->id_examen);
+                $failures->forget((int) $exam->id_examen);
             } catch (Throwable $exception) {
+                if ($exception instanceof EntryOpeningException) {
+                    try {
+                        $failures->put(
+                            (int) $exam->id_examen,
+                            $exception->reason(),
+                            $exception->getMessage(),
+                            $startsAt->copy()->addMinutes((int) $exam->duracion)
+                        );
+                    } catch (Throwable $cacheException) {
+                        Log::warning('No se pudo guardar el motivo de apertura fallida', [
+                            'id_examen' => $exam->id_examen,
+                            'motivo' => $cacheException->getMessage(),
+                        ]);
+                    }
+                }
+
                 Log::warning('No se pudo abrir el control de ingreso', [
                     'id_examen' => $exam->id_examen,
                     'motivo' => $exception->getMessage(),

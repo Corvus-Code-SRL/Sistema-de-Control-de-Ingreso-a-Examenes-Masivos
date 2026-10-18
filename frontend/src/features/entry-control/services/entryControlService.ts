@@ -1,6 +1,6 @@
 import { apiClient, apiPost } from '@/lib/api-client'
 import type {
-  EntryActionInput, EntryContext, EntryStatus, OpenEntryExam, RejectionReason, StatusResponse,
+  EntryActionInput, EntryContext, EntryStatus, OpenEntryExam, PendingEntryStatus, RejectionReason, StatusResponse,
   StudentMatch, Verification, VerificationInput,
 } from '../types/entry-control.types'
 
@@ -32,6 +32,18 @@ export const entryControlService = {
     return response.data
   },
 
+  async searchByIdentifier(
+    examId: number,
+    field: 'sis' | 'ci',
+    prefix: string,
+    signal?: AbortSignal
+  ): Promise<StudentMatch[]> {
+    const response = await apiClient<DataResponse<StudentMatch[]>>(`${base(examId)}/buscar`, {
+      query: { [field]: prefix }, signal,
+    })
+    return response.data
+  },
+
   async verify(examId: number, input: VerificationInput): Promise<Verification> {
     const response = await apiPost<DataResponse<Verification>>(`${base(examId)}/verificar`, input)
     return response.data
@@ -43,11 +55,16 @@ export const entryControlService = {
 
   async reject(examId: number, input: EntryActionInput & {
     motivo: RejectionReason; observacion?: string
-  }): Promise<void> {
-    await apiPost(`${base(examId)}/rechazar-ingreso`, input)
+  }): Promise<{ id_intento: number }> {
+    const response = await apiPost<DataResponse<{ id_intento: number }>>(`${base(examId)}/rechazar-ingreso`, input)
+    return response.data
   },
 }
 
 export function isFullStatus(value: StatusResponse): value is EntryStatus {
-  return !('sin_cambios' in value)
+  return 'ingresados' in value
+}
+
+export function isPendingStatus(value: StatusResponse): value is PendingEntryStatus {
+  return 'estado' in value && value.estado === 'PROGRAMADO'
 }
