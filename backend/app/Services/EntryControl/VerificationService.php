@@ -49,7 +49,7 @@ class VerificationService
                 return $result;
             }
 
-            $result['motivo'] = 'No se encontró al estudiante.';
+            $result['motivo'] = 'Estudiante no encontrado';
             return $result;
         }
 
@@ -78,7 +78,7 @@ class VerificationService
                 ],
             ];
 
-            return $this->deny($result, 'NO_PERTENECE', 'No figura en los grupos de este examen.');
+            return $this->deny($result, 'NO_PERTENECE', 'No pertenece a los grupos de este examen');
         }
 
         if ($record['estado_habilitacion'] === 'NO_HABILITADO') {
@@ -91,12 +91,17 @@ class VerificationService
             return $this->deny(
                 $result,
                 'CI_NO_COINCIDE',
-                'El CI presentado no coincide con el registrado para este estudiante.'
+                'El CI no coincide con el registrado'
             );
         }
 
         if ($record['ingreso_previo'] !== null) {
-            return $this->deny($result, 'DUPLICADO', 'El estudiante ya registró su ingreso a este examen.');
+            return $this->deny(
+                $result,
+                'DUPLICADO',
+                'Ya ingresó a las ' . substr((string) $record['ingreso_previo']['hora_ingreso'], 0, 5)
+                    . ' por el ' . $record['ingreso_previo']['nro_aula']
+            );
         }
 
         if ($record['ambiente_asignado'] === null) {
@@ -107,7 +112,7 @@ class VerificationService
             return $this->deny(
                 $result,
                 'AULA_INCORRECTA',
-                'Debe dirigirse al ambiente ' . $record['ambiente_asignado']['nro_aula'] . '.'
+                'Corresponde al ambiente ' . $record['ambiente_asignado']['nro_aula']
             );
         }
 
