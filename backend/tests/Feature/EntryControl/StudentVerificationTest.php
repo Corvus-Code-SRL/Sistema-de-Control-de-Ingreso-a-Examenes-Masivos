@@ -231,6 +231,7 @@ class StudentVerificationTest extends TestCase
         $this->postJson($this->url('verificar'), $this->input(['cod_sis' => '199912543', 'ci' => '9999999']))
             ->assertOk()
             ->assertJsonPath('data.veredicto', 'NO_PERTENECE')
+            ->assertJsonPath('data.motivo', 'No pertenece a los grupos de este examen')
             ->assertJsonPath('data.estudiante.id_estudiante', $outsideId)
             ->assertJsonPath('data.estudiante.nombre_completo', 'María Fuera Nómina')
             ->assertJsonPath('data.estudiante.ci', '0012345')
@@ -419,6 +420,7 @@ class StudentVerificationTest extends TestCase
         $this->postJson($this->url('verificar'), $this->input(['ci' => '999999999']))
             ->assertOk()
             ->assertJsonPath('data.veredicto', 'CI_NO_COINCIDE')
+            ->assertJsonPath('data.motivo', 'El CI no coincide con el registrado')
             ->assertJsonPath('data.autorizado', false)
             ->assertJsonPath('data.estudiante.ci', $originalCi);
 
@@ -572,6 +574,7 @@ class StudentVerificationTest extends TestCase
             'id_ambiente' => $this->aulaId,
         ])->assertOk()
             ->assertJsonPath('data.veredicto', 'NO_ENCONTRADO')
+            ->assertJsonPath('data.motivo', 'Estudiante no encontrado')
             ->assertJsonPath('data.estudiante', null);
 
         $this->assertDatabaseHas('intento_ingreso', [
@@ -633,6 +636,7 @@ class StudentVerificationTest extends TestCase
         $this->postJson($this->url('verificar'), $this->input(['id_ambiente' => $this->otraAulaId]))
             ->assertOk()
             ->assertJsonPath('data.veredicto', 'AULA_INCORRECTA')
+            ->assertJsonPath('data.motivo', 'Corresponde al ambiente 691A')
             ->assertJsonPath('data.ambiente_asignado.id_ambiente', $this->aulaId);
     }
 
@@ -669,6 +673,17 @@ class StudentVerificationTest extends TestCase
         $this->assertSame(1, $after['pendientes']);
         $this->assertNotSame($before['version'], $after['version']);
         $this->assertCount(1, $after['ultimos_ingresos']);
+
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.veredicto', 'DUPLICADO')
+            ->assertJsonPath(
+                'data.motivo',
+                'Ya ingresó a las ' . substr((string) DB::table('examen_estudiante')
+                    ->where('id_examen', $this->exam->id_examen)
+                    ->where('id_estudiante', $this->student->id_estudiante)
+                    ->value('hora_ingreso'), 0, 5) . ' por el 691A'
+            );
 
         $this->postJson($this->url('confirmar-ingreso'), $input)
             ->assertStatus(409)
