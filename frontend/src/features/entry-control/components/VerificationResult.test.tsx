@@ -37,7 +37,7 @@ describe('VerificationResult fotografía', () => {
   it('muestra las iniciales cuando el estudiante no tiene foto', () => {
     renderResult(null)
     expect(screen.getByText('AA')).toBeInTheDocument()
-    expect(screen.queryByText('Sin fotografía')).not.toBeInTheDocument()
+    expect(screen.getByText('Sin fotografía')).toBeInTheDocument()
     expect(screen.getByText('No ingresado')).toBeInTheDocument()
     expect(screen.getByText('Aula 691A')).toBeInTheDocument()
     expect(screen.queryByRole('img', { name: /Fotografía de/ })).not.toBeInTheDocument()
@@ -56,7 +56,7 @@ describe('VerificationResult fotografía', () => {
     mockImage(0)
     renderResult('https://minio.example.invalid/estudiantes/9501.webp')
     expect(await screen.findByText('AA')).toBeInTheDocument()
-    expect(screen.queryByText('Sin fotografía')).not.toBeInTheDocument()
+    expect(await screen.findByText('Sin fotografía')).toBeInTheDocument()
   })
 })
 
@@ -74,12 +74,12 @@ describe('VerificationResult CI', () => {
 
   it('muestra CI no coincide y no ofrece aceptar el ingreso', () => {
     render(<VerificationResult
-      result={{ ...result, veredicto: 'CI_NO_COINCIDE', motivo: 'El CI presentado no coincide.', autorizado: false }}
+      result={{ ...result, veredicto: 'CI_NO_COINCIDE', motivo: 'El CI no coincide con el registrado', autorizado: false }}
       presentedCi="1234567" busy={false} onConfirm={() => {}} onReject={() => {}} onNext={() => {}}
     />)
 
     expect(screen.getByRole('heading', { name: 'CI NO COINCIDE' })).toBeInTheDocument()
-    expect(screen.getByText('El CI presentado no coincide.')).toBeInTheDocument()
+    expect(screen.getByText('El CI no coincide con el registrado')).toBeInTheDocument()
     expect(screen.getByText('CI').nextElementSibling).toHaveTextContent('1234567 · registrado: 7100001')
     expect(screen.queryByRole('button', { name: 'Aceptar ingreso' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Siguiente estudiante' })).toBeInTheDocument()
@@ -116,7 +116,7 @@ describe('VerificationResult inscripción y riesgo', () => {
         veredicto: 'NO_PERTENECE',
         autorizado: false,
         grupo: null,
-        motivo: 'No figura en los grupos de este examen.',
+        motivo: 'No pertenece a los grupos de este examen',
         antecedentes: {
           total: 1,
           latest: { tipo_falta: 'Suplantación', fecha_registro: '2026-10-13' },

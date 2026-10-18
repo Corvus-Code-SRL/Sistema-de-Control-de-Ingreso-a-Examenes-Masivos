@@ -40,6 +40,7 @@ function StudentPhoto({ student }: { student: EntryStudent }) {
       />}
       <AvatarFallback className="rounded-lg bg-brand-soft text-lg font-semibold text-brand-deep">{initials}</AvatarFallback>
     </Avatar>
+    {(!student.foto_url || imageFailed) && <span className="text-xs text-muted-foreground">Sin fotografía</span>}
   </div>
 }
 
