@@ -56,8 +56,7 @@ class ExamService
 
         $pairs = $this->subjectCatalog->listSubjectCareers($teacherId)['pairs']
             ->filter(function ($pair) {
-                return (int) $pair -> cantidad_grupos > 0
-                    && $pair->estado === RecordStatus::ACTIVE
+                return $pair->estado === RecordStatus::ACTIVE
                     && $pair->subject->estado === RecordStatus::ACTIVE;
             })
             ->values();
