@@ -9,6 +9,9 @@ class StudentVerificationResource extends JsonResource
     public function toArray($request): array
     {
         return [
+            'id_intento' => $this['id_intento'] ?? null,
+            'registrado_en' => $this['registrado_en'] ?? null,
+            'reportado' => false,
             'veredicto' => $this['veredicto'],
             'motivo' => $this['motivo'],
             'autorizado' => $this['autorizado'],

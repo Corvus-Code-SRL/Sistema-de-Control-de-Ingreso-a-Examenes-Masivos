@@ -45,6 +45,52 @@ class StudentVerificationTest extends TestCase
         $this->actingAs(User::query()->findOrFail($this->docenteId));
     }
 
+    public function testDeniedVerificationReturnsPersistedAttemptId(): void
+    {
+        $response = $this->postJson($this->url('verificar'), $this->input(['cod_sis' => '999999999']))
+            ->assertOk()->assertJsonPath('data.autorizado', false);
+        $attemptId = $response->json('data.id_intento');
+        $this->assertIsInt($attemptId);
+        $this->assertDatabaseHas('intento_ingreso', [
+            'id_intento' => $attemptId,
+            'id_examen' => $this->exam->id_examen,
+            'id_estudiante' => null,
+        ]);
+    }
+
+    public function testAutomaticRejectionsReturnPersistedIdsAndTimes(): void
+    {
+        foreach ([
+            ['CI_NO_COINCIDE', $this->input(['ci' => '9999999999'])],
+            ['AULA_INCORRECTA', $this->input(['id_ambiente' => $this->otraAulaId])],
+        ] as [$verdict, $input]) {
+            $response = $this->postJson($this->url('verificar'), $input)
+                ->assertOk()->assertJsonPath('data.veredicto', $verdict);
+            $this->assertAttemptMatchesResponse($response->json('data'));
+        }
+
+        $this->postJson($this->url('confirmar-ingreso'), [
+            'id_estudiante' => $this->student->id_estudiante,
+            'id_ambiente' => $this->aulaId,
+        ])->assertCreated();
+        $response = $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()->assertJsonPath('data.veredicto', 'DUPLICADO');
+        $this->assertAttemptMatchesResponse($response->json('data'));
+    }
+
+    private function assertAttemptMatchesResponse(array $data): void
+    {
+        $this->assertIsInt($data['id_intento']);
+        $attempt = DB::table('intento_ingreso')->where('id_intento', $data['id_intento'])->first();
+        $this->assertNotNull($attempt);
+        $this->assertSame((int) $this->student->id_estudiante, (int) $attempt->id_estudiante);
+        $this->assertSame($data['veredicto'], $attempt->motivo);
+        $this->assertSame(
+            Carbon::parse($attempt->registrado_en)->getTimestamp(),
+            Carbon::parse($data['registrado_en'])->getTimestamp()
+        );
+    }
+
     private function rebuildSnapshot(): void
     {
         app(RoomAssignmentService::class)->prepare($this->exam->id_examen);
@@ -100,6 +146,7 @@ class StudentVerificationTest extends TestCase
             'id_ambiente' => $this->aulaId,
         ])->assertOk()
             ->assertJsonPath('data.veredicto', 'AUXILIAR_EXAMEN')
+            ->assertJsonPath('data.id_intento', null)
             ->assertJsonPath('data.autorizado', false)
             ->assertJsonPath('data.estudiante', null)
             ->assertJsonPath('data.auxiliar.cod_sis', $assistant->cod_sis)

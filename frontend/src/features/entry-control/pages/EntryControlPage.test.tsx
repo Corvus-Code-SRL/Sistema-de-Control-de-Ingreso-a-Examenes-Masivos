@@ -1,7 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { mockApi, mockNetworkFailure } from '@/test/http'
+import { mockApi, mockApiWith, mockNetworkFailure } from '@/test/http'
 import { renderWithRouter } from '@/test/render'
 import { EntryControlPage } from './EntryControlPage'
 import type { EntryContext, Verification } from '../types/entry-control.types'
@@ -27,6 +27,8 @@ function routes(verdict: Verification = allowed, examContext = context): Paramet
     { matches: (url: string) => url.includes('/estado'), body: { data: examContext.estado === 'PROGRAMADO' ? { estado: 'PROGRAMADO', motivo_apertura: null } : status } },
     { matches: (url: string) => url.endsWith('/verificar'), body: { data: verdict } },
     { matches: (url: string) => url.endsWith('/confirmar-ingreso'), status: 201, body: { data: { creado: true } } },
+    { matches: (url: string) => url.endsWith('/tipos-falta'), body: { data: [{ id_falta: 4, nombre: 'Suplantación', descripcion: null }] } },
+    { matches: (url: string) => url.includes('/intentos?'), body: { data: [] } },
   ]
 }
 
@@ -94,7 +96,7 @@ describe('EntryControlPage', () => {
 
   it('muestra al estudiante de otro examen con sus antecedentes, sin aceptar y con reporte', async () => {
     mockApi(routes({
-      veredicto: 'NO_PERTENECE', autorizado: false, motivo: 'No pertenece a los grupos de este examen',
+      veredicto: 'NO_PERTENECE', id_intento: 77, autorizado: false, motivo: 'No pertenece a los grupos de este examen',
       estudiante: {
         id_estudiante: 77, cod_sis: '199912543', ci: '0012345', ci_pendiente: false,
         nombre_completo: 'María Fuera Nómina', carrera: null, foto_url: null,
@@ -118,8 +120,9 @@ describe('EntryControlPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reportar incidencia' }))
     const dialog = await screen.findByRole('dialog', { name: 'Reportar incidencia' })
-    expect(within(dialog).getByText('Estudiante: María Fuera Nómina')).toBeInTheDocument()
-    expect(within(dialog).getByText('Examen 7, estudiante 77, ambiente 5')).toBeInTheDocument()
+    expect(within(dialog).getByText('María Fuera Nómina')).toBeInTheDocument()
+    expect(within(dialog).getByText('691A')).toBeInTheDocument()
+    expect(within(dialog).getByRole('textbox', { name: 'Descripción' })).toBeInTheDocument()
   })
 
   it('muestra estudiante, ambiente, hora y controlador en los últimos ingresos', async () => {
@@ -381,7 +384,7 @@ describe('EntryControlPage', () => {
       { matches: (url) => url.includes('/buscar'), body: { data: [{
         id_estudiante: student.id_estudiante, cod_sis: student.cod_sis, nombre_completo: student.nombre_completo,
       }] } },
-      { matches: (url) => url.endsWith('/rechazar-ingreso'), status: 201, body: { data: { registrado: true, id_intento: 123 } } },
+      { matches: (url) => url.endsWith('/rechazar-ingreso'), status: 201, body: { data: { registrado: true, id_intento: 123, motivo: 'DECISION_CONTROLADOR' } } },
     ])
     const user = userEvent.setup()
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
@@ -398,14 +401,16 @@ describe('EntryControlPage', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Reportar incidencia' })
     expect(screen.queryByLabelText('Motivo')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Registrar intento' })).not.toBeInTheDocument()
-    expect(within(dialog).getByText('El formulario de la HU-042 todavía no está disponible. El intento de ingreso ya quedó registrado.')).toBeInTheDocument()
+    expect(within(dialog).getByRole('textbox', { name: 'Descripción' })).toBeInTheDocument()
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
-    expect(within(dialog).getByText('Estudiante: Carlos Daniel Rocha Mendoza')).toBeInTheDocument()
-    expect(within(dialog).getByText('Examen 7, estudiante 19, ambiente 5, intento 123')).toBeInTheDocument()
-    expect(screen.getByText('AUTORIZADO')).toBeInTheDocument()
-    await user.click(within(dialog).getByRole('button', { name: 'Volver al control de ingreso' }))
-    expect(screen.queryByText('INGRESO RECHAZADO')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Código SIS')).toHaveValue('')
+    expect(within(dialog).getByText('Carlos Daniel Rocha Mendoza')).toBeInTheDocument()
+    expect(within(dialog).getByText('691A')).toBeInTheDocument()
+    expect(screen.getByText('INGRESO RECHAZADO')).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.getByText('INGRESO RECHAZADO')).toBeInTheDocument()
+    expect(screen.getByLabelText('Código SIS')).toHaveValue('202309201')
+    expect(screen.queryByRole('button', { name: 'Aceptar ingreso' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reportar incidencia' })).toBeEnabled()
     const calls = vi.mocked(fetch).mock.calls
     const verifyBody = JSON.parse((calls.find(([url]) => String(url).endsWith('/verificar'))?.[1] as RequestInit).body as string)
     const rejectBody = JSON.parse((calls.find(([url]) => String(url).endsWith('/rechazar-ingreso'))?.[1] as RequestInit).body as string)
@@ -414,7 +419,7 @@ describe('EntryControlPage', () => {
   })
 
   it('abre el modal de HU-042 para un ingreso duplicado', async () => {
-    mockApi(routes({ ...allowed, veredicto: 'DUPLICADO', autorizado: false,
+    mockApi(routes({ ...allowed, veredicto: 'DUPLICADO', id_intento: 124, autorizado: false,
       motivo: 'El estudiante ya registró su ingreso.' }))
     const user = userEvent.setup()
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
@@ -425,8 +430,8 @@ describe('EntryControlPage', () => {
     await user.click(screen.getByRole('button', { name: 'Reportar incidencia' }))
     const dialog = await screen.findByRole('dialog', { name: 'Reportar incidencia' })
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
-    expect(within(dialog).getByText('Examen 7, estudiante 19, ambiente 5')).toBeInTheDocument()
-    await user.click(within(dialog).getByRole('button', { name: 'Volver al control de ingreso' }))
+    expect(within(dialog).getByText('Carlos Daniel Rocha Mendoza')).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
     expect(screen.queryByRole('dialog', { name: 'Reportar incidencia' })).not.toBeInTheDocument()
     expect(screen.getByText('INGRESO DUPLICADO')).toBeInTheDocument()
   })
@@ -631,5 +636,128 @@ describe('EntryControlPage', () => {
     await screen.findByText(/Usted controla en/)
 
     expect(screen.getAllByText('Primer parcial').length).toBeGreaterThan(0)
+  })
+})
+
+async function sendIncident(user: ReturnType<typeof userEvent.setup>) {
+  const dialog = await screen.findByRole('dialog', { name: 'Reportar incidencia' })
+  await waitFor(() => expect(within(dialog).getByRole('combobox')).toBeEnabled())
+  await user.click(within(dialog).getByRole('combobox'))
+  await user.click(screen.getByRole('option', { name: 'Suplantación' }))
+  await user.type(within(dialog).getByRole('textbox', { name: 'Descripción' }), 'La fotografía no corresponde a la persona presente.')
+  await user.click(within(dialog).getByRole('button', { name: 'Enviar a revisión' }))
+}
+
+describe('HU-042 integrada sobre HU-032', () => {
+  it.each([
+    ['NO_PERTENECE', 'sis'], ['NO_PERTENECE', 'ci'], ['CI_NO_COINCIDE', 'sis'],
+    ['AULA_INCORRECTA', 'sis'], ['DUPLICADO', 'sis'], ['NO_HABILITADO', 'sis'],
+  ])('envía el intento real de %s al verificar por %s', async (verdict, field) => {
+    const apiRoutes = routes({
+      ...allowed, veredicto: verdict, autorizado: false, id_intento: 321,
+      registrado_en: '2026-10-18T14:03:00Z',
+      motivo: verdict === 'NO_PERTENECE' ? 'No pertenece a los grupos de este examen' : 'Ingreso no autorizado.',
+      grupo: verdict === 'NO_PERTENECE' ? null : allowed.grupo,
+    })
+    const { calls } = mockApiWith((request) => {
+      if (request.url.endsWith('/intentos/321/reporte')) return {
+        status: 201, body: { data: { id_reporte_est: 100, id_intento: 321, estado: 'PENDIENTE' } },
+      }
+      return apiRoutes.find((route) => route.matches(request.url))
+    })
+    const user = userEvent.setup()
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+    await user.type(await screen.findByLabelText(field === 'sis' ? 'Código SIS' : 'Carnet de identidad (CI)'), field === 'sis' ? student.cod_sis : student.ci!)
+    await user.click(screen.getByRole('button', { name: 'Verificar estudiante' }))
+    await user.click(await screen.findByRole('button', { name: 'Reportar incidencia' }))
+    expect(screen.queryByRole('button', { name: 'Aceptar ingreso' })).not.toBeInTheDocument()
+    const dialog = screen.getByRole('dialog', { name: 'Reportar incidencia' })
+    expect(within(dialog).getByText(student.nombre_completo)).toBeInTheDocument()
+    expect(within(dialog).getByText('691A')).toBeInTheDocument()
+    expect(within(dialog).getByText(/10:03/)).toBeInTheDocument()
+    await sendIncident(user)
+    expect(await screen.findByRole('button', { name: 'Ya reportado' })).toBeDisabled()
+    const posts = calls.filter((call) => call.url.endsWith('/reporte'))
+    expect(posts).toHaveLength(1)
+    expect(posts[0].url).toMatch(/\/examenes\/7\/intentos\/321\/reporte$/)
+    expect(posts[0].body).toBeInstanceOf(FormData)
+    expect((posts[0].body as FormData).has('id_estudiante')).toBe(false)
+    expect(calls.some((call) => call.url.endsWith('/rechazar-ingreso'))).toBe(false)
+  })
+
+  it('conserva el rechazo al cancelar y muestra Ya reportado también en la pestaña', async () => {
+    let reported = false
+    const apiRoutes = routes()
+    const { calls } = mockApiWith((request) => {
+      if (request.url.endsWith('/rechazar-ingreso')) return { status: 201, body: { data: {
+        registrado: true, id_intento: 30, motivo: 'DECISION_CONTROLADOR', registrado_en: '2026-10-18T14:00:00Z',
+      } } }
+      if (request.url.endsWith('/intentos/30/reporte')) {
+        reported = true
+        return { status: 201, body: { data: { id_reporte_est: 100, id_intento: 30, estado: 'PENDIENTE' } } }
+      }
+      if (request.url.includes('/intentos?')) return { body: { data: [{
+        id_intento: 30, estudiante: student, ambiente: { id_ambiente: 5, nro_aula: '691A' },
+        motivo: 'DECISION_CONTROLADOR', observacion: null, registrado_en: '2026-10-18T14:00:00Z', reportado: reported,
+      }] } }
+      return apiRoutes.find((route) => route.matches(request.url))
+    })
+    const user = userEvent.setup()
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+    await user.type(await screen.findByLabelText('Código SIS'), student.cod_sis)
+    await user.click(screen.getByRole('button', { name: 'Verificar estudiante' }))
+    await user.click(await screen.findByRole('button', { name: 'Rechazar' }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.getByText('INGRESO RECHAZADO')).toBeInTheDocument()
+    expect(screen.getByLabelText('Código SIS')).toHaveValue(student.cod_sis)
+    expect(screen.queryByRole('button', { name: 'Aceptar ingreso' })).not.toBeInTheDocument()
+    expect(calls.some((call) => call.url.endsWith('/reporte'))).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Reportar incidencia' }))
+    await sendIncident(user)
+    expect(await screen.findByRole('button', { name: 'Ya reportado' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Siguiente estudiante' }))
+    expect(screen.getByLabelText('Código SIS')).toHaveValue('')
+    expect(await screen.findByRole('button', { name: 'Ya reportado' })).toBeDisabled()
+    expect(screen.getByRole('tab', { name: /Rechazos/ })).toHaveAttribute('aria-selected', 'true')
+    expect(calls.filter((call) => call.url.endsWith('/rechazar-ingreso'))).toHaveLength(1)
+    expect(calls.filter((call) => call.url.endsWith('/reporte'))).toHaveLength(1)
+  })
+
+  it('usa el intento de la nueva verificación si confirmar devuelve 409', async () => {
+    let verifyCount = 0
+    const apiRoutes = routes()
+    const { calls } = mockApiWith((request) => {
+      if (request.url.endsWith('/verificar')) {
+        verifyCount += 1
+        return { body: { data: verifyCount === 1 ? allowed : {
+          ...allowed, autorizado: false, veredicto: 'DUPLICADO', id_intento: 444,
+        } } }
+      }
+      if (request.url.endsWith('/confirmar-ingreso')) return { status: 409, body: { mensaje: 'El ingreso ya fue registrado.' } }
+      if (request.url.endsWith('/intentos/444/reporte')) return { status: 201, body: {
+        data: { id_reporte_est: 101, id_intento: 444, estado: 'PENDIENTE' },
+      } }
+      return apiRoutes.find((route) => route.matches(request.url))
+    })
+    const user = userEvent.setup()
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+    await user.type(await screen.findByLabelText('Código SIS'), student.cod_sis)
+    await user.click(screen.getByRole('button', { name: 'Verificar estudiante' }))
+    await user.click(await screen.findByRole('button', { name: 'Aceptar ingreso' }))
+    await user.click(await screen.findByRole('button', { name: 'Reportar incidencia' }))
+    await sendIncident(user)
+    expect(await screen.findByRole('button', { name: 'Ya reportado' })).toBeDisabled()
+    expect(calls.filter((call) => call.url.endsWith('/intentos/444/reporte'))).toHaveLength(1)
+  })
+
+  it('no abre un reporte sin intento persistido ni para una persona desconocida', async () => {
+    mockApi(routes({ ...allowed, veredicto: 'NO_ENCONTRADO', autorizado: false, estudiante: null, id_intento: 555 }))
+    const user = userEvent.setup()
+    renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
+    await user.type(await screen.findByLabelText('Código SIS'), '999999999')
+    await user.click(screen.getByRole('button', { name: 'Verificar estudiante' }))
+    await screen.findByRole('button', { name: 'Siguiente estudiante' })
+    expect(screen.queryByRole('button', { name: 'Reportar incidencia' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

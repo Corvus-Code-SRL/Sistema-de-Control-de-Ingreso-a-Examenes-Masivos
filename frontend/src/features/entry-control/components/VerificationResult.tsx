@@ -11,13 +11,14 @@ interface Props {
   onReject: () => void
   onNext: () => void
   onReport?: () => void
+  reported?: boolean
   presentedCi?: string
   subjectName?: string | null
 }
 
 function verdictLabel(value: string): string {
   const labels: Record<string, string> = {
-    AUTORIZADO: 'AUTORIZADO', AUXILIAR_EXAMEN: 'AUXILIAR DEL EXAMEN', NO_ENCONTRADO: 'NO AUTORIZADO',
+    RECHAZADO_MANUAL: 'INGRESO RECHAZADO', AUTORIZADO: 'AUTORIZADO', AUXILIAR_EXAMEN: 'AUXILIAR DEL EXAMEN', NO_ENCONTRADO: 'NO AUTORIZADO',
     NO_PERTENECE: 'NO AUTORIZADO',
     NO_HABILITADO: 'NO HABILITADO', CI_NO_COINCIDE: 'CI NO COINCIDE', DUPLICADO: 'INGRESO DUPLICADO',
     AULA_INCORRECTA: 'AULA INCORRECTA', AULA_NO_ASIGNADA: 'AULA NO ASIGNADA',
@@ -83,7 +84,7 @@ function AssistantDetails({ result }: { result: Verification }) {
   </div>
 }
 
-export function VerificationResult({ result, busy, onConfirm, onReject, onNext, onReport, presentedCi, subjectName }: Props) {
+export function VerificationResult({ result, busy, onConfirm, onReject, onNext, onReport, reported = false, presentedCi, subjectName }: Props) {
   const allowed = result.autorizado
   const isAssistant = result.veredicto === 'AUXILIAR_EXAMEN' && result.auxiliar != null
   const canReport = !allowed && result.estudiante != null && result.veredicto !== 'AULA_NO_ASIGNADA'
@@ -105,7 +106,7 @@ export function VerificationResult({ result, busy, onConfirm, onReject, onNext, 
     {allowed && <p className="flex items-center gap-2 text-sm text-ok-fg"><AlertTriangle className="size-4" />Compare el nombre y el código SIS con la documentación disponible antes de decidir.</p>}
     <div className="flex flex-col gap-2 sm:flex-row">
       {allowed ? <><Button type="button" variant="outline" className="h-11 flex-1 border-danger/40 text-danger-fg hover:bg-danger-soft" disabled={busy} onClick={onReject}>Rechazar</Button><Button type="button" className="h-11 flex-1" disabled={busy} onClick={onConfirm}>{busy ? 'Registrando…' : 'Aceptar ingreso'}</Button></> : <>
-        {canReport && onReport && <Button type="button" variant="outline" className="h-11 flex-1 border-danger/40 text-danger-fg hover:bg-danger-soft" disabled={busy} onClick={onReport}><Flag className="size-4" />Reportar incidencia</Button>}
+        {canReport && onReport && <Button type="button" variant="outline" className="h-11 flex-1 border-danger/40 text-danger-fg hover:bg-danger-soft" disabled={busy || reported} onClick={onReport}><Flag className="size-4" />{reported ? 'Ya reportado' : 'Reportar incidencia'}</Button>}
         <Button type="button" variant="outline" className="h-11 flex-1" onClick={onNext}><RotateCcw className="size-4" />{isAssistant ? 'Nueva verificación' : 'Siguiente estudiante'}</Button>
       </>}
     </div>
