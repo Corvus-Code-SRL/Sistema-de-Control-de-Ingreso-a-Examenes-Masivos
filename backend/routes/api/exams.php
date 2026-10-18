@@ -42,22 +42,22 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
         ->name('cancelar');
 
     Route::post('/{exam}/finalizar', [ExamController::class, 'finish'])
-         ->whereNumber('exam')
-         ->name('finalizar');
+        ->where('exam', '[0-9]{1,9}')
+        ->name('finalizar');
 
     Route::post('/{exam}/grupos', [ExamGroupController::class, 'store'])
-         ->whereNumber('exam')
-         ->name('grupos.store');
+        ->where('exam', '[0-9]{1,9}')
+        ->name('grupos.store');
 
-    // HU-09 — {user} es el id_usuario (uuid) del auxiliar habilitado.
+     // HU-09 — {user} es el id_usuario (uuid) del auxiliar habilitado.
     Route::get('/{exam}/auxiliares', [AssistantClassroomController::class, 'index'])
-         ->whereNumber('exam')
-         ->name('auxiliares.index');
+        ->where('exam', '[0-9]{1,9}')
+        ->name('auxiliares.index');
 
     Route::put('/{exam}/auxiliares/{user}/ambiente', [AssistantClassroomController::class, 'update'])
-         ->whereNumber('exam')
-         ->whereUuid('user')
-         ->name('auxiliares.ambiente');
+        ->where('exam', '[0-9]{1,9}')
+        ->whereUuid('user')
+        ->name('auxiliares.ambiente');
 });
 
 // HU-029 — exámenes que incluyen un grupo propio (pestaña Exámenes del curso). El id se valida

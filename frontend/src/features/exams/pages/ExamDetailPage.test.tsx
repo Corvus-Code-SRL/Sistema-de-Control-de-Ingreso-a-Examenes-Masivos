@@ -81,4 +81,38 @@ describe('ExamDetailPage: texto de solo lectura (HU-024)', () => {
     expect(await screen.findByRole('button', { name: /guardar información general/i })).toBeInTheDocument()
     expect(screen.queryByText(/quedaron fijos/i)).not.toBeInTheDocument()
   })
+
+  it('muestra las acciones de auxiliares y ambientes cuando está PROGRAMADO', async () => {
+    mockExam('PROGRAMADO')
+    await renderDetail()
+
+    expect(
+      screen.getByRole('button', { name: /habilitar auxiliares/i })
+    ).toBeInTheDocument()
+
+    expect(
+      screen.getByRole('button', { name: /asignar ambientes/i })
+    ).toBeInTheDocument()
+  })
+
+  it.each([
+    'EN_INGRESO',
+    'EN_CURSO',
+    'FINALIZADO',
+    'CANCELADO',
+  ] as ExamStatus[])(
+    'oculta las acciones de auxiliares y ambientes cuando está %s',
+    async (estado) => {
+      mockExam(estado)
+      await renderDetail()
+
+      expect(
+        screen.queryByRole('button', { name: /habilitar auxiliares/i })
+      ).not.toBeInTheDocument()
+
+      expect(
+        screen.queryByRole('button', { name: /asignar ambientes/i })
+      ).not.toBeInTheDocument()
+    }
+  )
 })

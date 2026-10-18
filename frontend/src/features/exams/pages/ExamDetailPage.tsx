@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { AlertTriangle, Ban, DoorOpen, Loader2, Save, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, Ban, DoorOpen, Loader2, Save, ShieldAlert, Users, Building2, } from 'lucide-react';
 import { useExamDetail } from '../hooks/useExamDetail';
 import { ExamForm } from '../components/ExamForm';
 import { AssignGroupsForm } from '../components/AssignGroupsForm';
@@ -110,17 +110,41 @@ export function ExamDetailPage() {
         actions={
           exam && (
             isProgramado ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowCancelDialog(true)}
-                className="border-danger/30 text-danger hover:bg-danger-soft"
-              >
-                <Ban className="size-4" aria-hidden="true" /> Cancelar examen
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate('/mis-auxiliares')}
+                >
+                  <Users className="size-4" aria-hidden="true" />
+                  Habilitar auxiliares
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    document
+                      .getElementById('gestion-auxiliares-ambientes')
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }
+                >
+                  <Building2 className="size-4" aria-hidden="true" />
+                  Asignar ambientes
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowCancelDialog(true)}
+                  className="border-danger/30 text-danger hover:bg-danger-soft"
+                >
+                  <Ban className="size-4" aria-hidden="true" />
+                  Cancelar examen
+                </Button>
+              </div>
             ) : exam.estado === 'EN_INGRESO' ? (
               <Button onClick={() => navigate(`/examenes/${id}/control-ingreso`)}>
-                <DoorOpen className="size-4" /> Controlar ingreso
+                <DoorOpen className="size-4" />
+                Controlar ingreso
               </Button>
             ) : null
           )
@@ -251,7 +275,16 @@ export function ExamDetailPage() {
             </div>
           )}
 
-          <AssistantClassroomSection key={assistantSectionKey(exam)} examId={exam.id_examen} />
+          <section
+            id="gestion-auxiliares-ambientes"
+            className="scroll-mt-24"
+            aria-label="Gestión de auxiliares y ambientes"
+          >
+            <AssistantClassroomSection
+              key={assistantSectionKey(exam)}
+              examId={exam.id_examen}
+            />
+          </section>
         </div>
       )}
 
