@@ -45,7 +45,7 @@ async function renderDetail() {
   })
 
   await screen.findByRole('heading', {
-    name: /información general/i,
+    name: /datos del examen/i,
   })
 }
 
@@ -86,7 +86,7 @@ describe('ExamDetailPage: texto de solo lectura (HU-024)', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: /información general/i,
+        name: /datos del examen/i,
       })
     ).toBeInTheDocument()
 
@@ -172,6 +172,35 @@ describe('ExamDetailPage: texto de solo lectura (HU-024)', () => {
       within(section).getByRole('button', {
         name: /asignar ambientes/i,
       })
+    ).toBeInTheDocument()
+  })
+
+  it('muestra los datos del examen en una tarjeta', async () => {
+    mockExam('PROGRAMADO')
+    await renderDetail()
+
+    const section = screen.getByRole('region', {
+      name: /datos del examen/i,
+    })
+
+    expect(
+      within(section).getByText(/MAT-102/)
+    ).toBeInTheDocument()
+
+    expect(
+      within(section).getByText(/20\/10\/2026/)
+    ).toBeInTheDocument()
+
+    expect(
+      within(section).getByText(/Aula 691A \(40\)/)
+    ).toBeInTheDocument()
+
+    expect(
+      within(section).getByText(/40 lugares/)
+    ).toBeInTheDocument()
+
+    expect(
+      within(section).getByText(/sin grupos asignados/i)
     ).toBeInTheDocument()
   })
 })
