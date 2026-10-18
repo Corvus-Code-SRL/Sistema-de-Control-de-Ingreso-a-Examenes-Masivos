@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\DB;
  * (ServicesDoNotResolveCurrentUserTest). La autorización por dueño del examen se
  * aplica aquí con assertOwnedBy, igual que ExamService.
  */
-class IncidentReportService
+class IncidentReviewService
 {
     private AuditLogService $auditLog;
 

@@ -6,9 +6,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Fila de la lista de incidencias. No incluye descripción, evidencia, intento ni
- * revisor: el detalle vive en IncidentReportDetailResource.
+ * revisor: el detalle vive en IncidentReviewDetailResource.
  */
-class IncidentReportResource extends JsonResource
+class IncidentReviewResource extends JsonResource
 {
     public function toArray($request): array
     {

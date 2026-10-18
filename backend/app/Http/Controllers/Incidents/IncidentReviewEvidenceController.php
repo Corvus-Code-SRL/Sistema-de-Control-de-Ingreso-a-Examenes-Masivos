@@ -4,19 +4,19 @@ namespace App\Http\Controllers\Incidents;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Incidents\ShowIncidentReportRequest;
-use App\Services\Incidents\IncidentReportService;
+use App\Services\Incidents\IncidentReviewService;
 use App\Support\CurrentUser;
 use App\Support\Storage\EvidenceStorage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /** Entrega la evidencia de una incidencia solo al docente dueño del examen. */
-class IncidentReportEvidenceController extends Controller
+class IncidentReviewEvidenceController extends Controller
 {
-    private IncidentReportService $incidents;
+    private IncidentReviewService $incidents;
 
     private EvidenceStorage $storage;
 
-    public function __construct(IncidentReportService $incidents, EvidenceStorage $storage)
+    public function __construct(IncidentReviewService $incidents, EvidenceStorage $storage)
     {
         $this->incidents = $incidents;
         $this->storage   = $storage;
