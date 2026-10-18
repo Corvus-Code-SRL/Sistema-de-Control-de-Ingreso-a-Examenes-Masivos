@@ -3,9 +3,9 @@
 --   * examen.minutos_apertura (0 a 30, por defecto 10): minutos previos a la hora de inicio
 --     en que abre el control de ingreso.
 --   * Trigger que solo permite pasar a CANCELADO desde PROGRAMADO.
---   * Tablas grupo_auxiliar y examen_auxiliar (HU-008, HU-009). examen_auxiliar.id_ambiente
+--   * Tablas grupo_auxiliar y examen_auxiliar (HU-08, HU-09). examen_auxiliar.id_ambiente
 --     queda atado a los ambientes del propio examen.
---   * Ya incorporados en V4 tras la HU-021 y la HU-024: estudiante.ci admite NULL y examen
+--   * Ya incorporados en V4 tras la HU-21 y la HU-24: estudiante.ci admite NULL y examen
 --     tiene id_usuario_docente, id_carrera, id_materia y estado (public.estado_examen).
 --   * periodo.gestion es smallint entre 1900 y 2200.
 -- Versión 4 (public). Cambios respecto de V3:
@@ -57,7 +57,7 @@ CREATE TYPE public.categoria_examen AS ENUM (
 	'ADMISION'
 );
 
--- Ciclo de vida del examen (HU-024). Solo PROGRAMADO y CANCELADO se alcanzan hoy;
+-- Ciclo de vida del examen (HU-24). Solo PROGRAMADO y CANCELADO se alcanzan hoy;
 -- EN_INGRESO, EN_CURSO y FINALIZADO los asignan las historias de control de ingreso.
 CREATE TYPE public.estado_examen AS ENUM (
     'PROGRAMADO',
@@ -945,7 +945,7 @@ CREATE TABLE public.grupo_estudiante (
 -- grupo_auxiliar
 ---------------------------------------------------
 
--- Auxiliares que el docente incorpora a sus grupos (HU-008).
+-- Auxiliares que el docente incorpora a sus grupos (HU-08).
 CREATE TABLE public.grupo_auxiliar (
     id_grupo             integer NOT NULL,
     id_usuario           uuid NOT NULL,
@@ -1034,8 +1034,8 @@ CREATE TABLE public.examen_estudiante (
 -- examen_auxiliar
 ---------------------------------------------------
 
--- Auxiliares habilitados para un examen: es lo que les permite registrar ingresos ese día (HU-008).
--- id_ambiente lo asigna la HU-009, por eso admite NULL hasta entonces. Con la clave compuesta
+-- Auxiliares habilitados para un examen: es lo que les permite registrar ingresos ese día (HU-08).
+-- id_ambiente lo asigna la HU-09, por eso admite NULL hasta entonces. Con la clave compuesta
 -- hacia examen_ambiente, el ambiente asignado siempre es uno de los del propio examen
 -- (una clave foránea con algún componente NULL no se verifica).
 CREATE TABLE public.examen_auxiliar (
@@ -1700,13 +1700,7 @@ UPDATE public.periodo SET nombre = 'Semestre 1' WHERE codigo = 1;
 UPDATE public.periodo SET nombre = 'Semestre 2' WHERE codigo = 2;
 
 --
--- Versión 10: fotografía opcional del estudiante (HU-032)
---             (2026_10_13_000001_add_foto_url_to_estudiante)
-
-ALTER TABLE public.estudiante ADD COLUMN foto_url text;
-
---
--- Versión 11: base de la Central de Riesgo de estudiantes (2026_10_15_000000_prepare_risk_center_foundation)
+-- Versión 10: base de la Central de Riesgo de estudiantes (2026_10_15_000000_prepare_risk_center_foundation)
 --   * reporte_estudiante.id_intento vincula el reporte con el intento de ingreso que lo originó
 --     (UNIQUE: un intento origina como máximo un reporte; varios NULL sí se admiten).
 --   * La evidencia pasa a ser opcional, pero completa o ausente: no puede haber una URL sin public_id.
@@ -1726,3 +1720,9 @@ ALTER TABLE public.reporte_estudiante
         REFERENCES public.intento_ingreso(id_intento),
     ADD CONSTRAINT chk_reporte_estudiante_evidencia
         CHECK ((evidencia_url IS NULL) = (evidencia_public_id IS NULL));
+
+--
+-- Versión 11: fotografía opcional del estudiante (HU-032)
+--             (2026_10_13_000001_add_foto_url_to_estudiante)
+
+ALTER TABLE public.estudiante ADD COLUMN foto_url text;
