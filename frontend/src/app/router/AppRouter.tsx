@@ -64,7 +64,6 @@ function DocenteRoutes() {
         path="/examenes/programados"
         element={guarded('examenes.gestionar', <ExamsPage />)}
       />
-      <Route path="/examenes/:examId" element={guarded('examenes.gestionar', <ExamDetailPage />)} />
       <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
       <Route
         path="/examenes/:examId/control-ingreso"
