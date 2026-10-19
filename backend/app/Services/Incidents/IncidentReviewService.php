@@ -5,6 +5,7 @@ namespace App\Services\Incidents;
 use App\Exceptions\Incidents\IncidentAlreadyReviewedException;
 use App\Exceptions\Incidents\IncidentOwnershipException;
 use App\Exceptions\Incidents\IncidentReportNotFoundException;
+use App\Models\Action;
 use App\Models\RiskCenter;
 use App\Models\StudentReport;
 use App\Services\Security\AuditLogService;
@@ -13,7 +14,6 @@ use App\Support\Storage\EvidenceStorage;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
-use App\Models\Action;
 use LogicException;
 
 /**
@@ -389,7 +389,7 @@ class IncidentReviewService
             'tipo'         => $tipo,
             'tamano_bytes' => $desc['tamano_bytes'],
             'disponible'   => $desc['disponible'],
-            'url' => "/docente/incidencias/estudiante-{$r->id_reporte_est}/evidencia",        
+            'url' => "/docente/incidencias/estudiante-{$r->id_reporte_est}/evidencia",
         ];
     }
 
