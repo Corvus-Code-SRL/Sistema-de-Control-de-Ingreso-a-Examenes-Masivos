@@ -8,8 +8,6 @@ use Illuminate\Support\Facades\DB;
 use Tests\Concerns\AssignsIncidentRole;
 use Tests\Concerns\SeedsRiskCenterRecords;
 use Tests\TestCase;
-use App\Models\Action;
-use LogicException;
 
 class IncidentReportApproveTest extends TestCase
 {

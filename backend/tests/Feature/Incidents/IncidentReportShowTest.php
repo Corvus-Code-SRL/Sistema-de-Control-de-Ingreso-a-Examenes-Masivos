@@ -113,6 +113,6 @@ class IncidentReportShowTest extends TestCase
 
         $this->getJson("/api/docente/incidencias/estudiante-{$reporteId}")
             ->assertOk()
-        ->assertJsonPath('data.intento.motivo_legible', 'No pertenece al examen');
+            ->assertJsonPath('data.intento.motivo_legible', 'No pertenece al examen');
     }
 }
