@@ -74,21 +74,20 @@ describe('AppSidebar', () => {
     expect(screen.queryByRole('link', { name: 'Asignaciones' })).not.toBeInTheDocument()
   })
 
-  it('docente: Incidencias queda deshabilitada con su tooltip y sin número', () => {
-    renderSidebar('docente', '/materias')
+  it('docente: Incidencias es un enlace a /incidencias', () => {
+    renderSidebar('docente', '/incidencias')
 
-    const incidencias = screen.getByText('Incidencias').closest('span[aria-disabled]')
+    const incidencias = screen.getByRole('link', { name: 'Incidencias' })
 
-    expect(incidencias).toHaveAttribute('aria-disabled', 'true')
-    expect(incidencias).toHaveAttribute('title', 'Disponible en una próxima entrega')
-    expect(incidencias).toHaveTextContent(/^Incidencias$/)
+    expect(incidencias).toHaveAttribute('href', '/incidencias')
+    expect(incidencias).toHaveAttribute('aria-current', 'page')
   })
 
   it('docente: los ítems habilitados son enlaces y los pendientes no', () => {
     renderSidebar('docente', '/materias')
 
     expect(screen.getByRole('link', { name: 'Mis cursos' })).toHaveAttribute('href', '/mis-cursos')
-    expect(screen.queryByRole('link', { name: 'Incidencias' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Incidencias' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Historial' })).not.toBeInTheDocument()
   })
 

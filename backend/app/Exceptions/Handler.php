@@ -22,6 +22,9 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Http\Exceptions\PostTooLargeException;
 use Illuminate\Http\Request;
+use App\Exceptions\Incidents\IncidentAlreadyReviewedException;
+use App\Exceptions\Incidents\IncidentOwnershipException;
+use App\Exceptions\Incidents\IncidentReportNotFoundException;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -53,6 +56,9 @@ class Handler extends ExceptionHandler
         PasswordChangeRequiredException::class,
         SelfRoleAssignmentException::class,
         SisNoValidoException::class,
+        IncidentAlreadyReviewedException::class,
+        IncidentOwnershipException::class,
+        IncidentReportNotFoundException::class,
     ];
 
     /**

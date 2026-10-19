@@ -23,13 +23,13 @@ describe('navigationByArea', () => {
     expect(items.some((item) => 'badge' in item)).toBe(false)
   })
 
-  it('Incidencias sigue listada y deshabilitada, sin destino', () => {
+  it('Incidencias lleva a /incidencias', () => {
     const incidencias = navigationByArea.docente
       .flatMap((group) => group.items)
       .find((item) => item.label === 'Incidencias')
 
     expect(incidencias).toBeDefined()
-    expect(incidencias?.to).toBeUndefined()
+    expect(incidencias?.to).toBe('/incidencias')
   })
 
   it('el administrador tiene un encabezado Materias sin enlace con Asignaciones y Catálogo debajo', () => {

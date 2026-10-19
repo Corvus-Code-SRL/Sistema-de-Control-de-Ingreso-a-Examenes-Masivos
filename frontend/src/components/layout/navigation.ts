@@ -62,7 +62,7 @@ const navegacionDocente: NavGroup[] = [
       { label: 'Programados', icon: CalendarClock, to: '/examenes/programados' },
       { label: 'Control de ingreso', icon: DoorOpen, to: '/control-ingreso' },
       { label: 'En curso', icon: PlaySquare },
-      { label: 'Incidencias', icon: AlertTriangle },
+      { label: 'Incidencias', icon: AlertTriangle, to: '/incidencias' },
       { label: 'Historial', icon: History }
     ]
   },
