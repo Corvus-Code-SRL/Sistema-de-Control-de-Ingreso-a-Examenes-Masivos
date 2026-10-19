@@ -16,6 +16,12 @@ interface Props {
   onReported: (alreadyReported: boolean) => void
 }
 
+const dialogContentClass = [
+  'top-auto bottom-0 left-0 flex max-h-[92dvh] max-w-none translate-x-0 translate-y-0',
+  'flex-col gap-0 overflow-hidden rounded-b-none p-0',
+  'sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:max-w-xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl',
+].join(' ')
+
 /** Modal de escritorio y hoja inferior móvil para reportar un intento de ingreso. */
 export function ReportIncidentDialog({ context, onClose, onReported }: Props) {
   const fieldId = useId()
@@ -33,7 +39,7 @@ export function ReportIncidentDialog({ context, onClose, onReported }: Props) {
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !report.busy) onClose() }}>
       <DialogContent
-        className="top-auto bottom-0 left-0 flex max-h-[92dvh] max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-b-none p-0 sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:max-w-xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl"
+        className={dialogContentClass}
         showCloseButton={false}
       >
         <DialogHeader className="shrink-0 border-b p-4 text-left">
@@ -49,7 +55,11 @@ export function ReportIncidentDialog({ context, onClose, onReported }: Props) {
               <p className="text-xs font-medium text-muted-foreground">Datos del intento · no se editan</p>
               <dl className="grid grid-cols-[6rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
                 <dt className="text-muted-foreground">Estudiante</dt>
-                <dd className="font-medium"><span>{context.student.nombre_completo}</span> · <span className="sciem-tnum">{context.student.cod_sis}</span></dd>
+                <dd className="font-medium">
+                  <span>{context.student.nombre_completo}</span>
+                  {' · '}
+                  <span className="sciem-tnum">{context.student.cod_sis}</span>
+                </dd>
                 <dt className="text-muted-foreground">Examen</dt><dd>{context.examName}</dd>
                 <dt className="text-muted-foreground">Ambiente</dt>
                 <dd><span>{context.roomName}</span>{context.timeLabel && context.timeLabel !== '—' ? ` · ${context.timeLabel}` : ''}</dd>
@@ -112,13 +122,32 @@ export function ReportIncidentDialog({ context, onClose, onReported }: Props) {
                 <FileText className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{evidence.name}</p>
-                  <p className="text-xs text-muted-foreground">{(evidence.size / 1024 / 1024).toLocaleString('es-BO', { maximumFractionDigits: 2 })} MB</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(evidence.size / 1024 / 1024).toLocaleString('es-BO', { maximumFractionDigits: 2 })} MB
+                  </p>
                 </div>
-                <Button type="button" variant="ghost" size="icon-sm" disabled={report.busy} onClick={clearEvidence} aria-label="Quitar evidencia"><X className="size-4" /></Button>
-              </div> : <Button type="button" variant="outline" className="h-auto w-full justify-start border-dashed p-4 text-left" disabled={report.busy} onClick={() => fileInput.current?.click()}>
-                <Upload className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <span className="whitespace-normal">Adjunte una foto o un PDF</span>
-              </Button>}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={report.busy}
+                  onClick={clearEvidence}
+                  aria-label="Quitar evidencia"
+                >
+                  <X className="size-4" />
+                </Button>
+              </div> : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-auto w-full justify-start border-dashed p-4 text-left"
+                  disabled={report.busy}
+                  onClick={() => fileInput.current?.click()}
+                >
+                  <Upload className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <span className="whitespace-normal">Adjunte una foto o un PDF</span>
+                </Button>
+              )}
               <p id={`${fieldId}-evidence-help`} className="text-xs text-muted-foreground">JPG, PNG o PDF, hasta 5 MB.</p>
               {report.errors.evidencia && <p role="alert" className="text-sm text-danger-fg">{report.errors.evidencia}</p>}
             </div>
