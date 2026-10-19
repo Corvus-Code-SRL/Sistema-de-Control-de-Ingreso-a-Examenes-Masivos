@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Ban, Building2, DoorOpen, Pencil, Users } from 'lucide-react'
+import { Ban, DoorOpen, Pencil, Users } from 'lucide-react'
 import { ApiError } from '@/lib/api-client'
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/common/EmptyState'
