@@ -16,17 +16,17 @@ Route::get('docente/incidencias', [IncidentReviewController::class, 'index'])
     ->name('incidencias.index');
 
 Route::get('docente/incidencias/{reporte}', [IncidentReviewController::class, 'show'])
-    ->where('reporte', '^estudiante-[0-9]{1,9}$')
+    ->where('reporte', 'estudiante-[0-9]{1,9}')
     ->name('incidencias.show');
 
 Route::post('docente/incidencias/{reporte}/aprobar', [IncidentReviewController::class, 'approve'])
-    ->where('reporte', '^estudiante-[0-9]{1,9}$')
+    ->where('reporte', 'estudiante-[0-9]{1,9}')
     ->name('incidencias.aprobar');
 
 Route::post('docente/incidencias/{reporte}/rechazar', [IncidentReviewController::class, 'reject'])
-    ->where('reporte', '^estudiante-[0-9]{1,9}$')
+    ->where('reporte', 'estudiante-[0-9]{1,9}')
     ->name('incidencias.rechazar');
 
 Route::get('docente/incidencias/{reporte}/evidencia', [IncidentReviewEvidenceController::class, 'show'])
-    ->where('reporte', '^estudiante-[0-9]{1,9}$')
+    ->where('reporte', 'estudiante-[0-9]{1,9}')
     ->name('incidencias.evidencia');

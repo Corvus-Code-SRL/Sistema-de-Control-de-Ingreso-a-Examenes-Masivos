@@ -191,6 +191,10 @@ class RoutesRequireAuthenticationTest extends TestCase
         return '/' . preg_replace_callback('/\{(\w+)\??\}/', function (array $match) use ($route) {
             $pattern = $route->wheres[$match[1]] ?? '';
 
+            if (strpos($pattern, 'estudiante-') !== false) {
+                return 'estudiante-1';
+            }
+
             return strpos($pattern, '{12}') !== false
                 ? '00000000-0000-4000-8000-000000000001'
                 : '1';

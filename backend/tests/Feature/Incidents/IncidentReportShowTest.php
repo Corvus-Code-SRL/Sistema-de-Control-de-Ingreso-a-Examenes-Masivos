@@ -51,7 +51,7 @@ class IncidentReportShowTest extends TestCase
             ->assertJsonPath('data.estado', 'PENDIENTE')
             ->assertJsonPath('data.descripcion', 'Descripción del reporte de prueba.')
             ->assertJsonPath('data.intento.motivo', 'DOCUMENTO_NO_VALIDO')
-            ->assertJsonPath('data.intento.motivo_legible', 'El documento presentado no es válido.')
+            ->assertJsonPath('data.intento.motivo_legible', 'Documento no válido')
             ->assertJsonPath('data.intento.hora_intento', '09:15')
             ->assertJsonPath('data.evidencia.nombre', 'test.png')
             ->assertJsonPath('data.evidencia.tipo', 'imagen')
@@ -104,5 +104,15 @@ class IncidentReportShowTest extends TestCase
         $response = $this->getJson('/api/docente/incidencias/estudiante-abc');
 
         $response->assertNotFound();
+    }
+
+    public function test_motivo_no_pertenece_se_traduce(): void
+    {
+        $intentoId = $this->insertEntryAttempt($this->context, ['motivo' => 'NO_PERTENECE']);
+        $reporteId = $this->insertStudentReport($this->context, ['id_intento' => $intentoId]);
+
+        $this->getJson("/api/docente/incidencias/estudiante-{$reporteId}")
+            ->assertOk()
+        ->assertJsonPath('data.intento.motivo_legible', 'No pertenece al examen');
     }
 }

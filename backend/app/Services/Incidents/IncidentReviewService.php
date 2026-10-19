@@ -13,13 +13,14 @@ use App\Support\Storage\EvidenceStorage;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use App\Models\Action;
+use LogicException;
 
 /**
  * Lista, encuentra y revisa reportes de estudiante (HU-045).
  *
- * El actor entra por argumento: este servicio nunca resuelve el usuario actual
- * (ServicesDoNotResolveCurrentUserTest). La autorización por dueño del examen se
- * aplica aquí con assertOwnedBy, igual que ExamService.
+ * El actor entra por argumento. La autorización por dueño del examen se aplica
+ * aquí con assertOwnedBy, igual que ExamService.
  */
 class IncidentReviewService
 {
@@ -96,6 +97,10 @@ class IncidentReviewService
 
             $this->assertPending($report);
 
+            if (! Action::query()->where('operacion', 'APROBAR_REPORTE')->exists()) {
+                throw new LogicException('Falta la acción APROBAR_REPORTE requerida por la bitácora.');
+            }
+
             $report->update([
                 'estado'               => ReportStatus::APPROVED,
                 'fecha_revision'       => Carbon::now(),
@@ -133,6 +138,10 @@ class IncidentReviewService
             $report = $this->lockReport($teacherId, $reporte);
 
             $this->assertPending($report);
+
+            if (! Action::query()->where('operacion', 'RECHAZAR_REPORTE')->exists()) {
+                throw new LogicException('Falta la acción RECHAZAR_REPORTE requerida por la bitácora.');
+            }
 
             $report->update([
                 'estado'               => ReportStatus::REJECTED,
@@ -387,12 +396,19 @@ class IncidentReviewService
     private function motivoLegible(string $motivo): string
     {
         return match ($motivo) {
-            'DOCUMENTO_NO_VALIDO'  => 'El documento presentado no es válido.',
-            'IDENTIDAD_DUDOSA'     => 'La identidad del estudiante es dudosa.',
-            'DECISION_CONTROLADOR' => 'Decisión del controlador en la puerta.',
-            'NO_ENCONTRADO'        => 'El estudiante no figura en el sistema.',
-            'OTRO'                 => 'Otro motivo.',
-            default                => $motivo,
+            'NO_ENCONTRADO'        => 'Estudiante no encontrado',
+            'NO_PERTENECE'         => 'No pertenece al examen',
+            'NO_HABILITADO'        => 'No está habilitado para este examen',
+            'DUPLICADO'            => 'El estudiante ya registró su ingreso',
+            'AULA_INCORRECTA'      => 'El estudiante debe ingresar por otro ambiente',
+            'AULA_NO_ASIGNADA'     => 'No se pudo determinar un ambiente para el estudiante',
+            'DOCUMENTO_NO_VALIDO'  => 'Documento no válido',
+            'IDENTIDAD_DUDOSA'     => 'Identidad dudosa o posible suplantación',
+            'DECISION_CONTROLADOR' => 'Rechazo por decisión del controlador',
+            'CI_NO_COINCIDE'       => 'El CI no coincide con el registrado',
+            'AUXILIAR_EXAMEN'      => 'El SIS corresponde a un auxiliar de este examen',
+            'OTRO'                 => 'Otro motivo',
+            default                => str_replace('_', ' ', $motivo),
         };
     }
 }
