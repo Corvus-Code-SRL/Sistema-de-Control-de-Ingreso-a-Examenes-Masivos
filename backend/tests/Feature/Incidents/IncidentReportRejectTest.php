@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\DB;
 use Tests\Concerns\AssignsIncidentRole;
 use Tests\Concerns\SeedsRiskCenterRecords;
 use Tests\TestCase;
+use App\Models\Action;
+use LogicException;
 
 class IncidentReportRejectTest extends TestCase
 {
@@ -21,7 +23,7 @@ class IncidentReportRejectTest extends TestCase
     {
         parent::setUp();
         $this->seed(RoleSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);   // ← AÑADIR
+        $this->seed(\Database\Seeders\ActionSeeder::class);
 
         $this->context = $this->createReportingContext();
         $this->assignDocenteRole($this->context['id_usuario']);
@@ -119,5 +121,24 @@ class IncidentReportRejectTest extends TestCase
 
         $this->assertNotNull($log);
         $this->assertSame('reporte_estudiante', $log->tabla_afectada);
+    }
+
+    public function test_sin_accion_rechazar_report_no_actualiza_ni_audita(): void
+    {
+        DB::table('accion')->where('operacion', 'RECHAZAR_REPORTE')->delete();
+
+        $reporteId = $this->insertStudentReport($this->context);
+
+        $response = $this->postJson(
+            "/api/docente/incidencias/estudiante-{$reporteId}/rechazar",
+            ['observacion' => 'no']
+        );
+
+        $response->assertStatus(500);
+
+        $this->assertDatabaseHas('reporte_estudiante', [
+            'id_reporte_est' => $reporteId,
+            'estado' => 'PENDIENTE',
+        ]);
     }
 }

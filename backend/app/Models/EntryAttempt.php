@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use App\Models\Classroom;
 
 /**
  * Mapea public.intento_ingreso: un ingreso rechazado en el control de entrada de un examen.

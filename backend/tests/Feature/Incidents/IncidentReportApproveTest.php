@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\DB;
 use Tests\Concerns\AssignsIncidentRole;
 use Tests\Concerns\SeedsRiskCenterRecords;
 use Tests\TestCase;
+use App\Models\Action;
+use LogicException;
 
 class IncidentReportApproveTest extends TestCase
 {
@@ -21,7 +23,7 @@ class IncidentReportApproveTest extends TestCase
     {
         parent::setUp();
         $this->seed(RoleSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);   // ← AÑADIR
+        $this->seed(\Database\Seeders\ActionSeeder::class);
 
         $this->context = $this->createReportingContext();
         $this->assignDocenteRole($this->context['id_usuario']);
@@ -113,5 +115,22 @@ class IncidentReportApproveTest extends TestCase
 
         $this->assertNotNull($log);
         $this->assertSame('reporte_estudiante', $log->tabla_afectada);
+    }
+
+    public function test_sin_accion_aprobar_report_no_actualiza_ni_audita(): void
+    {
+        DB::table('accion')->where('operacion', 'APROBAR_REPORTE')->delete();
+
+        $reporteId = $this->insertStudentReport($this->context);
+
+        $response = $this->postJson("/api/docente/incidencias/estudiante-{$reporteId}/aprobar");
+
+        $response->assertStatus(500);
+
+        $this->assertDatabaseHas('reporte_estudiante', [
+            'id_reporte_est' => $reporteId,
+            'estado' => 'PENDIENTE',
+        ]);
+        $this->assertDatabaseMissing('central_riesgo', ['id_reporte_est' => $reporteId]);
     }
 }
