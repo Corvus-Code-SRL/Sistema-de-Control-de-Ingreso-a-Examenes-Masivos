@@ -267,7 +267,7 @@ class AssistantClassroomHttpTest extends TestCase
 
         $this->assertAssignedTo($examB, $this->mariaId, $this->aulaId);
     }
-    
+
     public function test_permite_ambientes_distintos_en_examenes_consecutivos(): void
     {
         // Examen A: 08:00 a 09:30, ambiente 691A.
