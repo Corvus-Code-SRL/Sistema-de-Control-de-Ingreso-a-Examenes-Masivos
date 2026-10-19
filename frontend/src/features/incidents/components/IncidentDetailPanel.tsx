@@ -50,30 +50,30 @@ export function IncidentDetailPanel({ incidentId, onReviewed, onBack }: Incident
   const incident: IncidentReview = resource.data.data
   const isPending = incident.estado === 'PENDIENTE'
 
-async function handleApprove(observacion: string | null) {
-  await approveIncident(incident.id, observacion)
-  setApproveOpen(false)
-  onReviewed({
-    title: 'Incidencia aprobada',
-    description: `${incident.persona.nombre_completo} quedó registrado en la Central de Riesgo.`,
-  })
-}
+  async function handleApprove(observacion: string | null) {
+    await approveIncident(incident.id, observacion)
+    setApproveOpen(false)
+    onReviewed({
+      title: 'Incidencia aprobada',
+      description: `${incident.persona.nombre_completo} quedó registrado en la Central de Riesgo.`,
+    })
+  }
 
-async function handleReject(observacion: string) {
-  await rejectIncident(incident.id, observacion)
-  setRejectOpen(false)
-  onReviewed({
-    title: 'Incidencia rechazada',
-    description: 'El reporte no entró a la Central de Riesgo.',
-  })
-}
+  async function handleReject(observacion: string) {
+    await rejectIncident(incident.id, observacion)
+    setRejectOpen(false)
+    onReviewed({
+      title: 'Incidencia rechazada',
+      description: 'El reporte no entró a la Central de Riesgo.',
+    })
+  }
 
   return (
     <>
       <Card className="p-0">
         <div className="flex flex-col gap-5 p-5">
           {onBack && (
-            <Button variant="ghost" size="sm" onClick={onBack} className="self-start">
+            <Button variant="ghost" size="sm" onClick={onBack} className="self-start lg:hidden">
               <ArrowLeft className="size-4" />
               Volver
             </Button>

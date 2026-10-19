@@ -92,6 +92,12 @@ describe('IncidentDetailPanel', () => {
     expect(screen.queryByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument()
   })
 
+  it('el botón Volver solo se muestra por debajo de lg', async () => {
+    renderPanel(pending)
+
+    expect(await screen.findByRole('button', { name: 'Volver' })).toHaveClass('lg:hidden')
+  })
+
   it('sin evidencia muestra el aviso', async () => {
     renderPanel(pending)
 
