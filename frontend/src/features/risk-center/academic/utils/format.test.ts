@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDate, formatDayMonthTime, formatFileSize, formatPlainDate, formatTime, initialsOf } from './format'
+import { formatDate, formatDayMonthTime, formatPlainDate, formatTime, initialsOf } from './format'
 
 describe('formatDate y formatTime (hora de La Paz)', () => {
   it('da la fecha en dd/mm/aaaa', () => {
@@ -32,16 +32,6 @@ describe('formatPlainDate', () => {
 
   it('devuelve tal cual lo que no tiene la forma esperada', () => {
     expect(formatPlainDate('sin fecha')).toBe('sin fecha')
-  })
-})
-
-describe('formatFileSize', () => {
-  it.each([
-    [512, '512 B'],
-    [2048, '2 KB'],
-    [1_258_291, '1,2 MB'],
-  ])('%i bytes → %s', (bytes, expected) => {
-    expect(formatFileSize(bytes)).toBe(expected)
   })
 })
 

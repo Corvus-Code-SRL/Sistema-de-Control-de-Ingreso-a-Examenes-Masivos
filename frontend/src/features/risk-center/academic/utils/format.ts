@@ -37,16 +37,7 @@ export function formatPlainDate(value: string): string {
   return year && month && day ? `${day}/${month}/${year}` : value
 }
 
-/** «1,2 MB», «340 KB», «512 B». */
-export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-
-  const format = (value: number) => value.toLocaleString(LOCALE, { maximumFractionDigits: 1 })
-
-  if (bytes < 1024 * 1024) return `${format(bytes / 1024)} KB`
-
-  return `${format(bytes / (1024 * 1024))} MB`
-}
+export { formatFileSize } from '@/lib/format'
 
 /**
  * Iniciales decorativas de un nombre completo: la del primer nombre y la del penúltimo término
