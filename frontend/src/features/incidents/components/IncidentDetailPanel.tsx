@@ -3,11 +3,10 @@ import { ArrowLeft, Check, FileImage, FileX, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { Toast } from '@/components/ui/toast'
 import { LoadingState } from '@/components/common/LoadingState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { useAsyncResource } from '@/hooks/useAsyncResource'
-import { formatFileSize } from '@/features/risk-center/academic/utils/format'
+import { formatFileSize } from '@/lib/format'
 import { ApproveIncidentModal } from './ApproveIncidentModal'
 import { RejectIncidentModal } from './RejectIncidentModal'
 import { IncidentStateBadge } from './IncidentStateBadge'
@@ -17,13 +16,8 @@ import type { IncidentPerson, IncidentReview } from '../types/incident.types'
 
 interface IncidentDetailPanelProps {
   incidentId: string
-  onReviewed: () => void
+  onReviewed: (message: { title: string; description: string }) => void
   onBack?: () => void
-}
-
-interface ToastState {
-  title: string
-  description: string
 }
 
 export function IncidentDetailPanel({ incidentId, onReviewed, onBack }: IncidentDetailPanelProps) {
@@ -34,7 +28,6 @@ export function IncidentDetailPanel({ incidentId, onReviewed, onBack }: Incident
 
   const [approveOpen, setApproveOpen] = useState(false)
   const [rejectOpen, setRejectOpen] = useState(false)
-  const [toast, setToast] = useState<ToastState | null>(null)
 
   if (resource.status === 'loading') {
     return (
@@ -57,25 +50,23 @@ export function IncidentDetailPanel({ incidentId, onReviewed, onBack }: Incident
   const incident: IncidentReview = resource.data.data
   const isPending = incident.estado === 'PENDIENTE'
 
-  async function handleApprove(observacion: string | null) {
-    await approveIncident(incident.id, observacion)
-    setApproveOpen(false)
-    setToast({
-      title: 'Incidencia aprobada',
-      description: `${incident.persona.nombre_completo} quedó registrado en la Central de Riesgo.`,
-    })
-    onReviewed()
-  }
+async function handleApprove(observacion: string | null) {
+  await approveIncident(incident.id, observacion)
+  setApproveOpen(false)
+  onReviewed({
+    title: 'Incidencia aprobada',
+    description: `${incident.persona.nombre_completo} quedó registrado en la Central de Riesgo.`,
+  })
+}
 
-  async function handleReject(observacion: string) {
-    await rejectIncident(incident.id, observacion)
-    setRejectOpen(false)
-    setToast({
-      title: 'Incidencia rechazada',
-      description: 'El reporte no entró a la Central de Riesgo.',
-    })
-    onReviewed()
-  }
+async function handleReject(observacion: string) {
+  await rejectIncident(incident.id, observacion)
+  setRejectOpen(false)
+  onReviewed({
+    title: 'Incidencia rechazada',
+    description: 'El reporte no entró a la Central de Riesgo.',
+  })
+}
 
   return (
     <>
@@ -90,7 +81,7 @@ export function IncidentDetailPanel({ incidentId, onReviewed, onBack }: Incident
 
           {/* Cabecera */}
           <div className="flex items-start gap-4">
-              <AvatarPersona persona={incident.persona} />
+            <AvatarPersona persona={incident.persona} />
             <div className="min-w-0 flex-1">
               <p className="sciem-h2 truncate">{incident.persona.nombre_completo}</p>
               <p className="text-sm text-muted-foreground">
@@ -212,14 +203,6 @@ export function IncidentDetailPanel({ incidentId, onReviewed, onBack }: Incident
         incident={incident}
         onConfirm={handleReject}
       />
-
-      {toast && (
-        <Toast
-          title={toast.title}
-          description={toast.description}
-          onClose={() => setToast(null)}
-        />
-      )}
     </>
   )
 }

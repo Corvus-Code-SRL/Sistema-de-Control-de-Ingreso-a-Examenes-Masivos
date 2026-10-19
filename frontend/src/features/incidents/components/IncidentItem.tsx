@@ -26,19 +26,19 @@ export function IncidentItem({ incident, isSelected, onSelect, showDecision }: I
         {initials}
       </span>
 
-    <div className="min-w-0 flex-1">
-    <p className="truncate text-sm font-semibold text-foreground">
-        {incident.persona.nombre_completo}
-    </p>
-    <p className="truncate text-xs text-muted-foreground">
-        {incident.tipo_falta.nombre}
-    </p>
-    <p className="truncate text-xs text-muted-foreground">
-        {showDecision
-        ? incident.examen.nombre_examen
-        : `Reportó ${incident.reportante.nombre_completo} (${incident.reportante.rol})`}
-    </p>
-    </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-foreground">
+          {incident.persona.nombre_completo}
+        </p>
+        <p className="truncate text-xs text-muted-foreground">
+          {incident.examen.nombre_examen} · {incident.tipo_falta.nombre}
+        </p>
+        <p className="truncate text-xs text-muted-foreground">
+          {showDecision
+            ? `Revisada · ${incident.revisor?.nombre_completo ?? ''}`
+            : `Reportó ${incident.reportante.nombre_completo} (${incident.reportante.rol})`}
+        </p>
+      </div>
 
       <div className="flex shrink-0 flex-col items-end gap-1">
         {showDecision ? (

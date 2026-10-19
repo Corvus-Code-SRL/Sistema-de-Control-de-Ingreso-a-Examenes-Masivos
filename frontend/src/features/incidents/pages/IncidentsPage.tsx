@@ -6,6 +6,7 @@ import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Card } from '@/components/ui/card'
+import { Toast } from '@/components/ui/toast'
 import { useAsyncResource } from '@/hooks/useAsyncResource'
 import { IncidentsList } from '../components/IncidentsList'
 import { IncidentDetailPanel } from '../components/IncidentDetailPanel'
@@ -22,9 +23,15 @@ const TABS: TabDefinition[] = [
   { value: 'revisada', label: 'Revisadas' },
 ]
 
+interface ToastState {
+  title: string
+  description: string
+}
+
 export function IncidentsPage() {
   const [filter, setFilter] = useState<IncidentFilter>('pendiente')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [toast, setToast] = useState<ToastState | null>(null)
 
   const resource = useAsyncResource(
     useCallback((signal) => listIncidents(filter, undefined, signal), [filter]),
@@ -33,11 +40,17 @@ export function IncidentsPage() {
 
   const incidents = resource.data?.data ?? []
   const totalPendientes = resource.data?.meta.total_pendientes ?? 0
-  const totalRevisadas  = resource.data?.meta.total_revisadas ?? 0
+  const totalRevisadas = resource.data?.meta.total_revisadas ?? 0
 
   function handleFilterChange(next: IncidentFilter) {
     setFilter(next)
     setSelectedId(null)
+  }
+
+  function handleReviewed(message: ToastState) {
+    setSelectedId(null)
+    setToast(message)
+    resource.reload()
   }
 
   const selectedIncident = useMemo<IncidentReview | null>(
@@ -70,8 +83,9 @@ export function IncidentsPage() {
         filter={filter}
         onChange={handleFilterChange}
         totalPendientes={totalPendientes}
-        totalRevisadas={totalRevisadas}          // NUEVO
+        totalRevisadas={totalRevisadas}
       />
+
       {resource.status === 'loading' && (
         <Card className="p-0">
           <LoadingState rows={4} label="Cargando incidencias" />
@@ -111,28 +125,13 @@ export function IncidentsPage() {
             filter={filter}
           />
 
-          {selectedIncident && (
-          <>
-            <div className="hidden lg:block">
-              <IncidentDetailPanel
-                incidentId={selectedIncident.id}
-                onReviewed={resource.reload}
-              />
-            </div>
-            <div className="lg:hidden">
-              <IncidentDetailPanel
-                incidentId={selectedIncident.id}
-                onReviewed={() => {
-                  setSelectedId(null)
-                  resource.reload()
-                }}
-                onBack={() => setSelectedId(null)}
-              />
-            </div>
-          </>
-        )}
-
-          {!selectedIncident && (
+          {selectedIncident ? (
+            <IncidentDetailPanel
+              incidentId={selectedIncident.id}
+              onReviewed={handleReviewed}
+              onBack={() => setSelectedId(null)}
+            />
+          ) : (
             <div className="hidden lg:flex">
               <Card className="flex w-full items-center justify-center p-12">
                 <p className="text-sm text-muted-foreground">
@@ -142,6 +141,14 @@ export function IncidentsPage() {
             </div>
           )}
         </div>
+      )}
+
+      {toast && (
+        <Toast
+          title={toast.title}
+          description={toast.description}
+          onClose={() => setToast(null)}
+        />
       )}
     </AppShell>
   )
@@ -153,7 +160,7 @@ interface TabsProps {
   filter: IncidentFilter
   onChange: (value: IncidentFilter) => void
   totalPendientes: number
-  totalRevisadas: number          // NUEVO
+  totalRevisadas: number
 }
 
 function Tabs({ filter, onChange, totalPendientes, totalRevisadas }: TabsProps) {
@@ -161,7 +168,7 @@ function Tabs({ filter, onChange, totalPendientes, totalRevisadas }: TabsProps) 
     <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-border">
       {TABS.map((tab) => {
         const isActive = tab.value === filter
-        const count = tab.value === 'pendiente' ? totalPendientes : totalRevisadas   // NUEVO
+        const count = tab.value === 'pendiente' ? totalPendientes : totalRevisadas
 
         return (
           <button
@@ -178,19 +185,14 @@ function Tabs({ filter, onChange, totalPendientes, totalRevisadas }: TabsProps) 
             {count > 0 && (
               <span
                 className={`rounded-full px-1.5 text-xs font-semibold ${
-                  isActive
-                    ? 'bg-brand-soft text-brand-deep'
-                    : 'bg-neutral-soft text-neutral-fg'
+                  isActive ? 'bg-brand-soft text-brand-deep' : 'bg-neutral-soft text-neutral-fg'
                 }`}
               >
                 {count}
               </span>
             )}
             {isActive && (
-              <span
-                aria-hidden="true"
-                className="absolute inset-x-0 -bottom-px h-0.5 bg-brand"
-              />
+              <span aria-hidden="true" className="absolute inset-x-0 -bottom-px h-0.5 bg-brand" />
             )}
           </button>
         )
