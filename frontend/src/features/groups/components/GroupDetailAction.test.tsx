@@ -10,7 +10,7 @@ describe('GroupDetailAction', () => {
 
     const link = screen.getByRole('link', { name: /ver detalles del grupo 1/i })
 
-    expect(link).toHaveAttribute('href', '/cursos/100')
+    expect(link).toHaveAttribute('href', '/grupos/100')
   })
 
   it('no ofrece el detalle de un grupo de otro docente', () => {
@@ -25,7 +25,7 @@ describe('GroupDetailAction', () => {
 
     expect(screen.getByRole('link', { name: /ver detalles del grupo 3/i })).toHaveAttribute(
       'href',
-      '/cursos/300'
+      '/grupos/300'
     )
   })
 })

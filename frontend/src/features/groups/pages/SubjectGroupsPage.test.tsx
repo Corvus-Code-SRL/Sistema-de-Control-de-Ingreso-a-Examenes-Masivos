@@ -190,7 +190,7 @@ describe('SubjectGroupsPage', () => {
 
     const action = screen.getByRole('link', { name: 'Cargar nómina' })
 
-    expect(action).toHaveAttribute('href', '/cursos/321')
+    expect(action).toHaveAttribute('href', '/grupos/321/nomina')
   })
 
   it('si el grupo no es del período activo, el aviso no ofrece cargar la nómina', async () => {

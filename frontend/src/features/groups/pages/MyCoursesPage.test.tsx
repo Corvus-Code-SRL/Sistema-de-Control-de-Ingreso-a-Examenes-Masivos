@@ -37,7 +37,7 @@ describe('MyCoursesPage', () => {
 
     expect(screen.getByRole('link', { name: /bases de datos i · grupo 1/i })).toHaveAttribute(
       'href',
-      '/cursos/100'
+      '/grupos/100'
     )
     expect(screen.getByRole('link', { name: /bases de datos i · grupo 4/i })).toBeInTheDocument()
     expect(screen.getAllByText('Ingenieria de Sistemas').length).toBeGreaterThan(0)
