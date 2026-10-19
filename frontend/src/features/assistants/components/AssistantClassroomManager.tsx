@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { AlertTriangle, Building2, Loader2, Lock, Users } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { AlertTriangle, Building2, Loader2, Lock, UserRound, Users } from 'lucide-react'
 import { LoadingState } from '@/components/common/LoadingState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,7 @@ import { AssistantClassroomRow } from './AssistantClassroomRow'
 interface AssistantClassroomManagerProps {
   examId: number
   isProgramado?: boolean
+  actions?: ReactNode
 }
 
 /**
@@ -26,7 +27,7 @@ interface AssistantClassroomManagerProps {
  * Los cambios se preparan localmente; solo se envían al pulsar «Guardar».
  * La editabilidad la determina el backend, no el navegador.
  */
-export function AssistantClassroomManager({examId, isProgramado,}: AssistantClassroomManagerProps) {
+export function AssistantClassroomManager({examId, isProgramado, actions, }: AssistantClassroomManagerProps) {
   const { status, data, error, reload } = useAsyncResource(
     (signal) => assistantsService.listExamAssistants(examId, signal),
     [examId]
@@ -83,26 +84,83 @@ export function AssistantClassroomManager({examId, isProgramado,}: AssistantClas
   }
 
   return (
-    <div className="flex flex-col items-start gap-2">
-      <Button type="button" variant="outline" onClick={() => setDialogOpen(true)}>
-        <Building2 className="size-4" aria-hidden="true" />
-        {(isProgramado ?? data?.editable !== false) ? 'Asignar ambientes': 'Ver ambientes'}
-      </Button>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {actions}
 
-      {status === 'success' && data && (
-        <div className="max-w-md space-y-1 text-xs text-muted-foreground" aria-live="polite">
-          {unassigned > 0 && (
-            <p className="inline-flex items-center gap-1 font-medium text-warn-fg">
-              <AlertTriangle className="size-3.5" aria-hidden="true" />
-              {unassigned} {unassigned === 1 ? 'auxiliar sin ambiente' : 'auxiliares sin ambiente'}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setDialogOpen(true)}
+        >
+          <Building2 className="size-4" aria-hidden="true" />
+          {(isProgramado ?? data?.editable !== false)
+            ? 'Asignar ambientes'
+            : 'Ver ambientes'}
+        </Button>
+
+        {status === 'success' && data && unassigned > 0 && (
+          <p
+            role="status"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-warn-fg"
+          >
+            <AlertTriangle className="size-4" aria-hidden="true" />
+            {unassigned}{' '}
+            {unassigned === 1
+              ? 'auxiliar sin ambiente'
+              : 'auxiliares sin ambiente'}
+          </p>
+        )}
+      </div>
+
+      {status === 'success' && data && data.auxiliares.length > 0 && (
+        <div className="overflow-hidden rounded-lg border border-border-soft">
+          <div className="border-b border-border-soft px-4 py-3">
+            <p className="text-sm font-medium text-foreground">
+              Auxiliares habilitados ({data.auxiliares.length})
             </p>
-          )}
-          {data.auxiliares.map((assistant) => (
-            <p key={assistant.id_usuario}>
-              {assistant.nombre_completo} →{' '}
-              {assistant.ambiente?.nro_aula ?? singleRoom?.nro_aula ?? 'Sin ambiente'}
-            </p>
-          ))}
+          </div>
+
+          <ul className="divide-y divide-border-soft">
+            {data.auxiliares.map((assistant) => {
+              const room =
+                assistant.ambiente?.nro_aula ??
+                singleRoom?.nro_aula
+
+              return (
+                <li
+                  key={assistant.id_usuario}
+                  className="flex flex-wrap items-center gap-3 px-4 py-3"
+                >
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border-soft bg-surface">
+                    <UserRound
+                      className="size-4 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {assistant.nombre_completo}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Auxiliar habilitado
+                    </p>
+                  </div>
+
+                  <span
+                    className={
+                      room
+                        ? 'rounded-md border border-border-soft bg-surface px-3 py-1 text-xs font-medium text-foreground'
+                        : 'rounded-md border border-warn-border bg-warn-soft px-3 py-1 text-xs font-medium text-warn-fg'
+                    }
+                  >
+                    {room ?? 'Sin ambiente'}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
         </div>
       )}
 

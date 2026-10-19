@@ -75,7 +75,11 @@ describe('AssistantClassroomManager: HU-030', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Asignar ambientes' })).not.toBeInTheDocument())
     expect(assignClassroom).toHaveBeenCalledWith(7, daniela.id_usuario, aula691A.id_ambiente)
-    expect(await screen.findByText(/Daniela Ferrufino Soliz → Aula 691A/)).toBeVisible()
+    const assistantName = await screen.findByText('Daniela Ferrufino Soliz')
+    const assistantRow = assistantName.closest('li')
+
+    expect(assistantRow).not.toBeNull()
+    expect(assistantRow).toHaveTextContent('Aula 691A')
   })
 
   it('cuando solo hay un ambiente, informa el ambiente por defecto sin ofrecer selectores', async () => {

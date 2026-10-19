@@ -333,19 +333,21 @@ export function ExamDetailPage() {
             aria-label="Personal del control de ingreso"
             className="space-y-4 rounded-xl border border-border-soft bg-surface p-6"
           >
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="space-y-1">
-                <h2 className="sciem-h3">
-                  Personal del control de ingreso
-                </h2>
+            <div className="space-y-1">
+              <h2 className="sciem-h3">
+                Personal del control de ingreso
+              </h2>
 
-                <p className="text-sm text-muted-foreground">
-                  Gestión de auxiliares del examen
-                </p>
-              </div>
+              <p className="text-sm text-muted-foreground">
+                Gestión de auxiliares del examen
+              </p>
+            </div>
 
-              {exam && (
-                <div className="flex flex-wrap items-center gap-2">
+            {exam && (
+              <AssistantClassroomManager
+                examId={id}
+                isProgramado={isProgramado}
+                actions={
                   <Button
                     type="button"
                     variant="outline"
@@ -354,18 +356,9 @@ export function ExamDetailPage() {
                     <Users className="size-4" aria-hidden="true" />
                     {isProgramado ? 'Habilitar auxiliares' : 'Ver auxiliares'}
                   </Button>
-
-                  <AssistantClassroomManager examId={id} isProgramado={isProgramado} />
-                </div>
-              )}
-            </div>
-
-            <div className="border-t border-border-soft pt-4">
-              <p className="text-sm text-muted-foreground">
-                La habilitación y la asignación de ambientes
-                se administran desde sus funcionalidades correspondientes.
-              </p>
-            </div>
+                }
+              />
+            )}
           </section>
         </div>
       )}
