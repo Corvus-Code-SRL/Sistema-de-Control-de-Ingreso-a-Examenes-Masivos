@@ -1,11 +1,12 @@
 import { apiClient } from '@/lib/api-client'
 import type {
   CreateGroupPayload,
-  GroupAssistant,
   GroupDetail,
   GroupDetailResponse,
-  GroupExam,
   GroupMutationResponse,
+  GroupStudentFilters,
+  GroupStudentsListResponse,
+  GroupStudentsPage,
   SubjectGroups,
   SubjectGroupsResponse,
   UpdateGroupPayload,
@@ -83,21 +84,28 @@ export async function updateGroup(
   return response.data
 }
 
-/** Exámenes que incluyen el grupo (solo su docente), del más próximo al más lejano. */
-export async function getGroupExams(groupId: number, signal?: AbortSignal): Promise<GroupExam[]> {
-  const response = await apiClient<{ data: GroupExam[] }>(`/grupos/${groupId}/examenes`, { signal })
-
-  return response.data
-}
-
-/** Auxiliares incorporados al grupo y los exámenes del grupo donde están habilitados. */
-export async function getGroupAssistants(
+/**
+ * Estudiantes inscritos en el grupo, 50 por página y ordenados por apellido.
+ *
+ * La búsqueda sin tildes por nombre o código SIS la resuelve el servidor; la vista solo manda lo
+ * que el docente escribió.
+ */
+export async function getGroupStudents(
   groupId: number,
+  { q, page }: GroupStudentFilters,
   signal?: AbortSignal
-): Promise<GroupAssistant[]> {
-  const response = await apiClient<{ data: GroupAssistant[] }>(`/grupos/${groupId}/auxiliares`, {
+): Promise<GroupStudentsPage> {
+  const response = await apiClient<GroupStudentsListResponse>(`/grupos/${groupId}/estudiantes`, {
+    query: { q: q === '' ? undefined : q, page },
     signal,
   })
 
-  return response.data
+  return {
+    items: response.data,
+    page: response.meta.current_page,
+    perPage: response.meta.per_page,
+    total: response.meta.total,
+    totalPages: Math.max(1, response.meta.last_page),
+    enrolledTotal: response.meta.total_inscritos,
+  }
 }

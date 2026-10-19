@@ -1,6 +1,5 @@
-import type { ExamStatus } from '@/features/exams'
 import type { SubjectCareer } from '@/features/subjects'
-import type { ResourceResponse } from '@/types/api.types'
+import type { Page, ResourceResponse } from '@/types/api.types'
 
 /**
  * Periodo académico al que pertenece un grupo (una fila de `gestion_periodo`).
@@ -158,33 +157,36 @@ export interface PeriodOption {
   vigente: boolean
 }
 
-
-/** Examen que incluye el grupo: una fila de la pestaña Exámenes del curso. */
-export interface GroupExam {
-  id_examen: number
-  nombre_examen: string
-  /** YYYY-MM-DD, sin zona. */
-  fecha: string
-  hora_inicio: string
-  hora_fin: string | null
-  estado: ExamStatus
-  materia?: { id_materia: number; nombre: string; codigo: string }
-}
-
-/** Examen de ese grupo donde un auxiliar está habilitado. */
-export interface GroupAssistantExam {
-  id_examen: number
-  nombre_examen: string
-  fecha: string
-  estado: ExamStatus
-}
-
-/** Auxiliar incorporado a un grupo: una fila de la pestaña Auxiliares del curso. */
-export interface GroupAssistant {
-  id_usuario: string
-  nombre_completo: string
+/** Un estudiante inscrito en el grupo (HU-020): una fila de la lista del detalle. */
+export interface GroupStudent {
+  id_estudiante: number
   cod_sis: string
-  correo: string
-  fecha_incorporacion: string
-  examenes: GroupAssistantExam[]
+  apellido_paterno: string
+  apellido_materno: string | null
+  nombre: string
+}
+
+/** Respuesta de `GET /grupos/{id_grupo}/estudiantes`. */
+export interface GroupStudentsListResponse {
+  data: GroupStudent[]
+  meta: {
+    current_page: number
+    last_page: number
+    per_page: number
+    /** Filas que cumplen la búsqueda: es lo que se pagina. */
+    total: number
+    /** Todas las inscripciones activas, sin la búsqueda: es el total del encabezado. */
+    total_inscritos: number
+  }
+}
+
+/** Una página de estudiantes más el total de inscritos del grupo. */
+export interface GroupStudentsPage extends Page<GroupStudent> {
+  enrolledTotal: number
+}
+
+/** Filtros de la lista de estudiantes; viven en la URL (`?q=`, `?page=`). */
+export interface GroupStudentFilters {
+  q: string
+  page: number
 }
