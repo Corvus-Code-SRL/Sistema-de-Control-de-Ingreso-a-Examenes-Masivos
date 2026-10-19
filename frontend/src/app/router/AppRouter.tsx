@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { LoadingState } from '@/components/common/LoadingState'
 import { MyAssignmentsPage, MyAssistantsPage } from '@/features/assistants'
 import {
@@ -15,9 +15,10 @@ import {
 } from '@/features/auth'
 import { EntryControlPage, OpenEntryControlsPage } from '@/features/entry-control'
 import { CreateExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
-import { CourseDetailPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
+import { GroupDetailPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
 import { ClassroomsPage } from '@/features/classrooms'
 import { RiskCenterPage } from '@/features/risk-center/academic'
+import { RosterUploadPage } from '@/features/students'
 import {
   AdminSubjectAssignmentsPage,
   AdminSubjectCatalogPage,
@@ -50,7 +51,12 @@ function DocenteRoutes() {
         path="/mis-auxiliares"
         element={guarded('auxiliares.gestionar', <MyAssistantsPage />)}
       />
-      <Route path="/cursos/:idGrupo" element={guarded('grupos.gestionar', <CourseDetailPage />)} />
+      <Route path="/grupos/:idGrupo" element={guarded('grupos.gestionar', <GroupDetailPage />)} />
+      <Route
+        path="/grupos/:idGrupo/nomina"
+        element={guarded('grupos.gestionar', <RosterUploadPage />)}
+      />
+      <Route path="/cursos/:idGrupo" element={<CourseDetailRedirect />} />
       <Route path="/examenes/nuevo" element={guarded('examenes.gestionar', <CreateExamPage />)} />
       <Route
         path="/examenes/programados"
@@ -88,6 +94,14 @@ function AuxiliarRoutes() {
       <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
     </Routes>
   )
+}
+
+/** El detalle del curso pasó de `/cursos/:idGrupo` a `/grupos/:idGrupo`; los enlaces viejos siguen sirviendo. */
+function CourseDetailRedirect() {
+  const { idGrupo = '' } = useParams()
+  const { search } = useLocation()
+
+  return <Navigate to={{ pathname: `/grupos/${encodeURIComponent(idGrupo)}`, search }} replace />
 }
 
 /**

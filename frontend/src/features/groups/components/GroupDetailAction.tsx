@@ -2,6 +2,7 @@ import { ChevronRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { groupLabel, type Group } from '../types/group.types'
+import { groupDetailPath } from '../utils/paths'
 
 interface GroupDetailActionProps {
   group: Group
@@ -20,7 +21,7 @@ export function GroupDetailAction({ group, compact = false }: GroupDetailActionP
     return <span className="text-xs text-muted-foreground">Solo lectura</span>
   }
 
-  const to = `/cursos/${group.id_grupo}`
+  const to = groupDetailPath(group.id_grupo)
   const label = `Ver detalles del ${groupLabel(group).toLowerCase()}`
 
   if (compact) {
