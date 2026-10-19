@@ -2,7 +2,7 @@
  * HU-045 — Revisar incidencias con doble comprobación
  * ========================================================================= */
 
-export type IncidentSource = 'estudiante' | 'postulante'
+export type IncidentSource = 'estudiante'
 export type IncidentState = 'PENDIENTE' | 'APROBADO' | 'RECHAZADO'
 export type IncidentFilter = 'pendiente' | 'revisada'
 

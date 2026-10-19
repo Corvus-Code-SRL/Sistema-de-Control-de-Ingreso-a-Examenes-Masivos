@@ -22,6 +22,7 @@ class IncidentReportAcceptanceTest extends TestCase
     public function test_flujo_completo_de_revision(): void
     {
         $this->seed(RoleSeeder::class);
+        $this->seed(\Database\Seeders\ActionSeeder::class);
 
         $context = $this->createReportingContext();
         $this->assignDocenteRole($context['id_usuario']);
