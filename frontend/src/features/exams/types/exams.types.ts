@@ -59,12 +59,6 @@ export interface Exam {
   carrera?: { id_carrera: number; nombre: string }
   ambientes?: Classroom[]
   grupos?: Group[]
-
-  estadisticas?: {
-    esperados: number
-    ingresados: number
-    pendientes: number
-  } | null
 }
 
 export interface ExamFormOptions {

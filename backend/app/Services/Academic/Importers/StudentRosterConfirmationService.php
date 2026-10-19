@@ -20,18 +20,18 @@ class StudentRosterConfirmationService
     private StudentRosterConfirmer $confirmer;
 
     public function __construct(
-    StudentRosterPreviewStore $previewStore,
-    StudentRosterGroupAccess $groupAccess,
-    StudentRosterAnalyzer $analyzer,
-    StudentRosterConfirmer $confirmer,
-    AuditLogService $auditLog
-) {
-    $this->previewStore = $previewStore;
-    $this->groupAccess = $groupAccess;
-    $this->analyzer = $analyzer;
-    $this->confirmer = $confirmer;
-    $this->auditLog = $auditLog;
-}
+        StudentRosterPreviewStore $previewStore,
+        StudentRosterGroupAccess $groupAccess,
+        StudentRosterAnalyzer $analyzer,
+        StudentRosterConfirmer $confirmer,
+        AuditLogService $auditLog
+    ) {
+        $this->previewStore = $previewStore;
+        $this->groupAccess = $groupAccess;
+        $this->analyzer = $analyzer;
+        $this->confirmer = $confirmer;
+        $this->auditLog = $auditLog;
+    }
 
     public function confirm(
         int $groupId,
@@ -70,32 +70,32 @@ class StudentRosterConfirmationService
             $preview->rows()
         );
 
-        $result = DB::transaction(function () use ($group, $analysis, $teacherId) {
-    $result = $this->confirmer->confirm(
-        (int) $group->id_grupo,
-        $analysis
-    );
+            $result = DB::transaction(function () use ($group, $analysis, $teacherId) {
+            $result = $this->confirmer->confirm(
+                (int) $group->id_grupo,
+                $analysis
+            );
 
-    $this->auditLog->registrar(
-        'CREAR',
-        'grupo_estudiante',
-        null,
-        [
-            'id_grupo' => (int) $group->id_grupo,
-            'total_filas' => $result->totalRows(),
-            'estudiantes_creados' => $result->createdStudents(),
-            'estudiantes_inscritos' => $result->enrolledStudents(),
-            'estudiantes_omitidos' => $result->alreadyEnrolled(),
-            'filas_inconsistentes' => $result->inconsistentRows(),
-        ],
-        $teacherId
-    );
+            $this->auditLog->registrar(
+                'CREAR',
+                'grupo_estudiante',
+                null,
+                [
+                    'id_grupo' => (int) $group->id_grupo,
+                    'total_filas' => $result->totalRows(),
+                    'estudiantes_creados' => $result->createdStudents(),
+                    'estudiantes_inscritos' => $result->enrolledStudents(),
+                    'estudiantes_omitidos' => $result->alreadyEnrolled(),
+                    'filas_inconsistentes' => $result->inconsistentRows(),
+                ],
+                $teacherId
+            );
 
-    return $result;
-});
+            return $result;
+        });
 
-$this->previewStore->forget($token);
+        $this->previewStore->forget($token);
 
-return $result;
+        return $result;
     }
 }

@@ -1,8 +1,7 @@
 <?php
 
 namespace App\Http\Resources\Exams;
-use App\Models\Exam;
-use App\Services\Exams\ExamParticipantService;
+
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
@@ -43,12 +42,8 @@ class ExamResource extends JsonResource
                 'nombre'     => $this->career->nombre,
             ]),
 
-           'ambientes' => ClassroomResource::collection($this->whenLoaded('classrooms')),
-               'grupos' => GroupResource::collection($this->whenLoaded('groups')),
-
-               'estadisticas' => $this->estado === Exam::FINALIZADO
-    ? app(ExamParticipantService::class)->counts((int) $this->id_examen)
-    : null,
+            'ambientes' => ClassroomResource::collection($this->whenLoaded('classrooms')),
+            'grupos' => GroupResource::collection($this->whenLoaded('groups')),
         ];
     }
 

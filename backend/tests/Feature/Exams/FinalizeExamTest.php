@@ -290,12 +290,12 @@ class FinalizeExamTest extends TestCase
             ],
         ]);
 
-        $this->postJson($this->url($exam))
-            ->assertOk()
-            ->assertJsonPath('data.estado', Exam::FINALIZADO)
-            ->assertJsonPath('data.estadisticas.esperados', 2)
-            ->assertJsonPath('data.estadisticas.ingresados', 2)
-            ->assertJsonPath('data.estadisticas.pendientes', 0);
+         $response = $this->postJson($this->url($exam));
+
+         $response->assertOk()
+         ->assertJsonPath('data.estado', Exam::FINALIZADO);
+
+        $this->assertArrayNotHasKey('estadisticas', $response->json('data'));
 
         $this->assertSame(2, DB::table('examen_estudiante')
             ->where('id_examen', $exam->id_examen)

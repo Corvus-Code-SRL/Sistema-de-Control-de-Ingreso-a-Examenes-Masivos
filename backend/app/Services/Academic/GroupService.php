@@ -29,12 +29,12 @@ class GroupService
     private AuditLogService $auditLog;
 
     public function __construct(
-    SubjectCatalogService $subjectCatalog,
-    AuditLogService $auditLog
-  ) {
-      $this->subjectCatalog = $subjectCatalog;
-      $this->auditLog = $auditLog;
-  }
+        SubjectCatalogService $subjectCatalog,
+        AuditLogService $auditLog
+    ) {
+        $this->subjectCatalog = $subjectCatalog;
+        $this->auditLog = $auditLog;
+    }
 
     public function listGroupsForPair(int $careerId, int $subjectId, string $teacherId): array
     {
@@ -85,8 +85,7 @@ class GroupService
             (int) $group->id_carrera,
             (int) $group->id_materia,
             $teacherId
-        );
-
+         );
         $this->markOwnGroup($group, $teacherId);
 
         $activePeriodId = $this->subjectCatalog->activePeriodId();
@@ -97,8 +96,8 @@ class GroupService
             'meta' => [
                 'id_periodo_activo' => $activePeriodId,
                 'es_periodo_activo' => (int) $group->id_gestion_periodo === $activePeriodId,
-            ],
-        ];
+             ],
+         ];
     }
 
     /**
@@ -128,39 +127,38 @@ class GroupService
             $data['num_grupo'],
             $periodId
         );
+        $group = DB::transaction(function () use ($pair, $data, $period, $teacherId) {
+            try {
+                $group = Group::create([
+                    'id_carrera' => $pair->id_carrera,
+                    'id_materia' => $pair->id_materia,
+                    'num_grupo' => $data['num_grupo'],
+                    'estado' => RecordStatus::ACTIVE,
+                    'id_usuario_docente' => $teacherId,
+                    'id_gestion_periodo' => $period->id_gestion_periodo,
+                ]);
+            } catch (QueryException $exception) {
+                throw $this->translateDatabaseError($exception);
+            }
 
-       $group = DB::transaction(function () use ($pair, $data, $period, $teacherId) {
-    try {
-        $group = Group::create([
-            'id_carrera' => $pair->id_carrera,
-            'id_materia' => $pair->id_materia,
-            'num_grupo' => $data['num_grupo'],
-            'estado' => RecordStatus::ACTIVE,
-            'id_usuario_docente' => $teacherId,
-            'id_gestion_periodo' => $period->id_gestion_periodo,
-        ]);
-    } catch (QueryException $exception) {
-        throw $this->translateDatabaseError($exception);
-    }
+            $this->auditLog->registrar(
+                'CREAR',
+                'grupo',
+                null,
+                $group->only([
+                    'id_grupo',
+                    'id_carrera',
+                    'id_materia',
+                    'num_grupo',
+                    'estado',
+                    'id_usuario_docente',
+                    'id_gestion_periodo',
+                ]),
+                $teacherId
+            );
 
-    $this->auditLog->registrar(
-        'CREAR',
-        'grupo',
-        null,
-        $group->only([
-            'id_grupo',
-            'id_carrera',
-            'id_materia',
-            'num_grupo',
-            'estado',
-            'id_usuario_docente',
-            'id_gestion_periodo',
-        ]),
-        $teacherId
-    );
-
-    return $group;
-});
+            return $group;
+        });
 
         return $this->showGroup($this->findGroup((int) $group->id_grupo), $teacherId);
     }

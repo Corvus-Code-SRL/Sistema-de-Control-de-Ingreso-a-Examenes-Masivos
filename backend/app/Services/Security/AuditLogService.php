@@ -25,25 +25,21 @@ class AuditLogService
             'tabla_afectada' => $tabla,
             'id_usuario'     => $idUsuario,
         ]);
+  }
+    private function resolverAccion(string $operacion): int
+    {
+        $idAccion = Action::where('operacion', $operacion)
+            ->value('id_accion');
+
+        if ($idAccion === null) {
+            throw new LogicException(
+                "La operación de auditoría '{$operacion}' no está registrada."
+            );
+        }
+
+        return (int) $idAccion;
     }
-
-
-private function resolverAccion(string $operacion): int
-{
-    $idAccion = Action::where('operacion', $operacion)
-        ->value('id_accion');
-
-    if ($idAccion === null) {
-        throw new LogicException(
-            "La operación de auditoría '{$operacion}' no está registrada."
-        );
-    }
-
-    return (int) $idAccion;
-}
-
-
-    /** Quita contraseñas y datos sensibles antes de persistir. */
+   /** Quita contraseñas y datos sensibles antes de persistir. */
     private function limpiar(?array $datos): ?array
     {
         if ($datos === null) {
