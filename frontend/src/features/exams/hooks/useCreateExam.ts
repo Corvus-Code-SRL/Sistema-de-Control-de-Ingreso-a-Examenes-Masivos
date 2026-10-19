@@ -152,10 +152,17 @@ export function useCreateExam(onSuccess?: (exam: Exam) => void) {
       } else {
         setWarnings([])
 
+        const classroomErrors =
+          error instanceof ApiError && error.status === 422
+            ? error.errors?.ambientes
+            : undefined
+
         const message =
-          error instanceof Error
-            ? error.message
-            : 'Ocurrió un error al registrar el examen'
+          classroomErrors && classroomErrors.length > 0
+            ? classroomErrors.join(' ')
+            : error instanceof Error
+              ? error.message
+              : 'Ocurrió un error al registrar el examen'
 
         setSubmitError(message)
       }
