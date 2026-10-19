@@ -249,26 +249,37 @@ class CreateExamTest extends TestCase
             ->assertCreated();
     }
 
-    public function test_criterio_9_advierte_un_ambiente_ya_reservado(): void
+    public function test_criterio_9_rechaza_un_ambiente_reservado_por_otro_docente(): void
     {
         $this->createExam([
             'nombre_examen'      => 'Examen ajeno',
             'id_usuario_docente' => $this->otroDocenteId,
         ], [$this->aulaId]);
 
-        $response = $this->postJson(self::URL, $this->validPayload(['hora_inicio' => '09:00']))
-            ->assertStatus(409)
-            ->assertJsonPath(
-                'errors.superposicion_ambiente.0',
-                'El ambiente 691A ya está reservado para «Examen ajeno» en ese horario.'
-            );
+        // Primer intento: el ambiente está ocupado.
+        $this->postJson(self::URL, $this->validPayload([
+            'hora_inicio' => '09:00',
+        ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ambientes');
 
-        $this->assertArrayNotHasKey('superposicion_horario', $response->json('errors'));
+        // Confirmar advertencias tampoco permite saltar la restricción.
+        $this->postJson(self::URL, $this->validPayload([
+            'hora_inicio'           => '09:00',
+            'confirmar_advertencias' => true,
+        ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ambientes');
 
+        $this->assertSame(1, Exam::count());
+
+        // Otro ambiente sí permite registrar el examen.
         $this->postJson(self::URL, $this->validPayload([
             'hora_inicio' => '09:00',
             'ambientes'   => [$this->otraAulaId],
         ]))->assertCreated();
+
+        $this->assertSame(2, Exam::count());
     }
 
     public function test_un_examen_cancelado_no_ocupa_horario_ni_ambiente(): void
@@ -358,15 +369,8 @@ class CreateExamTest extends TestCase
             'hora_inicio'   => '23:30',
             'duracion'      => 90,
         ]))
-            ->assertStatus(409)
-            ->assertJsonPath(
-                'errors.superposicion_horario.0',
-                'Ya tiene el examen «Madrugada propia» en un horario que se superpone.'
-            )
-            ->assertJsonPath(
-                'errors.superposicion_ambiente.0',
-                'El ambiente 691A ya está reservado para «Madrugada ajena» en ese horario.'
-            );
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ambientes');
 
         // Si termina a las 00:15 ya no alcanza a ninguno de los dos.
         $this->postJson(self::URL, $this->validPayload([
@@ -462,5 +466,29 @@ class CreateExamTest extends TestCase
             [$this->grupoPropioId],
             $log->nuevo_valor['grupos']
         );
+    }
+
+    public function test_permite_examenes_propios_simultaneos_en_mismo_ambiente(): void
+    {
+        $this->createExam([
+            'nombre_examen' => 'Primera materia',
+        ], [$this->aulaId]);
+
+        // Primero muestra la advertencia.
+        $this->postJson(self::URL, $this->validPayload([
+            'nombre_examen' => 'Segunda materia',
+        ]))
+            ->assertStatus(409)
+            ->assertJsonStructure([
+                'errors' => ['superposicion_ambiente'],
+            ]);
+
+        // El propio docente puede confirmarla.
+        $this->postJson(self::URL, $this->validPayload([
+            'nombre_examen'          => 'Segunda materia',
+            'confirmar_advertencias' => true,
+        ]))->assertCreated();
+
+        $this->assertSame(2, Exam::count());
     }
 }

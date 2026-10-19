@@ -312,4 +312,38 @@ class UpdateExamTest extends TestCase
             'nombre_examen' => 'Primer parcial',
         ]);
     }
+
+    public function test_no_permite_editar_hacia_ambiente_reservado_por_otro_docente(): void
+    {
+        $this->createExam([
+            'nombre_examen'      => 'Examen de otro docente',
+            'id_usuario_docente' => $this->otroDocenteId,
+            'hora_inicio'        => '10:00',
+        ], [$this->aulaId]);
+
+        $exam = $this->createExam([
+            'nombre_examen' => 'Mi examen',
+            'hora_inicio'   => '08:00',
+        ], [$this->otraAulaId]);
+
+        $this->putJson($this->url($exam), $this->validPayload([
+            'nombre_examen'          => 'Mi examen',
+            'hora_inicio'            => '10:30',
+            'ambientes'              => [$this->aulaId],
+            'confirmar_advertencias' => true,
+        ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ambientes');
+
+        // La modificación rechazada no altera la reserva anterior.
+        $this->assertDatabaseHas('examen', [
+            'id_examen'   => $exam->id_examen,
+            'hora_inicio' => '08:00:00',
+        ]);
+
+        $this->assertDatabaseHas('examen_ambiente', [
+            'id_examen'   => $exam->id_examen,
+            'id_ambiente' => $this->otraAulaId,
+        ]);
+    }
 }
