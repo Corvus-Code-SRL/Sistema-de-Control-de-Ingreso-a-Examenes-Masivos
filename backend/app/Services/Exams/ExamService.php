@@ -379,6 +379,8 @@ class ExamService
      */
     private function assertNoUnconfirmedWarnings(array $data, string $teacherId, ?int $ignoredExamId): void
     {
+        $this->assertNoForeignClassroomConflicts($data, $teacherId, $ignoredExamId);
+
         if (! empty($data['confirmar_advertencias'])) {
             return;
         }
@@ -387,6 +389,49 @@ class ExamService
 
         if ($warnings !== []) {
             throw new ExamWarningsException($warnings);
+        }
+    }
+
+    /**
+     * Un ambiente reservado por otro docente no puede confirmarse
+     * como una simple advertencia.
+     */
+    private function assertNoForeignClassroomConflicts(
+        array $data,
+        string $teacherId,
+        ?int $ignoredExamId
+    ): void {
+        $startsAt = $this->startsAt($data);
+        $endsAt = $startsAt->copy()->addMinutes((int) $data['duracion']);
+
+        $occupied = $this->overlapping($startsAt, $endsAt, $ignoredExamId)
+            ->join(
+                'examen_ambiente',
+                'examen_ambiente.id_examen',
+                '=',
+                'examen.id_examen'
+            )
+            ->join(
+                'ambiente',
+                'ambiente.id_ambiente',
+                '=',
+                'examen_ambiente.id_ambiente'
+            )
+            ->where('examen.id_usuario_docente', '<>', $teacherId)
+            ->whereIn('examen_ambiente.id_ambiente', $data['ambientes'])
+            ->orderBy('ambiente.nro_aula')
+            ->pluck('ambiente.nro_aula')
+            ->unique()
+            ->values();
+
+        if ($occupied->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'ambientes' => [
+                    'Los ambientes ' . $occupied->implode(', ')
+                    . ' ya están reservados por otro docente en ese horario. '
+                    . 'Seleccione otro ambiente u horario.',
+                ],
+            ]);
         }
     }
 
@@ -424,6 +469,7 @@ class ExamService
         $classroomOverlaps = $this->overlapping($startsAt, $endsAt, $ignoredExamId)
             ->join('examen_ambiente', 'examen_ambiente.id_examen', '=', 'examen.id_examen')
             ->join('ambiente', 'ambiente.id_ambiente', '=', 'examen_ambiente.id_ambiente')
+            ->where('examen.id_usuario_docente', $teacherId)
             ->whereIn('examen_ambiente.id_ambiente', $data['ambientes'])
             ->orderBy('ambiente.nro_aula')
             ->get(['ambiente.nro_aula', 'examen.nombre_examen']);
