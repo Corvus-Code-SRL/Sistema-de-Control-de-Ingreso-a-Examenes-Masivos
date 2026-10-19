@@ -1,7 +1,6 @@
 <?php
 
 namespace App\Services\Exams;
-use App\Models\AuditLog;
 use App\Models\Exam;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -23,15 +22,42 @@ class ExamParticipantService
      * vez; id_grupo es el menor de esos grupos.
      */
     public function expected(int $examId): Builder
-    {
+{
+    $exam = Exam::query()->findOrFail($examId);
+
+    if ($exam->estado === Exam::FINALIZADO) {
         return DB::table('estudiante')
-            ->join('grupo_estudiante', 'grupo_estudiante.id_estudiante', '=', 'estudiante.id_estudiante')
-            ->join('grupo_examen', 'grupo_examen.id_grupo', '=', 'grupo_estudiante.id_grupo')
-            ->where('grupo_examen.id_examen', $examId)
-            ->select('estudiante.*')
-            ->selectRaw('min(grupo_estudiante.id_grupo) as id_grupo')
-            ->groupBy('estudiante.id_estudiante');
+            ->join(
+                'examen_estudiante',
+                'examen_estudiante.id_estudiante',
+                '=',
+                'estudiante.id_estudiante'
+            )
+            ->where('examen_estudiante.id_examen', $examId)
+            ->select(
+                'estudiante.*',
+                'examen_estudiante.id_grupo'
+            );
     }
+
+    return DB::table('estudiante')
+        ->join(
+            'grupo_estudiante',
+            'grupo_estudiante.id_estudiante',
+            '=',
+            'estudiante.id_estudiante'
+        )
+        ->join(
+            'grupo_examen',
+            'grupo_examen.id_grupo',
+            '=',
+            'grupo_estudiante.id_grupo'
+        )
+        ->where('grupo_examen.id_examen', $examId)
+        ->select('estudiante.*')
+        ->selectRaw('MIN(grupo_estudiante.id_grupo) AS id_grupo')
+        ->groupBy('estudiante.id_estudiante');
+}
 
     public function entered(int $examId): Builder
     {
@@ -66,42 +92,6 @@ class ExamParticipantService
  */
 public function counts(int $examId): array
 {
-    $exam = Exam::query()->findOrFail($examId);
-
-    if ($exam->estado === Exam::FINALIZADO) {
-        $log = AuditLog::query()
-            ->where('tabla_afectada', 'examen')
-            ->where('nuevo_valor->id_examen', $examId)
-            ->whereHas('accion', function ($query) {
-                $query->where('operacion', 'FINALIZAR');
-            })
-            ->orderByDesc('id_log')
-            ->first();
-
-        $historical = $log ? $log->nuevo_valor : null;
-
-        if (
-            is_array($historical)
-            && isset(
-                $historical['estudiantes_esperados'],
-                $historical['ingresados_a_tiempo'],
-                $historical['ingresados_con_retraso']
-            )
-        ) {
-            $expected = (int) $historical['estudiantes_esperados'];
-
-            $entered = (int) $historical['ingresados_a_tiempo']
-                + (int) $historical['ingresados_con_retraso'];
-
-            return [
-                'esperados' => $expected,
-                'ingresados' => $entered,
-                'pendientes' => max(0, $expected - $entered),
-            ];
-        }
-    }
-
-    // Exámenes activos o antiguos sin estadísticas históricas.
     return [
         'esperados' => $this->countOf($this->expected($examId)),
         'ingresados' => $this->entered($examId)->count(),

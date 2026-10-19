@@ -72,15 +72,27 @@ abstract class TestCase extends BaseTestCase
         return $this->actAsUserId($teacherId);
     }
 
-    private static function loadDatabaseSchema(Application $app): void
-    {
-        $connection = $app->make('db')->connection();
 
-        self::assertTestDatabase($connection->getDatabaseName(), $connection->getConfig('host'));
+private static function loadDatabaseSchema(Application $app): void
+{
+    $connection = $app->make('db')->connection();
 
-        $connection->unprepared('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
-        $app->make(\Illuminate\Contracts\Console\Kernel::class)->call('migrate', ['--force' => true]);
-    }
+    self::assertTestDatabase(
+        $connection->getDatabaseName(),
+        $connection->getConfig('host')
+    );
+
+    $connection->unprepared('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
+
+    $kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
+
+    $kernel->call('migrate', ['--force' => true]);
+    $kernel->call('db:seed', [
+        '--class' => \Database\Seeders\ActionSeeder::class,
+        '--force' => true,
+    ]);
+}
+
 
     /**
      * La suite borra y recrea el esquema completo, así que solo corre contra una base llamada

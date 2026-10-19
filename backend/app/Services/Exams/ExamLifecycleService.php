@@ -43,27 +43,24 @@ class ExamLifecycleService
                 throw new ExamStateException($this->manualFinishMessage($locked->estado));
             }
 
-           $previousState = $locked->estado;
-$counts = $this->historicalCounts((int) $locked->id_examen);
+            $previousState = $locked->estado;
 
-$locked->update(['estado' => Exam::FINALIZADO]);
+            $this->registerMissingStudents((int) $locked->id_examen);
+            $locked->update(['estado' => Exam::FINALIZADO]);
 
-$this->auditLog->registrar(
-    'FINALIZAR',
-    'examen',
-    [
-        'id_examen' => $locked->id_examen,
-        'estado' => $previousState,
-    ],
-    array_merge(
-        [
-            'id_examen' => $locked->id_examen,
-            'estado' => Exam::FINALIZADO,
-        ],
-        $counts
-    ),
-    $teacherId
-);
+            $this->auditLog->registrar(
+                'FINALIZAR',
+                'examen',
+                [
+                    'id_examen' => $locked->id_examen,
+                    'estado' => $previousState,
+                ],
+                [
+                    'id_examen' => $locked->id_examen,
+                    'estado' => Exam::FINALIZADO,
+                ],
+                $teacherId
+            );
 
             return $locked;
         });
@@ -111,70 +108,83 @@ $this->auditLog->registrar(
                         continue;
                     }
 
-                    $changed = DB::transaction(function () use ($exam, $now): bool {
-                        $locked = Exam::query()->whereKey($exam->id_examen)->lockForUpdate()->firstOrFail();
-                        if (! in_array($locked->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::EN_CURSO], true)
-                            || $locked->duracion === null
-                            || $now->lessThan($this->timing->finishesAutomaticallyAt($locked))) {
-                            return false;
+                    try {
+                        $changed = DB::transaction(function () use ($exam, $now): bool {
+                            $locked = Exam::query()->whereKey($exam->id_examen)->lockForUpdate()->firstOrFail();
+                            if (! in_array($locked->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::EN_CURSO], true)
+                                || $locked->duracion === null
+                                || $now->lessThan($this->timing->finishesAutomaticallyAt($locked))) {
+                                return false;
+                            }
+
+                            $previousState = $locked->estado;
+
+                            $this->registerMissingStudents((int) $locked->id_examen);
+                            $locked->update(['estado' => Exam::FINALIZADO]);
+
+                            $this->auditLog->registrar(
+                                'FINALIZAR',
+                                'examen',
+                                [
+                                    'id_examen' => $locked->id_examen,
+                                    'estado' => $previousState,
+                                ],
+                                [
+                                    'id_examen' => $locked->id_examen,
+                                    'estado' => Exam::FINALIZADO,
+                                    'tipo_finalizacion' => 'AUTOMATICA',
+                                ],
+                                (string) $locked->id_usuario_docente
+                            );
+
+                            return true;
+                        });
+
+                        if ($changed) {
+                            $finished++;
                         }
-
-                        $previousState = $locked->estado;
-$counts = $this->historicalCounts((int) $locked->id_examen);
-
-$locked->update(['estado' => Exam::FINALIZADO]);
-
-$this->auditLog->registrar(
-    'FINALIZAR',
-    'examen',
-    [
-        'id_examen' => $locked->id_examen,
-        'estado' => $previousState,
-    ],
-    array_merge(
-        [
-            'id_examen' => $locked->id_examen,
-            'estado' => Exam::FINALIZADO,
-            'tipo_finalizacion' => 'AUTOMATICA',
-        ],
-        $counts
-    ),
-    (string) $locked->id_usuario_docente
-);
-
-return true;
-                    });
-
-                    if ($changed) {
-                        $finished++;
+                    } catch (Throwable $exception) {
+                        Log::error('Error al finalizar automáticamente un examen', [
+                            'id_examen' => $exam->id_examen,
+                            'motivo' => $exception->getMessage(),
+                        ]);
                     }
                 }
             }, 'id_examen');
 
         return $finished;
     }
-    private function historicalCounts(int $examId): array
-{
-    $expectedStudents = (int) DB::table('grupo_estudiante as gs')
-        ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
-        ->where('gx.id_examen', $examId)
-        ->distinct()
-        ->count('gs.id_estudiante');
 
-    $entryCounts = DB::table('examen_estudiante')
-        ->where('id_examen', $examId)
-        ->selectRaw("
-            COUNT(*) FILTER (WHERE estado_ingreso = 'INGRESO') AS a_tiempo,
-            COUNT(*) FILTER (WHERE estado_ingreso = 'CON_RETRASO') AS con_retraso
-        ")
-        ->first();
+    private function registerMissingStudents(int $examId): void
+    {
+        DB::statement(
+            "
+            INSERT INTO examen_estudiante (
+                id_examen,
+                id_estudiante,
+                id_grupo,
+                estado_habilitacion,
+                estado_ingreso,
+                hora_ingreso
+            )
+            SELECT
+                gx.id_examen,
+                gs.id_estudiante,
+                MIN(gs.id_grupo),
+                'HABILITADO',
+                'NO_INGRESO',
+                NULL
+            FROM grupo_examen gx
+            INNER JOIN grupo_estudiante gs
+                ON gs.id_grupo = gx.id_grupo
+            WHERE gx.id_examen = ?
+            GROUP BY gx.id_examen, gs.id_estudiante
+            ON CONFLICT (id_examen, id_estudiante) DO NOTHING
+            ",
+            [$examId]
+        );
+    }
 
-    return [
-        'estudiantes_esperados' => $expectedStudents,
-        'ingresados_a_tiempo' => (int) $entryCounts->a_tiempo,
-        'ingresados_con_retraso' => (int) $entryCounts->con_retraso,
-    ];
-}
     private function deactivateSnapshot(int $examId): void
     {
         try {

@@ -604,15 +604,31 @@ class ExamService
     }
 
     private function loadDetail(Exam $exam): Exam
-    {
-        return $exam->fresh([
-            'examType',
-            'subject',
-            'career',
-            'classrooms',
-            'groups' => fn ($query) => $query->withStudentCount(),
-        ]);
+{
+    $exam = $exam->fresh([
+        'examType',
+        'subject',
+        'career',
+        'classrooms',
+        'groups' => fn ($query) => $query->withStudentCount(),
+    ]);
+
+    if ($exam->estado === Exam::FINALIZADO) {
+        $historicalCounts = DB::table('examen_estudiante')
+            ->where('id_examen', $exam->id_examen)
+            ->selectRaw('id_grupo, COUNT(*) AS total')
+            ->groupBy('id_grupo')
+            ->pluck('total', 'id_grupo');
+
+        foreach ($exam->groups as $group) {
+            $group->cantidad_estudiantes = (int) (
+                $historicalCounts[$group->id_grupo] ?? 0
+            );
+        }
     }
+
+    return $exam;
+}
 
     private function notEditableMessage(string $status): string
     {

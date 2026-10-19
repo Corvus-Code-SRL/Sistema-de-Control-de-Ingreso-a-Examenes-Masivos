@@ -422,9 +422,12 @@ class StudentRosterConfirmationServiceTest extends TestCase
 {
     $this->seedAcademicCatalog();
 
-    // No cargamos ActionSeeder para provocar el fallo de auditoría.
-    $group = $this->ownActiveGroup();
-    $store = $this->previewStore();
+     DB::table('accion')
+       ->where('operacion', 'CREAR')
+       ->delete();
+
+       $group = $this->ownActiveGroup();
+       $store = $this->previewStore();
 
     $token = $store->store(
         (int) $group->id_grupo,

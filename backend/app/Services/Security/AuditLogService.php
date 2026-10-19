@@ -27,7 +27,8 @@ class AuditLogService
         ]);
     }
 
-    private function resolverAccion(string $operacion): int
+
+private function resolverAccion(string $operacion): int
 {
     $idAccion = Action::where('operacion', $operacion)
         ->value('id_accion');
@@ -40,6 +41,7 @@ class AuditLogService
 
     return (int) $idAccion;
 }
+
 
     /** Quita contraseñas y datos sensibles antes de persistir. */
     private function limpiar(?array $datos): ?array

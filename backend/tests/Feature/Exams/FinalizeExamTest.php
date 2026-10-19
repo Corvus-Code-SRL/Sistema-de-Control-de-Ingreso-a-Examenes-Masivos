@@ -10,12 +10,13 @@ use App\Models\Role;
 use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\EntryControl\RoomAssignmentService;
 use App\Services\Exams\ExamLifecycleService;
+use App\Services\Exams\ExamParticipantService;
+use App\Services\Security\AuditLogService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\SeedsExamCatalog;
 use Tests\TestCase;
-use App\Services\Exams\ExamParticipantService;
 
 class FinalizeExamTest extends TestCase
 {
@@ -32,56 +33,41 @@ class FinalizeExamTest extends TestCase
     {
         return "/api/examenes/{$exam->id_examen}/finalizar";
     }
+
     public function test_finalizacion_conserva_estudiantes_esperados_aunque_cambie_la_nomina(): void
-{
-    // Crear un examen con los 2 estudiantes iniciales.
-    $exam = $this->createExam(
-        ['estado' => Exam::EN_INGRESO],
-        [$this->aulaId]
-    );
+    {
+        $exam = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId]);
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
 
-    DB::table('grupo_examen')->insert([
-        'id_examen' => $exam->id_examen,
-        'id_grupo' => $this->grupoPropioId,
-    ]);
+        $this->postJson($this->url($exam))
+            ->assertOk()
+            ->assertJsonPath('data.estado', Exam::FINALIZADO);
 
-    // Finalizar el examen.
-    $this->postJson($this->url($exam))
-        ->assertOk()
-        ->assertJsonPath('data.estado', Exam::FINALIZADO);
+        $this->assertSame(2, DB::table('examen_estudiante')
+            ->where('id_examen', $exam->id_examen)
+            ->where('estado_ingreso', 'NO_INGRESO')
+            ->where('estado_habilitacion', 'HABILITADO')
+            ->count());
 
-    // Después de finalizar, inscribir 5 estudiantes adicionales.
-    $this->enrollStudents($this->grupoPropioId, 5);
+        $this->enrollStudents($this->grupoPropioId, 5);
 
-    // Comprobar que la nómina actual contiene 7 estudiantes.
-    $this->assertSame(
-        7,
-        (int) DB::table('grupo_estudiante')
+        $this->assertSame(7, DB::table('grupo_estudiante')
             ->where('id_grupo', $this->grupoPropioId)
-            ->count()
-    );
+            ->count());
 
-    // La bitácora debe conservar los 2 estudiantes esperados
-    // al momento de finalizar el examen.
-    $log = AuditLog::query()
-        ->where('tabla_afectada', 'examen')
-        ->where('nuevo_valor->id_examen', $exam->id_examen)
-        ->firstOrFail();
+        $counts = app(ExamParticipantService::class)->counts((int) $exam->id_examen);
+        $this->assertSame(2, $counts['esperados']);
+        $this->assertSame(0, $counts['ingresados']);
+        $this->assertSame(2, $counts['pendientes']);
 
-    $this->assertSame(
-        2,
-        (int) ($log->nuevo_valor['estudiantes_esperados'] ?? -1)
-    );
-    // Consultar las estadísticas después de modificar la nómina.
-$counts = app(ExamParticipantService::class)->counts(
-    (int) $exam->id_examen
-);
+        $this->getJson("/api/examenes/{$exam->id_examen}")
+            ->assertOk()
+            ->assertJsonPath('data.grupos.0.cantidad_estudiantes', 2);
+    }
 
-// El examen terminó con 2 estudiantes, aunque el grupo ahora tenga 7.
-$this->assertSame(2, $counts['esperados']);
-$this->assertSame(0, $counts['ingresados']);
-$this->assertSame(2, $counts['pendientes']);
-}
     public function test_docente_creador_finaliza_examen_abierto_desactiva_redis_y_audita(): void
     {
         $exam = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId]);
@@ -111,15 +97,13 @@ $this->assertSame(2, $counts['pendientes']);
             $log->antiguo_valor
         );
         $this->assertEquals(
-    [
-        'id_examen' => $exam->id_examen,
-        'estado' => Exam::FINALIZADO,
-        'estudiantes_esperados' => 2,
-        'ingresados_a_tiempo' => 0,
-        'ingresados_con_retraso' => 0,
-    ],
-    $log->nuevo_valor
-);
+            ['id_examen' => $exam->id_examen, 'estado' => Exam::FINALIZADO],
+            $log->nuevo_valor
+        );
+        $this->assertSame(2, DB::table('examen_estudiante')
+            ->where('id_examen', $exam->id_examen)
+            ->where('estado_ingreso', 'NO_INGRESO')
+            ->count());
     }
 
     public function test_solo_docente_creador_puede_finalizar(): void
@@ -238,103 +222,138 @@ $this->assertSame(2, $counts['pendientes']);
         $this->assertSame(Exam::FINALIZADO, $programmed->fresh()->estado);
         $this->assertSame(Exam::FINALIZADO, $running->fresh()->estado);
     }
-    public function test_finalizacion_automatica_guarda_estadisticas_historicas(): void
-{
-    $exam = $this->createExam([
-        'fecha' => '2026-09-30',
-        'hora_inicio' => '08:00',
-        'hora_fin' => '09:00',
-        'duracion' => 60,
-        'estado' => Exam::EN_CURSO,
-    ]);
 
-    DB::table('grupo_examen')->insert([
-        'id_examen' => $exam->id_examen,
-        'id_grupo' => $this->grupoPropioId,
-    ]);
-
-    $finished = app(ExamLifecycleService::class)->finishExpired(
-        Carbon::parse('2026-10-01 12:00:00', config('sciem.zona_horaria'))
-    );
-
-    $this->assertSame(1, $finished);
-    $this->assertSame(Exam::FINALIZADO, $exam->fresh()->estado);
-
-    $log = AuditLog::query()
-        ->where('tabla_afectada', 'examen')
-        ->where('nuevo_valor->id_examen', $exam->id_examen)
-        ->sole();
-
-    $this->assertSame('FINALIZAR', $log->accion->operacion);
-    $this->assertSame(2, $log->nuevo_valor['estudiantes_esperados']);
-    $this->assertSame(0, $log->nuevo_valor['ingresados_a_tiempo']);
-    $this->assertSame(0, $log->nuevo_valor['ingresados_con_retraso']);
-    $this->assertSame('AUTOMATICA', $log->nuevo_valor['tipo_finalizacion']);
-}
-    public function test_finalizacion_guarda_ingresos_a_tiempo_y_con_retraso(): void
-{
-    // Crear un examen con los 2 estudiantes del grupo.
-    $exam = $this->createExam(
-        ['estado' => Exam::EN_CURSO],
-        [$this->aulaId]
-    );
-
-    DB::table('grupo_examen')->insert([
-        'id_examen' => $exam->id_examen,
-        'id_grupo' => $this->grupoPropioId,
-    ]);
-
-    $students = DB::table('grupo_estudiante')
-        ->where('id_grupo', $this->grupoPropioId)
-        ->orderBy('id_estudiante')
-        ->pluck('id_estudiante');
-
-    // Registrar un ingreso a tiempo y otro con retraso.
-    DB::table('examen_estudiante')->insert([
-        [
+    public function test_finalizacion_automatica_congela_esperados_y_audita(): void
+    {
+        $exam = $this->createExam([
+            'fecha' => '2026-09-30',
+            'hora_inicio' => '08:00',
+            'hora_fin' => '09:00',
+            'duracion' => 60,
+            'estado' => Exam::EN_CURSO,
+        ]);
+        DB::table('grupo_examen')->insert([
             'id_examen' => $exam->id_examen,
-            'id_estudiante' => $students[0],
             'id_grupo' => $this->grupoPropioId,
-            'estado_habilitacion' => 'HABILITADO',
-            'estado_ingreso' => 'INGRESO',
-            'hora_ingreso' => '08:05:00',
-        ],
-        [
+        ]);
+
+        $finished = app(ExamLifecycleService::class)->finishExpired(
+            Carbon::parse('2026-10-01 12:00:00', config('sciem.zona_horaria'))
+        );
+
+        $this->assertSame(1, $finished);
+        $this->assertSame(Exam::FINALIZADO, $exam->fresh()->estado);
+        $this->assertSame(2, DB::table('examen_estudiante')
+            ->where('id_examen', $exam->id_examen)
+            ->where('estado_ingreso', 'NO_INGRESO')
+            ->count());
+
+        $log = AuditLog::query()
+            ->where('tabla_afectada', 'examen')
+            ->where('nuevo_valor->id_examen', $exam->id_examen)
+            ->sole();
+
+        $this->assertSame('FINALIZAR', $log->accion->operacion);
+        $this->assertSame('AUTOMATICA', $log->nuevo_valor['tipo_finalizacion']);
+        $this->assertArrayNotHasKey('estudiantes_esperados', $log->nuevo_valor);
+    }
+
+    public function test_finalizacion_conserva_ingresos_existentes(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::EN_CURSO], [$this->aulaId]);
+        DB::table('grupo_examen')->insert([
             'id_examen' => $exam->id_examen,
-            'id_estudiante' => $students[1],
             'id_grupo' => $this->grupoPropioId,
-            'estado_habilitacion' => 'HABILITADO',
-            'estado_ingreso' => 'CON_RETRASO',
-            'hora_ingreso' => '08:30:00',
-        ],
-    ]);
+        ]);
 
-    // Finalizar el examen.
-    $this->postJson($this->url($exam))
-    ->assertOk()
-    ->assertJsonPath('data.estado', Exam::FINALIZADO)
-    ->assertJsonPath('data.estadisticas.esperados', 2)
-    ->assertJsonPath('data.estadisticas.ingresados', 2)
-    ->assertJsonPath('data.estadisticas.pendientes', 0);
+        $students = DB::table('grupo_estudiante')
+            ->where('id_grupo', $this->grupoPropioId)
+            ->orderBy('id_estudiante')
+            ->pluck('id_estudiante');
 
-    // Verificar las estadísticas guardadas en la bitácora.
-    $log = AuditLog::query()
-        ->where('tabla_afectada', 'examen')
-        ->where('nuevo_valor->id_examen', $exam->id_examen)
-        ->sole();
+        DB::table('examen_estudiante')->insert([
+            [
+                'id_examen' => $exam->id_examen,
+                'id_estudiante' => $students[0],
+                'id_grupo' => $this->grupoPropioId,
+                'estado_habilitacion' => 'HABILITADO',
+                'estado_ingreso' => 'INGRESO',
+                'hora_ingreso' => '08:05:00',
+            ],
+            [
+                'id_examen' => $exam->id_examen,
+                'id_estudiante' => $students[1],
+                'id_grupo' => $this->grupoPropioId,
+                'estado_habilitacion' => 'HABILITADO',
+                'estado_ingreso' => 'CON_RETRASO',
+                'hora_ingreso' => '08:30:00',
+            ],
+        ]);
 
-    $this->assertSame(2, $log->nuevo_valor['estudiantes_esperados']);
-    $this->assertSame(1, $log->nuevo_valor['ingresados_a_tiempo']);
-    $this->assertSame(1, $log->nuevo_valor['ingresados_con_retraso']);
+        $this->postJson($this->url($exam))
+            ->assertOk()
+            ->assertJsonPath('data.estado', Exam::FINALIZADO)
+            ->assertJsonPath('data.estadisticas.esperados', 2)
+            ->assertJsonPath('data.estadisticas.ingresados', 2)
+            ->assertJsonPath('data.estadisticas.pendientes', 0);
 
-    // Verificar la consulta histórica.
-    $counts = app(ExamParticipantService::class)
-        ->counts((int) $exam->id_examen);
+        $this->assertSame(2, DB::table('examen_estudiante')
+            ->where('id_examen', $exam->id_examen)
+            ->count());
+        $this->assertSame(1, DB::table('examen_estudiante')
+            ->where('id_examen', $exam->id_examen)
+            ->where('estado_ingreso', 'INGRESO')
+            ->count());
+        $this->assertSame(1, DB::table('examen_estudiante')
+            ->where('id_examen', $exam->id_examen)
+            ->where('estado_ingreso', 'CON_RETRASO')
+            ->count());
 
-    $this->assertSame(2, $counts['esperados']);
-    $this->assertSame(2, $counts['ingresados']);
-    $this->assertSame(0, $counts['pendientes']);
-}
+        $counts = app(ExamParticipantService::class)->counts((int) $exam->id_examen);
+        $this->assertSame(2, $counts['esperados']);
+        $this->assertSame(2, $counts['ingresados']);
+        $this->assertSame(0, $counts['pendientes']);
+    }
+
+    public function test_finalizacion_automatica_continua_si_un_examen_falla_al_auditar(): void
+    {
+        $attributes = [
+            'fecha' => '2026-09-30',
+            'hora_inicio' => '08:00',
+            'hora_fin' => '09:00',
+            'duracion' => 60,
+            'estado' => Exam::EN_CURSO,
+        ];
+
+        $failedExam = $this->createExam($attributes + [
+            'nombre_examen' => 'Examen con error',
+        ]);
+        $successfulExam = $this->createExam($attributes + [
+            'nombre_examen' => 'Examen siguiente',
+        ]);
+
+        $attempts = 0;
+        $this->mock(AuditLogService::class, function ($mock) use (&$attempts): void {
+            $mock->shouldReceive('registrar')
+                ->twice()
+                ->andReturnUsing(function () use (&$attempts): void {
+                    $attempts++;
+                    if ($attempts === 1) {
+                        throw new \RuntimeException('Fallo simulado de auditoria');
+                    }
+                });
+        });
+
+        $finished = app(ExamLifecycleService::class)->finishExpired(
+            Carbon::parse('2026-10-01 12:00:00', config('sciem.zona_horaria'))
+        );
+
+        $this->assertSame(2, $attempts);
+        $this->assertSame(1, $finished);
+        $this->assertSame(Exam::EN_CURSO, $failedExam->fresh()->estado);
+        $this->assertSame(Exam::FINALIZADO, $successfulExam->fresh()->estado);
+    }
+
     public function test_finalizar_examen_inexistente_responde_404(): void
     {
         $this->postJson('/api/examenes/999999/finalizar')->assertNotFound();

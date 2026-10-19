@@ -47,21 +47,30 @@ class ActionSeederTest extends TestCase
         );
     }
 
-    public function test_corrige_la_descripcion_de_una_accion_existente_sin_duplicarla(): void
-    {
-        DB::table('accion')->insert([
-            'operacion' => 'APROBAR_REPORTE',
-            'tipo_operacion' => 'UPDATE',
+   public function test_corrige_la_descripcion_de_una_accion_existente_sin_duplicarla(): void
+{
+    DB::table('accion')
+        ->where('operacion', 'APROBAR_REPORTE')
+        ->update([
             'descripcion' => 'Otra descripción',
         ]);
 
-        $this->seed(ActionSeeder::class);
+    $this->seed(ActionSeeder::class);
 
-        $this->assertSame(1, DB::table('accion')->where('operacion', 'APROBAR_REPORTE')->count());
-        $this->assertSame(
-            'Aprobación de un reporte de falta',
-            DB::table('accion')->where('operacion', 'APROBAR_REPORTE')->value('descripcion')
-        );
-        $this->assertSame(14, DB::table('accion')->count());
-    }
+    $this->assertSame(
+        1,
+        DB::table('accion')
+            ->where('operacion', 'APROBAR_REPORTE')
+            ->count()
+    );
+
+    $this->assertSame(
+        'Aprobación de un reporte de falta',
+        DB::table('accion')
+            ->where('operacion', 'APROBAR_REPORTE')
+            ->value('descripcion')
+    );
+
+    $this->assertSame(14, DB::table('accion')->count());
+}
 }
