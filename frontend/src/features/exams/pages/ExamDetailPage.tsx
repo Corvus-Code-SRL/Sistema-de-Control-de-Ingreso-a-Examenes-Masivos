@@ -21,6 +21,7 @@ import { examsService } from '../services/examsService'
 import { ExamStatusBadge } from '../components/ExamStatusBadge'
 import { examLockedMessage } from '../utils/examLockedMessage'
 import type { Exam } from '../types/exams.types'
+import { AssistantClassroomManager } from '@/features/assistants/components/AssistantClassroomManager'
 
 function formatExamDate(date: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
@@ -42,7 +43,6 @@ export function ExamDetailPage() {
   const [loadError, setLoadError] = useState<ApiError | null>(null)
 
   const [showCancelDialog, setShowCancelDialog] = useState(false)
-  const [showEnvironmentInfo, setShowEnvironmentInfo] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
 
@@ -355,16 +355,7 @@ export function ExamDetailPage() {
                     {isProgramado ? 'Habilitar auxiliares' : 'Ver auxiliares'}
                   </Button>
 
-                  {isProgramado && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setShowEnvironmentInfo(true)}
-                    >
-                      <Building2 className="size-4" aria-hidden="true" />
-                      Asignar ambientes
-                    </Button>
-                  )}
+                  <AssistantClassroomManager examId={id} isProgramado={isProgramado} />
                 </div>
               )}
             </div>
@@ -422,26 +413,6 @@ export function ExamDetailPage() {
           </DialogContent>
         </Dialog>
       )}
-
-      <Dialog
-        open={showEnvironmentInfo}
-        onOpenChange={setShowEnvironmentInfo}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Asignar ambientes</DialogTitle>
-            <DialogDescription>
-              Esta funcionalidad se incorporará mediante
-              HU-030, con su modal independiente.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => setShowEnvironmentInfo(false)}>
-              Entendido
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </AppShell>
   )
 }
