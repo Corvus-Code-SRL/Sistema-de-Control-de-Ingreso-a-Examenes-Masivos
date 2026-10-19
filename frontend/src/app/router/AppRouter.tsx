@@ -24,6 +24,7 @@ import {
   SubjectsPage,
 } from '@/features/subjects'
 import { CuentaDetallePage, CuentasPage } from '@/features/users'
+import { IncidentsPage } from '@/features/incidents'
 
 /** Envuelve una pantalla con la capacidad que exige. Sin sesión redirige al login (ver ProtectedRoute). */
 function guarded(capability: Capability, element: ReactElement) {
@@ -62,6 +63,7 @@ function DocenteRoutes() {
         path="/examenes/:examId/control-ingreso"
         element={guarded('ingreso.operar', <EntryControlPage />)}
       />
+      <Route path="/incidencias" element={guarded('examenes.gestionar', <IncidentsPage />)} />
       <Route
         path="/central-riesgo/:id?"
         element={guarded('riesgo.consultar', <RiskCenterPage />)}
