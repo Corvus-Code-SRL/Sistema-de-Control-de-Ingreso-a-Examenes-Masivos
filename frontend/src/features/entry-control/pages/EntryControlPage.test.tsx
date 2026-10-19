@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { mockApi, mockApiWith, mockNetworkFailure } from '@/test/http'
 import { renderWithRouter } from '@/test/render'
 import { EntryControlPage } from './EntryControlPage'
+import { attemptTime } from '../components/entryAttemptPresentation'
 import type { EntryContext, Verification } from '../types/entry-control.types'
 
 const context: EntryContext = {
@@ -648,6 +649,14 @@ async function sendIncident(user: ReturnType<typeof userEvent.setup>) {
   await user.click(within(dialog).getByRole('button', { name: 'Enviar a revisión' }))
 }
 
+const attemptRegisteredAt = '2026-10-18T14:03:00Z'
+
+// Misma hora local que muestra el componente; Testing Library normaliza los espacios al comparar.
+const containsAttemptTime = (value: string) => {
+  const expected = attemptTime(value).replace(/\s+/g, ' ')
+  return (content: string) => content.includes(expected)
+}
+
 describe('HU-042 integrada sobre HU-032', () => {
   it.each([
     ['NO_PERTENECE', 'sis'], ['NO_PERTENECE', 'ci'], ['CI_NO_COINCIDE', 'sis'],
@@ -655,7 +664,7 @@ describe('HU-042 integrada sobre HU-032', () => {
   ])('envía el intento real de %s al verificar por %s', async (verdict, field) => {
     const apiRoutes = routes({
       ...allowed, veredicto: verdict, autorizado: false, id_intento: 321,
-      registrado_en: '2026-10-18T14:03:00Z',
+      registrado_en: attemptRegisteredAt,
       motivo: verdict === 'NO_PERTENECE' ? 'No pertenece a los grupos de este examen' : 'Ingreso no autorizado.',
       grupo: verdict === 'NO_PERTENECE' ? null : allowed.grupo,
     })
@@ -674,7 +683,7 @@ describe('HU-042 integrada sobre HU-032', () => {
     const dialog = screen.getByRole('dialog', { name: 'Reportar incidencia' })
     expect(within(dialog).getByText(student.nombre_completo)).toBeInTheDocument()
     expect(within(dialog).getByText('691A')).toBeInTheDocument()
-    expect(within(dialog).getByText(/10:03/)).toBeInTheDocument()
+    expect(within(dialog).getByText(containsAttemptTime(attemptRegisteredAt))).toBeInTheDocument()
     await sendIncident(user)
     expect(await screen.findByRole('button', { name: 'Ya reportado' })).toBeDisabled()
     const posts = calls.filter((call) => call.url.endsWith('/reporte'))
