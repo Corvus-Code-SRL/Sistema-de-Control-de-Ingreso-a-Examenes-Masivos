@@ -38,16 +38,20 @@ class ExamService
 
     private AssistantAvailabilityService $assistantAvailability;
 
+    private ExamParticipantService $participants;
+
     public function __construct(
         SubjectCatalogService $subjectCatalog,
         AuditLogService $auditLog,
         ExamGroupService $groupService,
-        AssistantAvailabilityService $assistantAvailability
+        AssistantAvailabilityService $assistantAvailability,
+        ExamParticipantService $participants
     ) {
         $this->subjectCatalog = $subjectCatalog;
         $this->auditLog = $auditLog;
         $this->groupService = $groupService;
         $this->assistantAvailability = $assistantAvailability;
+        $this->participants = $participants;
     }
 
     /**
@@ -95,12 +99,16 @@ class ExamService
     {
         $this->assertTeacherGiven($teacherId);
 
-        return Exam::query()
+        $exams = Exam::query()
             ->with($this->listRelations())
             ->where('id_usuario_docente', $teacherId)
             ->orderBy('fecha')
             ->orderBy('hora_inicio')
             ->get();
+
+        $this->participants->applyFrozenStudentCounts($exams);
+
+        return $exams;
     }
 
     /** Lo que muestra cada fila del listado: materia, ambientes y grupos con su cantidad de estudiantes. */
@@ -112,6 +120,7 @@ class ExamService
             'career',
             'classrooms',
             'groups' => fn ($query) => $query->withStudentCount(),
+            'groups.period',
         ];
     }
 
@@ -129,7 +138,7 @@ class ExamService
 
         $activePeriodId = $this->subjectCatalog->activePeriodId();
 
-        return Exam::query()
+        $exams = Exam::query()
             ->with($this->listRelations())
             ->where('id_usuario_docente', $teacherId)
             ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_INGRESO])
@@ -143,6 +152,10 @@ class ExamService
             ->orderBy('hora_inicio')
             ->orderBy('id_examen')
             ->get();
+
+        $this->participants->applyFrozenStudentCounts($exams);
+
+        return $exams;
     }
 
     /** Detalle de un examen propio, para editarlo o gestionar sus grupos. */
@@ -603,29 +616,11 @@ class ExamService
         return Carbon::createFromFormat('Y-m-d H:i', $data['fecha'] . ' ' . $data['hora_inicio']);
     }
 
-     private function loadDetail(Exam $exam): Exam
+    private function loadDetail(Exam $exam): Exam
     {
-        $exam = $exam->fresh([
-            'examType',
-            'subject',
-            'career',
-            'classrooms',
-            'groups' => fn ($query) => $query->withStudentCount(),
-        ]);
+        $exam = $exam->fresh($this->listRelations());
 
-        if ($exam->estado === Exam::FINALIZADO) {
-            $historicalCounts = DB::table('examen_estudiante')
-                ->where('id_examen', $exam->id_examen)
-                ->selectRaw('id_grupo, COUNT(*) AS total')
-                ->groupBy('id_grupo')
-                ->pluck('total', 'id_grupo');
-
-            foreach ($exam->groups as $group) {
-                $group->cantidad_estudiantes = (int) (
-                    $historicalCounts[$group->id_grupo] ?? 0
-                );
-            }
-        }
+        $this->participants->applyFrozenStudentCounts([$exam]);
 
         return $exam;
     }

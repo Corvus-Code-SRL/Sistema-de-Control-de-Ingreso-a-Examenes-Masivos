@@ -18,15 +18,18 @@ class ExamLifecycleService
     private ExamTimingService $timing;
     private EntryControlSnapshotService $snapshots;
     private AuditLogService $auditLog;
+    private ExamParticipantService $participants;
 
     public function __construct(
         ExamTimingService $timing,
         EntryControlSnapshotService $snapshots,
-        AuditLogService $auditLog
+        AuditLogService $auditLog,
+        ExamParticipantService $participants
     ) {
         $this->timing = $timing;
         $this->snapshots = $snapshots;
         $this->auditLog = $auditLog;
+        $this->participants = $participants;
     }
 
     /** Finaliza inmediatamente un examen activo, únicamente por su docente creador. */
@@ -67,10 +70,14 @@ class ExamLifecycleService
 
         $this->deactivateSnapshot((int) $exam->id_examen);
 
-        return $exam->fresh([
+        $exam = $exam->fresh([
             'examType', 'subject', 'career', 'classrooms',
             'groups' => fn ($query) => $query->withStudentCount(),
         ]);
+
+        $this->participants->applyFrozenStudentCounts([$exam]);
+
+        return $exam;
     }
 
     /**

@@ -97,6 +97,46 @@ class ExamParticipantService
         ];
     }
 
+    /**
+     * Sustituye la cantidad de estudiantes por grupo de los exámenes FINALIZADOS por la
+     * congelada en examen_estudiante, con una sola consulta para toda la colección. Los
+     * demás exámenes conservan el conteo en vivo.
+     *
+     * @param iterable<Exam> $exams con la relación groups ya cargada
+     */
+    public function applyFrozenStudentCounts(iterable $exams): void
+    {
+        $finalized = [];
+
+        foreach ($exams as $exam) {
+            if ($exam->estado === Exam::FINALIZADO && $exam->relationLoaded('groups')) {
+                $finalized[(int) $exam->id_examen] = $exam;
+            }
+        }
+
+        if ($finalized === []) {
+            return;
+        }
+
+        $frozenCounts = [];
+
+        $rows = DB::table('examen_estudiante')
+            ->whereIn('id_examen', array_keys($finalized))
+            ->selectRaw('id_examen, id_grupo, COUNT(*) AS total')
+            ->groupBy('id_examen', 'id_grupo')
+            ->get();
+
+        foreach ($rows as $row) {
+            $frozenCounts[$row->id_examen . ':' . $row->id_grupo] = (int) $row->total;
+        }
+
+        foreach ($finalized as $examId => $exam) {
+            foreach ($exam->groups as $group) {
+                $group->cantidad_estudiantes = $frozenCounts[$examId . ':' . $group->id_grupo] ?? 0;
+            }
+        }
+    }
+
     private function countOf(Builder $query): int
     {
         return DB::query()->fromSub($query, 'participantes')->count();
