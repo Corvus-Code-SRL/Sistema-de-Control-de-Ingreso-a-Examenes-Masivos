@@ -9,6 +9,7 @@ import type {
   ExamAssistantsData,
   GroupOption,
   MoveAssistantPayload,
+  SuggestedAssistant,
 } from '../types/assistant.types'
 
 interface DataResponse<TData> {
@@ -54,6 +55,19 @@ export const assistantsService = {
       signal,
       query: { criterio: criteria },
     })
+    return response.data
+  },
+
+  /** Obtiene los auxiliares sugeridos para el examen. */
+  async suggestedForExam(
+    examId: number,
+    signal?: AbortSignal
+  ): Promise<SuggestedAssistant[]> {
+    const response = await apiClient<DataResponse<SuggestedAssistant[]>>(
+      `/docente/examenes/${examId}/auxiliares/sugeridos`,
+      { signal }
+    )
+
     return response.data
   },
 

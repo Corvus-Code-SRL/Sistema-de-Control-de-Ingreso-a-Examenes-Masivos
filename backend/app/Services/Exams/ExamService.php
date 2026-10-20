@@ -36,14 +36,18 @@ class ExamService
 
     private ExamGroupService $groupService;
 
+    private AssistantAvailabilityService $assistantAvailability;
+
     public function __construct(
         SubjectCatalogService $subjectCatalog,
         AuditLogService $auditLog,
-        ExamGroupService $groupService
+        ExamGroupService $groupService,
+        AssistantAvailabilityService $assistantAvailability
     ) {
         $this->subjectCatalog = $subjectCatalog;
         $this->auditLog = $auditLog;
         $this->groupService = $groupService;
+        $this->assistantAvailability = $assistantAvailability;
     }
 
     /**
@@ -200,12 +204,31 @@ class ExamService
         $this->assertTeacherGiven($teacherId);
 
         $exam = DB::transaction(function () use ($exam, $data, $teacherId) {
+            // Mantener el orden de bloqueo: auxiliar -> examen.
+            $lockedAssistantIds = $this->lockCurrentAssistantUsers(
+                (int) $exam->id_examen
+            );
+
             $exam = $this->lockExam($exam);
 
             $this->assertOwnedBy($exam, $teacherId);
 
             if ($exam->estado !== Exam::PROGRAMADO) {
                 throw new ExamStateException($this->notEditableMessage($exam->estado));
+            }
+
+            // Detectar auxiliares habilitados mientras se esperaban los bloqueos.
+            $currentAssistantIds = DB::table('examen_auxiliar')
+                ->where('id_examen', $exam->id_examen)
+                ->pluck('id_usuario')
+                ->all();
+
+            if (array_diff($currentAssistantIds, $lockedAssistantIds) !== []) {
+                throw ValidationException::withMessages([
+                    'auxiliares' => [
+                        'La lista de auxiliares cambió durante la edición. Vuelva a intentarlo.',
+                    ],
+                ]);
             }
 
             $before = $exam->getAttributes();
@@ -217,11 +240,31 @@ class ExamService
             $attributes = $this->prepareAttributes($data, $teacherId);
 
             $this->lockSchedules($teacherId, $data['ambientes']);
-            $this->assertNoUnconfirmedWarnings($data, $teacherId, $exam->id_examen);
+            $this->assertNoUnconfirmedWarnings(
+                $data,
+                $teacherId,
+                $exam->id_examen
+            );
 
             $exam->update($attributes);
             $this->releaseRemovedClassrooms($exam, $data['ambientes']);
             $exam->classrooms()->sync($data['ambientes']);
+
+            // Revalidar utilizando el horario y los ambientes actualizados.
+            $assistants = DB::table('examen_auxiliar')
+                ->where('id_examen', $exam->id_examen)
+                ->orderBy('id_usuario')
+                ->get(['id_usuario', 'id_ambiente']);
+
+            foreach ($assistants as $assistant) {
+                $this->assistantAvailability->assertAvailable(
+                    $exam,
+                    (string) $assistant->id_usuario,
+                    $assistant->id_ambiente === null
+                        ? null
+                        : (int) $assistant->id_ambiente
+                );
+            }
 
             $after = $exam->getAttributes();
             $after['ambientes'] = $exam->classrooms()
@@ -241,6 +284,29 @@ class ExamService
         });
 
         return $this->loadDetail($exam);
+    }
+
+    /**
+     * Bloquea los auxiliares habilitados antes de bloquear el examen.
+     *
+     * Mantiene el orden utilizado al habilitar y asignar auxiliares.
+     */
+    private function lockCurrentAssistantUsers(int $examId): array
+    {
+        $assistantIds = DB::table('examen_auxiliar')
+            ->where('id_examen', $examId)
+            ->orderBy('id_usuario')
+            ->pluck('id_usuario')
+            ->all();
+
+        foreach ($assistantIds as $assistantId) {
+            DB::table('usuario')
+                ->where('id_usuario', $assistantId)
+                ->lockForUpdate()
+                ->first();
+        }
+
+        return $assistantIds;
     }
 
     /**

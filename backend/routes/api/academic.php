@@ -70,10 +70,15 @@ Route::post(
     [StudentRosterController::class, 'confirm']
 );
 
-// HU-08: auxiliares del docente. {id_grupo} y {id_examen} son enteros; {id_usuario} es un uuid.
+// HU-029: auxiliares del docente. Hasta 9 dígitos para evitar desbordar int4; usuarios con UUID.
 Route::prefix('docente')->group(function () {
     Route::get('auxiliares', [AssistantController::class, 'index']);
     Route::get('auxiliares/buscar', [AssistantController::class, 'search']);
+
+    Route::get(
+        'examenes/{id_examen}/auxiliares/sugeridos',
+        [AssistantController::class, 'suggestedForExam']
+    )->where('id_examen', '[0-9]{1,9}');
 
     Route::get('grupos', [MyGroupsController::class, 'index']);
 
@@ -81,14 +86,14 @@ Route::prefix('docente')->group(function () {
         ->whereUuid('id_usuario');
 
     Route::post('grupos/{id_grupo}/auxiliares', [AssistantController::class, 'addToGroup'])
-        ->whereNumber('id_grupo');
+        ->where('id_grupo', '[0-9]{1,9}');
     Route::post('examenes/{id_examen}/auxiliares', [AssistantController::class, 'enableForExam'])
-        ->whereNumber('id_examen');
+        ->where('id_examen', '[0-9]{1,9}');
 
     Route::delete('grupos/{id_grupo}/auxiliares/{id_usuario}', [AssistantController::class, 'removeFromGroup'])
-        ->whereNumber('id_grupo')
+        ->where('id_grupo', '[0-9]{1,9}')
         ->whereUuid('id_usuario');
     Route::delete('examenes/{id_examen}/auxiliares/{id_usuario}', [AssistantController::class, 'removeFromExam'])
-        ->whereNumber('id_examen')
+        ->where('id_examen', '[0-9]{1,9}')
         ->whereUuid('id_usuario');
 });

@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom'
 import { LoadingState } from '@/components/common/LoadingState'
 import { MyAssignmentsPage, MyAssistantsPage } from '@/features/assistants'
+import { ExamAssistantsPage } from '@/features/assistants/pages/ExamAssistantsPage'
 import {
   CHANGE_PASSWORD_PATH,
   CambiarContrasenaPage,
@@ -50,6 +51,10 @@ function DocenteRoutes() {
       <Route
         path="/mis-auxiliares"
         element={guarded('auxiliares.gestionar', <MyAssistantsPage />)}
+      />
+      <Route
+        path="/examenes/:examId/auxiliares"
+        element={guarded('examenes.gestionar', <ExamAssistantsPage />)}
       />
       <Route
         path="/examenes/:examId/editar"

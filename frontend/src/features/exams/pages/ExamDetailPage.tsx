@@ -344,25 +344,27 @@ export function ExamDetailPage() {
                 </p>
               </div>
 
-              {isProgramado && (
+              {exam && (
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => navigate('/mis-auxiliares')}
+                    onClick={() => navigate(`/examenes/${id}/auxiliares`)}
                   >
                     <Users className="size-4" aria-hidden="true" />
-                    Habilitar auxiliares
+                    {isProgramado ? 'Habilitar auxiliares' : 'Ver auxiliares'}
                   </Button>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowEnvironmentInfo(true)}
-                  >
-                    <Building2 className="size-4" aria-hidden="true" />
-                    Asignar ambientes
-                  </Button>
+                  {isProgramado && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowEnvironmentInfo(true)}
+                    >
+                      <Building2 className="size-4" aria-hidden="true" />
+                      Asignar ambientes
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
