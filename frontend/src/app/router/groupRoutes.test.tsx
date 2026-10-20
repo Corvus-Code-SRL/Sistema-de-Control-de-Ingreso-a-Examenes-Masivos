@@ -6,6 +6,9 @@ import { groupStudentsResponse, makeGroupStudent } from '@/test/groupStudentFixt
 import { mockApiWith } from '@/test/http'
 import { renderApp } from '@/test/renderApp'
 
+/** La app completa arranca la sesión antes de la vista: bajo carga tarda más que la espera por defecto. */
+const BOOT = { timeout: 4000 }
+
 /** Rutas del detalle del grupo (HU-020) y su carga de nómina, con la sesión de un Docente. */
 function stubBackend() {
   window.localStorage.setItem(TOKEN_STORAGE_KEY, 'tok')
@@ -37,7 +40,9 @@ describe('AppRouter — detalle del grupo', () => {
 
     const app = renderApp('/grupos/100')
 
-    expect(await screen.findByRole('heading', { name: 'Estudiantes inscritos' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Estudiantes inscritos' }, BOOT)
+    ).toBeInTheDocument()
     expect(app.pathname).toBe('/grupos/100')
   })
 
@@ -46,8 +51,18 @@ describe('AppRouter — detalle del grupo', () => {
 
     const app = renderApp('/cursos/100?q=adriana')
 
-    await waitFor(() => expect(app.pathname).toBe('/grupos/100'))
-    expect(await screen.findByRole('searchbox')).toHaveValue('adriana')
+    await waitFor(() => expect(app.pathname).toBe('/grupos/100'), BOOT)
+    expect(await screen.findByRole('searchbox', {}, BOOT)).toHaveValue('adriana')
+  })
+
+  it('la edición del grupo tiene su propia URL', async () => {
+    stubBackend()
+
+    const app = renderApp('/grupos/100/editar')
+
+    expect(await screen.findByLabelText(/N° de grupo/i, {}, BOOT)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Editar grupo' })).toBeInTheDocument()
+    expect(app.pathname).toBe('/grupos/100/editar')
   })
 
   it('la carga de nómina tiene su propia URL', async () => {
@@ -55,7 +70,7 @@ describe('AppRouter — detalle del grupo', () => {
 
     const app = renderApp('/grupos/100/nomina')
 
-    expect(await screen.findByText('Carga de nómina')).toBeInTheDocument()
+    expect(await screen.findByText('Carga de nómina', {}, BOOT)).toBeInTheDocument()
     expect(app.pathname).toBe('/grupos/100/nomina')
   })
 })

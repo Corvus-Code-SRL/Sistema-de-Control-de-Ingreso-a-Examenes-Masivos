@@ -1,6 +1,6 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useLocation } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GroupDetailPage } from './GroupDetailPage'
 import { makeForeignGroup, makeGroup, makeGroupWithoutRoster } from '@/test/fixtures'
@@ -12,9 +12,14 @@ import {
 import { renderWithRouter } from '@/test/render'
 
 function LocationProbe() {
-  const { pathname, search } = useLocation()
+  const { pathname, search, state } = useLocation()
 
-  return <output data-testid="location">{`${pathname}${search}`}</output>
+  return (
+    <>
+      <output data-testid="location">{`${pathname}${search}`}</output>
+      <output data-testid="location-state">{JSON.stringify(state)}</output>
+    </>
+  )
 }
 
 function renderPage(route = '/grupos/100') {
@@ -36,6 +41,18 @@ async function loadedTable() {
 function studentRequests(calls: { url: string }[]) {
   return calls.filter((call) => /\/grupos\/\d+\/estudiantes/.test(call.url))
 }
+
+/** Peticiones GET cuya ruta coincide; la búsqueda (`?q=&page=`) no cuenta para la coincidencia. */
+function getRequests(calls: { url: string; method: string }[], path: RegExp): number {
+  return calls.filter((call) => call.method === 'GET' && path.test(new URL(call.url).pathname)).length
+}
+
+/** Deja correr los efectos pendientes: un bucle de recargas volvería a pedir en este intervalo. */
+function settle() {
+  return new Promise((resolve) => setTimeout(resolve, 100))
+}
+
+const PAST_PERIOD_NOTICE = 'Este grupo pertenece a un período anterior; solo se puede consultar'
 
 const maria = makeGroupStudent({
   id_estudiante: 7,
@@ -307,21 +324,81 @@ describe('GroupDetailPage — acciones (CA-5)', () => {
     )
   })
 
-  it('«Editar grupo» abre la edición con el docente y los inscritos de la lista', async () => {
-    const user = userEvent.setup()
-    stubGroupApi({
-      group: makeGroup({ cantidad_estudiantes: 118, docente: { nombre_completo: 'Marcelo Quiroga' } }),
-      students: makeGroupStudents(37),
-    })
+  it('«Editar grupo» lleva a la vista de edición del grupo, sin abrir un modal', async () => {
+    stubGroupApi({ students: [maria] })
 
     renderPage()
     await loadedTable()
-    await user.click(screen.getByRole('button', { name: /editar grupo/i }))
 
-    const dialog = await screen.findByRole('dialog')
+    expect(screen.getByRole('link', { name: /editar grupo/i })).toHaveAttribute(
+      'href',
+      '/grupos/100/editar'
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
 
-    expect(within(dialog).getByText('Marcelo Quiroga')).toBeInTheDocument()
-    expect(within(dialog).getByText(/Los 37 estudiantes inscritos no se modifican/)).toBeInTheDocument()
+  it('al volver de editar muestra «Grupo actualizado» una sola vez y no vuelve a pedir datos', async () => {
+    const api = stubGroupApi({ students: [maria] })
+
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/grupos/100',
+            state: {
+              flash: {
+                title: 'Grupo actualizado',
+                description: 'Los cambios se guardaron correctamente.',
+              },
+            },
+          },
+        ]}
+      >
+        <Routes>
+          <Route
+            path="/grupos/:idGrupo"
+            element={
+              <>
+                <GroupDetailPage />
+                <LocationProbe />
+              </>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Grupo actualizado')).toBeInTheDocument()
+    expect(screen.getByText('Los cambios se guardaron correctamente.')).toBeInTheDocument()
+    // El aviso se borra del historial: recargar la página no lo repite.
+    await waitFor(() => expect(screen.getByTestId('location-state')).toHaveTextContent('null'))
+    expect(location()).toBe('/grupos/100')
+
+    // Borrar el aviso del historial no cambia la ruta ni la búsqueda: nada se vuelve a pedir.
+    await settle()
+    expect(getRequests(api.calls, /\/grupos\/100$/)).toBe(1)
+    expect(getRequests(api.calls, /\/grupos\/100\/estudiantes$/)).toBe(1)
+  })
+
+  it('pide el grupo y sus estudiantes una sola vez', async () => {
+    const api = stubGroupApi({ students: [maria] })
+
+    renderPage()
+    await loadedTable()
+    await settle()
+
+    expect(getRequests(api.calls, /\/grupos\/100$/)).toBe(1)
+    expect(getRequests(api.calls, /\/grupos\/100\/estudiantes$/)).toBe(1)
+  })
+
+  it('sin aviso en la navegación no muestra ningún mensaje', async () => {
+    stubGroupApi({ students: [maria] })
+
+    renderPage()
+    await loadedTable()
+
+    expect(screen.queryByText('Grupo actualizado')).not.toBeInTheDocument()
+    expect(screen.queryByText(PAST_PERIOD_NOTICE)).not.toBeInTheDocument()
   })
 
   it('un grupo de un período anterior es de solo lectura: sin editar ni cargar nómina', async () => {
@@ -330,7 +407,9 @@ describe('GroupDetailPage — acciones (CA-5)', () => {
     renderPage('/grupos/300')
 
     expect(await screen.findByText('Este grupo aún no tiene estudiantes')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /editar grupo/i })).not.toBeInTheDocument()
+    // CA-6 (HU-019): el aviso explica por qué no se ofrece editar.
+    expect(screen.getByText(PAST_PERIOD_NOTICE)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /editar grupo/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /cargar nómina/i })).not.toBeInTheDocument()
     expect(screen.getByText('Este grupo ya no admite cargar la nómina.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /ver exámenes/i })).toBeInTheDocument()
@@ -343,7 +422,7 @@ describe('GroupDetailPage — acciones (CA-5)', () => {
     renderPage()
     await loadedTable()
 
-    expect(screen.queryByRole('button', { name: /editar grupo/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /editar grupo/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /cargar nómina/i })).not.toBeInTheDocument()
   })
 })
