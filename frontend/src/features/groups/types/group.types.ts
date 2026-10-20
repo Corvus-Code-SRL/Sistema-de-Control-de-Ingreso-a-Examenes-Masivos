@@ -60,6 +60,8 @@ export type SubjectGroupsResponse = ResourceResponse<
 export interface GroupDetailMeta {
   id_periodo_activo: number
   es_periodo_activo: boolean
+  /** Un examen del grupo está en ingreso o en curso: el grupo no se puede editar (HU-019). */
+  edicion_bloqueada: boolean
 }
 
 /** Respuesta de `GET /grupos/{id_grupo}`. */
@@ -121,13 +123,11 @@ export interface CreateGroupPayload {
 }
 
 /**
- * No incluye id_carrera, id_materia ni id_usuario_docente: son inmutables
- * y el backend los ignora aunque se envíen. Tampoco "gestion", por el
- * mismo motivo que CreateGroupPayload.
+ * Solo el número de grupo es editable (HU-019). id_carrera, id_materia e id_usuario_docente son
+ * inmutables, y el período tampoco cambia: solo el vigente admite escritura (HU-006).
  */
 export interface UpdateGroupPayload {
   num_grupo: string
-  id_periodo?: number
 }
 
 /**

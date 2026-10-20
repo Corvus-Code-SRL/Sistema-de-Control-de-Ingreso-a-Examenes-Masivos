@@ -74,11 +74,15 @@ interface GroupApiOptions {
   group?: Group
   subject?: SubjectCareer
   esPeriodoActivo?: boolean
+  /** Un examen del grupo está en ingreso o en curso (HU-019). */
+  edicionBloqueada?: boolean
   students?: GroupStudent[]
   /** Fuerza una respuesta de error en la lista de estudiantes. */
   studentsStatus?: number
   /** Fuerza una respuesta de error en el detalle del grupo. */
   detailStatus?: number
+  /** Respuesta de `PUT /grupos/{id}`; por defecto, 200 con los datos enviados. */
+  updateResponse?: { status: number; body: unknown }
 }
 
 /** Simula el detalle del grupo y su lista de estudiantes; devuelve las llamadas para inspeccionarlas. */
@@ -86,11 +90,13 @@ export function stubGroupApi({
   group = makeGroup(),
   subject = makeSubject(),
   esPeriodoActivo = true,
+  edicionBloqueada = false,
   students = [],
   studentsStatus,
   detailStatus,
+  updateResponse,
 }: GroupApiOptions = {}) {
-  return mockApiWith(({ url }) => {
+  return mockApiWith(({ url, method, body }) => {
     const { pathname, searchParams } = new URL(url, 'http://localhost')
 
     if (/\/grupos\/\d+\/estudiantes$/.test(pathname)) {
@@ -107,12 +113,25 @@ export function stubGroupApi({
       }
     }
 
+    if (/\/grupos\/\d+$/.test(pathname) && method === 'PUT') {
+      if (updateResponse) return updateResponse
+
+      const payload = typeof body === 'object' && body !== null ? body : {}
+
+      return {
+        body: {
+          data: { grupo: { ...group, ...payload }, materia: subject },
+          mensaje: 'Grupo actualizado correctamente.',
+        },
+      }
+    }
+
     if (/\/grupos\/\d+$/.test(pathname)) {
       if (detailStatus) {
         return { status: detailStatus, body: { message: 'Error interno del servidor.' } }
       }
 
-      return { body: groupDetailResponse(group, subject, esPeriodoActivo) }
+      return { body: groupDetailResponse(group, subject, esPeriodoActivo, edicionBloqueada) }
     }
 
     if (pathname.endsWith('/periodos')) {
