@@ -20,7 +20,7 @@ use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 /**
- * Crea, modifica y cancela exámenes (HU-24).
+ * Gestiona el registro y las operaciones sobre exámenes.
  *
  * El examen pertenece a un par materia-carrera y queda asociado al docente que lo
  * crea. Solo mientras está PROGRAMADO admite cambios o cancelación: desde que se
@@ -36,14 +36,18 @@ class ExamService
 
     private ExamGroupService $groupService;
 
+    private AssistantAvailabilityService $assistantAvailability;
+
     public function __construct(
         SubjectCatalogService $subjectCatalog,
         AuditLogService $auditLog,
-        ExamGroupService $groupService
+        ExamGroupService $groupService,
+        AssistantAvailabilityService $assistantAvailability
     ) {
         $this->subjectCatalog = $subjectCatalog;
         $this->auditLog = $auditLog;
         $this->groupService = $groupService;
+        $this->assistantAvailability = $assistantAvailability;
     }
 
     /**
@@ -167,7 +171,25 @@ class ExamService
 
             $exam->classrooms()->attach($data['ambientes']);
 
-            return $this->groupService->assignGroups($exam, $data['grupos'], $teacherId);
+            $this->groupService->assignGroups(
+                $exam,
+                $data['grupos'],
+                $teacherId
+            );
+
+            $after = $exam->getAttributes();
+            $after['ambientes'] = $data['ambientes'];
+            $after['grupos'] = $data['grupos'];
+
+            $this->auditLog->registrar(
+                'CREAR',
+                'examen',
+                null,
+                $after,
+                $teacherId
+            );
+
+            return $exam;
         });
 
         return $this->loadDetail($exam);
@@ -182,6 +204,11 @@ class ExamService
         $this->assertTeacherGiven($teacherId);
 
         $exam = DB::transaction(function () use ($exam, $data, $teacherId) {
+            // Mantener el orden de bloqueo: auxiliar -> examen.
+            $lockedAssistantIds = $this->lockCurrentAssistantUsers(
+                (int) $exam->id_examen
+            );
+
             $exam = $this->lockExam($exam);
 
             $this->assertOwnedBy($exam, $teacherId);
@@ -190,19 +217,96 @@ class ExamService
                 throw new ExamStateException($this->notEditableMessage($exam->estado));
             }
 
+            // Detectar auxiliares habilitados mientras se esperaban los bloqueos.
+            $currentAssistantIds = DB::table('examen_auxiliar')
+                ->where('id_examen', $exam->id_examen)
+                ->pluck('id_usuario')
+                ->all();
+
+            if (array_diff($currentAssistantIds, $lockedAssistantIds) !== []) {
+                throw ValidationException::withMessages([
+                    'auxiliares' => [
+                        'La lista de auxiliares cambió durante la edición. Vuelva a intentarlo.',
+                    ],
+                ]);
+            }
+
+            $before = $exam->getAttributes();
+            $before['ambientes'] = $exam->classrooms()
+                ->pluck('ambiente.id_ambiente')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
             $attributes = $this->prepareAttributes($data, $teacherId);
 
             $this->lockSchedules($teacherId, $data['ambientes']);
-            $this->assertNoUnconfirmedWarnings($data, $teacherId, $exam->id_examen);
+            $this->assertNoUnconfirmedWarnings(
+                $data,
+                $teacherId,
+                $exam->id_examen
+            );
 
             $exam->update($attributes);
             $this->releaseRemovedClassrooms($exam, $data['ambientes']);
             $exam->classrooms()->sync($data['ambientes']);
 
+            // Revalidar utilizando el horario y los ambientes actualizados.
+            $assistants = DB::table('examen_auxiliar')
+                ->where('id_examen', $exam->id_examen)
+                ->orderBy('id_usuario')
+                ->get(['id_usuario', 'id_ambiente']);
+
+            foreach ($assistants as $assistant) {
+                $this->assistantAvailability->assertAvailable(
+                    $exam,
+                    (string) $assistant->id_usuario,
+                    $assistant->id_ambiente === null
+                        ? null
+                        : (int) $assistant->id_ambiente
+                );
+            }
+
+            $after = $exam->getAttributes();
+            $after['ambientes'] = $exam->classrooms()
+                ->pluck('ambiente.id_ambiente')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $this->auditLog->registrar(
+                'MODIFICAR',
+                'examen',
+                $before,
+                $after,
+                $teacherId
+            );
+
             return $exam;
         });
 
         return $this->loadDetail($exam);
+    }
+
+    /**
+     * Bloquea los auxiliares habilitados antes de bloquear el examen.
+     *
+     * Mantiene el orden utilizado al habilitar y asignar auxiliares.
+     */
+    private function lockCurrentAssistantUsers(int $examId): array
+    {
+        $assistantIds = DB::table('examen_auxiliar')
+            ->where('id_examen', $examId)
+            ->orderBy('id_usuario')
+            ->pluck('id_usuario')
+            ->all();
+
+        foreach ($assistantIds as $assistantId) {
+            DB::table('usuario')
+                ->where('id_usuario', $assistantId)
+                ->lockForUpdate()
+                ->first();
+        }
+
+        return $assistantIds;
     }
 
     /**
@@ -341,6 +445,8 @@ class ExamService
      */
     private function assertNoUnconfirmedWarnings(array $data, string $teacherId, ?int $ignoredExamId): void
     {
+        $this->assertNoForeignClassroomConflicts($data, $teacherId, $ignoredExamId);
+
         if (! empty($data['confirmar_advertencias'])) {
             return;
         }
@@ -349,6 +455,49 @@ class ExamService
 
         if ($warnings !== []) {
             throw new ExamWarningsException($warnings);
+        }
+    }
+
+    /**
+     * Un ambiente reservado por otro docente no puede confirmarse
+     * como una simple advertencia.
+     */
+    private function assertNoForeignClassroomConflicts(
+        array $data,
+        string $teacherId,
+        ?int $ignoredExamId
+    ): void {
+        $startsAt = $this->startsAt($data);
+        $endsAt = $startsAt->copy()->addMinutes((int) $data['duracion']);
+
+        $occupied = $this->overlapping($startsAt, $endsAt, $ignoredExamId)
+            ->join(
+                'examen_ambiente',
+                'examen_ambiente.id_examen',
+                '=',
+                'examen.id_examen'
+            )
+            ->join(
+                'ambiente',
+                'ambiente.id_ambiente',
+                '=',
+                'examen_ambiente.id_ambiente'
+            )
+            ->where('examen.id_usuario_docente', '<>', $teacherId)
+            ->whereIn('examen_ambiente.id_ambiente', $data['ambientes'])
+            ->orderBy('ambiente.nro_aula')
+            ->pluck('ambiente.nro_aula')
+            ->unique()
+            ->values();
+
+        if ($occupied->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'ambientes' => [
+                    'Los ambientes ' . $occupied->implode(', ')
+                    . ' ya están reservados por otro docente en ese horario. '
+                    . 'Seleccione otro ambiente u horario.',
+                ],
+            ]);
         }
     }
 
@@ -386,6 +535,7 @@ class ExamService
         $classroomOverlaps = $this->overlapping($startsAt, $endsAt, $ignoredExamId)
             ->join('examen_ambiente', 'examen_ambiente.id_examen', '=', 'examen.id_examen')
             ->join('ambiente', 'ambiente.id_ambiente', '=', 'examen_ambiente.id_ambiente')
+            ->where('examen.id_usuario_docente', $teacherId)
             ->whereIn('examen_ambiente.id_ambiente', $data['ambientes'])
             ->orderBy('ambiente.nro_aula')
             ->get(['ambiente.nro_aula', 'examen.nombre_examen']);
@@ -395,6 +545,22 @@ class ExamService
                 ->map(fn ($row) => "El ambiente {$row->nro_aula} ya está reservado para "
                     . "«{$row->nombre_examen}» en ese horario.")
                 ->all();
+        }
+
+        if ($ignoredExamId === null) {
+            $totalStudents = DB::table('grupo_estudiante')
+                ->whereIn('id_grupo', $data['grupos'])
+                ->count();
+
+            $totalCapacity = Classroom::query()
+                ->whereIn('id_ambiente', $data['ambientes'])
+                ->sum('capacidad');
+
+            if ($totalCapacity < $totalStudents) {
+                $warnings['capacidad_insuficiente'] = [
+                    "La capacidad ({$totalCapacity}) es menor que los estudiantes de los grupos ({$totalStudents})",
+                ];
+            }
         }
 
         return $warnings;
@@ -437,15 +603,31 @@ class ExamService
         return Carbon::createFromFormat('Y-m-d H:i', $data['fecha'] . ' ' . $data['hora_inicio']);
     }
 
-    private function loadDetail(Exam $exam): Exam
+     private function loadDetail(Exam $exam): Exam
     {
-        return $exam->fresh([
+        $exam = $exam->fresh([
             'examType',
             'subject',
             'career',
             'classrooms',
             'groups' => fn ($query) => $query->withStudentCount(),
         ]);
+
+        if ($exam->estado === Exam::FINALIZADO) {
+            $historicalCounts = DB::table('examen_estudiante')
+                ->where('id_examen', $exam->id_examen)
+                ->selectRaw('id_grupo, COUNT(*) AS total')
+                ->groupBy('id_grupo')
+                ->pluck('total', 'id_grupo');
+
+            foreach ($exam->groups as $group) {
+                $group->cantidad_estudiantes = (int) (
+                    $historicalCounts[$group->id_grupo] ?? 0
+                );
+            }
+        }
+
+        return $exam;
     }
 
     private function notEditableMessage(string $status): string

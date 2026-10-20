@@ -13,6 +13,14 @@ export interface Assistant {
   correo: string
 }
 
+/** Auxiliar sugerido para un examen (HU-029). */
+export interface SuggestedAssistant {
+  id_usuario: string
+  nombre_completo: string
+  cod_sis: string
+  habilitado: boolean
+}
+
 /** Respuesta de los endpoints de listado y búsqueda simple. */
 export interface AssistantListResponse {
   data: Assistant[]

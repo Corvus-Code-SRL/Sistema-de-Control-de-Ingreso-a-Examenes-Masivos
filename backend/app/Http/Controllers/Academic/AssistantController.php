@@ -70,6 +70,18 @@ class AssistantController extends Controller
         return ApiResponse::success(AssistantResource::collection($assistants));
     }
 
+    public function suggestedForExam(
+        ManageAssistantsRequest $request,
+        int $id_examen
+    ): JsonResponse {
+        $assistants = $this->assistantService->suggestedForExam(
+            $id_examen,
+            $this->currentUser->teacherId()
+        );
+
+        return ApiResponse::success($assistants);
+    }
+
     public function addToGroup(AddAssistantToGroupRequest $request, int $id_grupo): JsonResponse
     {
         $this->assistantService->addToGroup(

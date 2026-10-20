@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 import { Navigate, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { LoadingState } from '@/components/common/LoadingState'
 import { MyAssignmentsPage, MyAssistantsPage } from '@/features/assistants'
+import { ExamAssistantsPage } from '@/features/assistants/pages/ExamAssistantsPage'
 import {
   CHANGE_PASSWORD_PATH,
   CambiarContrasenaPage,
@@ -14,7 +15,7 @@ import {
   type Capability,
 } from '@/features/auth'
 import { EntryControlPage, OpenEntryControlsPage } from '@/features/entry-control'
-import { CreateExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
+import { CreateExamPage, EditExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
 import { GroupDetailPage, GroupEditPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
 import { ClassroomsPage } from '@/features/classrooms'
 import { RiskCenterPage } from '@/features/risk-center/academic'
@@ -52,22 +53,50 @@ function DocenteRoutes() {
         path="/mis-auxiliares"
         element={guarded('auxiliares.gestionar', <MyAssistantsPage />)}
       />
-      <Route path="/grupos/:idGrupo" element={guarded('grupos.gestionar', <GroupDetailPage />)} />
+      <Route
+        path="/grupos/:idGrupo"
+        element={guarded('grupos.gestionar', <GroupDetailPage />)}
+      />
+
       <Route
         path="/grupos/:idGrupo/editar"
         element={guarded('grupos.gestionar', <GroupEditPage />)}
       />
+
       <Route
         path="/grupos/:idGrupo/nomina"
         element={guarded('grupos.gestionar', <RosterUploadPage />)}
       />
-      <Route path="/cursos/:idGrupo" element={<CourseDetailRedirect />} />
-      <Route path="/examenes/nuevo" element={guarded('examenes.gestionar', <CreateExamPage />)} />
+
+      <Route
+        path="/cursos/:idGrupo"
+        element={<CourseDetailRedirect />}
+      />
+
+      <Route
+        path="/examenes/nuevo"
+        element={guarded('examenes.gestionar', <CreateExamPage />)}
+      />
+
       <Route
         path="/examenes/programados"
         element={guarded('examenes.gestionar', <ExamsPage />)}
       />
-      <Route path="/examenes/:examId" element={guarded('examenes.gestionar', <ExamDetailPage />)} />
+
+      <Route
+        path="/examenes/:examId/auxiliares"
+        element={guarded('examenes.gestionar', <ExamAssistantsPage />)}
+      />
+
+      <Route
+        path="/examenes/:examId/editar"
+        element={guarded('examenes.gestionar', <EditExamPage />)}
+      />
+
+      <Route
+        path="/examenes/:examId"
+        element={guarded('examenes.gestionar', <ExamDetailPage />)}
+      />
       <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
       <Route
         path="/examenes/:examId/control-ingreso"

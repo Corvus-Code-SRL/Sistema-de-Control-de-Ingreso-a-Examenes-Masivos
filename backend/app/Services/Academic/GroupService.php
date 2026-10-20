@@ -94,8 +94,7 @@ class GroupService
             (int) $group->id_carrera,
             (int) $group->id_materia,
             $teacherId
-        );
-
+         );
         $this->markOwnGroup($group, $teacherId);
 
         $activePeriodId = $this->subjectCatalog->activePeriodId();
@@ -139,10 +138,9 @@ class GroupService
             $data['num_grupo'],
             $periodId
         );
-
         $group = DB::transaction(function () use ($pair, $data, $period, $teacherId) {
             try {
-                return Group::create([
+                $group = Group::create([
                     'id_carrera' => $pair->id_carrera,
                     'id_materia' => $pair->id_materia,
                     'num_grupo' => $data['num_grupo'],
@@ -151,11 +149,26 @@ class GroupService
                     'id_gestion_periodo' => $period->id_gestion_periodo,
                 ]);
             } catch (QueryException $exception) {
-                // Red de seguridad ante una carrera entre dos solicitudes casi
-                // simultáneas: la validación de arriba ya cubre el caso normal,
-                // pero las constraints unq_grupo y fk_grupo_oferta_academica son la garantía real.
                 throw $this->translateDatabaseError($exception);
             }
+
+            $this->auditLog->registrar(
+                'CREAR',
+                'grupo',
+                null,
+                $group->only([
+                    'id_grupo',
+                    'id_carrera',
+                    'id_materia',
+                    'num_grupo',
+                    'estado',
+                    'id_usuario_docente',
+                    'id_gestion_periodo',
+                ]),
+                $teacherId
+            );
+
+            return $group;
         });
 
         return $this->showGroup($this->findGroup((int) $group->id_grupo), $teacherId);

@@ -26,10 +26,14 @@ class AssistantClassroomService
     private const ACTIVE_STATES = [Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::EN_CURSO];
 
     private AuditLogService $auditLog;
+    private AssistantAvailabilityService $availability;
 
-    public function __construct(AuditLogService $auditLog)
-    {
+    public function __construct(
+        AuditLogService $auditLog,
+        AssistantAvailabilityService $availability
+    ) {
         $this->auditLog = $auditLog;
+        $this->availability = $availability;
     }
 
     /**
@@ -64,6 +68,12 @@ class AssistantClassroomService
     public function assign(Exam $exam, string $userId, int $classroomId, string $teacherId): ExamAssistant
     {
         return DB::transaction(function () use ($exam, $userId, $classroomId, $teacherId) {
+            // Mismo orden de bloqueos que en HU-029: auxiliar y después examen.
+            DB::table('usuario')
+                ->where('id_usuario', $userId)
+                ->lockForUpdate()
+                ->first();
+
             // Serializa esta operación con las demás que bloquean el examen (edición y cancelación).
             $exam = Exam::query()->whereKey($exam->id_examen)->lockForUpdate()->firstOrFail();
 
@@ -90,6 +100,9 @@ class AssistantClassroomService
                     'id_ambiente' => 'El ambiente seleccionado no pertenece a este examen.',
                 ]);
             }
+
+            // HU-030: la asignación debe ser compatible con otros exámenes.
+            $this->availability->assertAvailable($exam, $userId, $classroomId);
 
             if ($assistant->id_ambiente !== $classroomId) {
                 ExamAssistant::forExamAndAssistant($exam->id_examen, $userId)

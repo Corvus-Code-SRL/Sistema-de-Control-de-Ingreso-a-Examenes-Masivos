@@ -76,12 +76,21 @@ abstract class TestCase extends BaseTestCase
     {
         $connection = $app->make('db')->connection();
 
-        self::assertTestDatabase($connection->getDatabaseName(), $connection->getConfig('host'));
+        self::assertTestDatabase(
+            $connection->getDatabaseName(),
+            $connection->getConfig('host')
+        );
 
         $connection->unprepared('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
-        $app->make(\Illuminate\Contracts\Console\Kernel::class)->call('migrate', ['--force' => true]);
-    }
 
+        $kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
+
+        $kernel->call('migrate', ['--force' => true]);
+        $kernel->call('db:seed', [
+            '--class' => \Database\Seeders\ActionSeeder::class,
+            '--force' => true,
+        ]);
+    }
     /**
      * La suite borra y recrea el esquema completo, así que solo corre contra una base llamada
      * sciem_test cuyo host sea local (127.0.0.1, localhost, ::1) o el servicio de Docker «postgres».

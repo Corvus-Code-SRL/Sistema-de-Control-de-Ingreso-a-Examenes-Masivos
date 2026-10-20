@@ -4,6 +4,8 @@ namespace App\Services\Academic\Importers;
 
 use App\Exceptions\Academic\StudentRosterPreviewUnavailableException;
 use App\Services\Academic\StudentRosterGroupAccess;
+use App\Services\Security\AuditLogService;
+use Illuminate\Support\Facades\DB;
 
 class StudentRosterConfirmationService
 {
@@ -13,18 +15,22 @@ class StudentRosterConfirmationService
 
     private StudentRosterAnalyzer $analyzer;
 
+    private AuditLogService $auditLog;
+
     private StudentRosterConfirmer $confirmer;
 
     public function __construct(
         StudentRosterPreviewStore $previewStore,
         StudentRosterGroupAccess $groupAccess,
         StudentRosterAnalyzer $analyzer,
-        StudentRosterConfirmer $confirmer
+        StudentRosterConfirmer $confirmer,
+        AuditLogService $auditLog
     ) {
         $this->previewStore = $previewStore;
         $this->groupAccess = $groupAccess;
         $this->analyzer = $analyzer;
         $this->confirmer = $confirmer;
+        $this->auditLog = $auditLog;
     }
 
     public function confirm(
@@ -64,10 +70,29 @@ class StudentRosterConfirmationService
             $preview->rows()
         );
 
-        $result = $this->confirmer->confirm(
-            (int) $group->id_grupo,
-            $analysis
-        );
+            $result = DB::transaction(function () use ($group, $analysis, $teacherId) {
+            $result = $this->confirmer->confirm(
+                (int) $group->id_grupo,
+                $analysis
+            );
+
+            $this->auditLog->registrar(
+                'CREAR',
+                'grupo_estudiante',
+                null,
+                [
+                    'id_grupo' => (int) $group->id_grupo,
+                    'total_filas' => $result->totalRows(),
+                    'estudiantes_creados' => $result->createdStudents(),
+                    'estudiantes_inscritos' => $result->enrolledStudents(),
+                    'estudiantes_omitidos' => $result->alreadyEnrolled(),
+                    'filas_inconsistentes' => $result->inconsistentRows(),
+                ],
+                $teacherId
+            );
+
+            return $result;
+        });
 
         $this->previewStore->forget($token);
 

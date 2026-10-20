@@ -2,33 +2,58 @@
 
 namespace App\Services\Exams;
 
+use App\Models\Exam;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Participantes de un examen, derivados y nunca copiados.
  *
- *   esperados = estudiantes de los grupos del examen en grupo_estudiante
- *   ingresados = filas con estado INGRESO o CON_RETRASO
- *   pendientes = esperados sin ingreso real, incluso si tienen una fila NO_INGRESO
- *
- * Es la única fuente de esta derivación: el control de ingreso y el seguimiento del
- * examen la consumen en lugar de reescribirla.
+ * esperados = estudiantes asociados al examen.
+ * ingresados = estudiantes con INGRESO o CON_RETRASO.
+ * pendientes = estudiantes esperados sin ingreso real.
  */
 class ExamParticipantService
 {
     /**
-     * Un estudiante con inscripción en más de un grupo del examen aparece una sola
-     * vez; id_grupo es el menor de esos grupos.
+     * Un estudiante inscrito en varios grupos del examen aparece una sola vez.
+     * Su id_grupo corresponde al menor de esos grupos.
      */
     public function expected(int $examId): Builder
     {
+        $exam = Exam::query()->findOrFail($examId);
+
+        if ($exam->estado === Exam::FINALIZADO) {
+            return DB::table('estudiante')
+                ->join(
+                    'examen_estudiante',
+                    'examen_estudiante.id_estudiante',
+                    '=',
+                    'estudiante.id_estudiante'
+                )
+                ->where('examen_estudiante.id_examen', $examId)
+                ->select(
+                    'estudiante.*',
+                    'examen_estudiante.id_grupo'
+                );
+        }
+
         return DB::table('estudiante')
-            ->join('grupo_estudiante', 'grupo_estudiante.id_estudiante', '=', 'estudiante.id_estudiante')
-            ->join('grupo_examen', 'grupo_examen.id_grupo', '=', 'grupo_estudiante.id_grupo')
+            ->join(
+                'grupo_estudiante',
+                'grupo_estudiante.id_estudiante',
+                '=',
+                'estudiante.id_estudiante'
+            )
+            ->join(
+                'grupo_examen',
+                'grupo_examen.id_grupo',
+                '=',
+                'grupo_estudiante.id_grupo'
+            )
             ->where('grupo_examen.id_examen', $examId)
             ->select('estudiante.*')
-            ->selectRaw('min(grupo_estudiante.id_grupo) as id_grupo')
+            ->selectRaw('MIN(grupo_estudiante.id_grupo) AS id_grupo')
             ->groupBy('estudiante.id_estudiante');
     }
 

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -34,7 +34,10 @@ const emptyForm: CreateExamFormData = {
 }
 
 /** `submitExam` simula una creación exitosa: entrega el examen al callback que pasó el contenedor. */
-const hook = vi.hoisted(() => ({ onSuccess: undefined as undefined | ((exam: unknown) => void) }))
+const hook = vi.hoisted(() => ({
+  onSuccess: undefined as undefined | ((exam: unknown) => void),
+  overrides: {} as Record<string, unknown>,
+}))
 
 vi.mock('../hooks/useCreateExam', () => ({
   useCreateExam: (onSuccess: (exam: unknown) => void) => {
@@ -53,6 +56,7 @@ vi.mock('../hooks/useCreateExam', () => ({
       validateForm: () => ({ isValid: true, errors: {}, warnings: {} }),
       toggleGroup: vi.fn(),
       submitExam: () => hook.onSuccess?.(createdExam),
+      ...hook.overrides,
     }
   },
 }))
@@ -77,6 +81,7 @@ function renderContainer() {
 describe('CreateExamContainer (HU-024)', () => {
   beforeEach(() => {
     hook.onSuccess = undefined
+    hook.overrides = {}
   })
 
   it('Cancelar lleva a Programados y no retrocede en el historial', async () => {
@@ -87,13 +92,21 @@ describe('CreateExamContainer (HU-024)', () => {
     expect(screen.getByTestId('ubicacion')).toHaveTextContent('/examenes/programados')
   })
 
-  it('tras crear el examen ofrece configurar auxiliares y ambientes en su detalle', async () => {
+  it('tras crear el examen ofrece acceder a su detalle', async () => {
     renderContainer()
-    await userEvent.click(screen.getByRole('button', { name: /guardar examen/i }))
 
-    expect(await screen.findByText('Examen creado')).toBeInTheDocument()
+    await userEvent.click(
+      screen.getByRole('button', { name: /guardar examen/i })
+    )
+
     expect(
-      screen.getByRole('link', { name: 'Configurar auxiliares y ambientes' })
+      await screen.findByRole('dialog', {
+        name: 'Examen creado correctamente',
+      })
+    ).toBeInTheDocument()
+
+    expect(
+      screen.getByRole('link', { name: 'Ver detalle del examen' })
     ).toHaveAttribute('href', '/examenes/77')
   })
 
@@ -113,5 +126,207 @@ describe('CreateExamContainer (HU-024)', () => {
     await userEvent.click(await screen.findByRole('button', { name: /crear otro examen/i }))
 
     expect(screen.getByRole('button', { name: /guardar examen/i })).toBeInTheDocument()
+  })
+
+  it('muestra capacidad suficiente cuando las plazas alcanzan', () => {
+    hook.overrides = {
+      formData: {
+        ...emptyForm,
+        ambientes: [1, 2],
+        grupos: [101],
+      },
+      options: {
+        materias: [],
+        ambientes: [
+          { id_ambiente: 1, nro_aula: '691A', capacidad: 40 },
+          { id_ambiente: 2, nro_aula: '691B', capacidad: 50 },
+        ],
+        grupos: [],
+      },
+      totalStudents: 75,
+    }
+
+    renderContainer()
+
+    const summary = screen.getByRole('region', {
+      name: /resumen de capacidad del examen/i,
+    })
+
+    expect(within(summary).getByText('90')).toBeInTheDocument()
+    expect(within(summary).getByText('75')).toBeInTheDocument()
+    expect(within(summary).getByText('0')).toBeInTheDocument()
+
+    expect(
+      within(summary).queryByText(/la capacidad seleccionada es insuficiente/i)
+    ).not.toBeInTheDocument()
+  })
+
+  it('advierte cuando faltan plazas sin bloquear el registro', () => {
+    hook.overrides = {
+      formData: {
+        ...emptyForm,
+        ambientes: [1, 2],
+        grupos: [101],
+      },
+      options: {
+        materias: [],
+        ambientes: [
+          { id_ambiente: 1, nro_aula: '691A', capacidad: 40 },
+          { id_ambiente: 2, nro_aula: '691B', capacidad: 35 },
+        ],
+        grupos: [],
+      },
+      totalStudents: 90,
+    }
+
+    renderContainer()
+
+    const summary = screen.getByRole('region', {
+      name: /resumen de capacidad del examen/i,
+    })
+
+    expect(within(summary).getByText('75')).toBeInTheDocument()
+    expect(within(summary).getByText('90')).toBeInTheDocument()
+    expect(within(summary).getByText('15')).toBeInTheDocument()
+
+    expect(
+      within(summary).getByText(/la capacidad seleccionada es insuficiente/i)
+    ).toBeInTheDocument()
+
+    expect(
+      screen.getByRole('button', { name: /guardar examen/i })
+    ).toBeEnabled()
+  })
+
+  it('solicita completar la seleccion antes de comparar capacidad', () => {
+    hook.overrides = {
+      formData: {
+        ...emptyForm,
+        ambientes: [1],
+        grupos: [],
+      },
+      options: {
+        materias: [],
+        ambientes: [
+          { id_ambiente: 1, nro_aula: '691A', capacidad: 40 },
+        ],
+        grupos: [],
+      },
+      totalStudents: 0,
+    }
+
+    renderContainer()
+
+    const summary = screen.getByRole('region', {
+      name: /resumen de capacidad del examen/i,
+    })
+
+    expect(
+      within(summary).getByText(
+        /seleccione ambientes y grupos para completar la comparación de capacidad/i
+      )
+    ).toBeInTheDocument()
+  })
+
+  it('bloquea el guardado normal cuando hay advertencias pendientes', () => {
+    const submitExam = vi.fn()
+
+    hook.overrides = {
+      warnings: [
+        'La capacidad de los ambientes seleccionados es insuficiente.',
+      ],
+      submitExam,
+    }
+
+    renderContainer()
+
+    const dialog = screen.getByRole('dialog', {
+      name: 'Revise antes de confirmar',
+    })
+
+    expect(dialog).toHaveTextContent(
+      'La capacidad de los ambientes seleccionados es insuficiente.'
+    )
+
+    expect(
+      screen.getByRole('button', {
+        name: /guardar examen/i,
+        hidden: true,
+      })
+    ).toBeDisabled()
+
+    expect(submitExam).not.toHaveBeenCalled()
+  })
+
+  it('solicita confirmacion explicita antes de registrar con advertencias', async () => {
+    const user = userEvent.setup()
+    const submitExam = vi.fn()
+
+    hook.overrides = {
+      warnings: [
+        'La capacidad de los ambientes seleccionados es insuficiente.',
+      ],
+      submitExam,
+    }
+
+    renderContainer()
+
+    const dialog = screen.getByRole('dialog', {
+      name: 'Revise antes de confirmar',
+    })
+
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: /crear de todos modos/i,
+      })
+    )
+
+    expect(submitExam).toHaveBeenCalledExactlyOnceWith(true)
+  })
+
+  it('no muestra errores de validacion antes de intentar guardar', () => {
+    hook.overrides = {
+      validateForm: () => ({
+        isValid: false,
+        errors: {
+          nombre_examen: 'El nombre del examen es obligatorio.',
+        },
+        warnings: {},
+      }),
+    }
+
+    renderContainer()
+
+    expect(
+      screen.queryByText('El nombre del examen es obligatorio.')
+    ).not.toBeInTheDocument()
+  })
+
+  it('muestra errores de validacion al intentar guardar', async () => {
+    const user = userEvent.setup()
+    const submitExam = vi.fn()
+
+    hook.overrides = {
+      validateForm: () => ({
+        isValid: false,
+        errors: {
+          nombre_examen: 'El nombre del examen es obligatorio.',
+        },
+        warnings: {},
+      }),
+      submitExam,
+    }
+
+    renderContainer()
+
+    await user.click(
+      screen.getByRole('button', { name: /guardar examen/i })
+    )
+
+    expect(
+      screen.getByText('El nombre del examen es obligatorio.')
+    ).toBeInTheDocument()
+
+    expect(submitExam).not.toHaveBeenCalled()
   })
 })

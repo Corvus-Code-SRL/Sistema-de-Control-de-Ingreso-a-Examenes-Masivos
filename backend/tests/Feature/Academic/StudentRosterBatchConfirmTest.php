@@ -78,11 +78,11 @@ class StudentRosterBatchConfirmTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('data.estudiantes_creados', 50);
         $response->assertJsonPath('data.estudiantes_inscritos', 50);
-        $this->assertLessThanOrEqual(11, $queries, "Se esperaban 11 consultas o menos:\n" . implode("\n", $statements));
+        $this->assertLessThanOrEqual(13, $queries, "Se esperaban 13 consultas o menos:\n" . implode("\n", $statements));
         $this->assertSame(50, $this->enrolled());
-        $this->assertSame(2, count(array_filter($statements, function (string $sql): bool {
-            return strpos($sql, 'insert into') === 0;
-        })), 'un insert de estudiantes y uno de inscripciones');
+        $this->assertSame(3, count(array_filter($statements, function (string $sql): bool {
+       return strpos($sql, 'insert into') === 0;
+   })), 'un insert de estudiantes, uno de inscripciones y uno de auditoría');
     }
 
     public function test_confirmar_1000_filas_nuevas_cuesta_12_consultas_o_menos(): void
@@ -93,7 +93,7 @@ class StudentRosterBatchConfirmTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('data.estudiantes_creados', 1000);
-        $this->assertLessThanOrEqual(12, $queries, "Se esperaban 12 consultas o menos:\n" . implode("\n", $statements));
+        $this->assertLessThanOrEqual(14, $queries, "Se esperaban 14 consultas o menos:\n" . implode("\n", $statements));
         $this->assertSame(1000, $this->enrolled());
     }
 
@@ -116,7 +116,7 @@ class StudentRosterBatchConfirmTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('data.estudiantes_creados', 0);
         $response->assertJsonPath('data.estudiantes_inscritos', 50);
-        $this->assertLessThanOrEqual(10, $queries);
+        $this->assertLessThanOrEqual(12, $queries);
         $this->assertSame(50, $this->enrolled());
     }
 

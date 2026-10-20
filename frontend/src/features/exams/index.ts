@@ -1,6 +1,7 @@
 export * from './pages/ExamsPage';
 export * from './pages/CreateExamPage';
 export * from './pages/ExamDetailPage';
+export * from './pages/EditExamPage';
 export * from './components/CreateExamContainer';
 export * from './components/ExamForm';
 export * from './components/ExamStatusBadge';

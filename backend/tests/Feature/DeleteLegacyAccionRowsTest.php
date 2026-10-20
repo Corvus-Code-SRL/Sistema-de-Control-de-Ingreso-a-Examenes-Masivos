@@ -116,17 +116,18 @@ class DeleteLegacyAccionRowsTest extends TestCase
         $this->assertSame(14, DB::table('accion')->count());
     }
 
-    public function test_no_hace_nada_en_una_base_sin_filas_heredadas(): void
+         public function test_no_hace_nada_en_una_base_sin_filas_heredadas(): void
     {
-        $this->migrate();
-        $this->assertSame(0, DB::table('accion')->count());
-
-        $this->seed(ActionSeeder::class);
         $before = $this->currentCatalog();
 
+        $this->assertSame(0, $this->legacyCount());
+        $this->assertCount(14, $before);
+
         $this->migrate();
 
+        $this->assertSame(0, $this->legacyCount());
         $this->assertSame($before, $this->currentCatalog());
+        $this->assertSame(14, DB::table('accion')->count());
     }
 
     public function test_el_down_no_hace_nada(): void

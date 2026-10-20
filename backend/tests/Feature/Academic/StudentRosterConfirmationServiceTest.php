@@ -25,6 +25,9 @@ use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Tests\Concerns\SeedsAcademicCatalog;
 use Tests\TestCase;
+use App\Services\Security\AuditLogService;
+use Database\Seeders\ActionSeeder;
+use App\Models\AuditLog;
 
 class StudentRosterConfirmationServiceTest extends TestCase
 {
@@ -34,6 +37,7 @@ class StudentRosterConfirmationServiceTest extends TestCase
     public function test_confirma_desde_token_y_reconsulta_estado_actual_de_base(): void
     {
         $this->seedAcademicCatalog();
+        $this->seed(ActionSeeder::class);
 
         $group = $this->ownActiveGroup();
 
@@ -106,7 +110,85 @@ class StudentRosterConfirmationServiceTest extends TestCase
             $store->find($token)
         );
     }
+    public function test_registra_bitacora_al_confirmar_nomina(): void
+{
+    $this->seedAcademicCatalog();
+    $this->seed(ActionSeeder::class);
 
+    $group = $this->ownActiveGroup();
+    $store = $this->previewStore();
+
+    $student = $this->createStudent(
+        '20250010',
+        '12000010'
+    );
+
+    DB::table('grupo_estudiante')->insert([
+        'id_grupo' => $group->id_grupo,
+        'id_estudiante' => $student->id_estudiante,
+        'fecha_inscripcion' => '2026-09-20',
+        'estado' => RecordStatus::ACTIVE,
+    ]);
+
+    $token = $store->store(
+        (int) $group->id_grupo,
+        $this->docenteId,
+        $this->analyze([
+            new StudentRosterRow(
+                2,
+                '20250010',
+                'PEREZ',
+                'ANA'
+            ),
+        ])
+    );
+
+    $logsAntes = AuditLog::query()
+        ->where('tabla_afectada', 'grupo_estudiante')
+        ->where('id_usuario', $this->docenteId)
+        ->count();
+
+    $result = $this->confirmationService($store)->confirm(
+        (int) $group->id_grupo,
+        $token,
+        $this->docenteId
+    );
+
+    $this->assertSame(0, $result->enrolledStudents());
+    $this->assertSame(1, $result->alreadyEnrolled());
+
+    $logs = AuditLog::query()
+        ->where('tabla_afectada', 'grupo_estudiante')
+        ->where('id_usuario', $this->docenteId)
+        ->orderByDesc('id_log')
+        ->get();
+
+    $this->assertCount($logsAntes + 1, $logs);
+
+    $log = $logs->first();
+
+    $this->assertSame('CREAR', $log->accion->operacion);
+
+    $this->assertSame(
+        (int) $group->id_grupo,
+        $log->nuevo_valor['id_grupo']
+    );
+
+    $this->assertSame(
+        0,
+        $log->nuevo_valor['estudiantes_inscritos']
+    );
+
+    $this->assertSame(
+        1,
+        $log->nuevo_valor['estudiantes_omitidos']
+    );
+
+    $this->assertSame(
+        $this->docenteId,
+        $log->id_usuario
+    );
+}
     public function test_rechaza_token_inexistente_o_expirado(): void
     {
         $this->seedAcademicCatalog();
@@ -227,12 +309,16 @@ class StudentRosterConfirmationServiceTest extends TestCase
 
         $service = new StudentRosterConfirmationService(
             $store,
-            new StudentRosterGroupAccess(new ExamRosterLockService(), new SubjectCatalogService()),
+            new StudentRosterGroupAccess(
+              new ExamRosterLockService(),
+              new SubjectCatalogService()
+             ),
             new StudentRosterAnalyzer(
-                new StudentRosterRowValidator()
-            ),
-            $confirmer
-        );
+            new StudentRosterRowValidator()
+                ),
+            $confirmer,
+            new AuditLogService()
+            );
 
         try {
             $service->confirm(
@@ -332,7 +418,51 @@ class StudentRosterConfirmationServiceTest extends TestCase
             'cod_sis' => '20250004',
         ]);
     }
+    public function test_revierte_inscripcion_si_falla_auditoria(): void
+{
+    $this->seedAcademicCatalog();
 
+     DB::table('accion')
+       ->where('operacion', 'CREAR')
+       ->delete();
+
+       $group = $this->ownActiveGroup();
+       $store = $this->previewStore();
+
+    $token = $store->store(
+        (int) $group->id_grupo,
+        $this->docenteId,
+        $this->analyze([
+            new StudentRosterRow(
+                2,
+                '20250999',
+                'ROJAS',
+                'CARLOS'
+            ),
+        ])
+    );
+
+    try {
+        $this->confirmationService($store)->confirm(
+            (int) $group->id_grupo,
+            $token,
+            $this->docenteId
+        );
+
+        $this->fail('La auditoría debía fallar.');
+    } catch (\LogicException $exception) {
+        $this->assertStringContainsString(
+            'CREAR',
+            $exception->getMessage()
+        );
+    }
+
+    $this->assertDatabaseMissing('estudiante', [
+        'cod_sis' => '20250999',
+    ]);
+
+    $this->assertNotNull($store->find($token));
+}
     private function confirmationService(
         StudentRosterPreviewStore $store
     ): StudentRosterConfirmationService {
@@ -347,9 +477,10 @@ class StudentRosterConfirmationServiceTest extends TestCase
                 new StudentRosterStudentCreator(
                     new StudentRosterStudentMapper()
                 )
-            )
-        );
-    }
+            ),
+            new AuditLogService()
+    );
+}
 
     private function previewStore(): StudentRosterPreviewStore
     {
