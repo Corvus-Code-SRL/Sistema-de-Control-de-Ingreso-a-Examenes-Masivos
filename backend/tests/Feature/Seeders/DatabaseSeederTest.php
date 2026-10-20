@@ -28,7 +28,7 @@ class DatabaseSeederTest extends TestCase
     public function test_el_seeder_general_carga_los_cuatro_tipos_de_falta_y_las_catorce_acciones(): void
     {
         $this->assertSame(0, DB::table('tipo_falta')->count());
-        $this->assertSame(0, DB::table('accion')->count());
+        $this->assertSame(14, DB::table('accion')->count());
 
         $this->seed(DatabaseSeeder::class);
 
