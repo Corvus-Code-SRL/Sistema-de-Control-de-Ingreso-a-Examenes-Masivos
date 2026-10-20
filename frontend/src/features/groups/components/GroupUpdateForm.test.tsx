@@ -2,16 +2,13 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api-client'
-import { makeGroup, periodoActivo } from '@/test/fixtures'
-import { usePeriods } from '../hooks/usePeriods'
+import { makeGroup } from '@/test/fixtures'
 import { useUpdateGroup } from '../hooks/useUpdateGroup'
 import { ActualizarGrupoForm } from './GroupUpdateForm'
 
 vi.mock('../hooks/useUpdateGroup', () => ({ useUpdateGroup: vi.fn() }))
-vi.mock('../hooks/usePeriods', () => ({ usePeriods: vi.fn() }))
 
 const mockedUseUpdateGroup = vi.mocked(useUpdateGroup)
-const mockedUsePeriods = vi.mocked(usePeriods)
 
 const submit = vi.fn()
 const onCancel = vi.fn()
@@ -44,29 +41,23 @@ describe('ActualizarGrupoForm (HU-019)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockUpdateGroup()
-    mockedUsePeriods.mockReturnValue({
-      periods: [{ ...periodoActivo, vigente: true }],
-      activePeriodId: periodoActivo.id_periodo,
-      isLoading: false,
-      error: null,
-    })
   })
 
   it('CA2: muestra los datos actuales del grupo', () => {
     renderForm()
 
     expect(screen.getByLabelText(/N° de grupo/i)).toHaveValue('1')
-    expect(screen.getByRole('combobox', { name: /Período académico/i })).toHaveTextContent(
-      '2/2026'
-    )
+    expect(screen.getByText('2/2026')).toBeInTheDocument()
     expect(screen.getByText('Bases de Datos I · Ingenieria de Sistemas')).toBeInTheDocument()
     expect(screen.getByText('Paola Careaga')).toBeInTheDocument()
   })
 
-  it('CA6: muestra la materia y el docente como no editables', () => {
+  it('CA6: muestra la materia, el docente y el período como no editables', () => {
     renderForm()
 
     expect(screen.getByText('No se puede cambiar.')).toBeInTheDocument()
+    expect(screen.getByText('Período académico')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     expect(
       screen.queryByDisplayValue('Bases de Datos I · Ingenieria de Sistemas')
     ).not.toBeInTheDocument()
@@ -81,7 +72,7 @@ describe('ActualizarGrupoForm (HU-019)', () => {
     expect(screen.queryByText(/P\. Careaga/)).not.toBeInTheDocument()
   })
 
-  it('CA3 y CA6: envía solo el número y el período, nunca la carrera, la materia ni el docente', async () => {
+  it('CA3 y CA6: envía solo el número, nunca el período, la carrera, la materia ni el docente', async () => {
     const user = userEvent.setup()
     const updated = { grupo: { num_grupo: '9' } }
     submit.mockResolvedValue(updated)
@@ -92,10 +83,7 @@ describe('ActualizarGrupoForm (HU-019)', () => {
     await user.type(input, '9')
     await user.click(screen.getByRole('button', { name: /Guardar cambios/i }))
 
-    expect(submit).toHaveBeenCalledWith(100, {
-      num_grupo: '9',
-      id_periodo: periodoActivo.id_periodo,
-    })
+    expect(submit).toHaveBeenCalledWith(100, { num_grupo: '9' })
     expect(onUpdated).toHaveBeenCalledWith(updated)
   })
 
