@@ -6,6 +6,11 @@ export function groupDetailPath(groupId: number): string {
   return `/grupos/${groupId}`
 }
 
+/** Edición del grupo (HU-019): número y período. */
+export function groupEditPath(groupId: number): string {
+  return `/grupos/${groupId}/editar`
+}
+
 /**
  * Carga de nómina del grupo (HU-021).
  *
