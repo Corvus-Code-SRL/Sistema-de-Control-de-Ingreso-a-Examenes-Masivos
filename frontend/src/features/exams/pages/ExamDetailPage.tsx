@@ -1,11 +1,13 @@
-import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { AppShell } from '@/components/layout/AppShell';
-import { EmptyState } from '@/components/common/EmptyState';
-import { ErrorState } from '@/components/common/ErrorState';
-import { LoadingState } from '@/components/common/LoadingState';
-import { PageHeader } from '@/components/common/PageHeader';
-import { Button } from '@/components/ui/button';
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Ban, Building2, DoorOpen, Pencil, Users } from 'lucide-react'
+import { ApiError } from '@/lib/api-client'
+import { AppShell } from '@/components/layout/AppShell'
+import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
+import { LoadingState } from '@/components/common/LoadingState'
+import { PageHeader } from '@/components/common/PageHeader'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -13,66 +15,145 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { AlertTriangle, Ban, DoorOpen, Loader2, Save, ShieldAlert } from 'lucide-react';
-import { useExamDetail } from '../hooks/useExamDetail';
-import { ExamForm } from '../components/ExamForm';
-import { AssignGroupsForm } from '../components/AssignGroupsForm';
-import { ExamStatusBadge } from '../components/ExamStatusBadge';
-import { validateExamForm, validateGroupsStep } from '../utils/examValidators';
-import { assistantSectionKey } from '../utils/assistantSectionKey';
-import { examLockedMessage } from '../utils/examLockedMessage';
-import { AssistantClassroomSection } from '@/features/assistants';
+} from '@/components/ui/dialog'
+import { ShieldAlert } from 'lucide-react'
+import { examsService } from '../services/examsService'
+import { ExamStatusBadge } from '../components/ExamStatusBadge'
+import { examLockedMessage } from '../utils/examLockedMessage'
+import type { Exam } from '../types/exams.types'
 
-/**
- * Detalle de un examen: edición de su información general, gestión de grupos
- * y cancelación mientras está PROGRAMADO (HU-24 criterios 10-12, HU-25
- * criterio 7). Desde EN_INGRESO todo se muestra de solo lectura (criterio 8).
- */
+function formatExamDate(date: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
+
+  if (!match) return date
+
+  return `${match[3]}/${match[2]}/${match[1]}`
+}
+
 export function ExamDetailPage() {
-  const navigate = useNavigate();
-  const { examId } = useParams<{ examId: string }>();
-  const id = Number(examId);
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const navigate = useNavigate()
+  const { examId } = useParams<{ examId: string }>()
+  const id = Number(examId)
 
-  const {
-    exam,
-    loading,
-    notFound,
-    forbidden,
-    loadError,
-    reload,
-    formData,
-    updateFormData,
-    options,
-    subjectGroups,
-    selectedSubject,
-    isProgramado,
-    toggleGroup,
-    savingInfo,
-    infoError,
-    infoWarnings,
-    saveGeneralInfo,
-    savingGroups,
-    groupsError,
-    saveGroups,
-    cancelling,
-    cancelError,
-    cancelExam,
-  } = useExamDetail(id);
+  const [exam, setExam] = useState<Exam | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
+  const [forbidden, setForbidden] = useState(false)
+  const [loadError, setLoadError] = useState<ApiError | null>(null)
 
-  const backTo = '/examenes/programados';
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [showEnvironmentInfo, setShowEnvironmentInfo] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
+
+  const backTo = '/examenes/programados'
+
+  const load = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true)
+    setNotFound(false)
+    setForbidden(false)
+    setLoadError(null)
+
+    if (
+      !examId ||
+      !/^[0-9]{1,9}$/.test(examId) ||
+      !Number.isSafeInteger(id) ||
+      id <= 0
+    ) {
+      setNotFound(true)
+      setLoading(false)
+      return
+    }
+
+    try {
+      const data = await examsService.getExam(id, signal)
+      if (!signal?.aborted) setExam(data)
+    } catch (error: unknown) {
+      if (signal?.aborted) return
+
+      if (error instanceof ApiError && error.isNotFound) {
+        setNotFound(true)
+      } else if (error instanceof ApiError && error.isForbidden) {
+        setForbidden(true)
+      } else {
+        setLoadError(
+          error instanceof ApiError
+            ? error
+            : new ApiError(
+                0,
+                error instanceof Error
+                  ? error.message
+                  : 'No se pudo consultar el examen'
+              )
+        )
+      }
+    } finally {
+      if (!signal?.aborted) setLoading(false)
+    }
+  }, [examId, id])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    void load(controller.signal)
+    return () => controller.abort()
+  }, [load])
+
+  const handleCancelExam = async () => {
+    if (!exam || exam.estado !== 'PROGRAMADO') return
+
+    setCancelling(true)
+    setCancelError(null)
+
+    try {
+      const updatedExam = await examsService.cancelExam(exam.id_examen)
+      setExam(updatedExam)
+      setShowCancelDialog(false)
+    } catch (error: unknown) {
+      setCancelError(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo cancelar el examen'
+      )
+    } finally {
+      setCancelling(false)
+    }
+  }
+
+  const isProgramado = exam?.estado === 'PROGRAMADO'
+  const groups = exam?.grupos ?? []
+  const classrooms = exam?.ambientes ?? []
+
+  const totalCapacity = classrooms.reduce(
+    (total, room) => total + Number(room.capacidad),
+    0
+  )
+
+  const totalStudents = groups.reduce(
+    (total, group) => total + Number(group.cantidad_estudiantes),
+    0
+  )
 
   if (notFound || forbidden) {
     return (
-      <AppShell mobileTitle="Examen" breadcrumbs={[{ label: 'Exámenes' }, { label: 'Programados', to: backTo }, { label: 'Detalle' }]}>
+      <AppShell
+        mobileTitle="Examen"
+        breadcrumbs={[
+          { label: 'Exámenes' },
+          { label: 'Programados', to: backTo },
+          { label: 'Detalle' },
+        ]}
+      >
         <EmptyState
           icon={ShieldAlert}
-          title={notFound ? 'Examen no encontrado' : 'No tiene acceso a este examen'}
+          title={
+            notFound
+              ? 'Examen no encontrado'
+              : 'No tiene acceso a este examen'
+          }
           description={
             notFound
               ? 'El examen no existe o ya no está disponible.'
-              : 'Solo el docente que lo creó puede ver y modificar este examen.'
+              : 'Solo el docente autorizado puede consultar este examen.'
           }
           action={
             <Button variant="outline" onClick={() => navigate(backTo)}>
@@ -81,202 +162,284 @@ export function ExamDetailPage() {
           }
         />
       </AppShell>
-    );
+    )
   }
-
-  const infoValidation = validateExamForm(formData);
-  const groupsValidation = validateGroupsStep(formData, subjectGroups);
-
-  const handleSaveInfo = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (infoValidation.isValid) saveGeneralInfo();
-  };
-
-  const handleConfirmCancel = async () => {
-    await cancelExam();
-    setShowCancelDialog(false);
-  };
 
   return (
     <AppShell
       mobileTitle={exam?.nombre_examen ?? 'Examen'}
-      breadcrumbs={[{ label: 'Exámenes' }, { label: 'Programados', to: backTo }, { label: exam?.nombre_examen ?? 'Detalle' }]}
+      breadcrumbs={[
+        { label: 'Exámenes' },
+        { label: 'Programados', to: backTo },
+        { label: exam?.nombre_examen ?? 'Detalle' },
+      ]}
     >
       <PageHeader
-        title={exam?.nombre_examen ?? 'Examen'}
+        title={exam?.nombre_examen ?? 'Detalle del examen'}
         backTo={backTo}
         backLabel="Volver a Programados"
         subtitle={exam && <ExamStatusBadge status={exam.estado} />}
         actions={
-          exam && (
-            isProgramado ? (
+          exam && isProgramado ? (
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setShowCancelDialog(true)}
-                className="border-danger/30 text-danger hover:bg-danger-soft"
+                onClick={() => navigate(`/examenes/${id}/editar`)}
               >
-                <Ban className="size-4" aria-hidden="true" /> Cancelar examen
+                <Pencil className="size-4" aria-hidden="true" />
+                Editar examen
               </Button>
-            ) : exam.estado === 'EN_INGRESO' ? (
-              <Button onClick={() => navigate(`/examenes/${id}/control-ingreso`)}>
-                <DoorOpen className="size-4" /> Controlar ingreso
+
+              <Button
+                type="button"
+                variant="outline"
+                className="border-danger/30 text-danger hover:bg-danger-soft"
+                onClick={() => setShowCancelDialog(true)}
+              >
+                <Ban className="size-4" aria-hidden="true" />
+                Cancelar examen
               </Button>
-            ) : null
-          )
+            </div>
+          ) : exam?.estado === 'EN_INGRESO' ? (
+            <Button
+              type="button"
+              onClick={() => navigate(`/examenes/${id}/control-ingreso`)}
+            >
+              <DoorOpen className="size-4" aria-hidden="true" />
+              Controlar ingreso
+            </Button>
+          ) : null
         }
       />
 
-      {loading && <LoadingState rows={5} label="Cargando el examen" />}
+      {loading && (
+        <LoadingState rows={5} label="Cargando el examen" />
+      )}
 
-      {!loading && loadError && <ErrorState error={loadError} onRetry={reload} />}
+      {!loading && loadError && (
+        <ErrorState error={loadError} onRetry={() => void load()} />
+      )}
 
       {!loading && !loadError && exam && (
-        <div className="space-y-6">
-          {!isProgramado ? (
-            <div className="rounded-xl border bg-card p-6 shadow-xs space-y-4">
-              <h2 className="sciem-h3">Información general</h2>
-              <p className="text-sm text-muted-foreground">{examLockedMessage(exam.estado)}</p>
-              <dl className="grid grid-cols-1 gap-x-8 gap-y-3 text-sm md:grid-cols-2">
-                <div>
-                  <dt className="font-medium">Materia</dt>
-                  <dd className="text-muted-foreground">{exam.materia?.nombre} — {exam.carrera?.nombre}</dd>
-                </div>
-                <div>
-                  <dt className="font-medium">Fecha y hora</dt>
-                  <dd className="text-muted-foreground">{exam.fecha}, {exam.hora_inicio}–{exam.hora_fin}</dd>
-                </div>
-                <div>
-                  <dt className="font-medium">Duración</dt>
-                  <dd className="text-muted-foreground">{exam.duracion} min</dd>
-                </div>
-                <div>
-                  <dt className="font-medium">Ambientes</dt>
-                  <dd className="text-muted-foreground">
-                    {(exam.ambientes ?? []).map((room) => room.nro_aula).join(', ') || '—'}
+        <div className="mx-auto max-w-5xl space-y-6">
+          {exam.estado !== 'PROGRAMADO' && (
+            <div
+              role="status"
+              className="rounded-xl border border-border-soft bg-surface p-4 text-sm text-muted-foreground"
+            >
+              {examLockedMessage(exam.estado)}
+            </div>
+          )}
+
+          <section
+            aria-label="Datos del examen"
+            className="rounded-xl border border-border-soft bg-surface p-6"
+          >
+            <h2 className="sciem-h3">Datos del examen</h2>
+
+            <dl className="mt-5 divide-y divide-border-soft text-sm">
+              <div className="grid gap-1 py-3 sm:grid-cols-[180px_1fr]">
+                <dt className="font-medium text-foreground">
+                  Materia
+                </dt>
+                <dd className="text-muted-foreground">
+                  {exam.materia
+                    ? `${exam.materia.codigo} · ${exam.materia.nombre}`
+                    : 'No disponible'}
+                  {exam.carrera && ` · ${exam.carrera.nombre}`}
+                </dd>
+              </div>
+
+              <div className="grid gap-1 py-3 sm:grid-cols-[180px_1fr]">
+                <dt className="font-medium text-foreground">
+                  Fecha y hora
+                </dt>
+                <dd className="text-muted-foreground">
+                  {formatExamDate(exam.fecha)} ·{' '}
+                  {exam.hora_inicio.slice(0, 5)} a{' '}
+                  {exam.hora_fin.slice(0, 5)} (
+                  {exam.duracion} min)
+                </dd>
+              </div>
+
+              <div className="grid gap-1 py-3 sm:grid-cols-[180px_1fr]">
+                <dt className="font-medium text-foreground">
+                  Tipo de examen
+                </dt>
+                <dd className="text-muted-foreground">
+                  {exam.tipo_examen?.nombre ?? 'No disponible'}
+                </dd>
+              </div>
+
+              <div className="grid gap-1 py-3 sm:grid-cols-[180px_1fr]">
+                <dt className="font-medium text-foreground">
+                  Grupos
+                </dt>
+                <dd className="text-muted-foreground">
+                  {groups.length > 0 ? (
+                    <>
+                      {groups
+                        .map(
+                          (group) =>
+                            `Grupo ${group.num_grupo} (${group.cantidad_estudiantes})`
+                        )
+                        .join(' · ')}
+                      {' · '}
+                      {totalStudents} estudiantes
+                    </>
+                  ) : (
+                    'Sin grupos asignados'
+                  )}
+                </dd>
+              </div>
+
+              <div className="grid gap-1 py-3 sm:grid-cols-[180px_1fr]">
+                <dt className="font-medium text-foreground">
+                  Ambientes
+                </dt>
+                <dd className="text-muted-foreground">
+                  {classrooms.length > 0 ? (
+                    <>
+                      {classrooms
+                        .map(
+                          (room) =>
+                            `Aula ${room.nro_aula} (${room.capacidad})`
+                        )
+                        .join(' · ')}
+                      {' · '}
+                      {totalCapacity} lugares
+                    </>
+                  ) : (
+                    'Sin ambientes asignados'
+                  )}
+                </dd>
+              </div>
+
+              {exam.normas && (
+                <div className="grid gap-1 py-3 sm:grid-cols-[180px_1fr]">
+                  <dt className="font-medium text-foreground">
+                    Normas del examen
+                  </dt>
+                  <dd className="whitespace-pre-wrap text-muted-foreground">
+                    {exam.normas}
                   </dd>
                 </div>
-              </dl>
-            </div>
-          ) : (
-            <form onSubmit={handleSaveInfo} className="space-y-4">
-              {infoError && (
-                <div role="alert" className="rounded-xl border border-danger/20 bg-danger-soft p-4 text-sm font-medium text-danger-fg">
-                  {infoError}
-                </div>
               )}
+            </dl>
+          </section>
 
-              <ExamForm
-                formData={formData}
-                subjects={options.materias}
-                classrooms={options.ambientes}
-                errors={infoValidation.errors}
-                warnings={{}}
-                updateFormData={updateFormData}
-              />
+          <section
+            aria-label="Personal del control de ingreso"
+            className="space-y-4 rounded-xl border border-border-soft bg-surface p-6"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h2 className="sciem-h3">
+                  Personal del control de ingreso
+                </h2>
 
-              {infoWarnings.length > 0 && (
-                <div role="alert" className="space-y-3 rounded-xl border border-warn-border bg-warn-soft p-4 text-sm text-warn-fg">
-                  <p className="flex items-center gap-2 font-bold">
-                    <AlertTriangle className="size-4" aria-hidden="true" /> Revise antes de confirmar
-                  </p>
-                  <ul className="list-disc space-y-1 pl-5">
-                    {infoWarnings.map((warning) => (
-                      <li key={warning}>{warning}</li>
-                    ))}
-                  </ul>
-                  <Button type="button" disabled={savingInfo} onClick={() => saveGeneralInfo(true)}>
-                    Guardar de todos modos
+                <p className="text-sm text-muted-foreground">
+                  Gestión de auxiliares del examen
+                </p>
+              </div>
+
+              {isProgramado && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate('/mis-auxiliares')}
+                  >
+                    <Users className="size-4" aria-hidden="true" />
+                    Habilitar auxiliares
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowEnvironmentInfo(true)}
+                  >
+                    <Building2 className="size-4" aria-hidden="true" />
+                    Asignar ambientes
                   </Button>
                 </div>
               )}
-
-              <div className="flex items-center justify-end">
-                <Button type="submit" disabled={savingInfo || infoWarnings.length > 0}>
-                  {savingInfo ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Guardando...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="size-4" aria-hidden="true" /> Guardar información general
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
-          )}
-
-          {isProgramado ? (
-            <div className="space-y-4">
-              {groupsError && (
-                <div role="alert" className="rounded-xl border border-danger/20 bg-danger-soft p-4 text-sm font-medium text-danger-fg">
-                  {groupsError}
-                </div>
-              )}
-
-              <AssignGroupsForm
-                selectedSubject={selectedSubject}
-                availableGroups={subjectGroups}
-                selectedGroupIds={formData.grupos}
-                errors={{}}
-                onToggleGroup={toggleGroup}
-              />
-
-              <div className="flex items-center justify-end">
-                <Button type="button" disabled={savingGroups || !groupsValidation.isValid} onClick={() => saveGroups()}>
-                  {savingGroups ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Guardando...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="size-4" aria-hidden="true" /> Guardar grupos
-                    </>
-                  )}
-                </Button>
-              </div>
             </div>
-          ) : (
-            <div className="rounded-xl border bg-card p-6 shadow-xs space-y-4">
-              <h2 className="sciem-h3">Grupos participantes</h2>
-              <div className="divide-y overflow-hidden rounded-lg border">
-                {(exam.grupos ?? []).map((group) => (
-                  <div key={group.id_grupo} className="flex items-center justify-between px-4 py-3.5 text-sm">
-                    <span className="font-medium">Grupo {group.num_grupo}</span>
-                    <span className="text-muted-foreground">{group.cantidad_estudiantes} estudiantes</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
-          <AssistantClassroomSection key={assistantSectionKey(exam)} examId={exam.id_examen} />
+            <div className="border-t border-border-soft pt-4">
+              <p className="text-sm text-muted-foreground">
+                La habilitación y la asignación de ambientes
+                se administran desde sus funcionalidades correspondientes.
+              </p>
+            </div>
+          </section>
         </div>
       )}
 
       {exam && (
-        <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <Dialog
+          open={showCancelDialog}
+          onOpenChange={setShowCancelDialog}
+        >
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Cancelar «{exam.nombre_examen}»</DialogTitle>
+              <DialogTitle>
+                Cancelar «{exam.nombre_examen}»
+              </DialogTitle>
               <DialogDescription>
-                Esta acción cancela el examen y no puede deshacerse desde aquí. El registro queda
-                como cancelado, no se elimina.
+                El examen quedará cancelado y no se eliminará
+                del registro.
               </DialogDescription>
             </DialogHeader>
-            {cancelError && <p className="text-sm font-medium text-danger">{cancelError}</p>}
+
+            {cancelError && (
+              <p role="alert" className="text-sm text-danger">
+                {cancelError}
+              </p>
+            )}
+
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCancelDialog(false)} disabled={cancelling}>
+              <Button
+                variant="outline"
+                disabled={cancelling}
+                onClick={() => setShowCancelDialog(false)}
+              >
                 Volver
               </Button>
-              <Button onClick={handleConfirmCancel} disabled={cancelling} variant="destructive">
-                {cancelling ? 'Cancelando...' : 'Sí, cancelar examen'}
+              <Button
+                variant="destructive"
+                disabled={cancelling}
+                onClick={() => void handleCancelExam()}
+              >
+                {cancelling
+                  ? 'Cancelando...'
+                  : 'Sí, cancelar examen'}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
+
+      <Dialog
+        open={showEnvironmentInfo}
+        onOpenChange={setShowEnvironmentInfo}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Asignar ambientes</DialogTitle>
+            <DialogDescription>
+              Esta funcionalidad se incorporará mediante
+              HU-030, con su modal independiente.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setShowEnvironmentInfo(false)}>
+              Entendido
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
-  );
+  )
 }

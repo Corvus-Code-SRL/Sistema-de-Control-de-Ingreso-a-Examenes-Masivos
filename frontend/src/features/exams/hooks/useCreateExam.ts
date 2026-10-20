@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { ApiError } from '@/lib/api-client'
 import { useExamFormOptions } from './useExamFormOptions'
 import { useExamFormState } from './useExamFormState'
@@ -16,6 +16,9 @@ export function useCreateExam(onSuccess?: (exam: Exam) => void) {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [warnings, setWarnings] = useState<string[]>([])
+
+  const requestInFlightRef = useRef(false)
+  const creationCompletedRef = useRef(false)
 
   const subjectGroups = useMemo(() => {
     if (!formData.materia) {
@@ -47,8 +50,12 @@ export function useCreateExam(onSuccess?: (exam: Exam) => void) {
   }, [formData, subjectGroups])
 
   const updateFormData = useCallback(
-    (fields: Partial<CreateExamFormData>) => {
-      setWarnings([])
+  (fields: Partial<CreateExamFormData>) => {
+    if (requestInFlightRef.current || creationCompletedRef.current) {
+      return
+    }
+
+    setWarnings([])
       setSubmitError(null)
 
       if (fields.materia !== undefined) {
@@ -79,15 +86,32 @@ export function useCreateExam(onSuccess?: (exam: Exam) => void) {
   )
 
   const submitExam = async (confirmWarnings = false) => {
-    const validation = validateForm()
-
-    if (!validation.isValid || !formData.materia) {
-      setSubmitError('Por favor complete todos los campos obligatorios del formulario.')
+    if (requestInFlightRef.current || creationCompletedRef.current) {
       return
     }
 
+    if (warnings.length > 0 && !confirmWarnings) {
+      return
+    }
+
+    if (confirmWarnings && warnings.length === 0) {
+      return
+    }
+
+    const validation = validateForm()
+
+    if (!validation.isValid || !formData.materia) {
+      setSubmitError(
+        'Por favor complete todos los campos obligatorios del formulario.'
+      )
+      return
+    }
+
+    requestInFlightRef.current = true
     setSubmitting(true)
     setSubmitError(null)
+
+    let createdExam: Exam | null = null
 
     try {
       const exam = await examsService.createExam({
@@ -104,19 +128,71 @@ export function useCreateExam(onSuccess?: (exam: Exam) => void) {
         confirmar_advertencias: confirmWarnings || undefined,
       })
 
+      creationCompletedRef.current = true
       setWarnings([])
-      onSuccess?.(exam)
+      createdExam = exam
     } catch (error: unknown) {
       if (error instanceof ApiError && error.status === 409) {
-        setWarnings(Object.values(error.errors).flat())
+        const serverWarnings = Object.values(error.errors)
+          .flat()
+          .filter(
+            (message) =>
+              typeof message === 'string' &&
+              message.trim().length > 0
+          )
+
+        setWarnings(
+          serverWarnings.length > 0
+            ? serverWarnings
+            : [
+                error.message ||
+                  'El examen requiere confirmación antes de registrarse.',
+              ]
+        )
       } else {
+        setWarnings([])
+
+        const classroomErrors =
+          error instanceof ApiError && error.status === 422
+            ? error.errors?.ambientes
+            : undefined
+
         const message =
-          error instanceof Error ? error.message : 'Ocurrió un error al registrar el examen'
+          classroomErrors && classroomErrors.length > 0
+            ? classroomErrors.join(' ')
+            : error instanceof Error
+              ? error.message
+              : 'Ocurrió un error al registrar el examen'
+
         setSubmitError(message)
       }
     } finally {
+      requestInFlightRef.current = false
       setSubmitting(false)
     }
+
+    if (createdExam) {
+      onSuccess?.(createdExam)
+    }
+  }
+
+  const dismissWarnings = () => {
+    if (requestInFlightRef.current || creationCompletedRef.current) {
+      return
+    }
+
+    setWarnings([])
+  }
+
+  const resetCreateExam = () => {
+    if (requestInFlightRef.current) {
+      return
+    }
+
+    resetFormData()
+    setSubmitError(null)
+    setWarnings([])
+    creationCompletedRef.current = false
   }
 
   const totalStudents = selectedGroups.reduce(
@@ -135,7 +211,8 @@ export function useCreateExam(onSuccess?: (exam: Exam) => void) {
     apiError: submitError || optionsError,
     warnings,
     updateFormData,
-    resetFormData,
+    resetFormData: resetCreateExam,
+    dismissWarnings,
     toggleGroup,
     validateForm,
     submitExam,

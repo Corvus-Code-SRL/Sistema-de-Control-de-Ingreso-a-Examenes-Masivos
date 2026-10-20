@@ -15,7 +15,7 @@ use Illuminate\Validation\Validator;
  * Información general de un examen: la misma al crearlo y al modificarlo.
  *
  * Aquí se valida la forma de los datos y que existan en los catálogos. Que el par
- * materia-carrera esté activo lo decide ExamService con la regla de HU-16.
+ * ExamService comprueba que el par materia-carrera esté activo.
  */
 abstract class ExamRequest extends FormRequest
 {
@@ -37,19 +37,37 @@ abstract class ExamRequest extends FormRequest
 
     public function rules(): array
     {
+
+        $careerId = filter_var(
+            $this->input('id_carrera'),
+            FILTER_VALIDATE_INT,
+            [
+                'options' => [
+                    'min_range' => 1,
+                    'max_range' => self::MAX_ID,
+                ],
+            ]
+        );
+
+        $subjectRules = [
+            'bail',
+            'required',
+            'integer',
+            'min:1',
+            'max:' . self::MAX_ID,
+        ];
+
+        if ($careerId !== false) {
+            $subjectRules[] = Rule::exists('materia_carrera', 'id_materia')
+                ->where(function ($query) use ($careerId) {
+                    $query->where('id_carrera', $careerId);
+                });
+        }
+
         return [
             'nombre_examen' => ['required', 'string', 'max:25'],
             'id_carrera'    => ['bail', 'required', 'integer', 'min:1', 'max:' . self::MAX_ID],
-            'id_materia'    => [
-                'bail',
-                'required',
-                'integer',
-                'min:1',
-                'max:' . self::MAX_ID,
-                Rule::exists('materia_carrera', 'id_materia')->where(function ($query) {
-                    $query->where('id_carrera', (int) $this->input('id_carrera'));
-                }),
-            ],
+            'id_materia'    => $subjectRules,
             'categoria'     => ['sometimes', 'required', 'string', Rule::in(self::CATEGORIES)],
             'fecha'         => ['required', 'date_format:Y-m-d'],
             'hora_inicio'   => ['required', 'date_format:H:i'],
@@ -91,7 +109,7 @@ abstract class ExamRequest extends FormRequest
             if ($startsAt->lessThanOrEqualTo(Carbon::now($timezone))) {
                 $validator->errors()->add(
                     'fecha',
-                    'La fecha y hora del examen no pueden ser anteriores al momento actual.'
+                    'La fecha y hora deben ser posteriores a la actual'
                 );
             }
         });

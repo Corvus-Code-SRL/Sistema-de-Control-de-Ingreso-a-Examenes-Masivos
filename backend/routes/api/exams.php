@@ -18,7 +18,7 @@ Route::prefix('ambientes')->name('ambientes.')->group(function () {
 });
 // Rutas del módulo: exams
 
-// HU-24 — {exam} es el id_examen: cualquier otro valor responde 404 sin llegar a la base.
+// HU-024 - Restringir los identificadores de examen antes del model binding.
 Route::prefix('examenes')->name('examenes.')->group(function () {
     Route::get('/formulario', [ExamController::class, 'formOptions'])
          ->name('formulario');
@@ -27,37 +27,37 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
          ->name('index');
 
     Route::post('/', [ExamController::class, 'store'])
-         ->name('store');
+        ->name('store');
 
     Route::get('/{exam}', [ExamController::class, 'show'])
-         ->whereNumber('exam')
-         ->name('show');
+        ->where('exam', '[0-9]{1,9}')
+        ->name('show');
 
     Route::put('/{exam}', [ExamController::class, 'update'])
-         ->whereNumber('exam')
-         ->name('update');
+        ->where('exam', '[0-9]{1,9}')
+        ->name('update');
 
     Route::post('/{exam}/cancelar', [ExamController::class, 'cancel'])
-         ->whereNumber('exam')
-         ->name('cancelar');
+        ->where('exam', '[0-9]{1,9}')
+        ->name('cancelar');
 
     Route::post('/{exam}/finalizar', [ExamController::class, 'finish'])
-         ->whereNumber('exam')
-         ->name('finalizar');
+        ->where('exam', '[0-9]{1,9}')
+        ->name('finalizar');
 
     Route::post('/{exam}/grupos', [ExamGroupController::class, 'store'])
-         ->whereNumber('exam')
-         ->name('grupos.store');
+        ->where('exam', '[0-9]{1,9}')
+        ->name('grupos.store');
 
-    // HU-09 — {user} es el id_usuario (uuid) del auxiliar habilitado.
+     // HU-09 — {user} es el id_usuario (uuid) del auxiliar habilitado.
     Route::get('/{exam}/auxiliares', [AssistantClassroomController::class, 'index'])
-         ->whereNumber('exam')
-         ->name('auxiliares.index');
+        ->where('exam', '[0-9]{1,9}')
+        ->name('auxiliares.index');
 
     Route::put('/{exam}/auxiliares/{user}/ambiente', [AssistantClassroomController::class, 'update'])
-         ->whereNumber('exam')
-         ->whereUuid('user')
-         ->name('auxiliares.ambiente');
+        ->where('exam', '[0-9]{1,9}')
+        ->whereUuid('user')
+        ->name('auxiliares.ambiente');
 });
 
 // HU-029 — exámenes que incluyen un grupo propio (pestaña Exámenes del curso). El id se valida

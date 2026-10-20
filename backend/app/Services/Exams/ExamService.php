@@ -20,7 +20,7 @@ use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 /**
- * Crea, modifica y cancela exámenes (HU-24).
+ * Gestiona el registro y las operaciones sobre exámenes.
  *
  * El examen pertenece a un par materia-carrera y queda asociado al docente que lo
  * crea. Solo mientras está PROGRAMADO admite cambios o cancelación: desde que se
@@ -167,7 +167,25 @@ class ExamService
 
             $exam->classrooms()->attach($data['ambientes']);
 
-            return $this->groupService->assignGroups($exam, $data['grupos'], $teacherId);
+            $this->groupService->assignGroups(
+                $exam,
+                $data['grupos'],
+                $teacherId
+            );
+
+            $after = $exam->getAttributes();
+            $after['ambientes'] = $data['ambientes'];
+            $after['grupos'] = $data['grupos'];
+
+            $this->auditLog->registrar(
+                'CREAR',
+                'examen',
+                null,
+                $after,
+                $teacherId
+            );
+
+            return $exam;
         });
 
         return $this->loadDetail($exam);
@@ -190,6 +208,12 @@ class ExamService
                 throw new ExamStateException($this->notEditableMessage($exam->estado));
             }
 
+            $before = $exam->getAttributes();
+            $before['ambientes'] = $exam->classrooms()
+                ->pluck('ambiente.id_ambiente')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
             $attributes = $this->prepareAttributes($data, $teacherId);
 
             $this->lockSchedules($teacherId, $data['ambientes']);
@@ -198,6 +222,20 @@ class ExamService
             $exam->update($attributes);
             $this->releaseRemovedClassrooms($exam, $data['ambientes']);
             $exam->classrooms()->sync($data['ambientes']);
+
+            $after = $exam->getAttributes();
+            $after['ambientes'] = $exam->classrooms()
+                ->pluck('ambiente.id_ambiente')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $this->auditLog->registrar(
+                'MODIFICAR',
+                'examen',
+                $before,
+                $after,
+                $teacherId
+            );
 
             return $exam;
         });
@@ -341,6 +379,8 @@ class ExamService
      */
     private function assertNoUnconfirmedWarnings(array $data, string $teacherId, ?int $ignoredExamId): void
     {
+        $this->assertNoForeignClassroomConflicts($data, $teacherId, $ignoredExamId);
+
         if (! empty($data['confirmar_advertencias'])) {
             return;
         }
@@ -349,6 +389,49 @@ class ExamService
 
         if ($warnings !== []) {
             throw new ExamWarningsException($warnings);
+        }
+    }
+
+    /**
+     * Un ambiente reservado por otro docente no puede confirmarse
+     * como una simple advertencia.
+     */
+    private function assertNoForeignClassroomConflicts(
+        array $data,
+        string $teacherId,
+        ?int $ignoredExamId
+    ): void {
+        $startsAt = $this->startsAt($data);
+        $endsAt = $startsAt->copy()->addMinutes((int) $data['duracion']);
+
+        $occupied = $this->overlapping($startsAt, $endsAt, $ignoredExamId)
+            ->join(
+                'examen_ambiente',
+                'examen_ambiente.id_examen',
+                '=',
+                'examen.id_examen'
+            )
+            ->join(
+                'ambiente',
+                'ambiente.id_ambiente',
+                '=',
+                'examen_ambiente.id_ambiente'
+            )
+            ->where('examen.id_usuario_docente', '<>', $teacherId)
+            ->whereIn('examen_ambiente.id_ambiente', $data['ambientes'])
+            ->orderBy('ambiente.nro_aula')
+            ->pluck('ambiente.nro_aula')
+            ->unique()
+            ->values();
+
+        if ($occupied->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'ambientes' => [
+                    'Los ambientes ' . $occupied->implode(', ')
+                    . ' ya están reservados por otro docente en ese horario. '
+                    . 'Seleccione otro ambiente u horario.',
+                ],
+            ]);
         }
     }
 
@@ -386,6 +469,7 @@ class ExamService
         $classroomOverlaps = $this->overlapping($startsAt, $endsAt, $ignoredExamId)
             ->join('examen_ambiente', 'examen_ambiente.id_examen', '=', 'examen.id_examen')
             ->join('ambiente', 'ambiente.id_ambiente', '=', 'examen_ambiente.id_ambiente')
+            ->where('examen.id_usuario_docente', $teacherId)
             ->whereIn('examen_ambiente.id_ambiente', $data['ambientes'])
             ->orderBy('ambiente.nro_aula')
             ->get(['ambiente.nro_aula', 'examen.nombre_examen']);
@@ -395,6 +479,22 @@ class ExamService
                 ->map(fn ($row) => "El ambiente {$row->nro_aula} ya está reservado para "
                     . "«{$row->nombre_examen}» en ese horario.")
                 ->all();
+        }
+
+        if ($ignoredExamId === null) {
+            $totalStudents = DB::table('grupo_estudiante')
+                ->whereIn('id_grupo', $data['grupos'])
+                ->count();
+
+            $totalCapacity = Classroom::query()
+                ->whereIn('id_ambiente', $data['ambientes'])
+                ->sum('capacidad');
+
+            if ($totalCapacity < $totalStudents) {
+                $warnings['capacidad_insuficiente'] = [
+                    "La capacidad ({$totalCapacity}) es menor que los estudiantes de los grupos ({$totalStudents})",
+                ];
+            }
         }
 
         return $warnings;

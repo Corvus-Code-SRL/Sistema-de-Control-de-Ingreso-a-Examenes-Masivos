@@ -1,4 +1,4 @@
-import { screen, waitForElementToBeRemoved } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { mockApi } from '@/test/http'
 import { renderWithRouter } from '@/test/render'
@@ -39,8 +39,14 @@ function mockExam(estado: ExamStatus) {
 }
 
 async function renderDetail() {
-  renderWithRouter(<ExamDetailPage />, { route: '/examenes/9', path: '/examenes/:examId' })
-  await waitForElementToBeRemoved(() => screen.queryAllByRole('status')[0])
+  renderWithRouter(<ExamDetailPage />, {
+    route: '/examenes/9',
+    path: '/examenes/:examId',
+  })
+
+  await screen.findByRole('heading', {
+    name: /datos del examen/i,
+  })
 }
 
 describe('ExamDetailPage: texto de solo lectura (HU-024)', () => {
@@ -74,11 +80,127 @@ describe('ExamDetailPage: texto de solo lectura (HU-024)', () => {
     expect(await screen.findByText(/está en curso/i)).toBeInTheDocument()
   })
 
-  it('un examen programado se edita: no muestra el aviso de solo lectura', async () => {
+  it('muestra un examen PROGRAMADO en modo consulta', async () => {
     mockExam('PROGRAMADO')
     await renderDetail()
 
-    expect(await screen.findByRole('button', { name: /guardar información general/i })).toBeInTheDocument()
-    expect(screen.queryByText(/quedaron fijos/i)).not.toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', {
+        name: /datos del examen/i,
+      })
+    ).toBeInTheDocument()
+
+    expect(
+      screen.getByRole('button', {
+        name: /editar examen/i,
+      })
+    ).toBeInTheDocument()
+
+    expect(
+      screen.queryByRole('button', {
+        name: /guardar información general/i,
+      })
+    ).not.toBeInTheDocument()
+
+    expect(
+      screen.queryByRole('button', {
+        name: /guardar grupos/i,
+      })
+    ).not.toBeInTheDocument()
+  })
+
+  it('muestra las acciones de auxiliares y ambientes cuando está PROGRAMADO', async () => {
+    mockExam('PROGRAMADO')
+    await renderDetail()
+
+    expect(
+      screen.getByRole('button', { name: /habilitar auxiliares/i })
+    ).toBeInTheDocument()
+
+    expect(
+      screen.getByRole('button', { name: /asignar ambientes/i })
+    ).toBeInTheDocument()
+  })
+
+  it.each([
+    'EN_INGRESO',
+    'EN_CURSO',
+    'FINALIZADO',
+    'CANCELADO',
+  ] as ExamStatus[])(
+    'oculta las acciones de auxiliares y ambientes cuando está %s',
+    async (estado) => {
+      mockExam(estado)
+      await renderDetail()
+
+      expect(
+        screen.queryByRole('button', { name: /habilitar auxiliares/i })
+      ).not.toBeInTheDocument()
+
+      expect(
+        screen.queryByRole('button', { name: /asignar ambientes/i })
+      ).not.toBeInTheDocument()
+    }
+  )
+
+  it('conserva el acceso al control de ingreso', async () => {
+    mockExam('EN_INGRESO')
+    await renderDetail()
+
+    expect(
+      screen.getByRole('button', {
+        name: /controlar ingreso/i,
+      })
+    ).toBeInTheDocument()
+  })
+
+  it('ubica las acciones de auxiliares en su sección', async () => {
+    mockExam('PROGRAMADO')
+    await renderDetail()
+
+    const section = screen.getByRole('region', {
+      name: /personal del control de ingreso/i,
+    })
+
+    expect(
+      within(section).getByRole('button', {
+        name: /habilitar auxiliares/i,
+      })
+    ).toBeInTheDocument()
+
+    expect(
+      within(section).getByRole('button', {
+        name: /asignar ambientes/i,
+      })
+    ).toBeInTheDocument()
+  })
+
+  it('muestra los datos del examen en una tarjeta', async () => {
+    mockExam('PROGRAMADO')
+    await renderDetail()
+
+    const section = screen.getByRole('region', {
+      name: /datos del examen/i,
+    })
+
+    expect(
+      within(section).getByText(/MAT-102/)
+    ).toBeInTheDocument()
+
+    expect(
+      within(section).getByText(/20\/10\/2026/)
+    ).toBeInTheDocument()
+
+    expect(
+      within(section).getByText(/Aula 691A \(40\)/)
+    ).toBeInTheDocument()
+
+    expect(
+      within(section).getByText(/40 lugares/)
+    ).toBeInTheDocument()
+
+    expect(
+      within(section).getByText(/sin grupos asignados/i)
+    ).toBeInTheDocument()
   })
 })

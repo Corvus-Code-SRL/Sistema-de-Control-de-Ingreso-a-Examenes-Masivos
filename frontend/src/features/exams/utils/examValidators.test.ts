@@ -29,13 +29,35 @@ describe('validateExamForm', () => {
     expect(validateExamForm(form({ materia: null }), now).errors.materia).toBeDefined()
   })
 
-  it('rechaza una hora ya pasada del mismo día', () => {
-    const result = validateExamForm(form({ fecha: '2026-09-21', hora_inicio: '09:59' }), now)
-
-    expect(result.errors.fecha).toBe(
-      'La fecha y hora del examen no pueden ser anteriores al momento actual.'
+  it('rechaza una fecha y hora anteriores a la actual con el mensaje correcto', () => {
+    const result = validateExamForm(
+      form({ fecha: '2026-09-21', hora_inicio: '09:59' }),
+      now
     )
-    expect(validateExamForm(form({ fecha: '2026-09-21', hora_inicio: '10:30' }), now).isValid).toBe(true)
+
+    expect(result.isValid).toBe(false)
+    expect(result.errors.fecha).toBe(
+      'La fecha y hora deben ser posteriores a la actual'
+    )
+  })
+
+  it('exige una fecha y hora estrictamente posteriores a la actual', () => {
+    const sameTime = validateExamForm(
+      form({ fecha: '2026-09-21', hora_inicio: '10:00' }),
+      now
+    )
+
+    const futureTime = validateExamForm(
+      form({ fecha: '2026-09-21', hora_inicio: '10:30' }),
+      now
+    )
+
+    expect(sameTime.isValid).toBe(false)
+    expect(sameTime.errors.fecha).toBe(
+      'La fecha y hora deben ser posteriores a la actual'
+    )
+
+    expect(futureTime.isValid).toBe(true)
   })
 
   it.each([0, -5, 1.5, 1440, Number.NaN])('rechaza la duración %s', (duracion) => {

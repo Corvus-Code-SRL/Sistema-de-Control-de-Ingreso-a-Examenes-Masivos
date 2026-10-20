@@ -42,8 +42,9 @@ export function validateExamForm(
 
   if (formData.fecha && formData.hora_inicio) {
     const startsAt = new Date(`${formData.fecha}T${formData.hora_inicio}`);
+
     if (startsAt.getTime() <= now.getTime()) {
-      errors.fecha = 'La fecha y hora del examen no pueden ser anteriores al momento actual.';
+      errors.fecha = 'La fecha y hora deben ser posteriores a la actual';
     }
   }
 

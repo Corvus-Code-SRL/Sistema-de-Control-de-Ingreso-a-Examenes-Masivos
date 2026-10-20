@@ -4,6 +4,7 @@ namespace Tests\Feature\Exams;
 
 use App\Models\Exam;
 use App\Models\ExamAssistant;
+use App\Models\AuditLog;
 use App\Support\RecordStatus;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -232,5 +233,117 @@ class UpdateExamTest extends TestCase
     {
         $this->putJson('/api/examenes/999999', $this->validPayload())->assertNotFound();
         $this->putJson('/api/examenes/abc', $this->validPayload())->assertNotFound();
+    }
+
+    public function test_modificar_examen_registra_valores_anteriores_y_nuevos(): void
+    {
+        $exam = $this->createExam(
+            ['nombre_examen' => 'Primer parcial'],
+            [$this->aulaId]
+        );
+
+        $this->putJson($this->url($exam), $this->validPayload([
+            'nombre_examen' => 'Parcial actualizado',
+            'fecha' => $this->futureDate(10),
+            'ambientes' => [$this->otraAulaId],
+        ]))->assertOk();
+
+        $log = AuditLog::query()
+            ->where('tabla_afectada', 'examen')
+            ->sole();
+
+        $actionId = DB::table('accion')
+            ->where('operacion', 'MODIFICAR')
+            ->value('id_accion');
+
+        $this->assertNotNull($actionId);
+        $this->assertSame((int) $actionId, $log->id_accion);
+        $this->assertSame($this->docenteId, $log->id_usuario);
+
+        $this->assertSame(
+            $exam->id_examen,
+            $log->antiguo_valor['id_examen']
+        );
+
+        $this->assertSame(
+            'Primer parcial',
+            $log->antiguo_valor['nombre_examen']
+        );
+
+        $this->assertSame(
+            'Parcial actualizado',
+            $log->nuevo_valor['nombre_examen']
+        );
+
+        $this->assertEquals(
+            [$this->aulaId],
+            $log->antiguo_valor['ambientes']
+        );
+
+        $this->assertEquals(
+            [$this->otraAulaId],
+            $log->nuevo_valor['ambientes']
+        );
+    }
+
+    public function test_modificacion_rechazada_no_genera_bitacora(): void
+    {
+        $exam = $this->createExam(
+            [
+                'nombre_examen' => 'Primer parcial',
+                'estado' => Exam::EN_INGRESO,
+            ],
+            [$this->aulaId]
+        );
+
+        $this->putJson($this->url($exam), $this->validPayload([
+            'nombre_examen' => 'Nombre actualizado',
+        ]))->assertStatus(409);
+
+        $this->assertSame(
+            0,
+            AuditLog::query()
+                ->where('tabla_afectada', 'examen')
+                ->count()
+        );
+
+        $this->assertDatabaseHas('examen', [
+            'id_examen' => $exam->id_examen,
+            'nombre_examen' => 'Primer parcial',
+        ]);
+    }
+
+    public function test_no_permite_editar_hacia_ambiente_reservado_por_otro_docente(): void
+    {
+        $this->createExam([
+            'nombre_examen'      => 'Examen de otro docente',
+            'id_usuario_docente' => $this->otroDocenteId,
+            'hora_inicio'        => '10:00',
+        ], [$this->aulaId]);
+
+        $exam = $this->createExam([
+            'nombre_examen' => 'Mi examen',
+            'hora_inicio'   => '08:00',
+        ], [$this->otraAulaId]);
+
+        $this->putJson($this->url($exam), $this->validPayload([
+            'nombre_examen'          => 'Mi examen',
+            'hora_inicio'            => '10:30',
+            'ambientes'              => [$this->aulaId],
+            'confirmar_advertencias' => true,
+        ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ambientes');
+
+        // La modificación rechazada no altera la reserva anterior.
+        $this->assertDatabaseHas('examen', [
+            'id_examen'   => $exam->id_examen,
+            'hora_inicio' => '08:00:00',
+        ]);
+
+        $this->assertDatabaseHas('examen_ambiente', [
+            'id_examen'   => $exam->id_examen,
+            'id_ambiente' => $this->otraAulaId,
+        ]);
     }
 }

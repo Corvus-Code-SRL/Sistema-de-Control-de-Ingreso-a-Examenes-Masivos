@@ -14,7 +14,7 @@ import {
   type Capability,
 } from '@/features/auth'
 import { EntryControlPage, OpenEntryControlsPage } from '@/features/entry-control'
-import { CreateExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
+import { CreateExamPage, EditExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
 import { CourseDetailPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
 import { ClassroomsPage } from '@/features/classrooms'
 import { RiskCenterPage } from '@/features/risk-center/academic'
@@ -51,13 +51,20 @@ function DocenteRoutes() {
         path="/mis-auxiliares"
         element={guarded('auxiliares.gestionar', <MyAssistantsPage />)}
       />
+      <Route
+        path="/examenes/:examId/editar"
+        element={guarded('examenes.gestionar', <EditExamPage />)}
+      />
+      <Route
+        path="/examenes/:examId"
+        element={guarded('examenes.gestionar', <ExamDetailPage />)}
+      />
       <Route path="/cursos/:idGrupo" element={guarded('grupos.gestionar', <CourseDetailPage />)} />
       <Route path="/examenes/nuevo" element={guarded('examenes.gestionar', <CreateExamPage />)} />
       <Route
         path="/examenes/programados"
         element={guarded('examenes.gestionar', <ExamsPage />)}
       />
-      <Route path="/examenes/:examId" element={guarded('examenes.gestionar', <ExamDetailPage />)} />
       <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
       <Route
         path="/examenes/:examId/control-ingreso"
