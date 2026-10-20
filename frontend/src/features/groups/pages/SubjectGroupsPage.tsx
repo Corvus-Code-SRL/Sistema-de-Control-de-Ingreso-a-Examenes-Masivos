@@ -17,6 +17,7 @@ import { SubjectFilterChip } from '../components/SubjectFilterChip'
 import { useSubjectGroups } from '../hooks/useSubjectGroups'
 import { Toast } from '@/components/ui/toast'
 import type { GroupMutationResponse } from '../types/group.types'
+import { groupRosterPath } from '../utils/paths'
 
 /**
  * Grupos de un par materia-carrera (artboards 1.4 y 1.5).
@@ -66,7 +67,7 @@ export function SubjectGroupsPage() {
     setIsCreateOpen(false)
     reload()
 
-    // Misma regla que la pestaña Nómina (canUploadRoster): grupo propio, activo y del período activo.
+    // Misma regla que «Cargar nómina» en el detalle del grupo: propio, activo y del período activo.
     const canUploadRoster =
       result.grupo.es_mio &&
       result.grupo.activo &&
@@ -76,7 +77,7 @@ export function SubjectGroupsPage() {
       show: true,
       title: `Grupo ${result.grupo.num_grupo} registrado`,
       description: 'El grupo se registró correctamente en el período seleccionado.',
-      rosterTo: canUploadRoster ? `/cursos/${result.grupo.id_grupo}` : undefined,
+      rosterTo: canUploadRoster ? groupRosterPath(result.grupo.id_grupo) : undefined,
     })
   }
 
@@ -180,7 +181,7 @@ export function SubjectGroupsPage() {
         )}
       </Card>
 
-      {/* HU-18 */}
+      {/* HU-018 */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="sm:max-w-[640px] p-0 overflow-hidden">
           <RegistrarGrupoForm

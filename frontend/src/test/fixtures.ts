@@ -129,13 +129,15 @@ export function subjectGroupsResponse(subject: SubjectCareer, groups: Group[]) {
 export function groupDetailResponse(
   group: Group,
   subject: SubjectCareer,
-  esPeriodoActivo = true
+  esPeriodoActivo = true,
+  edicionBloqueada = false
 ) {
   return {
     data: { grupo: group, materia: subject },
     meta: {
       id_periodo_activo: periodoActivo.id_periodo,
       es_periodo_activo: esPeriodoActivo,
+      edicion_bloqueada: edicionBloqueada,
     },
   }
 }

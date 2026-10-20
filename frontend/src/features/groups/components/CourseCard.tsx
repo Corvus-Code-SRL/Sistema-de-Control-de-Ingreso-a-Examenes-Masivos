@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { RosterStatusBadge } from './RosterStatusBadge'
+import { groupDetailPath } from '../utils/paths'
 import { courseTitle, groupLabel, hasRoster, type Course } from '../types/group.types'
 
 interface CourseCardProps {
@@ -20,7 +21,7 @@ export function CourseCard({ course }: CourseCardProps) {
   return (
     <Card className="p-0 transition-colors hover:border-ring">
       <Link
-        to={`/cursos/${group.id_grupo}`}
+        to={groupDetailPath(group.id_grupo)}
         className="flex h-full flex-col gap-3 p-4 focus-visible:outline-2 focus-visible:outline-ring"
         aria-label={`Abrir ${courseTitle(subject, group)}`}
       >

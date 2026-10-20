@@ -21,8 +21,8 @@ export function PageHeader({
   actions,
 }: PageHeaderProps) {
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-      <div className="flex min-w-0 items-start gap-2">
+    <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+      <div className="flex min-w-0 items-start gap-2 sm:flex-1 sm:basis-80">
         {backTo && (
           <Button variant="ghost" size="icon" className="mt-0.5 shrink-0" asChild>
             <Link to={backTo} aria-label={backLabel}>
@@ -37,7 +37,7 @@ export function PageHeader({
         </div>
       </div>
 
-      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2 sm:ml-auto">{actions}</div>}
     </div>
   )
 }

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Academic\AssistantController;
 use App\Http\Controllers\Academic\MyGroupsController;
 use App\Http\Controllers\Academic\GroupController;
+use App\Http\Controllers\Academic\GroupStudentController;
 use App\Http\Controllers\Academic\PeriodController;
 use App\Http\Controllers\Academic\StudentRosterController;
 use App\Http\Controllers\Academic\SubjectController;
@@ -55,6 +56,10 @@ Route::get('grupos/{id_grupo}', [GroupController::class, 'show']);
 // HU-029: auxiliares de un grupo propio (pestaña Auxiliares del curso). El id se valida en el
 // Request, igual que el detalle del grupo: uno inválido responde 422.
 Route::get('grupos/{id_grupo}/auxiliares', [AssistantController::class, 'forGroup']);
+// HU-020: estudiantes inscritos en un grupo propio, paginados y con búsqueda. {id_grupo} admite
+// hasta 9 dígitos para que nunca exceda el rango de int4 de la base.
+Route::get('grupos/{id_grupo}/estudiantes', [GroupStudentController::class, 'index'])
+    ->where('id_grupo', '[0-9]{1,9}');
 
 Route::post('grupos', [GroupController::class, 'store']);
 

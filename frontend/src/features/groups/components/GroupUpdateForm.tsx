@@ -5,30 +5,28 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { useUpdateGroup } from '../hooks/useUpdateGroup'
-import { usePeriods } from '../hooks/usePeriods'
 import type { Group, GroupMutationResponse } from '../types/group.types'
 
 export interface ActualizarGrupoFormProps {
   group: Group
   subjectCareerLabel: string
   teacherName: string
-  /** Inscritos activos del grupo; se muestran para dejar claro que no se modifican. */
-  studentCount: number
+  /**
+   * Inscritos activos del grupo; se muestran para dejar claro que no se modifican. null mientras
+   * no se conocen: se omite la cifra en lugar de mostrar una equivocada.
+   */
+  studentCount: number | null
   onCancel: () => void
   onUpdated: (group: GroupMutationResponse['data']) => void
+  /** En una vista propia el título lo pone el encabezado de la página. */
+  hideTitle?: boolean
+  /** Un examen del grupo está en curso (HU-019, CA-5): se ve, pero no se puede guardar. */
+  locked?: boolean
 }
 
 interface FieldErrors {
   num_grupo?: string
-  id_periodo?: string
 }
 
 export function ActualizarGrupoForm({
@@ -38,15 +36,16 @@ export function ActualizarGrupoForm({
   studentCount,
   onCancel,
   onUpdated,
+  hideTitle = false,
+  locked = false,
 }: ActualizarGrupoFormProps) {
-  const { periods, isLoading: isLoadingPeriods } = usePeriods()
   const { status, error, submit } = useUpdateGroup()
 
   const [numGrupo, setNumGrupo] = useState(group.num_grupo)
-  const [idPeriodo, setIdPeriodo] = useState<number>(group.periodo.id_periodo)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
 
   const isSubmitting = status === 'submitting'
+  const isDisabled = isSubmitting || locked
 
   function validate(): boolean {
     const errors: FieldErrors = {}
@@ -64,14 +63,12 @@ export function ActualizarGrupoForm({
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
 
-    if (!validate()) {
+    if (locked || !validate()) {
       return
     }
 
-    const result = await submit(group.id_grupo, {
-      num_grupo: numGrupo,
-      id_periodo: idPeriodo,
-    })
+    // Solo el número es editable: el período del grupo no cambia (HU-006).
+    const result = await submit(group.id_grupo, { num_grupo: numGrupo })
 
     if (result !== null) {
       onUpdated(result)
@@ -82,31 +79,36 @@ export function ActualizarGrupoForm({
   const backendPeriodoError = error?.isValidation ? error.errors.id_periodo?.[0] : undefined
 
   const numGrupoError = fieldErrors.num_grupo ?? backendNumGrupoError
-  const periodoError = fieldErrors.id_periodo ?? backendPeriodoError
 
-  const totalErrors = [numGrupoError, periodoError].filter(Boolean).length
-  const hasError = totalErrors > 0 || (error !== null && !error.isValidation)
+  const totalErrors = [numGrupoError, backendPeriodoError].filter(Boolean).length
+  // Un rechazo que no señala un campo (por ejemplo, el bloqueo por examen) se explica con su mensaje.
+  const hasFieldError = backendNumGrupoError !== undefined || backendPeriodoError !== undefined
+  const showsGeneralError = error !== null && (!error.isValidation || !hasFieldError)
+  const generalError = error !== null && showsGeneralError ? error.message : null
+  const hasError = totalErrors > 0 || generalError !== null
 
   const subjectName = subjectCareerLabel.split('·')[0]?.trim() || 'Materia'
 
   return (
     <div className="w-full flex flex-col">
-      <div className="flex items-center justify-between px-6 py-3.5 border-b">
-        <div className="flex flex-col pr-6">
-          <h2 className="text-base font-semibold leading-none tracking-tight">Editar grupo</h2>
-          <p className="text-xs text-muted-foreground mt-1">
-            {subjectName} · Grupo {group.num_grupo}
-          </p>
+      {!hideTitle && (
+        <div className="flex items-center justify-between px-6 py-3.5 border-b">
+          <div className="flex flex-col pr-6">
+            <h2 className="text-base font-semibold leading-none tracking-tight">Editar grupo</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              {subjectName} · Grupo {group.num_grupo}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       <form onSubmit={handleSubmit} noValidate className="p-5 flex flex-col gap-3.5">
         {hasError ? (
           <Alert variant="destructive" className="py-2 px-3">
             <AlertOctagon aria-hidden="true" />
             <AlertDescription className="text-xs font-medium leading-tight">
-              {error !== null && !error.isValidation
-                ? error.message
+              {totalErrors === 0 && generalError !== null
+                ? generalError
                 : `Revise ${totalErrors} ${totalErrors === 1 ? 'campo' : 'campos'} antes de guardar los cambios.`}
             </AlertDescription>
           </Alert>
@@ -114,20 +116,17 @@ export function ActualizarGrupoForm({
           <Alert variant="info" className="py-2.5 px-3">
             <Info aria-hidden="true" />
             <div className="flex flex-col gap-0.5">
-              <span className="text-xs font-semibold leading-tight">
-                Los {studentCount} estudiantes inscritos no se modifican
-              </span>
+              {studentCount !== null && (
+                <span className="text-xs font-semibold leading-tight">
+                  Los {studentCount} estudiantes inscritos no se modifican
+                </span>
+              )}
               <AlertDescription className="text-xs leading-tight">
                 Solo cambian los datos del grupo.
               </AlertDescription>
             </div>
           </Alert>
         )}
-
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-          <ReadOnlyField label="Materia de origen" value={subjectCareerLabel} hint="No se puede cambiar." />
-          <ReadOnlyField label="Docente" value={teacherName} />
-        </div>
 
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
@@ -137,8 +136,7 @@ export function ActualizarGrupoForm({
             <Input
               id="num_grupo"
               value={numGrupo}
-              maxLength={5}
-              disabled={isSubmitting}
+              disabled={isDisabled}
               aria-invalid={Boolean(numGrupoError)}
               onChange={(e) => setNumGrupo(e.target.value)}
               className={`h-8.5 px-3 py-1.5 text-xs bg-card text-foreground ${
@@ -158,44 +156,21 @@ export function ActualizarGrupoForm({
               </p>
             )}
           </div>
+        </div>
 
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+          <ReadOnlyField label="Materia de origen" value={subjectCareerLabel} hint="No se puede cambiar." />
+          <ReadOnlyField label="Docente" value={teacherName} />
           <div className="flex flex-col gap-1">
-            <Label htmlFor="id_periodo" className="text-xs font-medium text-foreground">
-              Período académico <span className="text-destructive" aria-hidden="true">*</span>
-            </Label>
-            <Select
-              disabled={isSubmitting || isLoadingPeriods}
-              value={String(idPeriodo)}
-              onValueChange={(value) => setIdPeriodo(Number(value))}
-            >
-              <SelectTrigger
-                id="id_periodo"
-                aria-invalid={Boolean(periodoError)}
-                className={`w-full h-8.5 py-1.5 text-foreground text-xs bg-card ${
-                  periodoError
-                    ? 'border-danger-fg bg-danger-soft/20 focus:ring-danger-fg'
-                    : 'border-input'
-                }`}
-              >
-                <SelectValue placeholder="Seleccione un período" />
-              </SelectTrigger>
-              <SelectContent>
-                {periods.map((period) => (
-                  <SelectItem
-                    key={period.id_periodo}
-                    value={String(period.id_periodo)}
-                    title={period.nombre_periodo}
-                    className="text-xs"
-                  >
-                    {period.etiqueta}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {periodoError && (
+            <ReadOnlyField
+              label="Período académico"
+              value={group.periodo.etiqueta}
+              hint={group.periodo.nombre_periodo}
+            />
+            {backendPeriodoError && (
               <p className="flex items-center gap-1 text-xs text-danger-fg mt-0.5">
                 <AlertOctagon className="size-3.5 shrink-0" aria-hidden="true" />
-                <span>{periodoError}</span>
+                <span>{backendPeriodoError}</span>
               </p>
             )}
           </div>
@@ -212,7 +187,7 @@ export function ActualizarGrupoForm({
           >
             Cancelar
           </Button>
-          <Button type="submit" size="sm" disabled={isSubmitting} className="text-xs">
+          <Button type="submit" size="sm" disabled={isDisabled} className="text-xs">
             {isSubmitting ? 'Guardando…' : 'Guardar cambios'}
           </Button>
         </div>
