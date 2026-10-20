@@ -2,10 +2,13 @@
 
 namespace App\Services\Academic;
 
+use App\Exceptions\Academic\GroupNotEditableException;
 use App\Models\AcademicOffering;
 use App\Models\Group;
 use App\Models\Period;
 use App\Models\User;
+use App\Services\Exams\ExamRosterLockService;
+use App\Services\Security\AuditLogService;
 use App\Support\RecordStatus;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,11 +26,23 @@ use Illuminate\Validation\ValidationException;
  */
 class GroupService
 {
+    /** Campos del grupo que la bitácora guarda al editarlo. */
+    private const AUDITED_FIELDS = ['id_grupo', 'num_grupo', 'id_gestion_periodo'];
+
     private SubjectCatalogService $subjectCatalog;
 
-    public function __construct(SubjectCatalogService $subjectCatalog)
-    {
+    private ExamRosterLockService $rosterLock;
+
+    private AuditLogService $auditLog;
+
+    public function __construct(
+        SubjectCatalogService $subjectCatalog,
+        ExamRosterLockService $rosterLock,
+        AuditLogService $auditLog
+    ) {
         $this->subjectCatalog = $subjectCatalog;
+        $this->rosterLock = $rosterLock;
+        $this->auditLog = $auditLog;
     }
 
     public function listGroupsForPair(int $careerId, int $subjectId, string $teacherId): array
@@ -91,6 +106,8 @@ class GroupService
             'meta' => [
                 'id_periodo_activo' => $activePeriodId,
                 'es_periodo_activo' => (int) $group->id_gestion_periodo === $activePeriodId,
+                // La vista de edición avisa antes de que el docente intente guardar.
+                'edicion_bloqueada' => $this->rosterLock->isLocked((int) $group->id_grupo),
             ],
         ];
     }
@@ -145,8 +162,8 @@ class GroupService
     }
 
     /**
-     * id_carrera, id_materia e id_usuario_docente son inmutables: se leen del
-     * propio grupo, nunca del payload recibido, aunque el FormRequest los reciba.
+     * HU-019: solo cambia el número de grupo. id_carrera, id_materia, id_usuario_docente y el
+     * período son inmutables: se leen del propio grupo, nunca del payload recibido.
      */
     public function updateGroup(int $groupId, array $data, string $teacherId): array
     {
@@ -159,10 +176,18 @@ class GroupService
 
             $this->assertGroupBelongsToTeacher($group, $teacherId);
 
-            $periodId = (int) ($data['id_periodo'] ?? $group->id_gestion_periodo);
-            $period = $this->findPeriodOrFail($periodId);
+            $periodId = (int) $group->id_gestion_periodo;
 
-            $this->assertPairIsOffered((int) $group->id_carrera, (int) $group->id_materia, $periodId);
+            // Solo el período vigente admite escritura (HU-006): un grupo anterior solo se consulta.
+            if ($periodId !== $this->subjectCatalog->activePeriodId()) {
+                throw GroupNotEditableException::pastPeriod();
+            }
+
+            if ($this->rosterLock->isLocked((int) $group->id_grupo)) {
+                throw GroupNotEditableException::examInProgress();
+            }
+
+            $this->assertPeriodIsUnchanged($data, $periodId);
 
             $this->assertNoDuplicateGroup(
                 (int) $group->id_carrera,
@@ -172,20 +197,47 @@ class GroupService
                 (int) $group->id_grupo
             );
 
+            $before = $group->only(self::AUDITED_FIELDS);
+
+            $group->fill(['num_grupo' => $data['num_grupo']]);
+
+            // Guardar sin cambios no es una modificación: no escribe ni deja rastro en la bitácora.
+            if (! $group->isDirty()) {
+                return $group;
+            }
+
             try {
-                $group->fill([
-                    'num_grupo' => $data['num_grupo'],
-                    'id_gestion_periodo' => $period->id_gestion_periodo,
-                ]);
                 $group->save();
             } catch (QueryException $exception) {
-                throw $this->translateDatabaseError($exception);
+                throw $this->translateDatabaseError($exception, $data['num_grupo']);
             }
+
+            $this->auditLog->registrar(
+                'MODIFICAR',
+                'grupo',
+                $before,
+                $group->only(self::AUDITED_FIELDS),
+                $teacherId
+            );
 
             return $group;
         });
 
         return $this->showGroup($this->findGroup((int) $group->id_grupo), $teacherId);
+    }
+
+    /**
+     * El período no se edita (HU-019): enviarlo igual al actual es válido, cambiarlo no.
+     */
+    private function assertPeriodIsUnchanged(array $data, int $currentPeriodId): void
+    {
+        if (! isset($data['id_periodo']) || (int) $data['id_periodo'] === $currentPeriodId) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'id_periodo' => ['El período del grupo no se puede cambiar.'],
+        ]);
     }
 
     /**
@@ -276,8 +328,9 @@ class GroupService
     }
 
     /**
-     * CA 8 (HU-18) y CA 5 (HU-19): (carrera, materia, número de grupo, período) define la
-     * duplicidad, nunca la materia sola. La gestión ya viaja dentro del período.
+     * CA 8 (HU-018) y CA 3 (HU-019): (carrera, materia, número de grupo, período) define la
+     * duplicidad, nunca la materia sola. La gestión ya viaja dentro del período. Con
+     * `$excludeGroupId` es una edición, que nombra el grupo con el que choca.
      */
     private function assertNoDuplicateGroup(
         int $careerId,
@@ -296,9 +349,13 @@ class GroupService
             })
             ->exists();
 
-        if ($exists) {
-            throw $this->duplicateGroupException();
+        if (! $exists) {
+            return;
         }
+
+        throw $excludeGroupId === null
+            ? $this->duplicateGroupException()
+            : $this->duplicateGroupOnUpdateException($groupNumber);
     }
 
     private function duplicateGroupException(): ValidationException
@@ -311,15 +368,27 @@ class GroupService
         ]);
     }
 
+    private function duplicateGroupOnUpdateException(string $groupNumber): ValidationException
+    {
+        return ValidationException::withMessages([
+            'num_grupo' => ["Ya existe el grupo {$groupNumber} para esta materia y período."],
+        ]);
+    }
+
     /**
      * 23505 (unique_violation): otra solicitud creó el mismo grupo. 23503 (foreign_key_violation):
      * la oferta del par en ese período desapareció entre la validación y la escritura.
+     * `$updatedGroupNumber` indica que la escritura era una edición (HU-019).
      */
-    private function translateDatabaseError(QueryException $exception): \Throwable
-    {
+    private function translateDatabaseError(
+        QueryException $exception,
+        ?string $updatedGroupNumber = null
+    ): \Throwable {
         switch ($exception->getCode()) {
             case '23505':
-                return $this->duplicateGroupException();
+                return $updatedGroupNumber === null
+                    ? $this->duplicateGroupException()
+                    : $this->duplicateGroupOnUpdateException($updatedGroupNumber);
             case '23503':
                 return $this->pairNotOfferedException();
             default:

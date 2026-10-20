@@ -2,6 +2,7 @@
 
 namespace App\Exceptions;
 
+use App\Exceptions\Academic\GroupNotEditableException;
 use App\Exceptions\Academic\StudentRosterFileException;
 use App\Exceptions\Academic\StudentRosterGroupAccessException;
 use App\Exceptions\Academic\StudentRosterPreviewUnavailableException;
@@ -41,6 +42,7 @@ class Handler extends ExceptionHandler
      * @var array<int, class-string<Throwable>>
      */
     protected $dontReport = [
+        GroupNotEditableException::class,
         StudentRosterFileException::class,
         StudentRosterGroupAccessException::class,
         StudentRosterPreviewUnavailableException::class,
