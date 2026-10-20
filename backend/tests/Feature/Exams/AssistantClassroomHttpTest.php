@@ -232,6 +232,111 @@ class AssistantClassroomHttpTest extends TestCase
             ->assertJsonCount(0, 'data');
     }
 
+    public function test_no_permite_asignar_auxiliar_a_dos_aulas_en_horarios_superpuestos(): void
+    {
+        // Primer examen: 08:00 a 09:30, aula 691A.
+        $examA = $this->examWithAssistants([
+            'hora_inicio' => '08:00',
+            'duracion' => 90,
+        ]);
+
+        $this->assign($examA, $this->mariaId, $this->aulaId)
+            ->assertOk();
+
+        // Segundo examen: 08:30 a 10:00, con dos ambientes.
+        $examB = $this->createExam([
+            'nombre_examen' => 'Segundo examen',
+            'fecha' => $examA->fecha->toDateString(),
+            'hora_inicio' => '08:30',
+            'duracion' => 90,
+        ], [$this->aulaId, $this->otraAulaId]);
+
+        $this->enableAssistant($examB, $this->mariaId);
+
+        // No puede controlar otro ambiente al mismo tiempo.
+        $this->assign($examB, $this->mariaId, $this->otraAulaId)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['id_ambiente']);
+
+        // El rechazo conserva la asignación anterior.
+        $this->assertAssignedTo($examB, $this->mariaId, null);
+
+        // Sí puede controlar ambos exámenes en la misma aula.
+        $this->assign($examB, $this->mariaId, $this->aulaId)
+            ->assertOk();
+
+        $this->assertAssignedTo($examB, $this->mariaId, $this->aulaId);
+    }
+
+    public function test_permite_ambientes_distintos_en_examenes_consecutivos(): void
+    {
+        // Examen A: 08:00 a 09:30, ambiente 691A.
+        $examA = $this->createExam([
+            'nombre_examen' => 'Examen de la mañana',
+            'hora_inicio' => '08:00',
+            'duracion' => 90,
+        ], [$this->aulaId]);
+
+        $this->enableAssistant($examA, $this->mariaId);
+
+        $this->assign($examA, $this->mariaId, $this->aulaId)
+            ->assertOk();
+
+        // Examen B: comienza exactamente cuando termina A.
+        $examB = $this->createExam([
+            'nombre_examen' => 'Examen consecutivo',
+            'fecha' => $examA->fecha->toDateString(),
+            'hora_inicio' => '09:30',
+            'duracion' => 90,
+        ], [$this->otraAulaId]);
+
+        $this->enableAssistant($examB, $this->mariaId);
+
+        // Puede controlar el segundo examen en otro ambiente.
+        $this->assign($examB, $this->mariaId, $this->otraAulaId)
+            ->assertOk();
+
+        $this->assertAssignedTo(
+            $examB,
+            $this->mariaId,
+            $this->otraAulaId
+        );
+    }
+
+    public function test_detecta_conflictos_que_cruzan_medianoche(): void
+    {
+        // Examen A: comienza a las 23:30 y termina a la 01:00.
+        $examA = $this->createExam([
+            'nombre_examen' => 'Examen nocturno',
+            'fecha' => $this->futureDate(7),
+            'hora_inicio' => '23:30',
+            'duracion' => 90,
+        ], [$this->aulaId]);
+
+        $this->enableAssistant($examA, $this->mariaId);
+
+        $this->assign($examA, $this->mariaId, $this->aulaId)
+            ->assertOk();
+
+        // Examen B: empieza al día siguiente, a las 00:15.
+        $examB = $this->createExam([
+            'nombre_examen' => 'Examen de madrugada',
+            'fecha' => $this->futureDate(8),
+            'hora_inicio' => '00:15',
+            'duracion' => 90,
+        ], [$this->otraAulaId]);
+
+        $this->enableAssistant($examB, $this->mariaId);
+
+        // Aunque tienen fechas diferentes, sus horarios coinciden.
+        $this->assign($examB, $this->mariaId, $this->otraAulaId)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['id_ambiente']);
+
+        // El rechazo no debe guardar una asignación incompatible.
+        $this->assertAssignedTo($examB, $this->mariaId, null);
+    }
+
     private function enableAssistant(Exam $exam, string $userId, ?int $classroomId = null): void
     {
         ExamAssistant::create([

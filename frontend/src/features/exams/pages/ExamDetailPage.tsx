@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Ban, Building2, DoorOpen, Pencil, Users } from 'lucide-react'
+import { Ban, DoorOpen, Pencil, Users } from 'lucide-react'
 import { ApiError } from '@/lib/api-client'
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -21,6 +21,7 @@ import { examsService } from '../services/examsService'
 import { ExamStatusBadge } from '../components/ExamStatusBadge'
 import { examLockedMessage } from '../utils/examLockedMessage'
 import type { Exam } from '../types/exams.types'
+import { AssistantClassroomManager } from '@/features/assistants/components/AssistantClassroomManager'
 
 function formatExamDate(date: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
@@ -42,7 +43,6 @@ export function ExamDetailPage() {
   const [loadError, setLoadError] = useState<ApiError | null>(null)
 
   const [showCancelDialog, setShowCancelDialog] = useState(false)
-  const [showEnvironmentInfo, setShowEnvironmentInfo] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
 
@@ -333,19 +333,21 @@ export function ExamDetailPage() {
             aria-label="Personal del control de ingreso"
             className="space-y-4 rounded-xl border border-border-soft bg-surface p-6"
           >
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="space-y-1">
-                <h2 className="sciem-h3">
-                  Personal del control de ingreso
-                </h2>
+            <div className="space-y-1">
+              <h2 className="sciem-h3">
+                Personal del control de ingreso
+              </h2>
 
-                <p className="text-sm text-muted-foreground">
-                  Gestión de auxiliares del examen
-                </p>
-              </div>
+              <p className="text-sm text-muted-foreground">
+                Gestión de auxiliares del examen
+              </p>
+            </div>
 
-              {exam && (
-                <div className="flex flex-wrap items-center gap-2">
+            {exam && (
+              <AssistantClassroomManager
+                examId={id}
+                isProgramado={isProgramado}
+                actions={
                   <Button
                     type="button"
                     variant="outline"
@@ -354,27 +356,9 @@ export function ExamDetailPage() {
                     <Users className="size-4" aria-hidden="true" />
                     {isProgramado ? 'Habilitar auxiliares' : 'Ver auxiliares'}
                   </Button>
-
-                  {isProgramado && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setShowEnvironmentInfo(true)}
-                    >
-                      <Building2 className="size-4" aria-hidden="true" />
-                      Asignar ambientes
-                    </Button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="border-t border-border-soft pt-4">
-              <p className="text-sm text-muted-foreground">
-                La habilitación y la asignación de ambientes
-                se administran desde sus funcionalidades correspondientes.
-              </p>
-            </div>
+                }
+              />
+            )}
           </section>
         </div>
       )}
@@ -422,26 +406,6 @@ export function ExamDetailPage() {
           </DialogContent>
         </Dialog>
       )}
-
-      <Dialog
-        open={showEnvironmentInfo}
-        onOpenChange={setShowEnvironmentInfo}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Asignar ambientes</DialogTitle>
-            <DialogDescription>
-              Esta funcionalidad se incorporará mediante
-              HU-030, con su modal independiente.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => setShowEnvironmentInfo(false)}>
-              Entendido
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </AppShell>
   )
 }
