@@ -2,14 +2,16 @@
 
 namespace Tests\Feature\Academic;
 
+use App\Models\Exam;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Tests\Concerns\SeedsAcademicCatalog;
+use Tests\Concerns\SeedsAssistantManagement;
 use Tests\TestCase;
 
 class GroupDetailTest extends TestCase
 {
     use DatabaseTransactions;
-    use SeedsAcademicCatalog;
+    // Aporta el catálogo académico y la creación de exámenes vinculados a un grupo.
+    use SeedsAssistantManagement;
 
     public function test_ubica_el_grupo_con_su_par_periodo_y_docente(): void
     {
@@ -120,6 +122,26 @@ class GroupDetailTest extends TestCase
         $this->getJson('/api/grupos/abc')
             ->assertStatus(422)
             ->assertJsonValidationErrors('id_grupo');
+    }
+
+    /** HU-019: la vista de edición sabe antes de guardar si un examen del grupo la bloquea. */
+    public function test_indica_si_la_edicion_esta_bloqueada_por_un_examen(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $this->getJson($this->groupUrl($this->grupoPropioId))
+            ->assertOk()
+            ->assertJsonPath('meta.edicion_bloqueada', false);
+
+        $this->createExamLinkedTo([$this->grupoPropioId], Exam::PROGRAMADO);
+
+        $this->getJson($this->groupUrl($this->grupoPropioId))
+            ->assertJsonPath('meta.edicion_bloqueada', false);
+
+        $this->createExamLinkedTo([$this->grupoPropioId], Exam::EN_CURSO, null, 'Parcial 2');
+
+        $this->getJson($this->groupUrl($this->grupoPropioId))
+            ->assertJsonPath('meta.edicion_bloqueada', true);
     }
 
     private function groupUrl(int $groupId): string
