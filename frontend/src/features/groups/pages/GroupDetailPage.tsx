@@ -1,26 +1,28 @@
 import { useEffect, useState } from 'react'
-import { CalendarClock, Pencil, Upload, UsersRound } from 'lucide-react'
-import { Link, useParams } from 'react-router-dom'
+import { CalendarClock, History, Pencil, Upload, UsersRound } from 'lucide-react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import { AppShell } from '@/components/layout/AppShell'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Toast } from '@/components/ui/toast'
 import { CourseAccessDenied } from '../components/CourseAccessDenied'
 import { CourseHeader } from '../components/CourseHeader'
 import { GroupNotFound } from '../components/GroupNotFound'
-import { ActualizarGrupoForm } from '../components/GroupUpdateForm'
 import { GroupStudentsTable } from '../components/GroupStudentsTable'
 import { useGroupDetail } from '../hooks/useGroupDetail'
 import { useGroupStudents } from '../hooks/useGroupStudents'
 import { useGroupStudentsFilters } from '../hooks/useGroupStudentsFilters'
 import { courseTitle } from '../types/group.types'
+import { flashMessageFrom } from '../utils/flash'
+import { PAST_PERIOD_MESSAGE } from '../utils/messages'
 import {
   groupAssistantsPath,
+  groupEditPath,
   groupExamsPath,
   groupIdFrom,
   groupRosterPath,
@@ -62,13 +64,17 @@ function GroupDetailView({ groupId }: { groupId: number }) {
   // Se pide en paralelo al detalle: si el grupo no es suyo, el servidor responde 403 y no se muestra.
   const students = useGroupStudents(groupId, filters)
 
-  const [toast, setToast] = useState<{ show: boolean; title: string; description: string }>({
-    show: false,
-    title: '',
-    description: '',
-  })
+  const location = useLocation()
+  const navigate = useNavigate()
+  // Aviso que deja otra vista al volver aquí (por ejemplo, «Grupo actualizado» tras editar).
+  const [flash, setFlash] = useState(() => flashMessageFrom(location.state))
 
-  const [isEditOpen, setIsEditOpen] = useState(false)
+  // Se muestra una sola vez: se borra del historial para que recargar la página no lo repita.
+  useEffect(() => {
+    if (flashMessageFrom(location.state) !== null) {
+      navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: null })
+    }
+  }, [location.state, location.pathname, location.search, navigate])
 
   const correctingPage =
     students.page !== null &&
@@ -122,14 +128,11 @@ function GroupDetailView({ groupId }: { groupId: number }) {
             <>
               {canManage && (
                 <>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="gap-2"
-                    onClick={() => setIsEditOpen(true)}
-                  >
-                    <Pencil className="size-4" aria-hidden="true" />
-                    <span>Editar grupo</span>
+                  <Button variant="secondary" size="sm" className="gap-2" asChild>
+                    <Link to={groupEditPath(groupId)}>
+                      <Pencil className="size-4" aria-hidden="true" />
+                      Editar grupo
+                    </Link>
                   </Button>
 
                   <Button variant="secondary" size="sm" className="gap-2" asChild>
@@ -159,12 +162,8 @@ function GroupDetailView({ groupId }: { groupId: number }) {
         }
       />
 
-      {toast.show && (
-        <Toast
-          title={toast.title}
-          description={toast.description}
-          onClose={() => setToast((prev) => ({ ...prev, show: false }))}
-        />
+      {flash && (
+        <Toast title={flash.title} description={flash.description} onClose={() => setFlash(null)} />
       )}
 
       {isLoading && (
@@ -193,6 +192,14 @@ function GroupDetailView({ groupId }: { groupId: number }) {
 
       {!isLoading && !error && isVisible && (
         <>
+          {/* CA-6 (HU-019): solo el período vigente admite escritura (HU-006). */}
+          {!detail.meta.es_periodo_activo && (
+            <Alert variant="info">
+              <History aria-hidden="true" />
+              <AlertDescription>{PAST_PERIOD_MESSAGE}</AlertDescription>
+            </Alert>
+          )}
+
           <CourseHeader
             detail={detail}
             enrolledCount={enrolledCount}
@@ -215,30 +222,6 @@ function GroupDetailView({ groupId }: { groupId: number }) {
           />
         </>
       )}
-
-      {/* Editar grupo (HU-019) se abre en un modal hasta que su historia publique su propia vista. */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-[640px] p-0 overflow-hidden">
-          {detail && (
-            <ActualizarGrupoForm
-              group={detail.group}
-              subjectCareerLabel={`${detail.subject.nombre} · ${detail.subject.carrera.nombre}`}
-              studentCount={enrolledCount ?? detail.group.cantidad_estudiantes}
-              teacherName={detail.group.docente.nombre_completo}
-              onCancel={() => setIsEditOpen(false)}
-              onUpdated={() => {
-                setIsEditOpen(false)
-                reload()
-                setToast({
-                  show: true,
-                  title: 'Grupo actualizado',
-                  description: 'Los cambios se guardaron correctamente.',
-                })
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
     </AppShell>
   )
 }
