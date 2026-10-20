@@ -7,7 +7,9 @@ use App\Models\Group;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Exams\ExamParticipantService;
+use App\Services\Exams\AssistantAvailabilityService;
 use App\Services\Security\AuditLogService;
+use App\Support\Database\AccentInsensitiveSearch;
 use App\Support\RecordStatus;
 use App\Support\SisCode;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -41,15 +43,18 @@ class AssistantService
     private SubjectCatalogService $subjectCatalog;
     private AuditLogService $auditLog;
     private ExamParticipantService $participants;
+    private AssistantAvailabilityService $availability;
 
     public function __construct(
         SubjectCatalogService $subjectCatalog,
         AuditLogService $auditLog,
-        ExamParticipantService $participants
+        ExamParticipantService $participants,
+        AssistantAvailabilityService $availability
     ) {
         $this->subjectCatalog = $subjectCatalog;
         $this->auditLog = $auditLog;
         $this->participants = $participants;
+        $this->availability = $availability;
     }
 
     /**
@@ -239,6 +244,81 @@ class AssistantService
     }
 
     /**
+     * Sugiere auxiliares activos vinculados a los grupos del examen.
+     *
+     * No habilita usuarios ni exige pertenecer a grupos para
+     * la habilitación directa. Solo prioriza candidatos relacionados.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function suggestedForExam(int $examId, string $teacherId): array
+    {
+        $exam = Exam::query()->find($examId);
+
+        if ($exam === null) {
+            throw new ModelNotFoundException('No existe el examen indicado.');
+        }
+
+        if ((string) $exam->id_usuario_docente !== $teacherId) {
+            throw new AuthorizationException(
+                'El examen no pertenece al docente actual.'
+            );
+        }
+
+        $assistants = User::query()
+            ->where('usuario.estado', RecordStatus::ACTIVE)
+            ->whereHas('activeRoles', function ($query) {
+                $query->where('rol.nombre_rol', Role::AUXILIAR);
+            })
+            ->whereExists(function ($query) use ($examId) {
+                $query->select(DB::raw(1))
+                    ->from('grupo_auxiliar')
+                    ->join(
+                        'grupo_examen',
+                        'grupo_examen.id_grupo',
+                        '=',
+                        'grupo_auxiliar.id_grupo'
+                    )
+                    ->join(
+                        'grupo',
+                        'grupo.id_grupo',
+                        '=',
+                        'grupo_auxiliar.id_grupo'
+                    )
+                    ->whereColumn(
+                        'grupo_auxiliar.id_usuario',
+                        'usuario.id_usuario'
+                    )
+                    ->where('grupo_examen.id_examen', $examId)
+                    ->where('grupo_auxiliar.estado', RecordStatus::ACTIVE)
+                    ->where('grupo.estado', RecordStatus::ACTIVE);
+            })
+            ->orderBy('usuario.apellido_paterno')
+            ->orderBy('usuario.nombre')
+            ->get();
+
+        $enabledIds = DB::table('examen_auxiliar')
+            ->where('id_examen', $examId)
+            ->whereIn('id_usuario', $assistants->pluck('id_usuario'))
+            ->pluck('id_usuario')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        return $assistants->map(function (User $assistant) use ($enabledIds) {
+            return [
+                'id_usuario' => (string) $assistant->id_usuario,
+                'nombre_completo' => $assistant->nombre_completo,
+                'cod_sis' => $assistant->cod_sis,
+                'habilitado' => in_array(
+                    (string) $assistant->id_usuario,
+                    $enabledIds,
+                    true
+                ),
+            ];
+        })->all();
+    }
+
+    /**
      * Búsqueda de auxiliares registrados por SIS o nombre.
      *
      * Solo usuarios ACTIVOS con rol Auxiliar vigente (fecha_fin IS NULL).
@@ -247,13 +327,13 @@ class AssistantService
      */
     public function search(string $criteria): Collection
     {
-        $criteria = trim($criteria);
+        $criteria = AccentInsensitiveSearch::normalize($criteria);
 
         if ($criteria === '') {
             return new Collection();
         }
 
-        $pattern = '%' . $criteria . '%';
+        $pattern = AccentInsensitiveSearch::pattern($criteria);
 
         return User::query()
             ->where('usuario.estado', RecordStatus::ACTIVE)
@@ -262,12 +342,14 @@ class AssistantService
             ->whereNull('usuario_rol.fecha_fin')
             ->where('rol.nombre_rol', Role::AUXILIAR)
             ->where(function ($q) use ($pattern) {
-                $q->where('usuario.cod_sis', 'ILIKE', $pattern)
-                ->orWhere('usuario.nombre', 'ILIKE', $pattern)
-                ->orWhere('usuario.apellido_paterno', 'ILIKE', $pattern)
-                ->orWhere('usuario.apellido_materno', 'ILIKE', $pattern)
+                $q->whereRaw(AccentInsensitiveSearch::condition('usuario.cod_sis'), [$pattern])
+                ->orWhereRaw(AccentInsensitiveSearch::condition('usuario.nombre'), [$pattern])
+                ->orWhereRaw(AccentInsensitiveSearch::condition('usuario.apellido_paterno'), [$pattern])
+                ->orWhereRaw(AccentInsensitiveSearch::condition('usuario.apellido_materno'), [$pattern])
                 ->orWhereRaw(
-                    "CONCAT(usuario.nombre, ' ', usuario.apellido_paterno, ' ', COALESCE(usuario.apellido_materno, '')) ILIKE ?",
+                    AccentInsensitiveSearch::condition(
+                        "CONCAT(usuario.nombre, ' ', usuario.apellido_paterno, ' ', COALESCE(usuario.apellido_materno, ''))"
+                    ),
                     [$pattern]
                 );
             })
@@ -428,7 +510,8 @@ class AssistantService
      *  - El examen debe ser del docente.
      *  - El examen debe estar PROGRAMADO: desde que se abre el control de
      *    ingreso, las habilitaciones quedan fijas.
-     *  - El auxiliar debe pertenecer a algún grupo vinculado al examen.
+     *  - El auxiliar debe tener cuenta ACTIVA y rol Auxiliar vigente.
+     *  - No se requiere pertenencia previa a grupos académicos.
      *  - El auxiliar no debe estar entre los estudiantes esperados del examen.
      *
      * El examen se bloquea con lockForUpdate para que no cambie de estado
@@ -439,27 +522,18 @@ class AssistantService
         $assistant = $this->findAssistantOrFail($assistantId);
 
         DB::transaction(function () use ($examId, $assistantId, $assistant, $teacherId) {
+            // Serializa las habilitaciones del mismo auxiliar.
+            DB::table('usuario')
+                ->where('id_usuario', $assistantId)
+                ->lockForUpdate()
+                ->first();
+
             $exam = $this->lockOwnExamOrFail($examId, $teacherId);
 
             if ($exam->estado !== Exam::PROGRAMADO) {
                 throw ValidationException::withMessages([
                     'id_examen' => [
                         'Solo se pueden habilitar auxiliares mientras el examen está PROGRAMADO.',
-                    ],
-                ]);
-            }
-
-            $belongsToExam = DB::table('grupo_auxiliar')
-                ->join('grupo_examen', 'grupo_examen.id_grupo', '=', 'grupo_auxiliar.id_grupo')
-                ->where('grupo_examen.id_examen', $examId)
-                ->where('grupo_auxiliar.id_usuario', $assistantId)
-                ->where('grupo_auxiliar.estado', RecordStatus::ACTIVE)
-                ->exists();
-
-            if (!$belongsToExam) {
-                throw ValidationException::withMessages([
-                    'id_usuario' => [
-                        'El auxiliar no pertenece a ningún grupo vinculado a este examen.',
                     ],
                 ]);
             }
@@ -489,6 +563,9 @@ class AssistantService
                 ]);
             }
 
+            // HU-029: evita habilitarlo en ambientes físicamente incompatibles.
+            $this->availability->assertAvailable($exam, $assistantId, null);
+
             DB::table('examen_auxiliar')->insert([
                 'id_examen' => $exam->id_examen,
                 'id_usuario' => $assistantId,
@@ -513,13 +590,9 @@ class AssistantService
     /**
      * Quita un auxiliar de un grupo.
      *
-     * grupo_auxiliar tiene estado: se marca INACTIVO, no se borra. No afecta
-     * a la misma persona en los grupos de otros docentes.
-     *
-     * Si el grupo era el último vínculo del auxiliar con un examen PROGRAMADO
-     * del docente, también se le deshabilita de ese examen en la misma
-     * transacción. Si alguno de esos exámenes ya está EN_INGRESO o EN_CURSO,
-     * la habilitación está fija y la operación se rechaza.
+     * La relación grupo_auxiliar se marca INACTIVA.
+     * No modifica las habilitaciones de examen_auxiliar,
+     * que se gestionan independientemente mediante removeFromExam().
      */
     public function removeFromGroup(int $groupId, string $assistantId, string $teacherId): void
     {
@@ -538,24 +611,6 @@ class AssistantService
         }
 
         DB::transaction(function () use ($groupId, $assistantId, $teacherId) {
-            $orphaned = $this->examsLeftWithoutGroupLink($groupId, $assistantId, $teacherId);
-
-            $started = $orphaned->filter(fn (Exam $exam) => in_array(
-                $exam->estado,
-                [Exam::EN_INGRESO, Exam::EN_CURSO],
-                true
-            ));
-
-            if ($started->isNotEmpty()) {
-                throw ValidationException::withMessages([
-                    'id_grupo' => [
-                        'No se puede quitar al auxiliar de este grupo porque está habilitado en un examen '
-                        . 'que ya inició el control de ingreso: '
-                        . $started->pluck('nombre_examen')->implode(', ') . '.',
-                    ],
-                ]);
-            }
-
             DB::table('grupo_auxiliar')
                 ->where('id_grupo', $groupId)
                 ->where('id_usuario', $assistantId)
@@ -564,14 +619,18 @@ class AssistantService
             $this->auditLog->registrar(
                 self::ACTION_REMOVE_FROM_GROUP,
                 'grupo_auxiliar',
-                ['id_grupo' => $groupId, 'id_usuario' => $assistantId, 'estado' => RecordStatus::ACTIVE],
-                ['id_grupo' => $groupId, 'id_usuario' => $assistantId, 'estado' => RecordStatus::INACTIVE],
+                [
+                    'id_grupo' => $groupId,
+                    'id_usuario' => $assistantId,
+                    'estado' => RecordStatus::ACTIVE,
+                ],
+                [
+                    'id_grupo' => $groupId,
+                    'id_usuario' => $assistantId,
+                    'estado' => RecordStatus::INACTIVE,
+                ],
                 $teacherId
             );
-
-            foreach ($orphaned->where('estado', Exam::PROGRAMADO) as $exam) {
-                $this->deleteExamEnablement((int) $exam->id_examen, $assistantId, $teacherId);
-            }
         });
     }
 
@@ -633,44 +692,6 @@ class AssistantService
             null,
             $teacherId
         );
-    }
-
-    /**
-     * Exámenes del docente donde el auxiliar está habilitado y el grupo indicado era su
-     * único vínculo activo. Quedan bloqueados hasta cerrar la transacción. Solo cuentan los
-     * que aún pueden cambiar: PROGRAMADO, o EN_INGRESO / EN_CURSO (que bloquean la operación).
-     *
-     * @return Collection<int, Exam>
-     */
-    private function examsLeftWithoutGroupLink(int $groupId, string $assistantId, string $teacherId): Collection
-    {
-        $examIds = DB::table('examen_auxiliar')
-            ->join('examen', 'examen.id_examen', '=', 'examen_auxiliar.id_examen')
-            ->join('grupo_examen', 'grupo_examen.id_examen', '=', 'examen.id_examen')
-            ->where('examen_auxiliar.id_usuario', $assistantId)
-            ->where('examen.id_usuario_docente', $teacherId)
-            ->where('grupo_examen.id_grupo', $groupId)
-            ->whereNotExists(function ($query) use ($groupId, $assistantId) {
-                $query->select(DB::raw(1))
-                    ->from('grupo_examen as otro_vinculo')
-                    ->join('grupo_auxiliar', 'grupo_auxiliar.id_grupo', '=', 'otro_vinculo.id_grupo')
-                    ->whereColumn('otro_vinculo.id_examen', 'examen.id_examen')
-                    ->where('otro_vinculo.id_grupo', '!=', $groupId)
-                    ->where('grupo_auxiliar.id_usuario', $assistantId)
-                    ->where('grupo_auxiliar.estado', RecordStatus::ACTIVE);
-            })
-            ->pluck('examen.id_examen')
-            ->all();
-
-        if ($examIds === []) {
-            return new Collection();
-        }
-
-        return Exam::query()
-            ->whereIn('id_examen', $examIds)
-            ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::EN_CURSO])
-            ->lockForUpdate()
-            ->get();
     }
 
     /** Aplica el filtro de "grupo activo del docente en el período" a la relación de grupos del auxiliar. */

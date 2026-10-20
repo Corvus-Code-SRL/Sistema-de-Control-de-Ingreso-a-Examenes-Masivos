@@ -55,52 +55,98 @@ class AssistantGroupRemovalTest extends TestCase
         $this->assertSame(0, $this->logCount('QUITAR_AUXILIAR_EXAMEN'));
     }
 
-    public function test_si_no_queda_ningun_grupo_vinculado_se_le_deshabilita_del_examen_y_se_registra(): void
+    public function test_quitar_el_ultimo_grupo_no_deshabilita_al_auxiliar_del_examen(): void
     {
         $this->putInGroup($this->auxiliarId, $this->grupoPropioId);
-        // El segundo grupo no está vinculado al examen: no cuenta como vínculo.
         $this->putInGroup($this->auxiliarId, $this->segundoGrupoPropioId);
         $this->enableInExam($this->auxiliarId, $this->examId);
 
         $this->removeFromGroup($this->grupoPropioId)->assertOk();
 
-        $this->assertSame('INACTIVO', $this->groupStatus($this->auxiliarId, $this->grupoPropioId));
-        $this->assertSame('ACTIVO', $this->groupStatus($this->auxiliarId, $this->segundoGrupoPropioId));
-        $this->assertFalse($this->isEnabledInExam($this->auxiliarId, $this->examId));
+        $this->assertSame(
+            'INACTIVO',
+            $this->groupStatus($this->auxiliarId, $this->grupoPropioId)
+        );
+
+        $this->assertSame(
+            'ACTIVO',
+            $this->groupStatus($this->auxiliarId, $this->segundoGrupoPropioId)
+        );
+
+        // La habilitación del examen es independiente de los grupos.
+        $this->assertTrue(
+            $this->isEnabledInExam($this->auxiliarId, $this->examId)
+        );
+
+        // Quitar del grupo no debe generar una baja del examen.
         $this->assertSame(1, $this->logCount('QUITAR_AUXILIAR_GRUPO'));
-        $this->assertSame(1, $this->logCount('QUITAR_AUXILIAR_EXAMEN'));
+        $this->assertSame(0, $this->logCount('QUITAR_AUXILIAR_EXAMEN'));
     }
 
-    public function test_el_otro_vinculo_inactivo_no_cuenta(): void
+    public function test_quitar_de_grupo_con_otro_vinculo_inactivo_conserva_habilitacion(): void
     {
-        DB::table('grupo_examen')->insert(['id_grupo' => $this->segundoGrupoPropioId, 'id_examen' => $this->examId]);
+        DB::table('grupo_examen')->insert([
+            'id_grupo' => $this->segundoGrupoPropioId,
+            'id_examen' => $this->examId,
+        ]);
+
         $this->putInGroup($this->auxiliarId, $this->grupoPropioId);
         $this->putInGroup($this->auxiliarId, $this->segundoGrupoPropioId);
+
         DB::table('grupo_auxiliar')
             ->where('id_grupo', $this->segundoGrupoPropioId)
             ->where('id_usuario', $this->auxiliarId)
             ->update(['estado' => 'INACTIVO']);
+
         $this->enableInExam($this->auxiliarId, $this->examId);
 
         $this->removeFromGroup($this->grupoPropioId)->assertOk();
 
-        $this->assertFalse($this->isEnabledInExam($this->auxiliarId, $this->examId));
+        $this->assertSame(
+            'INACTIVO',
+            $this->groupStatus($this->auxiliarId, $this->grupoPropioId)
+        );
+
+        $this->assertSame(
+            'INACTIVO',
+            $this->groupStatus($this->auxiliarId, $this->segundoGrupoPropioId)
+        );
+
+        // La habilitación permanece aunque no tenga grupos activos.
+        $this->assertTrue(
+            $this->isEnabledInExam($this->auxiliarId, $this->examId)
+        );
+
+        $this->assertSame(1, $this->logCount('QUITAR_AUXILIAR_GRUPO'));
+        $this->assertSame(0, $this->logCount('QUITAR_AUXILIAR_EXAMEN'));
     }
 
     /** @dataProvider startedStates */
-    public function test_un_examen_en_ingreso_o_en_curso_bloquea_la_baja_con_422(string $state): void
+    public function test_quitar_de_grupo_no_afecta_examen_iniciado(string $state): void
     {
         $this->putInGroup($this->auxiliarId, $this->grupoPropioId);
         $this->enableInExam($this->auxiliarId, $this->examId);
-        DB::table('examen')->where('id_examen', $this->examId)->update(['estado' => $state]);
 
-        $this->removeFromGroup($this->grupoPropioId)
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('id_grupo');
+        DB::table('examen')
+            ->where('id_examen', $this->examId)
+            ->update(['estado' => $state]);
 
-        $this->assertSame('ACTIVO', $this->groupStatus($this->auxiliarId, $this->grupoPropioId));
-        $this->assertTrue($this->isEnabledInExam($this->auxiliarId, $this->examId));
-        $this->assertSame(0, $this->logCount('QUITAR_AUXILIAR_GRUPO'));
+        $this->removeFromGroup($this->grupoPropioId)->assertOk();
+
+        // El auxiliar deja de pertenecer al grupo.
+        $this->assertSame(
+            'INACTIVO',
+            $this->groupStatus($this->auxiliarId, $this->grupoPropioId)
+        );
+
+        // Su habilitación al examen iniciado permanece intacta.
+        $this->assertTrue(
+            $this->isEnabledInExam($this->auxiliarId, $this->examId)
+        );
+
+        // Solo se registra la baja del grupo.
+        $this->assertSame(1, $this->logCount('QUITAR_AUXILIAR_GRUPO'));
+        $this->assertSame(0, $this->logCount('QUITAR_AUXILIAR_EXAMEN'));
     }
 
     /** @return array<string, array{0: string}> */

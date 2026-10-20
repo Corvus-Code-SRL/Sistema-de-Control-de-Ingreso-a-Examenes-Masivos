@@ -346,4 +346,231 @@ class UpdateExamTest extends TestCase
             'id_ambiente' => $this->otraAulaId,
         ]);
     }
+
+    public function test_rechaza_edicion_que_deja_auxiliar_en_aulas_distintas(): void
+    {
+        $day = $this->futureDate(10);
+
+        $firstExam = $this->createExam([
+            'nombre_examen' => 'Examen de la mañana',
+            'fecha' => $day,
+            'hora_inicio' => '08:00',
+            'duracion' => 90,
+        ], [$this->aulaId]);
+
+        $secondExam = $this->createExam([
+            'nombre_examen' => 'Examen de la tarde',
+            'fecha' => $day,
+            'hora_inicio' => '12:00',
+            'duracion' => 90,
+        ], [$this->otraAulaId]);
+
+        $assistantId = '00000000-0000-4000-8000-000000000093';
+
+        DB::table('usuario')->insert([
+            'id_usuario' => $assistantId,
+            'nombre' => 'Daniela',
+            'apellido_paterno' => 'Prueba',
+            'apellido_materno' => null,
+            'correo' => 'daniela.revalidacion@umss.edu',
+            'contrasenia' => 'x',
+            'cod_sis' => '209900093',
+            'estado' => RecordStatus::ACTIVE,
+        ]);
+
+        foreach ([
+            [$firstExam, $this->aulaId],
+            [$secondExam, $this->otraAulaId],
+        ] as [$exam, $classroomId]) {
+            ExamAssistant::create([
+                'id_examen' => $exam->id_examen,
+                'id_usuario' => $assistantId,
+                'id_usuario_docente_habilita' => $this->docenteId,
+                'id_ambiente' => $classroomId,
+            ]);
+        }
+
+        // Se intenta mover el segundo examen a un horario
+        // que coincide con el primero, pero en otra aula.
+        $this->putJson(
+            $this->url($secondExam),
+            $this->validPayload([
+                'nombre_examen' => 'Examen de la tarde',
+                'fecha' => $day,
+                'hora_inicio' => '09:00',
+                'duracion' => 90,
+                'ambientes' => [$this->otraAulaId],
+                'confirmar_advertencias' => true,
+            ])
+        )
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('id_ambiente');
+
+        // La actualización rechazada debe revertirse por completo.
+        $this->assertDatabaseHas('examen', [
+            'id_examen' => $secondExam->id_examen,
+            'hora_inicio' => '12:00:00',
+            'duracion' => 90,
+        ]);
+
+        $this->assertDatabaseHas('examen_auxiliar', [
+            'id_examen' => $secondExam->id_examen,
+            'id_usuario' => $assistantId,
+            'id_ambiente' => $this->otraAulaId,
+        ]);
+
+        $this->assertSame(
+            0,
+            AuditLog::query()
+                ->where('tabla_afectada', 'examen')
+                ->count()
+        );
+    }
+
+    private function crearExamenesConAuxiliar(
+        int $ambientePrimero,
+        int $ambienteSegundo
+    ): array {
+        $fecha = $this->futureDate(10);
+
+        $primero = $this->createExam([
+            'nombre_examen' => 'Examen A',
+            'fecha' => $fecha,
+            'hora_inicio' => '08:00',
+            'duracion' => 90,
+        ], [$ambientePrimero]);
+
+        $segundo = $this->createExam([
+            'nombre_examen' => 'Examen B',
+            'fecha' => $fecha,
+            'hora_inicio' => '12:00',
+            'duracion' => 90,
+        ], [$ambienteSegundo]);
+
+        $auxiliarId = '00000000-0000-4000-8000-000000000094';
+
+        DB::table('usuario')->insert([
+            'id_usuario' => $auxiliarId,
+            'nombre' => 'Daniela',
+            'apellido_paterno' => 'Disponibilidad',
+            'apellido_materno' => null,
+            'correo' => 'daniela.disponibilidad@umss.edu',
+            'contrasenia' => 'x',
+            'cod_sis' => '209900094',
+            'estado' => RecordStatus::ACTIVE,
+        ]);
+
+        foreach ([
+            [$primero, $ambientePrimero],
+            [$segundo, $ambienteSegundo],
+        ] as [$examen, $ambienteId]) {
+            ExamAssistant::create([
+                'id_examen' => $examen->id_examen,
+                'id_usuario' => $auxiliarId,
+                'id_usuario_docente_habilita' => $this->docenteId,
+                'id_ambiente' => $ambienteId,
+            ]);
+        }
+
+        return [$primero, $segundo, $auxiliarId, $fecha];
+    }
+
+    public function test_permite_editar_examenes_simultaneos_en_la_misma_aula(): void
+    {
+        [, $examen, $auxiliarId, $fecha] = $this->crearExamenesConAuxiliar(
+            $this->aulaId,
+            $this->aulaId
+        );
+
+        $this->putJson($this->url($examen), $this->validPayload([
+            'nombre_examen' => 'Examen B',
+            'fecha' => $fecha,
+            'hora_inicio' => '09:00',
+            'duracion' => 90,
+            'ambientes' => [$this->aulaId],
+            'confirmar_advertencias' => true,
+        ]))
+            ->assertOk()
+            ->assertJsonPath('mensaje', 'Examen actualizado correctamente.');
+
+        $this->assertDatabaseHas('examen', [
+            'id_examen' => $examen->id_examen,
+            'hora_inicio' => '09:00:00',
+        ]);
+
+        $this->assertDatabaseHas('examen_auxiliar', [
+            'id_examen' => $examen->id_examen,
+            'id_usuario' => $auxiliarId,
+            'id_ambiente' => $this->aulaId,
+        ]);
+    }
+
+    public function test_permite_editar_examenes_consecutivos_en_aulas_distintas(): void
+    {
+        [, $examen, $auxiliarId, $fecha] = $this->crearExamenesConAuxiliar(
+            $this->aulaId,
+            $this->otraAulaId
+        );
+
+        // El primer examen termina a las 09:30.
+        // El segundo comienza exactamente a las 09:30.
+        $this->putJson($this->url($examen), $this->validPayload([
+            'nombre_examen' => 'Examen B',
+            'fecha' => $fecha,
+            'hora_inicio' => '09:30',
+            'duracion' => 90,
+            'ambientes' => [$this->otraAulaId],
+        ]))
+            ->assertOk()
+            ->assertJsonPath('mensaje', 'Examen actualizado correctamente.');
+
+        $this->assertDatabaseHas('examen', [
+            'id_examen' => $examen->id_examen,
+            'hora_inicio' => '09:30:00',
+        ]);
+
+        $this->assertDatabaseHas('examen_auxiliar', [
+            'id_examen' => $examen->id_examen,
+            'id_usuario' => $auxiliarId,
+            'id_ambiente' => $this->otraAulaId,
+        ]);
+    }
+
+    public function test_rechaza_cambio_de_ambiente_y_horario_que_conflictua_con_auxiliar(): void
+    {
+        [$primero, $segundo, $auxiliarId, $fecha] =
+            $this->crearExamenesConAuxiliar(
+                $this->aulaId,
+                $this->aulaId
+            );
+
+        $this->putJson($this->url($segundo), $this->validPayload([
+            'nombre_examen' => 'Examen B',
+            'fecha' => $fecha,
+            'hora_inicio' => '09:00',
+            'duracion' => 90,
+            'ambientes' => [$this->otraAulaId],
+            'confirmar_advertencias' => true,
+        ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('id_usuario');
+
+        // Ni el horario ni el ambiente deben modificarse.
+        $this->assertDatabaseHas('examen', [
+            'id_examen' => $segundo->id_examen,
+            'hora_inicio' => '12:00:00',
+        ]);
+
+        $this->assertDatabaseHas('examen_ambiente', [
+            'id_examen' => $segundo->id_examen,
+            'id_ambiente' => $this->aulaId,
+        ]);
+
+        // La asignación original debe restaurarse.
+        $this->assertDatabaseHas('examen_auxiliar', [
+            'id_examen' => $segundo->id_examen,
+            'id_usuario' => $auxiliarId,
+            'id_ambiente' => $this->aulaId,
+        ]);
+    }
 }
