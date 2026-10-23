@@ -1,3 +1,4 @@
+import type { ExamStatus } from '@/features/exams'
 import type { SubjectCareer } from '@/features/subjects'
 import type { Page, ResourceResponse } from '@/types/api.types'
 
@@ -189,4 +190,28 @@ export interface GroupStudentsPage extends Page<GroupStudent> {
 export interface GroupStudentFilters {
   q: string
   page: number
+}
+
+/** Datos del listado contextual; este endpoint no carga ambientes ni grupos. */
+export interface GroupExam {
+  id_examen: number
+  nombre_examen: string
+  fecha: string
+  hora_inicio: string
+  hora_fin: string | null
+  estado: ExamStatus
+}
+
+export interface GroupAssistant {
+  id_usuario: string
+  nombre_completo: string
+  cod_sis: string
+  correo: string
+  fecha_incorporacion: string
+  examenes: {
+    id_examen: number
+    nombre_examen: string
+    fecha: string
+    estado: ExamStatus
+  }[]
 }

@@ -14,6 +14,9 @@ export { GroupNotFound } from './components/GroupNotFound'
 export {
   MY_COURSES_PATH,
   groupDetailPath,
+  groupExamsPath,
+  groupAssistantsPath,
+  groupCreateExamPath,
   groupEditPath,
   groupIdFrom,
   groupRosterPath,
@@ -32,3 +35,6 @@ export type {
   SubjectGroupsMeta,
   SubjectGroupsResponse,
 } from './types/group.types'
+
+export { GroupExamsPage } from './pages/GroupExamsPage'
+export { GroupAssistantsPage } from './pages/GroupAssistantsPage'

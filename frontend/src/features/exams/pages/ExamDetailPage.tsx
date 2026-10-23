@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Ban, DoorOpen, Pencil, Users } from 'lucide-react'
+import { groupExamsPath, groupIdFrom } from '@/features/groups'
 import { ApiError } from '@/lib/api-client'
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -46,7 +47,16 @@ export function ExamDetailPage() {
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
 
-  const backTo = '/examenes/programados'
+  const [searchParams] = useSearchParams()
+  const requestedGroupId = groupIdFrom(searchParams.get('grupo') ?? undefined)
+  const groupId = exam?.grupos?.some((group) => group.id_grupo === requestedGroupId)
+    ? requestedGroupId
+    : null
+  const backTo = groupId === null ? '/examenes/programados' : groupExamsPath(groupId)
+  const backLabel = groupId === null ? 'Volver a Programados' : 'Volver a exámenes del grupo'
+  const parentBreadcrumbs = groupId === null
+    ? [{ label: 'Exámenes' }, { label: 'Programados', to: backTo }]
+    : [{ label: 'Exámenes del grupo', to: backTo }]
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
@@ -138,8 +148,7 @@ export function ExamDetailPage() {
       <AppShell
         mobileTitle="Examen"
         breadcrumbs={[
-          { label: 'Exámenes' },
-          { label: 'Programados', to: backTo },
+          ...parentBreadcrumbs,
           { label: 'Detalle' },
         ]}
       >
@@ -157,7 +166,7 @@ export function ExamDetailPage() {
           }
           action={
             <Button variant="outline" onClick={() => navigate(backTo)}>
-              Volver a Programados
+              {backLabel}
             </Button>
           }
         />
@@ -169,15 +178,14 @@ export function ExamDetailPage() {
     <AppShell
       mobileTitle={exam?.nombre_examen ?? 'Examen'}
       breadcrumbs={[
-        { label: 'Exámenes' },
-        { label: 'Programados', to: backTo },
+        ...parentBreadcrumbs,
         { label: exam?.nombre_examen ?? 'Detalle' },
       ]}
     >
       <PageHeader
         title={exam?.nombre_examen ?? 'Detalle del examen'}
         backTo={backTo}
-        backLabel="Volver a Programados"
+        backLabel={backLabel}
         subtitle={exam && <ExamStatusBadge status={exam.estado} />}
         actions={
           exam && isProgramado ? (
@@ -185,7 +193,7 @@ export function ExamDetailPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => navigate(`/examenes/${id}/editar`)}
+                onClick={() => navigate(`/examenes/${id}/editar${groupId === null ? '' : `?grupo=${groupId}`}`)}
               >
                 <Pencil className="size-4" aria-hidden="true" />
                 Editar examen
@@ -351,7 +359,7 @@ export function ExamDetailPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => navigate(`/examenes/${id}/auxiliares`)}
+                    onClick={() => navigate(`/examenes/${id}/auxiliares${groupId === null ? '' : `?grupo=${groupId}`}`)}
                   >
                     <Users className="size-4" aria-hidden="true" />
                     {isProgramado ? 'Habilitar auxiliares' : 'Ver auxiliares'}

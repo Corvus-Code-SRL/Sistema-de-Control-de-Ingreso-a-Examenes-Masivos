@@ -67,9 +67,9 @@ function examData(
   }
 }
 
-function renderPage(examId = '9') {
+function renderPage(examId = '9', search = '') {
   return renderWithRouter(<ExamAssistantsPage />, {
-    route: `/examenes/${examId}/auxiliares`,
+    route: `/examenes/${examId}/auxiliares${search}`,
     path: '/examenes/:examId/auxiliares',
   })
 }
@@ -298,4 +298,29 @@ describe('ExamAssistantsPage', () => {
     expect(listExamAssistants).not.toHaveBeenCalled()
     expect(suggestedForExam).not.toHaveBeenCalled()
   })
+
+  it.each([
+    ['?grupo=100', '/examenes/9?grupo=100'],
+    ['', '/examenes/9'],
+    ['?grupo=abc', '/examenes/9'],
+    ['?grupo=0', '/examenes/9'],
+    ['?grupo=2147483648', '/examenes/9'],
+  ])('con %s el regreso y el breadcrumb apuntan a %s sin alterar las consultas', async (search, destination) => {
+    renderPage('9', search)
+    await screen.findByText('Todavía no hay auxiliares habilitados.')
+    expect(screen.getByRole('link', { name: 'Volver al examen' })).toHaveAttribute('href', destination)
+    const breadcrumbs = within(screen.getByRole('navigation', { name: 'breadcrumb' }))
+    expect(breadcrumbs.getByRole('link', { name: 'Detalle' })).toHaveAttribute('href', destination)
+    if (search === '?grupo=100') {
+      expect(breadcrumbs.getByRole('link', { name: 'Exámenes del grupo' })).toHaveAttribute('href', '/grupos/100/examenes')
+    } else {
+      expect(breadcrumbs.getByRole('link', { name: 'Exámenes' })).toHaveAttribute('href', '/examenes/programados')
+      expect(breadcrumbs.queryByRole('link', { name: 'Exámenes del grupo' })).not.toBeInTheDocument()
+    }
+    expect(listExamAssistants).toHaveBeenCalledExactlyOnceWith(9, expect.any(AbortSignal))
+    expect(suggestedForExam).toHaveBeenCalledExactlyOnceWith(9, expect.any(AbortSignal))
+    expect(enableForExam).not.toHaveBeenCalled()
+    expect(removeFromExam).not.toHaveBeenCalled()
+  })
+
 })

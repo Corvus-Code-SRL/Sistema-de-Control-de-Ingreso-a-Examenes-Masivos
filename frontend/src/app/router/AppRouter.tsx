@@ -16,7 +16,14 @@ import {
 } from '@/features/auth'
 import { EntryControlPage, OpenEntryControlsPage } from '@/features/entry-control'
 import { CreateExamPage, EditExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
-import { GroupDetailPage, GroupEditPage, MyCoursesPage, SubjectGroupsPage } from '@/features/groups'
+import {
+  GroupAssistantsPage,
+  GroupDetailPage,
+  GroupEditPage,
+  GroupExamsPage,
+  MyCoursesPage,
+  SubjectGroupsPage,
+} from '@/features/groups'
 import { ClassroomsPage } from '@/features/classrooms'
 import { RiskCenterPage } from '@/features/risk-center/academic'
 import { RosterUploadPage } from '@/features/students'
@@ -58,6 +65,14 @@ function DocenteRoutes() {
         element={guarded('grupos.gestionar', <GroupDetailPage />)}
       />
 
+      <Route
+        path="/grupos/:idGrupo/examenes"
+        element={guarded('examenes.gestionar', <GroupExamsPage />)}
+      />
+      <Route
+        path="/grupos/:idGrupo/auxiliares"
+        element={guarded('auxiliares.gestionar', <GroupAssistantsPage />)}
+      />
       <Route
         path="/grupos/:idGrupo/editar"
         element={guarded('grupos.gestionar', <GroupEditPage />)}

@@ -21,14 +21,14 @@ export function groupRosterPath(groupId: number): string {
   return `/grupos/${groupId}/nomina`
 }
 
-/** Exámenes programados filtrados por el grupo. */
+/** Exámenes asociados al grupo. */
 export function groupExamsPath(groupId: number): string {
-  return `/examenes/programados?grupo=${groupId}`
+  return `/grupos/${groupId}/examenes`
 }
 
-/** Mis auxiliares filtrado por el grupo. */
+/** Auxiliares incorporados al grupo. */
 export function groupAssistantsPath(groupId: number): string {
-  return `/mis-auxiliares?grupo=${groupId}`
+  return `/grupos/${groupId}/auxiliares`
 }
 
 /**
@@ -39,4 +39,9 @@ export function groupIdFrom(param: string | undefined): number | null {
   if (param === undefined || !/^[1-9]\d{0,8}$/.test(param)) return null
 
   return Number(param)
+}
+
+/** Creación única de HU-24 con contexto inicial de grupo. */
+export function groupCreateExamPath(groupId: number): string {
+  return `/examenes/nuevo?grupo=${groupId}`
 }

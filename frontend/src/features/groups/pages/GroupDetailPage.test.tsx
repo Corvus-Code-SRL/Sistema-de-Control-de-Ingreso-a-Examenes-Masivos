@@ -316,11 +316,11 @@ describe('GroupDetailPage — acciones (CA-5)', () => {
     )
     expect(screen.getByRole('link', { name: /ver exámenes/i })).toHaveAttribute(
       'href',
-      '/examenes/programados?grupo=100'
+      '/grupos/100/examenes'
     )
     expect(screen.getByRole('link', { name: 'Auxiliares' })).toHaveAttribute(
       'href',
-      '/mis-auxiliares?grupo=100'
+      '/grupos/100/auxiliares'
     )
   })
 

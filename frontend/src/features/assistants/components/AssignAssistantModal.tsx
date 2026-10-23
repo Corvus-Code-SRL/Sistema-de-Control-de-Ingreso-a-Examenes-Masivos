@@ -18,28 +18,45 @@ interface GroupOption {
   label: string
 }
 
-interface AssignAssistantModalProps {
+interface CommonProps {
   open: boolean
-  groups: GroupOption[]
-  existingAssignments: AssistantWithGroups[]
   /** Recibe el auxiliar y la lista de grupos seleccionados. */
   onConfirm: (userId: string, groupIds: number[]) => Promise<void>
   onCancel: () => void
 }
 
+type AssignAssistantModalProps = CommonProps & (
+  | {
+      groups: GroupOption[]
+      existingAssignments: AssistantWithGroups[]
+      contextGroup?: never
+      assignedUserIds?: never
+    }
+  | {
+      contextGroup: GroupOption
+      assignedUserIds: string[]
+      groups?: never
+      existingAssignments?: never
+    }
+)
+
 /**
  * Modal "Asignar auxiliar".
  *
  * Permite asignar al mismo auxiliar a VARIOS grupos a la vez.
- * Los grupos donde ya está aparecen marcados y deshabilitados.
+ * Los grupos donde ya está aparecen marcados y deshabilitados. En modo contextual
+ * el destino es fijo y no se muestra el selector de grupos.
  */
 export function AssignAssistantModal({
   open,
-  groups,
-  existingAssignments,
+  groups = [],
+  existingAssignments = [],
+  contextGroup,
+  assignedUserIds = [],
   onConfirm,
   onCancel,
 }: AssignAssistantModalProps) {
+  const [error, setError] = useState<string | null>(null)
   const [criterion, setCriterion] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [result, setResult] = useState<Assistant | null>(null)
@@ -48,6 +65,7 @@ export function AssignAssistantModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   function reset() {
+    setError(null)
     setCriterion('')
     setResult(null)
     setHasSearched(false)
@@ -62,6 +80,7 @@ export function AssignAssistantModal({
 
     if (trimmed.length < 2) return
 
+    setError(null)
     setIsSearching(true)
     setHasSearched(false)
     setResult(null)
@@ -70,7 +89,8 @@ export function AssignAssistantModal({
     try {
       const results = await assistantsService.search(trimmed)
       setResult(results[0] ?? null)
-    } catch {
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo buscar el auxiliar.')
       setResult(null)
     } finally {
       setHasSearched(true)
@@ -87,18 +107,23 @@ export function AssignAssistantModal({
   }
 
   async function handleConfirm() {
-    if (result === null || selectedGroupIds.length === 0) return
+    if (result === null || isSubmitting || newAssignmentsCount === 0) return
+    const groupIds = contextGroup ? [contextGroup.id_grupo] : selectedGroupIds
+    setError(null)
 
     setIsSubmitting(true)
     try {
-      await onConfirm(result.id_usuario, selectedGroupIds)
+      await onConfirm(result.id_usuario, groupIds)
       reset()
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo asignar el auxiliar.')
     } finally {
       setIsSubmitting(false)
     }
   }
 
   function handleClose() {
+    if (isSubmitting) return
     reset()
     onCancel()
   }
@@ -108,9 +133,10 @@ export function AssignAssistantModal({
     : []
 
   // Cuántos grupos seleccionados NO están ya asignados (los que se van a agregar)
-  const newAssignmentsCount = selectedGroupIds.filter(
-    (id) => !assistantGroups.some((g) => g.id_grupo === id)
-  ).length
+  const contextAlreadyAssigned = result !== null && assignedUserIds.includes(result.id_usuario)
+  const newAssignmentsCount = contextGroup
+    ? (contextAlreadyAssigned ? 0 : 1)
+    : selectedGroupIds.filter((id) => !assistantGroups.some((g) => g.id_grupo === id)).length
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
@@ -118,6 +144,9 @@ export function AssignAssistantModal({
         <DialogHeader>
           <DialogTitle>Asignar auxiliar</DialogTitle>
         </DialogHeader>
+
+        {contextGroup && <p className="text-sm text-muted-foreground">{contextGroup.label}</p>}
+        {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
 
         <form onSubmit={handleSearch}>
           <div className="relative">
@@ -127,7 +156,7 @@ export function AssignAssistantModal({
               onChange={(e) => setCriterion(e.target.value)}
               placeholder="Nombre, código SIS"
               className="pl-9"
-              disabled={isSearching}
+              disabled={isSearching || isSubmitting}
             />
           </div>
         </form>
@@ -146,43 +175,51 @@ export function AssignAssistantModal({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Grupos</Label>
+            {contextGroup ? (
+              contextAlreadyAssigned && (
+                <p role="status" className="text-sm text-muted-foreground">
+                  El auxiliar ya está incorporado a este grupo.
+                </p>
+              )
+            ) : (
+              <div className="space-y-2">
+                <Label>Grupos</Label>
 
-              {groups.map((g) => {
-                const isAssigned = assistantGroups.some(
-                  (ga) => ga.id_grupo === g.id_grupo
-                )
-                const isSelected = selectedGroupIds.includes(g.id_grupo)
+                {groups.map((g) => {
+                  const isAssigned = assistantGroups.some(
+                    (ga) => ga.id_grupo === g.id_grupo
+                  )
+                  const isSelected = selectedGroupIds.includes(g.id_grupo)
 
-                return (
-                  <label
-                    key={g.id_grupo}
-                    className={`flex items-center gap-2 ${
-                      isAssigned ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isAssigned || isSelected}
-                      disabled={isAssigned || isSubmitting}
-                      onChange={() => !isAssigned && toggleGroup(g.id_grupo)}
-                      className="size-4 rounded border-input"
-                    />
-                    <span className="text-sm">{g.label}</span>
-                    {isAssigned && (
-                      <span className="ml-auto text-xs text-destructive">
-                        Ya está asignada a este grupo.
-                      </span>
-                    )}
-                  </label>
-                )
-              })}
-            </div>
+                  return (
+                    <label
+                      key={g.id_grupo}
+                      className={`flex items-center gap-2 ${
+                        isAssigned ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isAssigned || isSelected}
+                        disabled={isAssigned || isSubmitting}
+                        onChange={() => !isAssigned && toggleGroup(g.id_grupo)}
+                        className="size-4 rounded border-input"
+                      />
+                      <span className="text-sm">{g.label}</span>
+                      {isAssigned && (
+                        <span className="ml-auto text-xs text-destructive">
+                          Ya está asignada a este grupo.
+                        </span>
+                      )}
+                    </label>
+                  )
+                })}
+              </div>
+            )}
           </>
         )}
 
-        {hasSearched && result === null && !isSearching && (
+        {hasSearched && result === null && !isSearching && !error && (
           <Alert className="border-info-border bg-info-soft text-info">
             <AlertCircle className="size-4" />
             <AlertTitle>No hay un auxiliar registrado con ese código</AlertTitle>
@@ -204,7 +241,9 @@ export function AssignAssistantModal({
             >
               {isSubmitting
                 ? 'Asignando…'
-                : newAssignmentsCount === 0
+                : contextGroup
+                  ? (contextAlreadyAssigned ? 'Ya está asignado' : 'Asignar al grupo')
+                  : newAssignmentsCount === 0
                   ? 'Seleccione al menos un grupo'
                   : `Asignar a ${newAssignmentsCount} ${newAssignmentsCount === 1 ? 'grupo' : 'grupos'}`}
             </Button>

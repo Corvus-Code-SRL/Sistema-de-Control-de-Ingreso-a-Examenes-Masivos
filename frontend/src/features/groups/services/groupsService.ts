@@ -1,6 +1,8 @@
 import { apiClient } from '@/lib/api-client'
 import type {
   CreateGroupPayload,
+  GroupExam,
+  GroupAssistant,
   GroupDetail,
   GroupDetailResponse,
   GroupMutationResponse,
@@ -108,4 +110,16 @@ export async function getGroupStudents(
     totalPages: Math.max(1, response.meta.last_page),
     enrolledTotal: response.meta.total_inscritos,
   }
+}
+
+/** Exámenes asociados al grupo, en el orden que determina el backend. */
+export async function getGroupExams(groupId: number, signal?: AbortSignal): Promise<GroupExam[]> {
+  const response = await apiClient<{ data: GroupExam[] }>(`/grupos/${groupId}/examenes`, { signal })
+  return response.data
+}
+
+/** Incorporaciones activas y habilitaciones en exámenes del grupo. */
+export async function getGroupAssistants(groupId: number, signal?: AbortSignal): Promise<GroupAssistant[]> {
+  const response = await apiClient<{ data: GroupAssistant[] }>(`/grupos/${groupId}/auxiliares`, { signal })
+  return response.data
 }

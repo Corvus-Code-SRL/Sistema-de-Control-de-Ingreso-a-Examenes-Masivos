@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Search, UserPlus, Users } from 'lucide-react'
+import { examDetailPath } from '@/features/exams'
+import { groupExamsPath, groupIdFrom } from '@/features/groups'
 import { Toast } from '@/components/ui/toast'
 import { AppShell } from '@/components/layout/AppShell'
 import { PageHeader } from '@/components/common/PageHeader'
@@ -35,6 +37,9 @@ function errorMessage(error: unknown): string {
 export function ExamAssistantsPage() {
   const { examId } = useParams<{ examId: string }>()
   const id = Number(examId)
+  const [searchParams] = useSearchParams()
+  const groupId = groupIdFrom(searchParams.get('grupo') ?? undefined)
+  const backTo = examDetailPath(id, groupId ?? undefined)
   const validId =
     !!examId &&
     /^[0-9]{1,9}$/.test(examId) &&
@@ -208,15 +213,17 @@ export function ExamAssistantsPage() {
     <AppShell
       mobileTitle="Auxiliares del examen"
       breadcrumbs={[
-        { label: 'Exámenes', to: '/examenes/programados' },
-        { label: 'Detalle', to: `/examenes/${id}` },
+        groupId === null
+          ? { label: 'Exámenes', to: '/examenes/programados' }
+          : { label: 'Exámenes del grupo', to: groupExamsPath(groupId) },
+        { label: 'Detalle', to: backTo },
         { label: 'Auxiliares' },
       ]}
     >
       <PageHeader
         title="Auxiliares del examen"
         subtitle={`Examen ${examId ?? ''}`}
-        backTo={`/examenes/${id}`}
+        backTo={backTo}
         backLabel="Volver al examen"
       />
 
