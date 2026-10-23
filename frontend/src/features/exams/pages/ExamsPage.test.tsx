@@ -1,7 +1,7 @@
 import { screen, waitForElementToBeRemoved } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ExamsPage } from './ExamsPage'
-import { mockApi, mockApiOnce } from '@/test/http'
+import { mockApi, mockApiOnce, mockApiWith } from '@/test/http'
 import { renderWithRouter } from '@/test/render'
 import type { Exam } from '../types/exams.types'
 
@@ -81,4 +81,12 @@ describe('ExamsPage', () => {
     expect(screen.getByText('Error interno del servidor.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /reintentar/i })).toBeInTheDocument()
   })
+})
+
+it('Programados conserva su consulta general aunque la URL tenga un grupo', async () => {
+  const { calls } = mockApiWith(({ url }) => url.endsWith('/examenes?vista=programados') ? { body: { data: [makeExam()] } } : undefined)
+  renderWithRouter(<ExamsPage />, { route: '/examenes/programados?grupo=100' })
+  expect(await screen.findByText('Primer parcial')).toBeInTheDocument()
+  expect(calls).toHaveLength(1)
+  expect(calls[0].url).toContain('/examenes?vista=programados')
 })

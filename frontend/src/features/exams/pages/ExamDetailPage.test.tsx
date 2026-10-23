@@ -1,11 +1,23 @@
-import { screen, within } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
+import { useLocation } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
-import { mockApi } from '@/test/http'
+import { mockApi, mockApiWith } from '@/test/http'
 import { renderWithRouter } from '@/test/render'
-import type { Exam, ExamStatus } from '../types/exams.types'
+import type { Exam, ExamStatus, Group } from '../types/exams.types'
 import { ExamDetailPage } from './ExamDetailPage'
 
-function makeExam(estado: ExamStatus): Exam {
+const originGroup: Group = {
+  id_grupo: 100,
+  num_grupo: '1',
+  gestion: '2026',
+  estado: 'ACTIVO',
+  id_carrera: 2,
+  id_materia: 3,
+  cantidad_estudiantes: 20,
+  tiene_nomina: true,
+}
+
+function makeExam(estado: ExamStatus, groups: Group[] = []): Exam {
   return {
     id_examen: 9,
     nombre_examen: 'Segundo parcial',
@@ -23,24 +35,24 @@ function makeExam(estado: ExamStatus): Exam {
     materia: { id_materia: 3, nombre: 'Cálculo II', codigo: 'MAT-102' },
     carrera: { id_carrera: 2, nombre: 'Ingenieria de Sistemas' },
     ambientes: [{ id_ambiente: 5, nro_aula: '691A', capacidad: 40 }],
-    grupos: [],
+    grupos: groups,
   }
 }
 
-function mockExam(estado: ExamStatus) {
+function mockExam(estado: ExamStatus, groups: Group[] = []) {
   mockApi([
     { matches: (url) => url.endsWith('/examenes/formulario'), body: { data: { materias: [], ambientes: [], grupos: [] } } },
     {
       matches: (url) => url.endsWith('/examenes/9/auxiliares'),
       body: { data: { estado, editable: false, ambientes: [], auxiliares: [] } },
     },
-    { matches: (url) => url.endsWith('/examenes/9'), body: { data: makeExam(estado) } },
+    { matches: (url) => url.endsWith('/examenes/9'), body: { data: makeExam(estado, groups) } },
   ])
 }
 
-async function renderDetail() {
+async function renderDetail(route = '/examenes/9') {
   renderWithRouter(<ExamDetailPage />, {
-    route: '/examenes/9',
+    route,
     path: '/examenes/:examId',
   })
 
@@ -203,4 +215,88 @@ describe('ExamDetailPage: texto de solo lectura (HU-024)', () => {
       within(section).getByText(/sin grupos asignados/i)
     ).toBeInTheDocument()
   })
+})
+
+describe('ExamDetailPage — origen de navegación', () => {
+  it('regresa a los exámenes del grupo y refleja ese contexto en los breadcrumbs', async () => {
+    const { calls } = mockApiWith(({ url }) => {
+      if (url.endsWith('/examenes/9')) return { body: { data: makeExam('FINALIZADO', [originGroup]) } }
+      if (url.endsWith('/examenes/9/auxiliares')) return { body: { data: { estado: 'FINALIZADO', editable: false, ambientes: [], auxiliares: [] } } }
+    })
+    await renderDetail('/examenes/9?grupo=100')
+    expect(screen.getByRole('link', { name: 'Volver a exámenes del grupo' })).toHaveAttribute('href', '/grupos/100/examenes')
+    expect(screen.getByRole('link', { name: 'Exámenes del grupo' })).toHaveAttribute('href', '/grupos/100/examenes')
+    expect(calls.some((call) => call.url.includes('grupo='))).toBe(false)
+    expect(calls.some((call) => call.url.includes('/grupos/'))).toBe(false)
+  })
+
+  it('sin contexto conserva el regreso y breadcrumbs generales', async () => {
+    mockExam('PROGRAMADO')
+    await renderDetail()
+    expect(screen.getByRole('link', { name: 'Volver a Programados' })).toHaveAttribute('href', '/examenes/programados')
+    const breadcrumbs = within(screen.getByRole('navigation', { name: 'breadcrumb' }))
+    expect(breadcrumbs.getByText('Exámenes')).toBeInTheDocument()
+    expect(breadcrumbs.getByRole('link', { name: 'Programados' })).toHaveAttribute('href', '/examenes/programados')
+  })
+
+  it.each(['abc', '0', '-1', '2147483648'])('un grupo inválido (%s) conserva el regreso general', async (group) => {
+    mockExam('PROGRAMADO')
+    await renderDetail(`/examenes/9?grupo=${group}`)
+    expect(screen.getByRole('link', { name: 'Volver a Programados' })).toHaveAttribute('href', '/examenes/programados')
+    expect(screen.queryByRole('link', { name: 'Volver a exámenes del grupo' })).not.toBeInTheDocument()
+  })
+})
+
+function LocationProbe() {
+  const { pathname, search } = useLocation()
+  return <output data-testid="location">{pathname}{search}</output>
+}
+
+describe('ExamDetailPage — navegación a auxiliares', () => {
+  it.each([
+    ['?grupo=100', '/examenes/9/auxiliares?grupo=100'],
+    ['', '/examenes/9/auxiliares'],
+    ['?grupo=abc', '/examenes/9/auxiliares'],
+    ['?grupo=200', '/examenes/9/auxiliares'],
+    ['?grupo=0', '/examenes/9/auxiliares'],
+  ])('Ver auxiliares desde el detalle con %s navega a %s', async (search, destination) => {
+    mockExam('FINALIZADO', [originGroup])
+    renderWithRouter(<><ExamDetailPage /><LocationProbe /></>, {
+      route: `/examenes/9${search}`,
+      path: '/examenes/:examId/*',
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver auxiliares' }))
+    expect(screen.getByTestId('location').textContent).toBe(destination)
+  })
+})
+
+describe('ExamDetailPage — navegación a edición', () => {
+  it.each([
+    ['?grupo=100', '/examenes/9/editar?grupo=100'],
+    ['', '/examenes/9/editar'],
+    ['?grupo=abc', '/examenes/9/editar'],
+    ['?grupo=200', '/examenes/9/editar'],
+    ['?grupo=0', '/examenes/9/editar'],
+  ])('Editar examen desde el detalle con %s navega a %s', async (search, destination) => {
+    mockExam('PROGRAMADO', [originGroup])
+    renderWithRouter(<><ExamDetailPage /><LocationProbe /></>, {
+      route: `/examenes/9${search}`,
+      path: '/examenes/:examId/*',
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar examen' }))
+    expect(screen.getByTestId('location').textContent).toBe(destination)
+  })
+})
+
+it('un grupo sintácticamente válido que no pertenece al examen usa el regreso y breadcrumbs generales', async () => {
+  const { calls } = mockApiWith(({ url }) => {
+    if (url.endsWith('/examenes/9')) return { body: { data: makeExam('PROGRAMADO', [{ ...originGroup, id_grupo: 200 }]) } }
+    if (url.endsWith('/examenes/9/auxiliares')) return { body: { data: { estado: 'PROGRAMADO', editable: false, ambientes: [], auxiliares: [] } } }
+  })
+  await renderDetail('/examenes/9?grupo=100')
+  expect(screen.getByRole('link', { name: 'Volver a Programados' })).toHaveAttribute('href', '/examenes/programados')
+  expect(screen.queryByRole('link', { name: 'Exámenes del grupo' })).not.toBeInTheDocument()
+  const breadcrumbs = within(screen.getByRole('navigation', { name: 'breadcrumb' }))
+  expect(breadcrumbs.getByRole('link', { name: 'Programados' })).toHaveAttribute('href', '/examenes/programados')
+  expect(calls.map((call) => new URL(call.url).pathname)).toEqual(['/api/examenes/9', '/api/examenes/9/auxiliares'])
 })

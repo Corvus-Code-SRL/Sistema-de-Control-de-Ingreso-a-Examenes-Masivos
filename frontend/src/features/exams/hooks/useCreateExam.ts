@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError } from '@/lib/api-client'
 import { useExamFormOptions } from './useExamFormOptions'
 import { useExamFormState } from './useExamFormState'
@@ -9,9 +9,37 @@ import type { CreateExamFormData, Exam, StepValidationResult } from '../types/ex
 /**
  * Crea el examen junto con sus grupos y permite confirmar advertencias de horario.
  */
-export function useCreateExam(onSuccess?: (exam: Exam) => void) {
+export function useCreateExam(onSuccess?: (exam: Exam) => void, initialGroupId?: number) {
   const { options, loading: loadingOptions, error: optionsError } = useExamFormOptions()
   const { formData, updateFormData: setFields, resetFormData } = useExamFormState()
+
+  const initializedContext = useRef(false)
+  const [contextResetCount, setContextResetCount] = useState(0)
+  const initialGroup = options.grupos.find((group) => group.id_grupo === initialGroupId)
+  const initialPair = initialGroup && options.materias.find((subject) =>
+    subject.id_carrera === initialGroup.id_carrera && subject.id_materia === initialGroup.id_materia
+  )
+  const contextError = initialGroupId !== undefined && !loadingOptions && !optionsError
+    ? !initialGroup || !initialPair
+      ? 'El grupo no está disponible entre las opciones actuales del formulario.'
+      : !initialGroup.tiene_nomina
+        ? 'El grupo no tiene nómina y no puede seleccionarse para un examen.'
+        : null
+    : null
+
+  useEffect(() => {
+    if (
+      initialGroupId === undefined || initializedContext.current ||
+      loadingOptions || optionsError || contextError
+    ) return
+    if (!initialGroup || !initialPair) return
+    initializedContext.current = true
+    // La selección inicial es atómica: cambiar la materia normalmente limpia los grupos.
+    setFields({
+      materia: { id_carrera: initialGroup.id_carrera, id_materia: initialGroup.id_materia },
+      grupos: [initialGroup.id_grupo],
+    })
+  }, [initialGroupId, initialGroup, initialPair, loadingOptions, optionsError, contextError, setFields, contextResetCount])
 
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -190,6 +218,10 @@ export function useCreateExam(onSuccess?: (exam: Exam) => void) {
     }
 
     resetFormData()
+    if (initialGroupId !== undefined) {
+      initializedContext.current = false
+      setContextResetCount((count) => count + 1)
+    }
     setSubmitError(null)
     setWarnings([])
     creationCompletedRef.current = false
@@ -202,6 +234,7 @@ export function useCreateExam(onSuccess?: (exam: Exam) => void) {
 
   return {
     formData,
+    contextError,
     options,
     subjectGroups,
     selectedGroups,

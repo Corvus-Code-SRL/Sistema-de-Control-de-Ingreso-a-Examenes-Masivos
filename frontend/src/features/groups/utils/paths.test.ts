@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupIdFrom } from './paths'
+import { groupIdFrom, groupDetailPath, groupExamsPath, groupAssistantsPath, groupCreateExamPath } from './paths'
 
 describe('groupIdFrom', () => {
   it('acepta un entero positivo de hasta 9 dígitos', () => {
@@ -13,4 +13,13 @@ describe('groupIdFrom', () => {
       expect(groupIdFrom(value)).toBeNull()
     }
   )
+})
+
+describe('rutas contextuales', () => {
+  it('conserva el identificador del grupo en cada destino', () => {
+    expect(groupDetailPath(100)).toBe('/grupos/100')
+    expect(groupExamsPath(100)).toBe('/grupos/100/examenes')
+    expect(groupAssistantsPath(100)).toBe('/grupos/100/auxiliares')
+    expect(groupCreateExamPath(100)).toBe('/examenes/nuevo?grupo=100')
+  })
 })

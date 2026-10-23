@@ -67,11 +67,11 @@ function Where() {
   return <p data-testid="ubicacion">{location.pathname}</p>
 }
 
-function renderContainer() {
+function renderContainer(initialGroupId?: number) {
   return render(
     <MemoryRouter initialEntries={['/examenes/nuevo']}>
       <Routes>
-        <Route path="/examenes/nuevo" element={<CreateExamContainer />} />
+        <Route path="/examenes/nuevo" element={<CreateExamContainer initialGroupId={initialGroupId} />} />
         <Route path="*" element={<Where />} />
       </Routes>
     </MemoryRouter>
@@ -118,6 +118,27 @@ describe('CreateExamContainer (HU-024)', () => {
       'href',
       '/examenes/programados'
     )
+  })
+
+  it('tras crear con contexto vuelve a los exámenes del grupo y conserva el acceso al detalle', async () => {
+    hook.overrides = { formData: { ...emptyForm, grupos: [100] } }
+    renderContainer(100)
+    await userEvent.click(screen.getByRole('button', { name: /guardar examen/i }))
+
+    const back = await screen.findByRole('link', { name: 'Volver a exámenes del grupo' })
+    expect(back).toHaveAttribute('href', '/grupos/100/examenes')
+    expect(screen.queryByRole('link', { name: 'Ver en Programados' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ver detalle del examen' })).toHaveAttribute('href', '/examenes/77?grupo=100')
+    await userEvent.click(back)
+    expect(screen.getByTestId('ubicacion')).toHaveTextContent('/grupos/100/examenes')
+  })
+
+  it('no propaga el grupo origen al detalle si ya no está en la selección creada', async () => {
+    hook.overrides = { formData: { ...emptyForm, grupos: [200] } }
+    renderContainer(100)
+    await userEvent.click(screen.getByRole('button', { name: /guardar examen/i }))
+    expect(await screen.findByRole('link', { name: 'Ver detalle del examen' })).toHaveAttribute('href', '/examenes/77')
+    expect(screen.getByRole('link', { name: 'Volver a exámenes del grupo' })).toHaveAttribute('href', '/grupos/100/examenes')
   })
 
   it('tras crear el examen se puede seguir creando otro', async () => {

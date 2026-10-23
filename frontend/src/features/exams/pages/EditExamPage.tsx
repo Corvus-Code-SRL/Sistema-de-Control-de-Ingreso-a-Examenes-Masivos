@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { groupExamsPath, groupIdFrom } from '@/features/groups';
+import { examDetailPath } from '../utils/paths';
 import { AppShell } from '@/components/layout/AppShell';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -59,11 +61,24 @@ export function EditExamPage() {
     cancelExam,
   } = useExamDetail(id);
 
-  const backTo = `/examenes/${id}`;
+  const [searchParams] = useSearchParams();
+  const requestedGroupId = groupIdFrom(searchParams.get('grupo') ?? undefined);
+  const groupId = exam?.grupos?.some((group) => group.id_grupo === requestedGroupId)
+    ? requestedGroupId
+    : null;
+  const backTo = examDetailPath(id, groupId ?? undefined);
+  const handleCancelEditing = () => navigate(backTo);
+  const breadcrumbs = [
+    ...(groupId === null
+      ? [{ label: 'Exámenes' }, { label: 'Programados', to: '/examenes/programados' }]
+      : [{ label: 'Exámenes del grupo', to: groupExamsPath(groupId) }]),
+    { label: exam?.nombre_examen ?? 'Detalle', to: backTo },
+    { label: 'Editar examen' },
+  ];
 
   if (notFound || forbidden) {
     return (
-      <AppShell mobileTitle="Examen" breadcrumbs={[{ label: 'Exámenes' }, { label: 'Programados', to: backTo }, { label: 'Detalle' }]}>
+      <AppShell mobileTitle="Examen" breadcrumbs={breadcrumbs}>
         <EmptyState
           icon={ShieldAlert}
           title={notFound ? 'Examen no encontrado' : 'No tiene acceso a este examen'}
@@ -98,7 +113,7 @@ export function EditExamPage() {
   return (
     <AppShell
       mobileTitle={exam?.nombre_examen ?? 'Examen'}
-      breadcrumbs={[{ label: 'Exámenes' }, { label: 'Programados', to: backTo }, { label: exam?.nombre_examen ?? 'Detalle' }]}
+      breadcrumbs={breadcrumbs}
     >
       <PageHeader
         title={`Editar: ${exam?.nombre_examen ?? 'Examen'}`}
@@ -191,7 +206,10 @@ export function EditExamPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-end">
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                <Button type="button" variant="outline" onClick={handleCancelEditing}>
+                  Cancelar edición
+                </Button>
                 <Button type="submit" disabled={savingInfo || infoWarnings.length > 0}>
                   {savingInfo ? (
                     <>
@@ -223,7 +241,10 @@ export function EditExamPage() {
                 onToggleGroup={toggleGroup}
               />
 
-              <div className="flex items-center justify-end">
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                <Button type="button" variant="outline" onClick={handleCancelEditing}>
+                  Cancelar edición
+                </Button>
                 <Button type="button" disabled={savingGroups || !groupsValidation.isValid} onClick={() => saveGroups()}>
                   {savingGroups ? (
                     <>

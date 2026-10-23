@@ -14,14 +14,18 @@ import {
 } from '@/components/ui/dialog';
 import { AlertTriangle, CheckCircle2, Loader2, Save } from 'lucide-react';
 import { Exam } from '../types/exams.types';
+import { examDetailPath } from '../utils/paths';
+import { groupExamsPath } from '@/features/groups';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
-export const CreateExamContainer: React.FC = () => {
+export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ initialGroupId }) => {
   const navigate = useNavigate();
   const [createdExam, setCreatedExam] = useState<Exam | null>(null);
   const [showValidationErrors, setShowValidationErrors] = useState(false);
 
   const {
     formData,
+    contextError,
     options,
     subjectGroups,
     totalStudents,
@@ -35,8 +39,12 @@ export const CreateExamContainer: React.FC = () => {
     validateForm,
     toggleGroup,
     submitExam,
-  } = useCreateExam(setCreatedExam);
+  } = useCreateExam(setCreatedExam, initialGroupId);
 
+  const cancelTo = initialGroupId === undefined ? '/examenes/programados' : groupExamsPath(initialGroupId);
+  const detailGroupId = initialGroupId !== undefined && formData.grupos.includes(initialGroupId)
+    ? initialGroupId
+    : undefined;
   const validation = validateForm();
   const selectedSubject = options.materias.find(
     (subject) =>
@@ -62,6 +70,15 @@ export const CreateExamContainer: React.FC = () => {
       <div className="flex flex-col items-center justify-center min-h-[350px] gap-3 text-muted-foreground">
         <Loader2 className="h-7 w-7 animate-spin text-primary" />
         <p className="text-xs font-medium">Cargando formulario y catálogo de materias...</p>
+      </div>
+    );
+  }
+
+  if (contextError) {
+    return (
+      <div className="space-y-4">
+        <Alert variant="destructive"><AlertDescription>{contextError}</AlertDescription></Alert>
+        <Button asChild variant="outline"><Link to={cancelTo}>Volver a los exámenes del grupo</Link></Button>
       </div>
     );
   }
@@ -206,7 +223,7 @@ export const CreateExamContainer: React.FC = () => {
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate('/examenes/programados')}
+            onClick={() => navigate(cancelTo)}
             disabled={submitting}
             className="bg-card border-border text-foreground hover:bg-muted text-xs font-medium px-5 py-2.5 rounded-lg"
           >
@@ -360,14 +377,14 @@ export const CreateExamContainer: React.FC = () => {
 
               <div className="flex flex-col gap-2 pt-2">
                 <Button asChild>
-                  <Link to={`/examenes/${createdExam.id_examen}`}>
+                  <Link to={examDetailPath(createdExam.id_examen, detailGroupId)}>
                     Ver detalle del examen
                   </Link>
                 </Button>
 
                 <Button asChild variant="outline">
-                  <Link to="/examenes/programados">
-                    Ver en Programados
+                  <Link to={cancelTo}>
+                    {initialGroupId === undefined ? 'Ver en Programados' : 'Volver a exámenes del grupo'}
                   </Link>
                 </Button>
 

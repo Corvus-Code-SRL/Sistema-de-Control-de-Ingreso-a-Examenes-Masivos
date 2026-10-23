@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event'
 import { screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { TOKEN_STORAGE_KEY, meBody } from '@/test/authFixtures'
@@ -72,5 +73,39 @@ describe('AppRouter — detalle del grupo', () => {
 
     expect(await screen.findByText('Carga de nómina', {}, BOOT)).toBeInTheDocument()
     expect(app.pathname).toBe('/grupos/100/nomina')
+  })
+})
+
+describe('AppRouter — navegación contextual', () => {
+  afterEach(() => window.localStorage.clear())
+
+  it.each([
+    ['Ver exámenes', '/grupos/100/examenes', 'Exámenes del grupo'],
+    ['Auxiliares', '/grupos/100/auxiliares', 'Auxiliares del grupo'],
+  ])('%s abre su página independiente y permite regresar', async (action, destination, title) => {
+    stubBackend()
+    const app = renderApp('/grupos/100')
+    await userEvent.click(await screen.findByRole('link', { name: action }, BOOT))
+    await waitFor(() => {
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: title })).toBeInTheDocument()
+    }, BOOT)
+    expect(app.pathname).toBe(destination)
+    await userEvent.click(screen.getByRole('link', { name: 'Volver al grupo' }))
+    expect(await screen.findByRole('heading', { name: 'Estudiantes inscritos' }, BOOT)).toBeInTheDocument()
+    expect(app.pathname).toBe('/grupos/100')
+  })
+
+  it.each([
+    ['/grupos/100/examenes', 'Exámenes del grupo'],
+    ['/grupos/100/auxiliares', 'Auxiliares del grupo'],
+  ])('abre directamente %s', async (route, title) => {
+    stubBackend()
+    const app = renderApp(route)
+    await waitFor(() => {
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: title })).toBeInTheDocument()
+    }, BOOT)
+    expect(app.pathname).toBe(route)
   })
 })
