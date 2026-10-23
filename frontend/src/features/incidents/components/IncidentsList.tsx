@@ -12,13 +12,6 @@ interface IncidentsListProps {
 export function IncidentsList({ incidents, selectedId, onSelect, filter }: IncidentsListProps) {
   return (
     <Card className="overflow-hidden p-0">
-      <div className="border-b border-border px-4 py-3">
-        <p className="text-sm text-muted-foreground">
-          {filter === 'pendiente'
-            ? 'Del más antiguo al más reciente'
-            : 'Del más reciente al más antiguo'}
-        </p>
-      </div>
       <div>
         {incidents.map((incident) => (
           <IncidentItem

@@ -9,6 +9,7 @@ import type {
 export async function listIncidents(
   filter: IncidentFilter,
   examId?: number,
+  orden?: 'asc' | 'desc',
   signal?: AbortSignal
 ): Promise<IncidentListResponse> {
   return apiClient<IncidentListResponse>('/docente/incidencias', {
@@ -16,6 +17,7 @@ export async function listIncidents(
     query: {
       estado: filter,
       examen: examId,
+      orden,
     },
   })
 }
