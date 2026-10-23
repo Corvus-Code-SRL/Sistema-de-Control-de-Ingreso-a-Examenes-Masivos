@@ -39,13 +39,16 @@ class IncidentReviewService
      *
      * @return array{data: array<int, array>, meta: array{total_pendientes: int, total_revisadas: int}}
      */
-    public function list(string $teacherId, string $estado, ?int $examId): array
+    public function list(string $teacherId, string $estado, ?int $examId, ?string $orden = null): array
     {
         $reports = $this->baseQuery($teacherId)
             ->when($examId !== null, fn (Builder $q) => $q->where('id_examen', $examId))
             ->when($estado === 'pendiente', fn (Builder $q) => $q->where('estado', ReportStatus::PENDING))
             ->when($estado === 'revisada', fn (Builder $q) => $q->whereIn('estado', [ReportStatus::APPROVED, ReportStatus::REJECTED]))
-            ->orderBy('fecha_reporte', $estado === 'pendiente' ? 'asc' : 'desc')
+            ->orderBy(
+                $estado === 'revisada' ? 'fecha_revision' : 'fecha_reporte',
+                $orden ?? ($estado === 'pendiente' ? 'asc' : 'desc')
+            )
             ->get();
 
         return [

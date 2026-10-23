@@ -27,8 +27,14 @@ class IncidentReviewController extends Controller
         $teacherId = $currentUser->id();
         $estado    = $request->input('estado', 'pendiente');
         $examId    = $request->input('examen');
+        $orden     = $request->input('orden');
 
-        $result = $this->incidents->list($teacherId, $estado, $examId !== null ? (int) $examId : null);
+        $result = $this->incidents->list(
+            $teacherId,
+            $estado,
+            $examId !== null ? (int) $examId : null,
+            $orden
+        );
 
         return IncidentReviewResource::collection($result['data'])
             ->additional(['meta' => $result['meta']]);
