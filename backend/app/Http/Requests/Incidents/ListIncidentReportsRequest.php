@@ -25,6 +25,7 @@ class ListIncidentReportsRequest extends FormRequest
         return [
             'estado' => ['nullable', 'in:pendiente,revisada'],
             'examen' => ['nullable', 'integer', 'min:1', 'max:2147483647'],
+            'orden'  => ['nullable', 'in:asc,desc'],
         ];
     }
 }

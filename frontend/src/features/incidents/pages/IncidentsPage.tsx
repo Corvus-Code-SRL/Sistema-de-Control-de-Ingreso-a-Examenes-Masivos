@@ -7,6 +7,13 @@ import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Card } from '@/components/ui/card'
 import { Toast } from '@/components/ui/toast'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useAsyncResource } from '@/hooks/useAsyncResource'
 import { IncidentsList } from '../components/IncidentsList'
 import { IncidentDetailPanel } from '../components/IncidentDetailPanel'
@@ -23,6 +30,8 @@ const TABS: TabDefinition[] = [
   { value: 'revisada', label: 'Revisadas' },
 ]
 
+type Orden = 'asc' | 'desc'
+
 interface ToastState {
   title: string
   description: string
@@ -30,12 +39,13 @@ interface ToastState {
 
 export function IncidentsPage() {
   const [filter, setFilter] = useState<IncidentFilter>('pendiente')
+  const [orden, setOrden] = useState<Orden>('asc')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [toast, setToast] = useState<ToastState | null>(null)
 
   const resource = useAsyncResource(
-    useCallback((signal) => listIncidents(filter, undefined, signal), [filter]),
-    [filter]
+    useCallback((signal) => listIncidents(filter, undefined, orden, signal), [filter, orden]),
+    [filter, orden]
   )
 
   const incidents = resource.data?.data ?? []
@@ -45,6 +55,7 @@ export function IncidentsPage() {
   function handleFilterChange(next: IncidentFilter) {
     setFilter(next)
     setSelectedId(null)
+    setOrden(next === 'pendiente' ? 'asc' : 'desc')
   }
 
   function handleReviewed(message: ToastState) {
@@ -79,12 +90,29 @@ export function IncidentsPage() {
         }
       />
 
-      <Tabs
-        filter={filter}
-        onChange={handleFilterChange}
-        totalPendientes={totalPendientes}
-        totalRevisadas={totalRevisadas}
-      />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <Tabs
+          filter={filter}
+          onChange={handleFilterChange}
+          totalPendientes={totalPendientes}
+          totalRevisadas={totalRevisadas}
+        />
+
+        <div className="flex items-center gap-2">
+          <label htmlFor="orden" className="text-sm text-muted-foreground">
+            Ordenar por
+          </label>
+          <Select value={orden} onValueChange={(value) => setOrden(value as Orden)}>
+            <SelectTrigger id="orden" className="h-9 w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="asc">Más antiguas primero</SelectItem>
+              <SelectItem value="desc">Más recientes primero</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
       {resource.status === 'loading' && (
         <Card className="p-0">
@@ -117,30 +145,48 @@ export function IncidentsPage() {
       )}
 
       {!isEmpty && resource.status === 'success' && (
-        <div className="grid gap-5 lg:grid-cols-[420px_1fr]">
-          <IncidentsList
-            incidents={incidents}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            filter={filter}
-          />
+        <>
+          {/* Móvil: el detalle reemplaza la lista */}
+          <div className="lg:hidden">
+            {selectedIncident ? (
+              <IncidentDetailPanel
+                incidentId={selectedIncident.id}
+                onReviewed={handleReviewed}
+                onBack={() => setSelectedId(null)}
+              />
+            ) : (
+              <IncidentsList
+                incidents={incidents}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                filter={filter}
+              />
+            )}
+          </div>
 
-          {selectedIncident ? (
-            <IncidentDetailPanel
-              incidentId={selectedIncident.id}
-              onReviewed={handleReviewed}
-              onBack={() => setSelectedId(null)}
+          {/* Escritorio: lista + detalle */}
+          <div className="hidden gap-5 lg:grid lg:grid-cols-[420px_1fr]">
+            <IncidentsList
+              incidents={incidents}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              filter={filter}
             />
-          ) : (
-            <div className="hidden lg:flex">
+
+            {selectedIncident ? (
+              <IncidentDetailPanel
+                incidentId={selectedIncident.id}
+                onReviewed={handleReviewed}
+              />
+            ) : (
               <Card className="flex w-full items-center justify-center p-12">
                 <p className="text-sm text-muted-foreground">
                   Seleccione una incidencia para ver el detalle.
                 </p>
               </Card>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        </>
       )}
 
       {toast && (
@@ -165,7 +211,7 @@ interface TabsProps {
 
 function Tabs({ filter, onChange, totalPendientes, totalRevisadas }: TabsProps) {
   return (
-    <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-border">
+    <div role="tablist" className="flex gap-1 border-b border-border">
       {TABS.map((tab) => {
         const isActive = tab.value === filter
         const count = tab.value === 'pendiente' ? totalPendientes : totalRevisadas
