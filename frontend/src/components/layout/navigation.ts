@@ -31,6 +31,7 @@ export interface NavItem {
    * navegan.
    */
   children?: NavItem[]
+  badge?: number
 }
 
 export interface NavGroup {

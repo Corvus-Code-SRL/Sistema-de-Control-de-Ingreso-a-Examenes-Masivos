@@ -2,6 +2,7 @@ import { LogIn, LogOut } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { AREA_LABELS, LOGIN_PATH, useAuth, useCurrentUser } from '@/features/auth'
+import { usePendingIncidentsCount } from '@/features/incidents'
 import { cn } from '@/lib/utils'
 import { navigationByArea, type NavItem } from './navigation'
 
@@ -46,6 +47,11 @@ function SidebarLink({ item, onNavigate }: SidebarLinkProps) {
     >
       <item.icon className="size-4 shrink-0" aria-hidden="true" />
       <span className="flex-1 truncate">{item.label}</span>
+      {item.badge !== undefined && item.badge > 0 && (
+        <span className="rounded-full bg-warn px-1.5 text-xs font-semibold text-warn-fg">
+          {item.badge}
+        </span>
+      )}
     </NavLink>
   )
 }
@@ -63,6 +69,7 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
   const navigate = useNavigate()
   const navigation = navigationByArea[area]
   const hasSession = estado === 'autenticado'
+  const pendingIncidents = usePendingIncidentsCount(area === 'docente')
 
   async function handleLogout() {
     await cerrarSesion()
@@ -111,7 +118,14 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
                       </ul>
                     </div>
                   ) : (
-                    <SidebarLink item={item} onNavigate={onNavigate} />
+                    <SidebarLink
+                      item={
+                        area === 'docente' && item.label === 'Incidencias'
+                          ? { ...item, badge: pendingIncidents }
+                          : item
+                      }
+                      onNavigate={onNavigate}
+                    />
                   )}
                 </li>
               ))}
