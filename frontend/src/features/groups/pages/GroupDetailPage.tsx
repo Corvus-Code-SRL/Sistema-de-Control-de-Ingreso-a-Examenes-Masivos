@@ -44,9 +44,9 @@ export function GroupDetailPage() {
     return (
       <AppShell
         mobileTitle="Grupo"
-        breadcrumbs={[{ label: 'Mis cursos', to: MY_COURSES_PATH }, { label: 'Detalle del grupo' }]}
+        breadcrumbs={[{ label: 'Mis grupos', to: MY_COURSES_PATH }, { label: 'Detalle del grupo' }]}
       >
-        <PageHeader title="Detalle del grupo" backTo={MY_COURSES_PATH} backLabel="Volver a Mis cursos" />
+        <PageHeader title="Detalle del grupo" backTo={MY_COURSES_PATH} backLabel="Volver a Mis grupos" />
         <Card className="p-0">
           <GroupNotFound />
         </Card>
@@ -106,12 +106,12 @@ function GroupDetailView({ groupId }: { groupId: number }) {
     <AppShell
       mobileTitle={isVisible ? `Grupo ${detail.group.num_grupo}` : 'Grupo'}
       mobileSubtitle={isVisible ? detail.subject.nombre : undefined}
-      breadcrumbs={[{ label: 'Mis cursos', to: MY_COURSES_PATH }, { label: title }]}
+      breadcrumbs={[{ label: 'Mis grupos', to: MY_COURSES_PATH }, { label: title }]}
     >
       <PageHeader
         title={title}
         backTo={MY_COURSES_PATH}
-        backLabel="Volver a Mis cursos"
+        backLabel="Volver a Mis grupos"
         subtitle={
           isVisible && (
             <>

@@ -78,7 +78,7 @@ export interface SubjectGroups {
   meta: SubjectGroupsMeta
 }
 
-/** Un grupo del docente junto a la materia que dicta: la unidad de «Mis cursos». */
+/** Un grupo del docente junto a la materia que dicta: la unidad de «Mis grupos». */
 export interface Course {
   group: Group
   subject: SubjectCareer

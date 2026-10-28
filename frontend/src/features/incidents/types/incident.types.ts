@@ -82,7 +82,8 @@ export interface IncidentReview {
 
 export interface IncidentListResponse {
   data: IncidentReview[]
-  meta: {
+  /** Puede faltar ante una respuesta inesperada: quien la lee debe tolerarlo. */
+  meta?: {
     total_pendientes: number
     total_revisadas: number
   }

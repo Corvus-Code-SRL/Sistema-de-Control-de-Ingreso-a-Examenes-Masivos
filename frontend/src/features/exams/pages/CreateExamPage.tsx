@@ -27,7 +27,7 @@ export const CreateExamPage: React.FC = () => {
             <AlertDescription>El identificador del grupo no es válido.</AlertDescription>
           </Alert>
           <Button asChild variant="outline">
-            <Link to={MY_COURSES_PATH}>Volver a Mis cursos</Link>
+            <Link to={MY_COURSES_PATH}>Volver a Mis grupos</Link>
           </Button>
         </div>
       ) : <CreateExamContainer key={groupId ?? 'general'} initialGroupId={groupId} />}

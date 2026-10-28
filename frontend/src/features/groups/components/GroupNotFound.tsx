@@ -13,7 +13,7 @@ export function GroupNotFound() {
       description="El grupo que intenta abrir no está registrado o fue dado de baja."
       action={
         <Button variant="outline" size="sm" asChild>
-          <Link to={MY_COURSES_PATH}>Ir a mis cursos</Link>
+          <Link to={MY_COURSES_PATH}>Ir a mis grupos</Link>
         </Button>
       }
     />
