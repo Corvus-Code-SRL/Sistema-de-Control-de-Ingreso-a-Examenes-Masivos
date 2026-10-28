@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Exams\ExamInProgressController;
 use App\Http\Controllers\Exams\AssistantClassroomController;
 use App\Http\Controllers\Exams\ExamController;
 use App\Http\Controllers\Exams\ExamGroupController;
@@ -32,6 +33,10 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
     Route::get('/{exam}', [ExamController::class, 'show'])
         ->where('exam', '[0-9]{1,9}')
         ->name('show');
+
+    Route::get('/{exam}/en-curso', [ExamInProgressController::class, 'show'])
+        ->where('exam', '[0-9]{1,9}')
+        ->name('en-curso');
 
     Route::put('/{exam}', [ExamController::class, 'update'])
         ->where('exam', '[0-9]{1,9}')

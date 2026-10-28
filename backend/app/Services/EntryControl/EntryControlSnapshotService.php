@@ -66,7 +66,7 @@ class EntryControlSnapshotService
             }
         }
 
-        $assignedRooms = $this->assignRooms(array_keys($membersByStudent), $rooms);
+        $assignedRooms = self::assignRooms(array_keys($membersByStudent), $rooms);
         $entries = $this->entries($examId);
         $risks = $this->riskCenter->summariesForSnapshot(array_keys($membersByStudent));
         $career = DB::table('carrera')->where('id_carrera', $exam->id_carrera)->value('nombre');
@@ -542,7 +542,7 @@ class EntryControlSnapshotService
             })->all();
     }
 
-    private function assignRooms(array $studentIds, array $rooms): array
+    public static function assignRooms(array $studentIds, array $rooms): array
     {
         sort($studentIds, SORT_NUMERIC);
         $assigned = [];
