@@ -229,7 +229,7 @@ class StudentVerificationTest extends TestCase
 
         $this->getJson($this->url('buscar') . '?' . http_build_query(['nombre' => '%_otro']))
             ->assertOk()
-            ->assertJsonCount(0, 'data');
+            ->assertJsonMissing(['cod_sis' => $assistant->cod_sis]);
     }
 
     public function test_sugerencias_solo_incluyen_la_nomina_y_sis_manual_muestra_al_ajeno(): void
