@@ -1,4 +1,5 @@
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { mockApi, mockApiWith, mockNetworkFailure } from '@/test/http'
@@ -637,6 +638,150 @@ describe('EntryControlPage', () => {
     await screen.findByText(/Usted controla en/)
 
     expect(screen.getAllByText('Primer parcial').length).toBeGreaterThan(0)
+  })
+
+  it('HU-038 permite cancelar la confirmación sin iniciar el examen', async () => {
+    const docenteContext: EntryContext = {
+      ...context,
+      rol_controlador: 'DOCENTE',
+      id_ambiente_asignado: null,
+    }
+
+    mockApi(routes(allowed, docenteContext))
+
+    const user = userEvent.setup()
+
+    renderWithRouter(<EntryControlPage />, {
+      route: '/examenes/7/control-ingreso',
+      path: '/examenes/:examId/control-ingreso',
+    })
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Iniciar examen' })
+    )
+
+    const dialog = screen.getByRole('dialog', {
+      name: '¿Iniciar el examen?',
+    })
+
+    expect(within(dialog).getByText('Ingresados')).toBeInTheDocument()
+    expect(within(dialog).getByText('Pendientes')).toBeInTheDocument()
+
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Todavía no' })
+    )
+
+    expect(
+      screen.queryByRole('dialog', { name: '¿Iniciar el examen?' })
+    ).not.toBeInTheDocument()
+
+    expect(
+      vi.mocked(fetch).mock.calls.some(
+        ([url]) => String(url).endsWith('/iniciar')
+      )
+    ).toBe(false)
+  })
+
+  it('HU-038 inicia el examen y navega a En curso', async () => {
+    const docenteContext: EntryContext = {
+      ...context,
+      rol_controlador: 'DOCENTE',
+      id_ambiente_asignado: null,
+    }
+
+    mockApi([
+      ...routes(allowed, docenteContext),
+      {
+        matches: (url) => url.endsWith('/examenes/7/iniciar'),
+        body: {
+          data: {
+            id_examen: 7,
+            estado: 'EN_CURSO',
+            inicio_real_en: '2026-10-28T08:25:00-04:00',
+            inicio_automatico: false,
+          },
+        },
+      },
+    ])
+
+    const user = userEvent.setup()
+
+    render(
+      <MemoryRouter initialEntries={['/examenes/7/control-ingreso']}>
+        <Routes>
+          <Route
+            path="/examenes/:examId/control-ingreso"
+            element={<EntryControlPage />}
+          />
+          <Route
+            path="/examenes/:examId/en-curso"
+            element={<p>Vista En curso abierta</p>}
+          />
+        </Routes>
+      </MemoryRouter>
+    )
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Iniciar examen' })
+    )
+
+    const dialog = screen.getByRole('dialog', {
+      name: '¿Iniciar el examen?',
+    })
+
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Iniciar examen' })
+    )
+
+    expect(
+      await screen.findByText('Vista En curso abierta')
+    ).toBeInTheDocument()
+
+    expect(
+      vi.mocked(fetch).mock.calls.some(
+        ([url, options]) =>
+          String(url).endsWith('/examenes/7/iniciar') &&
+          (options as RequestInit | undefined)?.method === 'POST'
+      )
+    ).toBe(true)
+  })
+
+  it('HU-038 avisa cuando el examen ya inició en otra sesión', async () => {
+    mockApi([
+      ...routes().filter(
+        (route) => !route.matches('/api/control-ingreso/examenes/7/estado')
+      ),
+      {
+        matches: (url) => url.endsWith('/estado'),
+        status: 409,
+        body: { mensaje: 'El control de ingreso terminó.' },
+      },
+      {
+        matches: (url) => url.endsWith('/examenes/7/en-curso'),
+        body: { data: { estado: 'EN_CURSO' } },
+      },
+    ])
+
+    renderWithRouter(<EntryControlPage />, {
+      route: '/examenes/7/control-ingreso',
+      path: '/examenes/:examId/control-ingreso',
+    })
+
+    expect(
+      await screen.findByText('El examen ya inició')
+    ).toBeInTheDocument()
+
+    expect(
+      screen.getByRole('button', { name: 'Ir a En curso' })
+    ).toBeInTheDocument()
+
+    expect(
+      screen.queryByLabelText('Código SIS')
+    ).not.toBeInTheDocument()
+
+    expect(
+      screen.queryByRole('button', { name: 'Iniciar examen' })
+    ).not.toBeInTheDocument()
   })
 })
 
