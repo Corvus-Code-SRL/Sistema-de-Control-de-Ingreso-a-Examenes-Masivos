@@ -15,7 +15,7 @@ import {
   type Capability,
 } from '@/features/auth'
 import { EntryControlPage, OpenEntryControlsPage } from '@/features/entry-control'
-import { CreateExamPage, EditExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
+import { CreateExamPage, EditExamPage, ExamDetailPage, ExamsPage, FinalReportPage } from '@/features/exams'
 import {
   GroupAssistantsPage,
   GroupDetailPage,
@@ -140,6 +140,10 @@ function AuxiliarRoutes() {
       <Route
         path="/examenes/:examId/control-ingreso"
         element={guarded('ingreso.operar', <EntryControlPage />)}
+        />
+      <Route
+        path="/examenes/:examId/reporte-final"
+        element={guarded('examenes.gestionar', <FinalReportPage />)}
       />
       <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
     </Routes>
