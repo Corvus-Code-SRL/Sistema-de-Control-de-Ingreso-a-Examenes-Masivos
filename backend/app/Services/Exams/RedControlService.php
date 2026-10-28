@@ -30,16 +30,17 @@ class RedControlService
 
     public function currentStatus(int $examId, User $actor, ?string $clientVersion): array
     {
-        if (! $this->snapshots->ready($examId)) {
-            $exam = Exam::query()->findOrFail($examId);
-            $this->access->assertCanControl($exam, $actor);
+        $exam = Exam::query()->findOrFail($examId);
 
-            if ($exam->estado === Exam::PROGRAMADO) {
-                return [
-                    'estado' => Exam::PROGRAMADO,
-                    'motivo_apertura' => $this->failures->get($examId),
-                ];
-            }
+        // Validar siempre contra PostgreSQL, incluso si Redis indica
+        // que existe un snapshot activo.
+        $this->access->assertCanControl($exam, $actor);
+
+        if ($exam->estado === Exam::PROGRAMADO) {
+            return [
+                'estado' => Exam::PROGRAMADO,
+                'motivo_apertura' => $this->failures->get($examId),
+            ];
         }
 
         $status = $this->snapshots->currentStatus($examId, $actor, $clientVersion);

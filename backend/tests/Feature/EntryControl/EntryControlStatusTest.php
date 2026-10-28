@@ -157,4 +157,31 @@ class EntryControlStatusTest extends TestCase
             ->assertJsonPath('data.id_ambiente_asignado', null)
             ->assertJsonCount(2, 'data.ambientes');
     }
+
+    public function test_no_muestra_snapshot_activo_si_examen_ya_inicio(): void
+    {
+        $this->seedExamCatalog();
+
+        $exam = $this->createExam([], [$this->aulaId]);
+
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
+
+        app(RoomAssignmentService::class)->prepare($exam->id_examen);
+
+        $url = "/api/control-ingreso/examenes/{$exam->id_examen}/estado";
+
+        $this->actingAs(User::query()->findOrFail($this->docenteId))
+            ->getJson($url)
+            ->assertOk();
+
+        // Simula que PostgreSQL ya confirmó el inicio,
+        // mientras el snapshot anterior continúa activo.
+        $exam->update(['estado' => Exam::EN_CURSO]);
+
+        // El snapshot no debe prevalecer sobre el estado persistido.
+        $this->getJson($url)->assertStatus(409);
+    }
 }
