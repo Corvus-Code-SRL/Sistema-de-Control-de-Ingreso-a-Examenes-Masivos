@@ -7,6 +7,7 @@ import { capabilitiesOf } from '@/features/auth'
 import { TOKEN_STORAGE_KEY, meBody, type AccountKey } from '@/test/authFixtures'
 import { mockApiWith } from '@/test/http'
 import { renderApp } from '@/test/renderApp'
+import { openAllSections } from '@/test/sidebar'
 
 /**
  * Alcance por clics: toda pantalla enlazada desde el menú lateral de un rol se abre con un clic,
@@ -72,7 +73,7 @@ describe('alcance por clics desde el menú lateral', () => {
         const app = renderApp('/')
 
         const sidebar = await screen.findByRole('navigation', { name: MAIN_NAV })
-        await user.click(within(sidebar).getByRole('button', { name: 'Expandir' }))
+        await openAllSections(user, sidebar)
         await user.click(within(sidebar).getByRole('link', { name: label }))
 
         await waitFor(() => expect(app.pathname).toBe(to))
@@ -94,7 +95,7 @@ describe('alcance por clics desde el menú lateral', () => {
       renderApp('/')
 
       const sidebar = await screen.findByRole('navigation', { name: MAIN_NAV })
-      await user.click(within(sidebar).getByRole('button', { name: 'Expandir' }))
+      await openAllSections(user, sidebar)
 
       const pending = items.filter((item) => !isConnected(item))
 

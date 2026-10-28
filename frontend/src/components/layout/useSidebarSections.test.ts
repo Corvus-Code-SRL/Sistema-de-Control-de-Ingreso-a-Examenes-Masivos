@@ -68,20 +68,10 @@ describe('useSidebarSections', () => {
     expect(IDS.filter(second.result.current.isOpen)).toEqual(['a', 'c'])
   })
 
-  it('expande y contrae todas las secciones', () => {
+  it('solo expone consultar y alternar una sección', () => {
     const { result } = renderHook(() => useSidebarSections('user-1', IDS, 'a'))
 
-    expect(result.current.allOpen).toBe(false)
-    expect(result.current.noneOpen).toBe(false)
-
-    act(() => result.current.expandAll())
-    expect(IDS.every(result.current.isOpen)).toBe(true)
-    expect(result.current.allOpen).toBe(true)
-
-    act(() => result.current.collapseAll())
-    expect(IDS.some(result.current.isOpen)).toBe(false)
-    expect(result.current.noneOpen).toBe(true)
-    expect(stored()).toEqual([])
+    expect(Object.keys(result.current).sort()).toEqual(['isOpen', 'toggle'])
   })
 
   it('al navegar a otra sección con el menú montado, la abre', () => {

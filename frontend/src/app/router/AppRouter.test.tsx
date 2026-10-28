@@ -5,6 +5,7 @@ import { mockApiWith } from '@/test/http'
 import { detailOf, faultTypes, records } from '@/test/riskCenterFixtures'
 import { TOKEN_STORAGE_KEY, meBody, type AccountKey } from '@/test/authFixtures'
 import { renderApp } from '@/test/renderApp'
+import { openAllSections } from '@/test/sidebar'
 
 /**
  * Las áreas salen del rol de la sesión. Sin sesión, toda ruta protegida redirige al login.
@@ -283,14 +284,14 @@ describe('AppRouter — Central de Riesgo por área', () => {
     stubRiskCenter('docente')
     const docente = renderApp('/materias')
 
-    await user.click(await screen.findByRole('button', { name: 'Expandir' }))
+    await openAllSections(user, await screen.findByRole('navigation', { name: 'Navegación principal' }))
     expect(screen.getByRole('link', { name: 'Central de riesgo' })).toHaveAttribute('href', '/central-riesgo')
 
     docente.unmount()
     stubRiskCenter('administrador')
     renderApp('/cuentas')
 
-    await user.click(await screen.findByRole('button', { name: 'Expandir' }))
+    await openAllSections(user, await screen.findByRole('navigation', { name: 'Navegación principal' }))
     expect(screen.getByRole('link', { name: 'Consultar central' })).toHaveAttribute('href', '/central-riesgo')
   })
 })

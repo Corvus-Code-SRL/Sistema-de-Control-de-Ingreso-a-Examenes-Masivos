@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { openAllSections } from '@/test/sidebar'
 import { AppSidebar } from './AppSidebar'
 
 const session = vi.hoisted(() => ({
@@ -78,20 +79,43 @@ beforeEach(() => {
 })
 
 describe('AppSidebar — estructura', () => {
-  it('docente: dibuja las 5 secciones numeradas, con su conteo de entradas', () => {
+  it('docente: dibuja las 5 secciones, solo con su etiqueta', () => {
     renderSidebar('Docente', '/mis-cursos')
 
     const nav = screen.getByRole('navigation', { name: MAIN_NAV })
     const headers = within(nav).getAllByRole('heading', { level: 3 })
 
     expect(headers.map((header) => header.textContent)).toEqual([
-      '1Grupos académicos y nóminas4',
-      '2Preparación de exámenes7',
-      '3Control de ingreso y examen en curso4',
-      '4Central de riesgo2',
-      '5Historial de exámenes y reportes2'
+      'Grupos académicos y nóminas',
+      'Preparación de exámenes',
+      'Control de ingreso y examen en curso',
+      'Central de riesgo',
+      'Historial de exámenes y reportes'
     ])
   })
+
+  it.each([
+    ['Administrador', '/cuentas'],
+    ['Docente', '/mis-cursos'],
+    ['Auxiliar', '/mis-examenes']
+  ] as const)(
+    '%s: no hay rótulo «Secciones», botones de expandir o contraer, índices ni conteos',
+    (role, route) => {
+      renderSidebar(role, route)
+
+      const nav = screen.getByRole('navigation', { name: MAIN_NAV })
+      const headers = within(nav).getAllByRole('heading', { level: 3 })
+
+      expect(headers.length).toBeGreaterThan(0)
+      for (const header of headers) {
+        expect(header.textContent).not.toMatch(/\d/)
+      }
+
+      expect(within(nav).queryByText('Secciones')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Expandir' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Contraer' })).not.toBeInTheDocument()
+    }
+  )
 
   it('no muestra Inicio, códigos de historia ni avisos de estado', () => {
     renderSidebar('Docente', '/mis-cursos')
@@ -113,7 +137,7 @@ describe('AppSidebar — estructura', () => {
 
     const headings = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)
 
-    expect(headings).toEqual(['1Exámenes y grupos2', '2Control de ingreso y reportes3'])
+    expect(headings).toEqual(['Exámenes y grupos', 'Control de ingreso y reportes'])
     expect(screen.queryByText(/central de riesgo/i)).not.toBeInTheDocument()
   })
 
@@ -122,7 +146,6 @@ describe('AppSidebar — estructura', () => {
     renderSidebar('Docente', '/login')
 
     expect(screen.queryAllByRole('heading', { level: 3 })).toHaveLength(0)
-    expect(screen.queryByRole('button', { name: 'Expandir' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Iniciar sesión' })).toBeInTheDocument()
   })
 })
@@ -163,20 +186,20 @@ describe('AppSidebar — secciones colapsables', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
   })
 
-  it('«Expandir» y «Contraer» actúan sobre todas las secciones', async () => {
+  it('cada sección se abre y se cierra por separado, sin afectar a las demás', async () => {
     const user = userEvent.setup()
     renderSidebar('Docente', '/mis-cursos')
 
-    await user.click(screen.getByRole('button', { name: 'Expandir' }))
-    expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(5)
-    for (const heading of screen.getAllByRole('heading', { level: 3 })) {
-      expect(within(heading).getByRole('button')).toHaveAttribute('aria-expanded', 'true')
-    }
+    const other = sectionButton('Central de riesgo')
+    const active = sectionButton('Grupos académicos y nóminas')
 
-    await user.click(screen.getByRole('button', { name: 'Contraer' }))
-    for (const heading of screen.getAllByRole('heading', { level: 3 })) {
-      expect(within(heading).getByRole('button')).toHaveAttribute('aria-expanded', 'false')
-    }
+    await user.click(other)
+    expect(other).toHaveAttribute('aria-expanded', 'true')
+    expect(active).toHaveAttribute('aria-expanded', 'true')
+
+    await user.click(other)
+    expect(other).toHaveAttribute('aria-expanded', 'false')
+    expect(active).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('recuerda por usuario qué secciones dejó abiertas, aunque se vuelva a montar el menú', async () => {
@@ -245,7 +268,7 @@ describe('AppSidebar — entradas y estado activo', () => {
   it('docente: las entradas conectadas llevan a su ruta', async () => {
     const user = userEvent.setup()
     renderSidebar('Docente', '/mis-cursos')
-    await user.click(screen.getByRole('button', { name: 'Expandir' }))
+    await openAllSections(user)
 
     const hrefs = screen
       .getAllByRole('link')
@@ -275,7 +298,7 @@ describe('AppSidebar — entradas y estado activo', () => {
   it('/examenes/:id/control-ingreso resalta Control de ingreso y no Programados', async () => {
     const user = userEvent.setup()
     renderSidebar('Docente', '/examenes/12/control-ingreso')
-    await user.click(screen.getByRole('button', { name: 'Expandir' }))
+    await openAllSections(user)
 
     expect(screen.getByRole('link', { name: 'Control de ingreso' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Programados' })).not.toHaveAttribute('aria-current')

@@ -4,7 +4,6 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { AREA_LABELS, LOGIN_PATH, useAuth, useCurrentUser } from '@/features/auth'
 import { usePendingIncidentsCount } from '@/features/incidents'
-import { cn } from '@/lib/utils'
 import type { NavBadge } from './navigation'
 import { findActiveItem, visibleSections } from './navigationSelectors'
 import { SidebarSection } from './SidebarSection'
@@ -14,11 +13,6 @@ interface AppSidebarProps {
   /** Al navegar en móvil hay que cerrar el panel que contiene el menú. */
   onNavigate?: () => void
 }
-
-const TOOLBAR_BUTTON_CLASSES =
-  'rounded-md border border-sidebar-border px-2 py-0.5 text-xs font-medium text-sidebar-foreground ' +
-  'outline-none hover:bg-sb-hover focus-visible:ring-2 focus-visible:ring-sidebar-ring ' +
-  'aria-disabled:cursor-default aria-disabled:text-sb-group/70 aria-disabled:hover:bg-transparent'
 
 /**
  * Navegación lateral: en escritorio es fija, en móvil vive dentro de un panel.
@@ -68,36 +62,10 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
       </div>
 
       <nav aria-label="Navegación principal" className="flex-1 overflow-y-auto px-2 py-3">
-        {sections.length > 0 && (
-          <div className="mb-1 flex items-center justify-between gap-2 px-2 pb-1">
-            <span className="sciem-overline text-sb-group">Secciones</span>
-
-            <div className="flex gap-1">
-              <button
-                type="button"
-                aria-disabled={state.allOpen}
-                onClick={state.expandAll}
-                className={TOOLBAR_BUTTON_CLASSES}
-              >
-                Expandir
-              </button>
-              <button
-                type="button"
-                aria-disabled={state.noneOpen}
-                onClick={state.collapseAll}
-                className={TOOLBAR_BUTTON_CLASSES}
-              >
-                Contraer
-              </button>
-            </div>
-          </div>
-        )}
-
-        {sections.map((section, index) => (
+        {sections.map((section) => (
           <SidebarSection
             key={section.id}
             section={section}
-            position={index + 1}
             open={state.isOpen(section.id)}
             onToggle={() => state.toggle(section.id)}
             activeItemId={active?.sectionId === section.id ? active.itemId : undefined}

@@ -35,10 +35,6 @@ function writeStored(userId: string | undefined, openIds: ReadonlySet<string>): 
 export interface SidebarSectionsState {
   isOpen: (sectionId: string) => boolean
   toggle: (sectionId: string) => void
-  expandAll: () => void
-  collapseAll: () => void
-  allOpen: boolean
-  noneOpen: boolean
 }
 
 /**
@@ -98,15 +94,5 @@ export function useSidebarSections(
     })
   }, [])
 
-  const expandAll = useCallback(() => setOpenIds(new Set(sectionIds)), [sectionIds])
-  const collapseAll = useCallback(() => setOpenIds(new Set()), [])
-
-  return {
-    isOpen,
-    toggle,
-    expandAll,
-    collapseAll,
-    allOpen: sectionIds.every((id) => openIds.has(id)),
-    noneOpen: sectionIds.every((id) => !openIds.has(id))
-  }
+  return { isOpen, toggle }
 }

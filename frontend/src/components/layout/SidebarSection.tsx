@@ -6,8 +6,6 @@ import { SidebarItem } from './SidebarItem'
 
 interface SidebarSectionProps {
   section: NavSection
-  /** Posición (desde 1) entre las secciones visibles. */
-  position: number
   open: boolean
   onToggle: () => void
   activeItemId: string | undefined
@@ -16,12 +14,12 @@ interface SidebarSectionProps {
 }
 
 /**
- * Sección colapsable del menú, con su número, el conteo de entradas y el estado abierto o cerrado
- * expuesto al teclado y a los lectores de pantalla (`aria-expanded` y `aria-controls`).
+ * Sección colapsable del menú, con su icono y su etiqueta, y el estado abierto o cerrado expuesto
+ * al teclado y a los lectores de pantalla (`aria-expanded` y `aria-controls`). No lleva números:
+ * un contador junto al título se confundiría con una notificación.
  */
 export function SidebarSection({
   section,
-  position,
   open,
   onToggle,
   activeItemId,
@@ -50,15 +48,7 @@ export function SidebarSection({
           <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-sb-hover text-sb-sub">
             <section.icon className="size-3.5" aria-hidden="true" />
           </span>
-          <span className="sciem-overline flex min-w-0 flex-1 items-baseline gap-1.5">
-            <span className="text-sb-group" aria-hidden="true">
-              {position}
-            </span>
-            <span className="min-w-0">{section.label}</span>
-          </span>
-          <span className="text-xs font-semibold text-sb-sub" aria-hidden="true">
-            {section.items.length}
-          </span>
+          <span className="sciem-overline min-w-0 flex-1">{section.label}</span>
           <ChevronDown
             className={cn(
               'size-4 shrink-0 text-sb-sub transition-transform motion-reduce:transition-none',
