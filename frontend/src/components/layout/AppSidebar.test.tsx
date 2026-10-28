@@ -150,6 +150,28 @@ describe('AppSidebar — estructura', () => {
   })
 })
 
+describe('AppSidebar — desplazamiento', () => {
+  const SCROLL_CLASSES = ['overflow-y-auto', 'overflow-auto', 'overflow-y-scroll', 'overflow-scroll']
+
+  it.each([
+    ['Administrador', '/cuentas'],
+    ['Docente', '/mis-cursos'],
+    ['Auxiliar', '/mis-examenes']
+  ] as const)('%s: solo el nav se desplaza y no muestra la barra', (role, route) => {
+    const { container } = renderSidebar(role, route)
+    const nav = screen.getByRole('navigation', { name: MAIN_NAV })
+
+    expect(nav).toHaveClass('scrollbar-hidden', 'overflow-y-auto')
+    expect(nav).not.toHaveClass('overflow-hidden')
+
+    const scrollers = [...container.querySelectorAll('*')].filter((element) =>
+      SCROLL_CLASSES.some((name) => element.classList.contains(name))
+    )
+
+    expect(scrollers).toEqual([nav])
+  })
+})
+
 describe('AppSidebar — secciones colapsables', () => {
   it('abre solo la sección de la ruta actual y expone aria-expanded y aria-controls', () => {
     renderSidebar('Docente', '/examenes/programados')

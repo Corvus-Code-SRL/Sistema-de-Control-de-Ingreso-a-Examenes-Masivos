@@ -20,6 +20,9 @@ interface AppSidebarProps {
  * Las secciones salen de las capacidades del usuario, no de su rol (ver `visibleSections`), y se
  * pueden contraer; cuáles están abiertas se recuerda por usuario.
  *
+ * El `<nav>` es el único elemento que se desplaza (la cabecera y la cuenta quedan fijas) y no
+ * muestra barra de desplazamiento; sigue respondiendo al tacto, la rueda y el foco por teclado.
+ *
  * Va sobre el teal profundo de la marca, así que sus colores salen de los tokens
  * del sidebar y no de los de superficie clara: el gris de texto secundario de la
  * aplicación resultaría ilegible aquí.
@@ -61,7 +64,10 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
         </div>
       </div>
 
-      <nav aria-label="Navegación principal" className="flex-1 overflow-y-auto px-2 py-3">
+      <nav
+        aria-label="Navegación principal"
+        className="scrollbar-hidden flex-1 overflow-y-auto overscroll-contain px-2 py-3"
+      >
         {sections.map((section) => (
           <SidebarSection
             key={section.id}
