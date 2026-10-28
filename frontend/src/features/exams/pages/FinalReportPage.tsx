@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
-import { Printer, ShieldAlert } from 'lucide-react'
+import { Download, Printer, ShieldAlert } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -12,9 +12,10 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow,
+  TableRow
 } from '@/components/ui/table'
 import { useFinalReport } from '../hooks/useFinalReport'
+import { useFinalReportPdf } from '../hooks/useFinalReportPdf'
 import { examDetailPath } from '../utils/paths'
 import type { FinalReport } from '../types/finalReport.types'
 
@@ -52,7 +53,7 @@ function HeaderSection({ report }: { report: FinalReport }) {
     ['Fecha del examen', formatDate(cabecera.fecha)],
     ['Hora de inicio', orDash(cabecera.hora_inicio)],
     ['Hora de fin', orDash(cabecera.hora_fin)],
-    ['Reporte generado', formatGeneratedAt(cabecera.generado_en)],
+    ['Reporte generado', formatGeneratedAt(cabecera.generado_en)]
   ]
 
   return (
@@ -171,12 +172,13 @@ function IncidentsSection({ report }: { report: FinalReport }) {
 export function FinalReportPage() {
   const { examId } = useParams<{ examId: string }>()
   const { report, loading, notFound, loadError, reload } = useFinalReport(examId)
+  const { download, downloading, downloadError } = useFinalReportPdf(report)
 
   const summaryPath = examDetailPath(Number(examId))
   const breadcrumbs = [
     { label: 'Exámenes' },
     { label: 'Resumen del examen', to: summaryPath },
-    { label: 'Reporte final' },
+    { label: 'Reporte final' }
   ]
 
   if (notFound) {
@@ -203,6 +205,15 @@ export function FinalReportPage() {
             <Button variant="outline" className="print:hidden" asChild>
               <Link to={summaryPath}>Resumen del examen</Link>
             </Button>
+            <Button
+              variant="outline"
+              className="print:hidden"
+              onClick={() => void download()}
+              disabled={!report || downloading}
+            >
+              <Download className="size-4" />
+              {downloading ? 'Descargando…' : 'Descargar PDF'}
+            </Button>
             <Button className="print:hidden" onClick={() => window.print()} disabled={!report}>
               <Printer className="size-4" />
               Imprimir
@@ -210,6 +221,12 @@ export function FinalReportPage() {
           </>
         }
       />
+
+      {downloadError && (
+        <p role="alert" className="text-sm text-danger-fg print:hidden">
+          {downloadError}
+        </p>
+      )}
 
       {loading && <LoadingState label="Cargando reporte final" />}
 
