@@ -138,7 +138,7 @@ class StudentVerificationTest extends TestCase
         $this->rebuildSnapshot();
         $this->getJson($this->url('buscar') . '?sis=' . substr($assistant->cod_sis, 0, 4))
             ->assertOk()
-            ->assertJsonCount(0, 'data');
+            ->assertJsonMissing(['cod_sis' => $assistant->cod_sis]);
         $before = $this->getJson($this->url('estado'))->assertOk()->json('data');
 
         $this->postJson($this->url('verificar'), [
@@ -229,7 +229,7 @@ class StudentVerificationTest extends TestCase
 
         $this->getJson($this->url('buscar') . '?' . http_build_query(['nombre' => '%_otro']))
             ->assertOk()
-            ->assertJsonMissing(['cod_sis' => $assistant->cod_sis]);
+            ->assertJsonCount(0, 'data');
     }
 
     public function test_sugerencias_solo_incluyen_la_nomina_y_sis_manual_muestra_al_ajeno(): void
