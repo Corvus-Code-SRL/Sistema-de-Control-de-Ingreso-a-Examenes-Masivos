@@ -50,7 +50,11 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
     Route::get('/{exam}/reporte-final', [FinalReportController::class, 'show'])
         ->where('exam', '[0-9]{1,9}')
         ->name('reporte-final');
-        
+
+    Route::get('/{exam}/reporte-final/pdf', [FinalReportController::class, 'pdf'])
+        ->where('exam', '[0-9]{1,9}')
+        ->name('reporte-final.pdf');
+
     Route::post('/{exam}/grupos', [ExamGroupController::class, 'store'])
         ->where('exam', '[0-9]{1,9}')
         ->name('grupos.store');

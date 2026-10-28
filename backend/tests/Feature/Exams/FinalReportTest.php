@@ -155,4 +155,25 @@ class FinalReportTest extends TestCase
     {
         $this->getJson('/api/examenes/abc/reporte-final')->assertNotFound();
     }
+
+        public function test_docente_descarga_el_pdf_con_nombre_de_examen_y_fecha(): void
+    {
+        $exam = $this->finishedExam(['nombre_examen' => 'Parcial final']);
+
+        $response = $this->get($this->url($exam) . '/pdf')->assertOk();
+
+        $this->assertSame('application/pdf', $response->headers->get('Content-Type'));
+        $this->assertStringContainsString(
+            'reporte-final-parcial-final-' . $exam->fecha->toDateString() . '.pdf',
+            $response->headers->get('Content-Disposition')
+        );
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+    }
+
+    public function test_no_se_descarga_el_pdf_de_un_examen_en_curso(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::EN_CURSO], [$this->aulaId]);
+
+        $this->getJson($this->url($exam) . '/pdf')->assertForbidden();
+    }
 }
