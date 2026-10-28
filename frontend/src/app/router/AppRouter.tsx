@@ -153,6 +153,10 @@ function AuxiliarRoutes() {
         path="/examenes/:examId/control-ingreso"
         element={guarded('ingreso.operar', <EntryControlPage />)}
       />
+      <Route
+        path="/examenes/:examId/en-curso"
+        element={guarded('ingreso.operar', <ExamInProgressPage />)}
+      />
       <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
     </Routes>
   )
