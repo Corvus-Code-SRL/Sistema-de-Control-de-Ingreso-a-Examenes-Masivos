@@ -223,4 +223,35 @@ class ExamInProgressTest extends TestCase
         $this->getJson($this->url($exam))
             ->assertForbidden();
     }
+
+    public function test_respuesta_incluye_hora_del_servidor_en_utc(): void
+    {
+        $exam = $this->examWithRoster();
+
+        $before = now('UTC')->subSeconds(2);
+
+        $response = $this->getJson($this->url($exam));
+
+        $after = now('UTC')->addSeconds(2);
+
+        $response
+            ->assertOk()
+            ->assertJsonStructure([
+                'data' => ['hora_servidor_en'],
+            ]);
+
+        $raw = $response->json('data.hora_servidor_en');
+
+        $this->assertIsString($raw);
+
+        $serverTime = \Carbon\Carbon::parse($raw);
+
+        // La referencia horaria debe estar expresada en UTC.
+        $this->assertSame(0, $serverTime->getOffset());
+
+        // Debe corresponder al momento real de la consulta.
+        $this->assertTrue(
+            $serverTime->between($before, $after)
+        );
+    }
 }

@@ -209,6 +209,7 @@ class ExamInProgressQueryService
             'fin_automatico' => (bool) $exam->fin_automatico,
             'fin_programado_en' =>
                 $this->timing->endsAt($exam)->toIso8601String(),
+            'hora_servidor_en' => now('UTC')->toIso8601String(),
             'totales' => $counts,
             'estudiantes' => $students,
         ];

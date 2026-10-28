@@ -7,7 +7,10 @@ import { examInProgressService } from '../services/examInProgressService';
 import type {
   ExamInProgress,
   InProgressStudent,
-} from '../types/examInProgress.types';
+} from '../types/examInProgress.types';import {
+  remainingExamSeconds,
+  type ExamClockSync,
+} from '../utils/examClock';
 
 type Filter = 'presentes' | 'retraso' | 'ausentes' | 'todos';
 
@@ -46,12 +49,17 @@ export function ExamInProgressPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
-  const [now, setNow] = useState(Date.now());
+  const [monoNow, setMonoNow] = useState(() => performance.now());
+  const [clockSync, setClockSync] =
+    useState<ExamClockSync | null>(null);
   const [filter, setFilter] = useState<Filter>('presentes');
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    const timer = window.setInterval(() => {
+        setMonoNow(performance.now());
+    }, 1000);
+
     return () => window.clearInterval(timer);
   }, []);
 
@@ -71,13 +79,29 @@ export function ExamInProgressPage() {
 
       try {
         const result = await examInProgressService.get(
-          id,
-          controller.signal
+            id,
+            controller.signal
         );
 
+        const serverNowMs = Date.parse(result.hora_servidor_en);
+
+        if (!Number.isFinite(serverNowMs)) {
+            throw new Error(
+                'El servidor no devolvió una hora válida.'
+            );
+        }
+
         if (!controller.signal.aborted) {
-          setData(result);
-          setError(null);
+            const sampledMonoMs = performance.now();
+
+            setClockSync({
+                serverNowMs,
+                sampledMonoMs,
+            });
+
+            setMonoNow(sampledMonoMs);
+            setData(result);
+            setError(null);
         }
       } catch (cause) {
         if (!controller.signal.aborted) {
@@ -105,13 +129,14 @@ export function ExamInProgressPage() {
     };
   }, [id, retry]);
 
-  const endTime = data
-    ? new Date(data.fin_programado_en).getTime()
-    : 0;
-
-  const remaining = data && data.estado === 'EN_CURSO'
-    ? Math.max(0, Math.ceil((endTime - now) / 1000))
-    : 0;
+  const remaining =
+    data?.estado === 'EN_CURSO' && clockSync
+        ? remainingExamSeconds(
+            data.fin_programado_en,
+            clockSync,
+            monoNow
+        )
+        : 0;
 
   const query = normalizeSearch(search);
 
@@ -204,7 +229,7 @@ export function ExamInProgressPage() {
                   className="sciem-tnum mt-1 text-3xl font-semibold"
                   aria-label="Tiempo restante del examen"
                 >
-                  {clock(remaining)}
+                  {data.estado === 'EN_CURSO' && !clockSync ? 'Sincronizando…' : clock(remaining)}
                 </p>
                 <p className="mt-2 text-xs text-muted-foreground">
                   Fin programado: {localTime(data.fin_programado_en)}

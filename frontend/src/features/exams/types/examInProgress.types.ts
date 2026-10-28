@@ -28,6 +28,7 @@ export interface ExamInProgress {
     inicio_automatico: boolean;
     fin_automatico: boolean;
     fin_programado_en: string;
+    hora_servidor_en: string;
     totales: {
     a_tiempo: number;
     con_retraso: number;
