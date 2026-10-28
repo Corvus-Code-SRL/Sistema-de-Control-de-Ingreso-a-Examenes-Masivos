@@ -21,15 +21,6 @@ class ExamInProgressQueryService
 
     public function show(Exam $exam, User $actor): array
     {
-        if (!in_array($exam->estado, [
-            Exam::EN_CURSO,
-            Exam::FINALIZADO,
-        ], true)) {
-            throw new ExamStateException(
-                'El examen todavía no está en curso.'
-            );
-        }
-
         if ($actor->estado !== User::ESTADO_ACTIVO) {
             throw new AuthorizationException();
         }
@@ -89,6 +80,15 @@ class ExamInProgressQueryService
                     'No tiene un ambiente asignado.'
                 );
             }
+        }
+
+        if (!in_array($exam->estado, [
+            Exam::EN_CURSO,
+            Exam::FINALIZADO,
+        ], true)) {
+            throw new ExamStateException(
+                'El examen todavía no está en curso.'
+            );
         }
 
         $roster = DB::query()

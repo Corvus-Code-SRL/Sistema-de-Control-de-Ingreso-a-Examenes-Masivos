@@ -254,4 +254,28 @@ class ExamInProgressTest extends TestCase
             $serverTime->between($before, $after)
         );
     }
+
+    public function test_docente_ajeno_no_conoce_estado_de_examen_programado(): void
+    {
+        $exam = $this->createExam([
+            'estado' => Exam::PROGRAMADO,
+        ]);
+
+        $this->actAsTeacher($this->otroDocenteId);
+
+        $this->getJson($this->url($exam))
+            ->assertForbidden();
+    }
+
+    public function test_docente_ajeno_no_conoce_estado_de_examen_finalizado(): void
+    {
+        $exam = $this->createExam([
+            'estado' => Exam::FINALIZADO,
+        ]);
+
+        $this->actAsTeacher($this->otroDocenteId);
+
+        $this->getJson($this->url($exam))
+            ->assertForbidden();
+    }
 }
