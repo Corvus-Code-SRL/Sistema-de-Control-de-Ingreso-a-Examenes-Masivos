@@ -2,10 +2,18 @@ import { describe, expect, it } from 'vitest'
 import { areaForRole, capabilitiesOf, hasCapability } from './capabilities'
 
 describe('capacidades por rol', () => {
-  it('el Docente incluye todo lo que puede el Auxiliar', () => {
+  it('el Docente incluye lo operativo del Auxiliar, salvo lo propio de la auxiliatura', () => {
+    const own: string[] = ['asignaciones.consultar']
+
     for (const capability of capabilitiesOf('Auxiliar')) {
-      expect(hasCapability('Docente', capability)).toBe(true)
+      expect(hasCapability('Docente', capability)).toBe(!own.includes(capability))
     }
+  })
+
+  it('consultar las asignaciones como auxiliar es solo del Auxiliar', () => {
+    expect(hasCapability('Auxiliar', 'asignaciones.consultar')).toBe(true)
+    expect(hasCapability('Docente', 'asignaciones.consultar')).toBe(false)
+    expect(hasCapability('Administrador', 'asignaciones.consultar')).toBe(false)
   })
 
   it('el Docente puede más que el Auxiliar', () => {
