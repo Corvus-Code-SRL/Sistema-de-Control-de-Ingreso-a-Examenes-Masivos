@@ -41,6 +41,10 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
         ->where('exam', '[0-9]{1,9}')
         ->name('cancelar');
 
+    Route::post('/{exam}/iniciar', [ExamController::class, 'start'])
+        ->where('exam', '[0-9]{1,9}')
+        ->name('iniciar');
+
     Route::post('/{exam}/finalizar', [ExamController::class, 'finish'])
         ->where('exam', '[0-9]{1,9}')
         ->name('finalizar');

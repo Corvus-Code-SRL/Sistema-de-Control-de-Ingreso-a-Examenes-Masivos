@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-/** Transiciones manuales y automáticas del final del examen. */
+/** Transiciones de estado del ciclo de vida del examen. */
 class ExamLifecycleService
 {
     private ExamTimingService $timing;
@@ -30,6 +30,55 @@ class ExamLifecycleService
         $this->snapshots = $snapshots;
         $this->auditLog = $auditLog;
         $this->participants = $participants;
+    }
+
+    /** Inicia manualmente desde EN_INGRESO; solo el docente propietario. */
+    public function startManually(Exam $exam, string $teacherId): Exam
+    {
+        $exam = DB::transaction(function () use ($exam, $teacherId): Exam {
+            $locked = Exam::query()->whereKey($exam->id_examen)->lockForUpdate()->firstOrFail();
+
+            if ((string) $locked->id_usuario_docente !== $teacherId) {
+                throw new ExamOwnershipException();
+            }
+
+            if ($locked->estado !== Exam::EN_INGRESO) {
+                throw new ExamStateException('Solo puede iniciar un examen que está en ingreso.');
+            }
+
+            $startedAt = Carbon::now('UTC');
+            $locked->estado = Exam::EN_CURSO;
+            $locked->inicio_real_en = $startedAt;
+            $locked->inicio_automatico = false;
+            $locked->save();
+
+            $this->auditLog->registrar(
+                'INICIAR',
+                'examen',
+                [
+                    'id_examen' => $locked->id_examen,
+                    'estado' => Exam::EN_INGRESO,
+                ],
+                [
+                    'id_examen' => $locked->id_examen,
+                    'estado' => Exam::EN_CURSO,
+                    'inicio_real_en' => $startedAt->toIso8601String(),
+                    'tipo_inicio' => 'MANUAL',
+                ],
+                $teacherId
+            );
+
+            return $locked;
+        });
+
+        // Invalidar después del commit evita que Redis anuncie un estado
+        // anterior al persistido. El backend debe seguir validando el estado.
+        $this->deactivateSnapshot((int) $exam->id_examen);
+
+        return $exam->fresh([
+            'examType', 'subject', 'career', 'classrooms',
+            'groups' => fn ($query) => $query->withStudentCount(),
+        ]);
     }
 
     /** Finaliza inmediatamente un examen activo, únicamente por su docente creador. */
