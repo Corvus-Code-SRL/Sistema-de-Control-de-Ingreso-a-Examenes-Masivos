@@ -1,75 +1,53 @@
+import { useMemo } from 'react'
 import { LogIn, LogOut } from 'lucide-react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { AREA_LABELS, LOGIN_PATH, useAuth, useCurrentUser } from '@/features/auth'
 import { usePendingIncidentsCount } from '@/features/incidents'
 import { cn } from '@/lib/utils'
-import { navigationByArea, type NavItem } from './navigation'
+import type { NavBadge } from './navigation'
+import { findActiveItem, visibleSections } from './navigationSelectors'
+import { SidebarSection } from './SidebarSection'
+import { useSidebarSections } from './useSidebarSections'
 
 interface AppSidebarProps {
   /** Al navegar en móvil hay que cerrar el panel que contiene el menú. */
   onNavigate?: () => void
 }
 
-interface SidebarLinkProps {
-  item: NavItem
-  onNavigate?: () => void
-}
-
-/** Un destino de la navegación: enlace si tiene `to`, y si no, un ítem deshabilitado que lo avisa. */
-function SidebarLink({ item, onNavigate }: SidebarLinkProps) {
-  if (!item.to) {
-    return (
-      <span
-        aria-disabled="true"
-        title="Disponible en una próxima entrega"
-        className="flex h-10 cursor-not-allowed items-center gap-3 rounded-md px-3 text-sm font-medium text-sb-group/70"
-      >
-        <item.icon className="size-4 shrink-0" aria-hidden="true" />
-        <span className="flex-1 truncate">{item.label}</span>
-      </span>
-    )
-  }
-
-  return (
-    <NavLink
-      to={item.to}
-      end={item.end}
-      onClick={onNavigate}
-      className={({ isActive }) =>
-        cn(
-          'flex h-10 items-center gap-3 rounded-md px-3 text-sm transition-colors',
-          isActive
-            ? 'bg-brand font-semibold text-white'
-            : 'font-medium text-sidebar-foreground hover:bg-sb-hover'
-        )
-      }
-    >
-      <item.icon className="size-4 shrink-0" aria-hidden="true" />
-      <span className="flex-1 truncate">{item.label}</span>
-      {item.badge !== undefined && item.badge > 0 && (
-        <span className="rounded-full bg-warn px-1.5 text-xs font-semibold text-warn-fg">
-          {item.badge}
-        </span>
-      )}
-    </NavLink>
-  )
-}
+const TOOLBAR_BUTTON_CLASSES =
+  'rounded-md border border-sidebar-border px-2 py-0.5 text-xs font-medium text-sidebar-foreground ' +
+  'outline-none hover:bg-sb-hover focus-visible:ring-2 focus-visible:ring-sidebar-ring ' +
+  'aria-disabled:cursor-default aria-disabled:text-sb-group/70 aria-disabled:hover:bg-transparent'
 
 /**
  * Navegación lateral: en escritorio es fija, en móvil vive dentro de un panel.
+ *
+ * Las secciones salen de las capacidades del usuario, no de su rol (ver `visibleSections`), y se
+ * pueden contraer; cuáles están abiertas se recuerda por usuario.
  *
  * Va sobre el teal profundo de la marca, así que sus colores salen de los tokens
  * del sidebar y no de los de superficie clara: el gris de texto secundario de la
  * aplicación resultaría ilegible aquí.
  */
 export function AppSidebar({ onNavigate }: AppSidebarProps) {
-  const { user, area } = useCurrentUser()
-  const { estado, cerrarSesion } = useAuth()
+  const { user, area, capabilities } = useCurrentUser()
+  const { estado, usuario, cerrarSesion } = useAuth()
   const navigate = useNavigate()
-  const navigation = navigationByArea[area]
+  const { pathname } = useLocation()
   const hasSession = estado === 'autenticado'
-  const pendingIncidents = usePendingIncidentsCount(area === 'docente')
+
+  const sections = useMemo(() => visibleSections(capabilities), [capabilities])
+  const sectionIds = useMemo(() => sections.map((section) => section.id), [sections])
+  const active = useMemo(() => findActiveItem(sections, pathname), [sections, pathname])
+  const state = useSidebarSections(usuario?.id_usuario, sectionIds, active?.sectionId)
+
+  // Solo se pide el contador si alguna entrada visible lo muestra.
+  const showsPendingIncidents = sections.some((section) =>
+    section.items.some((item) => item.badge === 'pendingIncidents')
+  )
+  const pendingIncidents = usePendingIncidentsCount(showsPendingIncidents)
+  const badges: Partial<Record<NavBadge, number>> = { pendingIncidents }
 
   async function handleLogout() {
     await cerrarSesion()
@@ -90,47 +68,42 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
       </div>
 
       <nav aria-label="Navegación principal" className="flex-1 overflow-y-auto px-2 py-3">
-        {navigation.map((group, index) => (
-          <div key={group.label ?? index} className="mb-3">
-            {group.label && (
-              <p className="sciem-overline px-2 pt-3 pb-1.5 text-sb-group">{group.label}</p>
-            )}
+        {sections.length > 0 && (
+          <div className="mb-1 flex items-center justify-between gap-2 px-2 pb-1">
+            <span className="sciem-overline text-sb-group">Secciones</span>
 
-            <ul className="space-y-0.5">
-              {group.items.map((item) => (
-                <li key={item.label}>
-                  {item.children ? (
-                    <div>
-                      <span className="flex h-10 items-center gap-3 px-3 text-sm font-medium text-sidebar-foreground">
-                        <item.icon className="size-4 shrink-0" aria-hidden="true" />
-                        <span className="flex-1 truncate">{item.label}</span>
-                      </span>
-
-                      <ul
-                        aria-label={item.label}
-                        className="ml-5 space-y-0.5 border-l border-sidebar-border pl-2"
-                      >
-                        {item.children.map((child) => (
-                          <li key={child.label}>
-                            <SidebarLink item={child} onNavigate={onNavigate} />
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : (
-                    <SidebarLink
-                      item={
-                        area === 'docente' && item.label === 'Incidencias'
-                          ? { ...item, badge: pendingIncidents }
-                          : item
-                      }
-                      onNavigate={onNavigate}
-                    />
-                  )}
-                </li>
-              ))}
-            </ul>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                aria-disabled={state.allOpen}
+                onClick={state.expandAll}
+                className={TOOLBAR_BUTTON_CLASSES}
+              >
+                Expandir
+              </button>
+              <button
+                type="button"
+                aria-disabled={state.noneOpen}
+                onClick={state.collapseAll}
+                className={TOOLBAR_BUTTON_CLASSES}
+              >
+                Contraer
+              </button>
+            </div>
           </div>
+        )}
+
+        {sections.map((section, index) => (
+          <SidebarSection
+            key={section.id}
+            section={section}
+            position={index + 1}
+            open={state.isOpen(section.id)}
+            onToggle={() => state.toggle(section.id)}
+            activeItemId={active?.sectionId === section.id ? active.itemId : undefined}
+            badges={badges}
+            onNavigate={onNavigate}
+          />
         ))}
       </nav>
 

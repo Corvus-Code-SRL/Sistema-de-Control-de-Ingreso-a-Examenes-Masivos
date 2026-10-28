@@ -1,4 +1,5 @@
 import { screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { mockApiWith } from '@/test/http'
 import { detailOf, faultTypes, records } from '@/test/riskCenterFixtures'
@@ -110,7 +111,7 @@ describe('AppRouter — materias del administrador', () => {
     expect(await screen.findByRole('heading', { name: 'Asignaciones de materias' })).toBeInTheDocument()
   })
 
-  it('la navegación del Administrador no enlaza /materias: Materias es solo un encabezado', async () => {
+  it('la navegación del Administrador no enlaza /materias: solo Catálogo y Asignaciones', async () => {
     stubBackend('administrador')
 
     renderApp('/materias/asignaciones')
@@ -120,8 +121,11 @@ describe('AppRouter — materias del administrador', () => {
     const menu = within(screen.getByRole('navigation', { name: 'Navegación principal' }))
 
     expect(menu.queryByRole('link', { name: 'Materias' })).not.toBeInTheDocument()
-    expect(menu.getByRole('link', { name: 'Asignaciones' })).toHaveAttribute('href', '/materias/asignaciones')
-    expect(menu.getByRole('link', { name: 'Catálogo' })).toHaveAttribute('href', '/materias/catalogo')
+    expect(menu.getByRole('link', { name: 'Asignar materia a carrera' })).toHaveAttribute(
+      'href',
+      '/materias/asignaciones'
+    )
+    expect(menu.getByRole('link', { name: 'Catálogo académico' })).toHaveAttribute('href', '/materias/catalogo')
     expect(menu.queryByRole('link', { name: 'Asignar materia' })).not.toBeInTheDocument()
   })
 
@@ -274,17 +278,19 @@ describe('AppRouter — Central de Riesgo por área', () => {
     expect(app.pathname).toBe('/central-riesgo/9945')
   })
 
-  it('el Docente llega desde «Registros» y el Administrador desde «Supervisión › Central de riesgo»', async () => {
+  it('el Docente llega desde «Central de riesgo» y el Administrador desde «Consultar central»', async () => {
+    const user = userEvent.setup()
     stubRiskCenter('docente')
     const docente = renderApp('/materias')
 
-    expect(await screen.findByRole('link', { name: 'Registros' })).toHaveAttribute('href', '/central-riesgo')
+    await user.click(await screen.findByRole('button', { name: 'Expandir' }))
+    expect(screen.getByRole('link', { name: 'Central de riesgo' })).toHaveAttribute('href', '/central-riesgo')
 
     docente.unmount()
     stubRiskCenter('administrador')
     renderApp('/cuentas')
 
-    expect(await screen.findByRole('link', { name: 'Central de riesgo' })).toHaveAttribute('href', '/central-riesgo')
-    expect(screen.getByText('Supervisión')).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Expandir' }))
+    expect(screen.getByRole('link', { name: 'Consultar central' })).toHaveAttribute('href', '/central-riesgo')
   })
 })
