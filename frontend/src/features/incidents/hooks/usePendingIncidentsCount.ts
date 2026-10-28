@@ -15,5 +15,5 @@ export function usePendingIncidentsCount(enabled: boolean): number {
     [enabled]
   )
 
-  return resource.data?.meta.total_pendientes ?? 0
+  return resource.data?.meta?.total_pendientes ?? 0
 }

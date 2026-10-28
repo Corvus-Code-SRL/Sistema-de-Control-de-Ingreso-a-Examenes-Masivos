@@ -48,6 +48,14 @@ afterEach(() => {
 })
 
 describe('IncidentsPage', () => {
+  it('no se rompe si la respuesta no trae meta', async () => {
+    mockApi([{ matches: (url) => url.includes('/api/docente/incidencias'), body: { data: [pendiente] } }])
+    renderPage()
+
+    expect(await screen.findAllByText('José Luis Pérez Núñez')).not.toHaveLength(0)
+    expect(screen.getByRole('tab', { name: /Pendientes/ })).toBeInTheDocument()
+  })
+
   it('muestra las pestañas y el contador de pendientes', async () => {
     stubList([pendiente, { ...pendiente, id: 'estudiante-9927' }])
     renderPage()
@@ -55,7 +63,8 @@ describe('IncidentsPage', () => {
     expect(screen.getByRole('tab', { name: /Pendientes/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('tab', { name: /Revisadas/ })).toHaveAttribute('aria-selected', 'false')
 
-    expect(await screen.findAllByText('José Luis Pérez Núñez')).toHaveLength(2)
+    // La lista se dibuja dos veces (móvil y escritorio; el CSS oculta una): 2 incidencias × 2 diseños.
+    expect(await screen.findAllByText('José Luis Pérez Núñez')).toHaveLength(4)
     expect(screen.getByText('2 pendientes')).toBeInTheDocument()
   })
 
