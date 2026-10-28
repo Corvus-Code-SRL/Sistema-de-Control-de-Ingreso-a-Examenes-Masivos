@@ -81,6 +81,82 @@ class ExamLifecycleService
         ]);
     }
 
+    /** Inicia exámenes no iniciados manualmente una vez alcanzado el margen. */
+    public function startExpired(?Carbon $now = null): int
+    {
+        $now = $now ?? Carbon::now(config('sciem.zona_horaria'));
+        $started = 0;
+
+        Exam::query()
+            ->where('estado', Exam::EN_INGRESO)
+            ->whereBetween('fecha', [
+                $now->copy()->subDay()->toDateString(),
+                $now->copy()->addDay()->toDateString(),
+            ])
+            ->orderBy('id_examen')
+            ->chunkById(100, function ($exams) use ($now, &$started): void {
+                foreach ($exams as $exam) {
+                    if ($exam->duracion === null
+                        || $now->lessThan($this->timing->startsAutomaticallyAt($exam))
+                        || $this->timing->hasEnded($exam, $now)) {
+                        continue;
+                    }
+
+                    try {
+                        $changed = DB::transaction(function () use ($exam, $now): bool {
+                            $locked = Exam::query()
+                                ->whereKey($exam->id_examen)
+                                ->lockForUpdate()
+                                ->firstOrFail();
+
+                            // La ejecución manual y el job usan el mismo bloqueo.
+                            if ($locked->estado !== Exam::EN_INGRESO
+                                || $locked->duracion === null
+                                || $now->lessThan($this->timing->startsAutomaticallyAt($locked))
+                                || $this->timing->hasEnded($locked, $now)) {
+                                return false;
+                            }
+
+                            $startedAt = $now->copy()->setTimezone('UTC');
+                            $locked->estado = Exam::EN_CURSO;
+                            $locked->inicio_real_en = $startedAt;
+                            $locked->inicio_automatico = true;
+                            $locked->save();
+
+                            $this->auditLog->registrar(
+                                'INICIAR',
+                                'examen',
+                                ['id_examen' => $locked->id_examen, 'estado' => Exam::EN_INGRESO],
+                                [
+                                    'id_examen' => $locked->id_examen,
+                                    'estado' => Exam::EN_CURSO,
+                                    'inicio_real_en' => $startedAt->toIso8601String(),
+                                    'tipo_inicio' => 'AUTOMATICO',
+                                ],
+                                // Compatibilidad con las auditorías automáticas actuales:
+                                // el tipo AUTOMATICO distingue al proceso del docente.
+                                (string) $locked->id_usuario_docente
+                            );
+
+                            return true;
+                        });
+
+                        if ($changed) {
+                            $started++;
+                            $this->deactivateSnapshot((int) $exam->id_examen);
+                        }
+                    } catch (Throwable $exception) {
+                        Log::error('Error al iniciar automáticamente un examen', [
+                            'id_examen' => $exam->id_examen,
+                            'motivo' => $exception->getMessage(),
+                        ]);
+                    }
+                }
+            }, 'id_examen');
+
+        return $started;
+    }
+
     /** Finaliza inmediatamente un examen activo, únicamente por su docente creador. */
     public function finishManually(Exam $exam, string $teacherId): Exam
     {
