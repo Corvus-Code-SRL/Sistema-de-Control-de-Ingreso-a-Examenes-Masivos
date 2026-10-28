@@ -49,8 +49,8 @@ export function IncidentsPage() {
   )
 
   const incidents = resource.data?.data ?? []
-  const totalPendientes = resource.data?.meta.total_pendientes ?? 0
-  const totalRevisadas = resource.data?.meta.total_revisadas ?? 0
+  const totalPendientes = resource.data?.meta?.total_pendientes ?? 0
+  const totalRevisadas = resource.data?.meta?.total_revisadas ?? 0
 
   function handleFilterChange(next: IncidentFilter) {
     setFilter(next)

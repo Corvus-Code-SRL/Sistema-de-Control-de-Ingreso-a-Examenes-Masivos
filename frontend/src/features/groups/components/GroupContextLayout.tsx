@@ -23,9 +23,9 @@ export function GroupContextLayout(props: Props) {
     return (
       <AppShell
         mobileTitle={props.title}
-        breadcrumbs={[{ label: 'Mis cursos', to: MY_COURSES_PATH }, { label: props.title }]}
+        breadcrumbs={[{ label: 'Mis grupos', to: MY_COURSES_PATH }, { label: props.title }]}
       >
-        <PageHeader title={props.title} backTo={MY_COURSES_PATH} backLabel="Volver a Mis cursos" />
+        <PageHeader title={props.title} backTo={MY_COURSES_PATH} backLabel="Volver a Mis grupos" />
         <Card className="p-0"><GroupNotFound /></Card>
       </AppShell>
     )
@@ -40,7 +40,7 @@ function ResolvedGroupContext({ groupId, title, children }: Props & { groupId: n
     <AppShell
       mobileTitle={title}
       breadcrumbs={[
-        { label: 'Mis cursos', to: MY_COURSES_PATH },
+        { label: 'Mis grupos', to: MY_COURSES_PATH },
         { label: visible ? courseTitle(detail.subject, detail.group) : 'Grupo', to: groupDetailPath(groupId) },
         { label: title },
       ]}

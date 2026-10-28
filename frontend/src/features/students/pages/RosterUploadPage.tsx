@@ -121,7 +121,7 @@ function RosterShell({ title, courseLabel, backTo, children }: RosterShellProps)
       mobileTitle={title}
       mobileSubtitle={courseLabel}
       breadcrumbs={[
-        { label: 'Mis cursos', to: MY_COURSES_PATH },
+        { label: 'Mis grupos', to: MY_COURSES_PATH },
         ...(courseLabel && backTo ? [{ label: courseLabel, to: backTo }] : []),
         { label: title },
       ]}
@@ -130,7 +130,7 @@ function RosterShell({ title, courseLabel, backTo, children }: RosterShellProps)
         title={title}
         subtitle={courseLabel}
         backTo={backTo ?? MY_COURSES_PATH}
-        backLabel={backTo ? 'Volver al grupo' : 'Volver a Mis cursos'}
+        backLabel={backTo ? 'Volver al grupo' : 'Volver a Mis grupos'}
       />
 
       {children}
