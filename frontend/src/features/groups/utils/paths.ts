@@ -1,7 +1,7 @@
-/** Mis cursos: a donde vuelve el docente desde el detalle de un grupo. */
+/** Mis grupos: a donde vuelve el docente desde el detalle de un grupo. */
 export const MY_COURSES_PATH = '/mis-cursos'
 
-/** Detalle del grupo (HU-020): la vista a la que se llega desde Mis cursos y desde Grupos de la materia. */
+/** Detalle del grupo (HU-020): la vista a la que se llega desde Mis grupos y desde Grupos de la materia. */
 export function groupDetailPath(groupId: number): string {
   return `/grupos/${groupId}`
 }
