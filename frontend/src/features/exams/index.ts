@@ -11,3 +11,5 @@ export * from './hooks/useExamDetail';
 export * from './types/exams.types';
 export * from './services/examsService';
 export { examDetailPath } from './utils/paths';
+export { ExamInProgressPage } from './pages/ExamInProgressPage';
+export type { ExamInProgressExtensions } from './components/ExamInProgressExtensions';

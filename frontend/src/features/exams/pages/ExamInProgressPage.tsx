@@ -4,6 +4,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/button';
 import { normalizeSearch } from '@/lib/text';
 import { examInProgressService } from '../services/examInProgressService';
+import type { ExamInProgressExtensions } from '../components/ExamInProgressExtensions';
 import type {
   ExamInProgress,
   InProgressStudent,
@@ -42,7 +43,11 @@ function entryLabel(student: InProgressStudent): string {
   return 'Ausente';
 }
 
-export function ExamInProgressPage() {
+interface ExamInProgressPageProps {
+  extensions?: ExamInProgressExtensions;
+}
+
+export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
   const { examId } = useParams<{ examId: string }>();
   const id = Number(examId);
 
@@ -229,9 +234,13 @@ export function ExamInProgressPage() {
                 </p>
               </div>
 
-              <span className="rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-brand-deep">
-                {data.estado === 'FINALIZADO' ? 'Finalizado' : 'En curso'}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-brand-deep">
+                  {data.estado === 'FINALIZADO' ? 'Finalizado' : 'En curso'}
+                </span>
+                {/* HU-037 y HU-038-B: acciones del encabezado */}
+                {extensions?.headerActions?.(data)}
+              </div>
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -287,8 +296,6 @@ export function ExamInProgressPage() {
               </p>
             )}
 
-            {/* HU-037 y HU-038-B: acciones del encabezado */}
-            <div data-hu-extension="acciones-encabezado" />
           </section>
 
           <section className="grid gap-3 sm:grid-cols-3">
@@ -365,7 +372,9 @@ export function ExamInProgressPage() {
                     <th className="px-3 py-3">Ambiente</th>
                     <th className="px-3 py-3">Hora ingreso</th>
                     <th className="px-3 py-3">Estado</th>
-                    <th className="px-3 py-3">Acciones</th>
+                    {extensions?.studentActions && (
+                      <th className="px-3 py-3">Acciones</th>
+                    )}
                   </tr>
                 </thead>
 
@@ -380,13 +389,12 @@ export function ExamInProgressPage() {
                       <td className="px-3 py-3">{student.ambiente ?? '—'}</td>
                       <td className="px-3 py-3">{student.hora_ingreso ?? '—'}</td>
                       <td className="px-3 py-3">{entryLabel(student)}</td>
-                      <td className="px-3 py-3">
-                        {/* HU-042 y HU-057: acciones por estudiante */}
-                        <div
-                          data-hu-extension="acciones-estudiante"
-                          data-student-id={student.id_estudiante}
-                        />
-                      </td>
+                      {extensions?.studentActions && (
+                        <td className="px-3 py-3">
+                          {/* HU-042 y HU-057: acciones por estudiante */}
+                          {extensions.studentActions(student, data)}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -401,7 +409,11 @@ export function ExamInProgressPage() {
           </section>
 
           {/* HU-037, HU-042 y HU-057: paneles y notificaciones */}
-          <section data-hu-extension="paneles-en-curso" />
+          {extensions?.panels && (
+            <section aria-label="Funciones adicionales del examen">
+              {extensions.panels(data)}
+            </section>
+          )}
         </div>
       )}
     </AppShell>
