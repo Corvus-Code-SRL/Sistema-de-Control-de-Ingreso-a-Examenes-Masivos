@@ -4,16 +4,19 @@ namespace App\Services\EntryControl;
 
 use App\Exceptions\EntryControl\EntryOpeningException;
 use App\Models\Exam;
+use App\Services\Security\AuditLogService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
 class RoomAssignmentService
 {
     private EntryControlSnapshotService $snapshots;
+    private AuditLogService $auditLog;
 
-    public function __construct(EntryControlSnapshotService $snapshots)
+    public function __construct(EntryControlSnapshotService $snapshots, AuditLogService $auditLog)
     {
         $this->snapshots = $snapshots;
+        $this->auditLog = $auditLog;
     }
 
     /**
@@ -67,6 +70,13 @@ class RoomAssignmentService
 
             if ($exam->estado === Exam::PROGRAMADO) {
                 $exam->update(['estado' => Exam::EN_INGRESO]);
+                $this->auditLog->registrar(
+                    'MODIFICAR',
+                    'examen',
+                    ['id_examen' => $exam->id_examen, 'estado' => Exam::PROGRAMADO],
+                    ['id_examen' => $exam->id_examen, 'estado' => Exam::EN_INGRESO, 'evento' => 'APERTURA_CONTROL'],
+                    (string) $exam->id_usuario_docente
+                );
             }
 
             return $token;
