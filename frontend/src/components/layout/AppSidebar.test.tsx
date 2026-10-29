@@ -305,7 +305,8 @@ describe('AppSidebar — entradas y estado activo', () => {
       ['Registrar examen', '/examenes/nuevo'],
       ['Control de ingreso', '/control-ingreso'],
       ['Revisar reportes de incidencias', '/incidencias'],
-      ['Central de riesgo', '/central-riesgo']
+      ['Central de riesgo', '/central-riesgo'],
+      ['Historial de mis exámenes', '/historial']
     ])
   })
 
