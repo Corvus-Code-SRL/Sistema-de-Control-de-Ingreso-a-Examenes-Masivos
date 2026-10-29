@@ -307,6 +307,17 @@
    conteos y cualquier columna numérica alineada. */
 .sciem-tnum { font-variant-numeric: tabular-nums; }
 
+/* Oculta la barra de desplazamiento sin quitar el desplazamiento: sigue
+   funcionando con tacto, rueda y foco por teclado. Solo para el menú lateral. */
+@utility scrollbar-hidden {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Edge antiguo */
+
+  &::-webkit-scrollbar {
+    display: none; /* Chromium, Safari y Edge */
+  }
+}
+
 /* Wordmark del sidebar — único uso de Poppins */
 .sciem-wordmark {
   font-family: var(--font-brand);

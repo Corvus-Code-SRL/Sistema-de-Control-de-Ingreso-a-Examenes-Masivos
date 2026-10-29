@@ -1,85 +1,192 @@
 import { describe, expect, it } from 'vitest'
-import { navigationByArea } from './navigation'
+import { capabilitiesOf } from '@/features/auth'
+import { NAVIGATION } from './navigation'
+import { visibleSections } from './navigationSelectors'
 
-function labelsOf(area: keyof typeof navigationByArea): string[] {
-  return navigationByArea[area].flatMap((group) =>
-    group.items.flatMap((item) => [item.label, ...(item.children ?? []).map((child) => child.label)])
-  )
+type RoleName = 'Administrador' | 'Docente' | 'Auxiliar'
+
+/** El menú de un rol como lo vería su usuario: secciones y, dentro, [etiqueta, destino]. */
+function menuOf(role: RoleName) {
+  return visibleSections(capabilitiesOf(role)).map((section) => ({
+    label: section.label,
+    items: section.items.map((item) => [item.label, item.to] as const)
+  }))
 }
 
-describe('navigationByArea', () => {
-  it('incluye Ambientes solo en la navegación del administrador', () => {
-    expect(labelsOf('administrador')).toContain('Ambientes')
-    expect(labelsOf('docente')).not.toContain('Ambientes')
+describe('NAVIGATION', () => {
+  it('los ids de secciones y entradas no se repiten', () => {
+    const ids = NAVIGATION.flatMap((section) => [section.id, ...section.items.map((item) => item.id)])
+
+    expect(new Set(ids).size).toBe(ids.length)
   })
 
-  it('el auxiliar ve Mis exámenes y el control de ingreso', () => {
-    expect(labelsOf('auxiliar')).toEqual(['Mis exámenes', 'Control de ingreso'])
-  })
-
-  it('ningún ítem lleva una insignia numérica inventada', () => {
-    const items = Object.values(navigationByArea).flatMap((groups) => groups.flatMap((group) => group.items))
-
-    expect(items.some((item) => 'badge' in item)).toBe(false)
-  })
-
-  it('Incidencias lleva a /incidencias', () => {
-    const incidencias = navigationByArea.docente
-      .flatMap((group) => group.items)
-      .find((item) => item.label === 'Incidencias')
-
-    expect(incidencias).toBeDefined()
-    expect(incidencias?.to).toBe('/incidencias')
-  })
-
-  it('el administrador tiene un encabezado Materias sin enlace con Asignaciones y Catálogo debajo', () => {
-    const items = navigationByArea.administrador.flatMap((group) => group.items)
-    const header = items.find((item) => item.label === 'Materias')
-
-    expect(items.filter((item) => item.label === 'Materias')).toHaveLength(1)
-    expect(header?.to).toBeUndefined()
-    expect(header?.children?.map((child) => [child.label, child.to])).toEqual([
-      ['Asignaciones', '/materias/asignaciones'],
-      ['Catálogo', '/materias/catalogo'],
+  it('ninguna entrada muestra códigos de historia ni avisos de estado en su texto', () => {
+    const labels = NAVIGATION.flatMap((section) => [
+      section.label,
+      ...section.items.map((item) => item.label)
     ])
-    expect(items.find((item) => item.label === 'Asignar materia')).toBeUndefined()
-    expect(items.some((item) => item.to === '/materias/asignar' || item.to === '/materias')).toBe(false)
+
+    for (const label of labels) {
+      expect(label).not.toMatch(/\bHU-?\d+/i)
+      expect(label).not.toMatch(/actual|sin ruta/i)
+    }
+    expect(labels).not.toContain('Inicio')
   })
 
-  it('la navegación del docente conserva Materias como enlace directo a /materias', () => {
-    const items = navigationByArea.docente.flatMap((group) => group.items)
+  it('la única insignia es el contador de incidencias pendientes', () => {
+    const withBadge = NAVIGATION.flatMap((section) => section.items).filter((item) => item.badge)
 
-    expect(items.find((item) => item.label === 'Materias')).toMatchObject({ to: '/materias' })
-    expect(items.some((item) => item.children !== undefined)).toBe(false)
-  })
-
-  it('el docente tiene Registros hacia /central-riesgo y Verificar antecedentes sin destino', () => {
-    const items = navigationByArea.docente.flatMap((group) => group.items)
-
-    expect(items.find((item) => item.label === 'Registros')).toMatchObject({ to: '/central-riesgo' })
-    expect(items.find((item) => item.label === 'Verificar antecedentes')?.to).toBeUndefined()
-  })
-
-  it('el administrador tiene el grupo Supervisión con Central de riesgo y la Bitácora pendiente', () => {
-    const group = navigationByArea.administrador.find((candidate) => candidate.label === 'Supervisión')
-    const administration = navigationByArea.administrador.find((candidate) => candidate.label === 'Administración')
-
-    expect(group?.items.map((item) => [item.label, item.to])).toEqual([
-      ['Central de riesgo', '/central-riesgo'],
-      ['Bitácora', undefined],
+    expect(withBadge.map((item) => [item.label, item.badge])).toEqual([
+      ['Revisar reportes de incidencias', 'pendingIncidents']
     ])
-    expect(administration?.items.map((item) => item.label)).not.toContain('Bitácora')
-    expect(administration?.items.map((item) => item.label)).toEqual([
-      'Cuentas',
-      'Materias',
-      'Facultades',
-      'Ambientes',
-      'Carreras',
+  })
+})
+
+describe('menú por capacidades', () => {
+  it('administrador: 4 secciones con las entradas y destinos acordados', () => {
+    expect(menuOf('Administrador')).toEqual([
+      {
+        label: 'Cuentas y roles',
+        items: [
+          ['Registrar cuenta nueva', '/cuentas'],
+          ['Modificar rol', undefined]
+        ]
+      },
+      {
+        label: 'Catálogo académico y ambientes',
+        items: [
+          ['Catálogo académico', '/materias/catalogo'],
+          ['Registrar facultad', undefined],
+          ['Registrar carrera', undefined],
+          ['Registrar materia', undefined],
+          ['Asignar materia a carrera', '/materias/asignaciones'],
+          ['Deshabilitar materia de carrera', undefined],
+          ['Registrar ambiente', '/ambientes']
+        ]
+      },
+      {
+        label: 'Central de riesgo',
+        items: [
+          ['Consultar central', '/central-riesgo'],
+          ['Rectificar registro de la central', undefined]
+        ]
+      },
+      {
+        label: 'Historial, auditoría y reportes',
+        items: [
+          ['Bitácora de operaciones', undefined],
+          ['Generar reporte de bitácora', undefined]
+        ]
+      }
     ])
   })
 
-  it('el auxiliar no tiene acceso a la Central de riesgo', () => {
-    expect(labelsOf('auxiliar')).not.toContain('Registros')
-    expect(labelsOf('auxiliar')).not.toContain('Central de riesgo')
+  it('docente: 5 secciones con las entradas y destinos acordados', () => {
+    expect(menuOf('Docente')).toEqual([
+      {
+        label: 'Grupos académicos y nóminas',
+        items: [
+          ['Materias', '/materias'],
+          ['Mis grupos', '/mis-cursos'],
+          ['Cargar nómina de estudiantes', undefined],
+          ['Mis auxiliares', '/mis-auxiliares']
+        ]
+      },
+      {
+        label: 'Preparación de exámenes',
+        items: [
+          ['Programados', '/examenes/programados'],
+          ['Registrar examen', '/examenes/nuevo'],
+          ['Editar examen', undefined],
+          ['Habilitar auxiliar para el examen', undefined],
+          ['Cargar nómina de habilitados', undefined],
+          ['Invitar docentes colaboradores', undefined],
+          ['Invitaciones a otros exámenes', undefined]
+        ]
+      },
+      {
+        label: 'Control de ingreso y examen en curso',
+        items: [
+          ['Control de ingreso', '/control-ingreso'],
+          ['En curso', undefined],
+          ['Registrar estudiante con retraso', undefined],
+          ['Registrar estudiante excepcional', undefined]
+        ]
+      },
+      {
+        label: 'Central de riesgo',
+        items: [
+          ['Revisar reportes de incidencias', '/incidencias'],
+          ['Central de riesgo', '/central-riesgo']
+        ]
+      },
+      {
+        label: 'Historial de exámenes y reportes',
+        items: [
+          ['Historial de mis exámenes', undefined],
+          ['Generar reporte de examen', undefined]
+        ]
+      }
+    ])
+  })
+
+  it('auxiliar: 2 secciones con las entradas y destinos acordados', () => {
+    expect(menuOf('Auxiliar')).toEqual([
+      {
+        label: 'Exámenes y grupos',
+        items: [
+          ['Mis grupos', undefined],
+          ['Mis exámenes', '/mis-examenes']
+        ]
+      },
+      {
+        label: 'Control de ingreso y reportes',
+        items: [
+          ['Control de ingreso', '/control-ingreso'],
+          ['En curso', undefined],
+          ['Registrar estudiante con retraso', undefined]
+        ]
+      }
+    ])
+  })
+
+  it('un rol sin capacidades, o desconocido, no ve ningún menú', () => {
+    expect(visibleSections([])).toEqual([])
+    expect(visibleSections(capabilitiesOf('Invitado'))).toEqual([])
+    expect(visibleSections(capabilitiesOf(null))).toEqual([])
+  })
+
+  it('una sección sin ninguna entrada permitida no se devuelve', () => {
+    // Con la capacidad de entrada pero sin las de sus entradas, la sección queda vacía y se omite.
+    const sections = visibleSections(['administracion.gestionar'])
+
+    expect(sections.map((section) => section.label)).toEqual([
+      'Cuentas y roles',
+      'Catálogo académico y ambientes',
+      'Central de riesgo',
+      'Historial, auditoría y reportes'
+    ])
+    expect(sections[2].items.map((item) => item.label)).toEqual(['Rectificar registro de la central'])
+  })
+
+  it('el Docente no ve secciones del Auxiliar, ni el Auxiliar las del Docente', () => {
+    const teacher = menuOf('Docente').map((section) => section.label)
+    const assistant = menuOf('Auxiliar').map((section) => section.label)
+
+    expect(teacher).not.toContain('Exámenes y grupos')
+    expect(teacher).not.toContain('Control de ingreso y reportes')
+    expect(assistant).not.toContain('Control de ingreso y examen en curso')
+    expect(assistant).not.toContain('Central de riesgo')
+  })
+
+  it('el Administrador no ve secciones del Docente aunque comparta la Central de riesgo', () => {
+    const admin = visibleSections(capabilitiesOf('Administrador'))
+    const riskSections = admin.filter((section) => section.label === 'Central de riesgo')
+
+    expect(riskSections).toHaveLength(1)
+    expect(riskSections[0].items.map((item) => item.label)).toEqual([
+      'Consultar central',
+      'Rectificar registro de la central'
+    ])
   })
 })

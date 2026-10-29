@@ -80,7 +80,7 @@ describe('MyCoursesPage', () => {
     renderWithRouter(<MyCoursesPage />, { route: '/mis-cursos' })
     await waitForLoad()
 
-    expect(screen.getByText('Aún no tiene cursos')).toBeInTheDocument()
+    expect(screen.getByText('Aún no tiene grupos')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: /ir a materias/i }).length).toBeGreaterThan(0)
   })
@@ -126,6 +126,6 @@ describe('MyCoursesPage', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument()
     expect(screen.getByText('Error interno del servidor.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /reintentar/i })).toBeInTheDocument()
-    expect(screen.queryByText('Aún no tiene cursos')).not.toBeInTheDocument()
+    expect(screen.queryByText('Aún no tiene grupos')).not.toBeInTheDocument()
   })
 })
