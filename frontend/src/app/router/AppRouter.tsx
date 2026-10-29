@@ -15,7 +15,15 @@ import {
   type Capability,
 } from '@/features/auth'
 import { EntryControlPage, OpenEntryControlsPage } from '@/features/entry-control'
-import { CreateExamPage, EditExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
+import {
+  CreateExamPage,
+  EditExamPage,
+  ExamDetailPage,
+  ExamInProgressPage,
+  ExamsPage,
+  InProgressExamsPage,
+  type ExamInProgressExtensions,
+} from '@/features/exams'
 import {
   GroupAssistantsPage,
   GroupDetailPage,
@@ -34,8 +42,10 @@ import {
 } from '@/features/subjects'
 import { CuentaDetallePage, CuentasPage } from '@/features/users'
 import { IncidentsPage } from '@/features/incidents'
-import { ExamInProgressPage } from '@/features/exams/pages/ExamInProgressPage'
-import { InProgressExamsPage } from '@/features/exams/pages/InProgressExamsPage'
+
+// Punto de composición de HU-037, HU-038-B, HU-042 y HU-057.
+// Cada feature puede aportar componentes aquí sin editar ExamInProgressPage.
+const examInProgressExtensions: ExamInProgressExtensions = {}
 
 /** Envuelve una pantalla con la capacidad que exige. Sin sesión redirige al login (ver ProtectedRoute). */
 function guarded(capability: Capability, element: ReactElement) {
@@ -129,7 +139,7 @@ function DocenteRoutes() {
 
       <Route
         path="/examenes/:examId/en-curso"
-        element={guarded('ingreso.operar', <ExamInProgressPage />)}
+        element={guarded('ingreso.operar', <ExamInProgressPage extensions={examInProgressExtensions} />)}
       />
 
       <Route path="/incidencias" element={guarded('examenes.gestionar', <IncidentsPage />)} />
@@ -165,7 +175,7 @@ function AuxiliarRoutes() {
       />
       <Route
         path="/examenes/:examId/en-curso"
-        element={guarded('ingreso.operar', <ExamInProgressPage />)}
+        element={guarded('ingreso.operar', <ExamInProgressPage extensions={examInProgressExtensions} />)}
       />
       <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
     </Routes>

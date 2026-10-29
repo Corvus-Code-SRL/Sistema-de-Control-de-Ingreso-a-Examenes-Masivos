@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithRouter } from '@/test/render';
 import { examInProgressService } from '../services/examInProgressService';
@@ -107,5 +108,77 @@ describe('HU-038-A: puntos de extensión de En curso', () => {
     expect(await screen.findByText('María Pérez')).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'Acciones' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Funciones adicionales del examen' })).not.toBeInTheDocument();
+  });
+});
+
+describe('HU-038-A: consulta y filtros de En curso', () => {
+  it('muestra el inicio automático, el fin programado y los totales', async () => {
+    vi.mocked(examInProgressService.get).mockResolvedValue({
+      ...exam,
+      inicio_automatico: true,
+    });
+
+    renderWithRouter(<ExamInProgressPage />, {
+      route: '/examenes/8/en-curso',
+      path: '/examenes/:examId/en-curso',
+    });
+
+    expect(await screen.findByText('Tercer Parcial')).toBeInTheDocument();
+    expect(screen.getByText('Inicio automático')).toBeInTheDocument();
+    expect(screen.getByText(/Fin programado:/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Presentes (1)' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Ausentes (1)' })).toBeInTheDocument();
+    expect(screen.getByText('María Pérez')).toBeInTheDocument();
+    expect(screen.queryByText('Juan López')).not.toBeInTheDocument();
+  });
+
+  it('filtra retrasados y ausentes y busca nombre sin tildes, SIS y CI', async () => {
+    const user = userEvent.setup();
+    vi.mocked(examInProgressService.get).mockResolvedValue({
+      ...exam,
+      totales: {
+        ...exam.totales,
+        con_retraso: 1,
+        presentes: 2,
+        total: 3,
+      },
+      estudiantes: [
+        ...exam.estudiantes,
+        {
+          id_estudiante: 12,
+          cod_sis: '202300300',
+          ci: '9876543',
+          nombre_completo: 'Álvaro Núñez',
+          estado_ingreso: 'CON_RETRASO',
+          hora_ingreso: '10:12',
+          id_ambiente: 1,
+          ambiente: '692C',
+        },
+      ],
+    });
+
+    renderWithRouter(<ExamInProgressPage />, {
+      route: '/examenes/8/en-curso',
+      path: '/examenes/:examId/en-curso',
+    });
+
+    expect(await screen.findByText('Álvaro Núñez')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Con retraso (1)' }));
+    expect(screen.queryByText('María Pérez')).not.toBeInTheDocument();
+
+    const search = screen.getByRole('textbox', { name: 'Buscar estudiante' });
+    await user.type(search, 'alvaro');
+    expect(screen.getByText('Álvaro Núñez')).toBeInTheDocument();
+    await user.clear(search);
+    await user.type(search, '202300300');
+    expect(screen.getByText('Álvaro Núñez')).toBeInTheDocument();
+    await user.clear(search);
+    await user.type(search, '9876543');
+    expect(screen.getByText('Álvaro Núñez')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Ausentes (1)' }));
+    await user.clear(search);
+    expect(screen.getByText('Juan López')).toBeInTheDocument();
+    expect(screen.queryByText('Álvaro Núñez')).not.toBeInTheDocument();
   });
 });

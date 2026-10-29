@@ -104,6 +104,17 @@ describe('HU-038-A: listado En curso', () => {
         ambiente: null,
         ambiente_por_defecto: false,
       },
+      {
+        id_examen: 11,
+        nombre_examen: 'Examen sin ambiente',
+        fecha: '2026-10-29',
+        hora_inicio: '10:00',
+        hora_fin: '12:00',
+        estado: 'EN_CURSO',
+        materia: 'Química',
+        ambiente: null,
+        ambiente_por_defecto: false,
+      },
     ]);
 
     renderPage();
@@ -111,6 +122,7 @@ describe('HU-038-A: listado En curso', () => {
     expect(await screen.findByText('Tercer Parcial')).toBeInTheDocument();
     expect(screen.getByText('Su ambiente: 692C')).toBeInTheDocument();
     expect(screen.queryByText('Próxima evaluación')).not.toBeInTheDocument();
+    expect(screen.queryByText('Examen sin ambiente')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ver examen' })).toHaveAttribute(
       'href',
       '/examenes/8/en-curso'

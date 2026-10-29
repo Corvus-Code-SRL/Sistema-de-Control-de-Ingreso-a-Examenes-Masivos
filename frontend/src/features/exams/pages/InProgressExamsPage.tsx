@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/button';
 import { useCurrentUser } from '@/features/auth';
-import { assistantsService } from '@/features/assistants/services/assistantsService';
+import { assistantsService } from '@/features/assistants';
 import { useAsyncResource } from '@/hooks/useAsyncResource';
 
 import { examsService } from '../services/examsService';
@@ -38,7 +38,7 @@ export function InProgressExamsPage() {
         const exams = await assistantsService.listMyExams(signal);
 
         return exams
-          .filter((exam) => exam.estado === 'EN_CURSO')
+          .filter((exam) => exam.estado === 'EN_CURSO' && exam.ambiente !== null)
           .map((exam) => ({
             id: exam.id_examen,
             title: exam.nombre_examen,
