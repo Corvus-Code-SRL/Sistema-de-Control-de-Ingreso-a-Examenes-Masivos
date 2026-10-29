@@ -21,17 +21,17 @@ export function MyCoursesPage() {
 
   return (
     <AppShell
-      mobileTitle="Mis cursos"
+      mobileTitle="Mis grupos"
       mobileSubtitle={
         courses.length > 0
           ? `${courses.length} ${courses.length === 1 ? 'grupo' : 'grupos'}`
           : undefined
       }
-      breadcrumbs={[{ label: 'Gestión académica' }, { label: 'Mis cursos' }]}
+      breadcrumbs={[{ label: 'Gestión académica' }, { label: 'Mis grupos' }]}
     >
       <PageHeader
-        title="Mis cursos"
-        subtitle="Sus grupos del período vigente en todas las carreras. Abra un curso para ver su nómina, auxiliares y exámenes."
+        title="Mis grupos"
+        subtitle="Sus grupos del período vigente en todas las carreras. Abra un grupo para ver su nómina, auxiliares y exámenes."
         actions={
           <Button variant="outline" size="sm" asChild>
             <Link to="/materias">Ir a Materias</Link>
@@ -41,7 +41,7 @@ export function MyCoursesPage() {
 
       {isLoading && (
         <Card className="p-0">
-          <LoadingState rows={4} label="Cargando sus cursos" />
+          <LoadingState rows={4} label="Cargando sus grupos" />
         </Card>
       )}
 
@@ -55,8 +55,8 @@ export function MyCoursesPage() {
         <Card className="p-0">
           <EmptyState
             icon={GraduationCap}
-            title="Aún no tiene cursos"
-            description="Los cursos aparecen cuando usted dicta un grupo en alguna de sus materias. Revise el catálogo para ver las materias a su cargo."
+            title="Aún no tiene grupos"
+            description="Sus grupos aparecen cuando usted dicta alguno en sus materias. Revise el catálogo para ver las materias a su cargo."
             action={
               <Button variant="outline" size="sm" asChild>
                 <Link to="/materias">Ir a Materias</Link>

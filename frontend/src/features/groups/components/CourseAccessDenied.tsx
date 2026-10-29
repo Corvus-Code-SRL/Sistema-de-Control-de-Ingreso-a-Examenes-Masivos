@@ -18,7 +18,7 @@ export function CourseAccessDenied() {
       description="Solo el docente que dicta el grupo puede ver su nómina, sus auxiliares y sus exámenes. Si cree que debería tener acceso, consúltelo con la dirección de carrera."
       action={
         <Button variant="outline" size="sm" asChild>
-          <Link to="/mis-cursos">Ir a mis cursos</Link>
+          <Link to="/mis-cursos">Ir a mis grupos</Link>
         </Button>
       }
     />

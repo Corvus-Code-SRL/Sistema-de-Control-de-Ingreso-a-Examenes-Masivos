@@ -1,25 +1,29 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
-import { navigationByArea } from '@/components/layout/navigation'
-import type { Area } from '@/features/auth'
+import { NAVIGATION } from '@/components/layout/navigation'
+import { isConnected, visibleSections } from '@/components/layout/navigationSelectors'
+import { capabilitiesOf } from '@/features/auth'
 import { TOKEN_STORAGE_KEY, meBody, type AccountKey } from '@/test/authFixtures'
 import { mockApiWith } from '@/test/http'
 import { renderApp } from '@/test/renderApp'
+import { openAllSections } from '@/test/sidebar'
 
 /**
- * Alcance por clics: toda pantalla enlazada desde el menú lateral de un rol se abre con un clic
- * y conserva ese menú, de modo que desde ella se sigue navegando sin escribir una URL.
+ * Alcance por clics: toda pantalla enlazada desde el menú lateral de un rol se abre con un clic,
+ * el rol no recibe el aviso de falta de permiso (la capacidad que declara la entrada alcanza para
+ * la ruta) y la pantalla conserva ese menú, de modo que desde ella se sigue navegando sin escribir
+ * una URL.
  *
  * Las pantallas que cuelgan de otras (detalle de curso, de examen, de cuenta, control de ingreso)
  * se alcanzan con los enlaces que cada una prueba en su propio archivo; la tabla completa está
  * en el informe de la rama.
  */
 
-const SESSION_BY_AREA: Record<Area, AccountKey> = {
-  docente: 'docente',
-  auxiliar: 'auxiliar',
-  administrador: 'administrador',
+const ROLE_BY_ACCOUNT: Record<AccountKey, 'Docente' | 'Auxiliar' | 'Administrador'> = {
+  docente: 'Docente',
+  auxiliar: 'Auxiliar',
+  administrador: 'Administrador',
 }
 
 function stubBackend(session: AccountKey) {
@@ -54,46 +58,70 @@ describe('alcance por clics desde el menú lateral', () => {
     window.localStorage.clear()
   })
 
-  const areas = Object.keys(navigationByArea) as Area[]
+  const accountKeys = Object.keys(ROLE_BY_ACCOUNT) as AccountKey[]
 
-  for (const area of areas) {
-    // Un encabezado con hijos no navega: sus destinos son los hijos.
-    const linkable = navigationByArea[area]
-      .flatMap((group) => group.items)
-      .flatMap((item) => item.children ?? [item])
-      .filter((item) => item.to)
+  for (const accountKey of accountKeys) {
+    const sections = visibleSections(capabilitiesOf(ROLE_BY_ACCOUNT[accountKey]))
+    const items = sections.flatMap((section) => section.items)
+    const linkable = items.filter(isConnected)
 
-    it.each(linkable.map((item) => [item.label, item.to as string]))(
-      `${area}: «%s» abre %s y deja el menú disponible`,
+    it.each(linkable.map((item) => [item.label, item.to]))(
+      `${accountKey}: «%s» abre %s, resalta la entrada y deja el menú disponible`,
       async (label, to) => {
-        stubBackend(SESSION_BY_AREA[area])
+        stubBackend(accountKey)
         const user = userEvent.setup()
         const app = renderApp('/')
 
         const sidebar = await screen.findByRole('navigation', { name: MAIN_NAV })
+        await openAllSections(user, sidebar)
         await user.click(within(sidebar).getByRole('link', { name: label }))
 
         await waitFor(() => expect(app.pathname).toBe(to))
         // La pantalla de destino también trae el menú: no es un callejón sin salida.
-        expect(await screen.findByRole('navigation', { name: MAIN_NAV })).toBeInTheDocument()
+        const destination = await screen.findByRole('navigation', { name: MAIN_NAV })
+
+        expect(within(destination).getByRole('link', { name: label })).toHaveAttribute(
+          'aria-current',
+          'page'
+        )
+        // La capacidad de la entrada alcanza para la ruta: ProtectedRoute no la rechaza.
+        expect(screen.queryByText('Sin permiso')).not.toBeInTheDocument()
       }
     )
+
+    it(`${accountKey}: las entradas sin destino se muestran deshabilitadas y no son enlaces`, async () => {
+      stubBackend(accountKey)
+      const user = userEvent.setup()
+      renderApp('/')
+
+      const sidebar = await screen.findByRole('navigation', { name: MAIN_NAV })
+      await openAllSections(user, sidebar)
+
+      const pending = items.filter((item) => !isConnected(item))
+
+      expect(pending.length).toBeGreaterThan(0)
+
+      for (const item of pending) {
+        expect(within(sidebar).queryByRole('link', { name: item.label })).not.toBeInTheDocument()
+        expect(within(sidebar).getByRole('button', { name: item.label })).toHaveAttribute(
+          'aria-disabled',
+          'true'
+        )
+      }
+    })
   }
 
-  it('docente: los ítems sin destino se muestran deshabilitados y no son enlaces', async () => {
-    stubBackend('docente')
-    renderApp('/')
+  it('toda entrada conectada del catálogo la ve al menos un rol y se prueba arriba', () => {
+    const visible = new Set(
+      accountKeys.flatMap((accountKey) =>
+        visibleSections(capabilitiesOf(ROLE_BY_ACCOUNT[accountKey])).flatMap((section) =>
+          section.items.map((item) => item.id)
+        )
+      )
+    )
 
-    const sidebar = await screen.findByRole('navigation', { name: MAIN_NAV })
-    const pending = navigationByArea.docente
-      .flatMap((group) => group.items)
-      .filter((item) => !item.to)
-
-    expect(pending.length).toBeGreaterThan(0)
-
-    for (const item of pending) {
-      expect(within(sidebar).queryByRole('link', { name: item.label })).not.toBeInTheDocument()
-      expect(within(sidebar).getByText(item.label).closest('[aria-disabled="true"]')).not.toBeNull()
+    for (const item of NAVIGATION.flatMap((section) => section.items)) {
+      expect(visible.has(item.id)).toBe(true)
     }
   })
 })

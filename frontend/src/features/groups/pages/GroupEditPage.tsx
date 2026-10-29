@@ -163,7 +163,7 @@ function GroupEditShell({ courseLabel, backTo, children }: GroupEditShellProps) 
       mobileTitle={TITLE}
       mobileSubtitle={courseLabel}
       breadcrumbs={[
-        { label: 'Mis cursos', to: MY_COURSES_PATH },
+        { label: 'Mis grupos', to: MY_COURSES_PATH },
         ...(courseLabel && backTo ? [{ label: courseLabel, to: backTo }] : []),
         { label: TITLE },
       ]}
@@ -172,7 +172,7 @@ function GroupEditShell({ courseLabel, backTo, children }: GroupEditShellProps) 
         title={TITLE}
         subtitle={courseLabel}
         backTo={backTo ?? MY_COURSES_PATH}
-        backLabel={backTo ? 'Volver al grupo' : 'Volver a Mis cursos'}
+        backLabel={backTo ? 'Volver al grupo' : 'Volver a Mis grupos'}
       />
 
       {children}
