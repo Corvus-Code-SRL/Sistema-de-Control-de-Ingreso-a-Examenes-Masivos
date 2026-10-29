@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Exams\AssistantClassroomController;
 use App\Http\Controllers\Exams\ExamController;
+use App\Http\Controllers\Exams\ExamHistoryController;
 use App\Http\Controllers\Exams\ExamGroupController;
 use App\Http\Controllers\Exams\GroupExamController;
 use Illuminate\Support\Facades\Route;
@@ -17,6 +18,13 @@ Route::prefix('ambientes')->name('ambientes.')->group(function () {
          ->name('store');
 });
 // Rutas del módulo: exams
+
+Route::prefix('historial/examenes')->name('historial.examenes.')->group(function () {
+    Route::get('/', [ExamHistoryController::class, 'index'])->name('index');
+    Route::get('/{exam}', [ExamHistoryController::class, 'show'])
+        ->where('exam', '[0-9]{1,9}')
+        ->name('show');
+});
 
 // HU-024 - Restringir los identificadores de examen antes del model binding.
 Route::prefix('examenes')->name('examenes.')->group(function () {
