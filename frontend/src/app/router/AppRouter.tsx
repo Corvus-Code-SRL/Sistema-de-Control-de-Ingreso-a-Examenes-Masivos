@@ -15,7 +15,7 @@ import {
   type Capability,
 } from '@/features/auth'
 import { EntryControlPage, OpenEntryControlsPage } from '@/features/entry-control'
-import { CreateExamPage, EditExamPage, ExamDetailPage, ExamsPage, FinalReportPage } from '@/features/exams'
+import { CreateExamPage, EditExamPage, ExamDetailPage, ExamReportsPage, ExamsPage, FinalReportPage } from '@/features/exams'
 import {
   GroupAssistantsPage,
   GroupDetailPage,
@@ -99,6 +99,11 @@ function DocenteRoutes() {
       />
 
       <Route
+        path="/examenes/reportes"
+        element={guarded('examenes.gestionar', <ExamReportsPage />)}
+      />
+
+      <Route
         path="/examenes/:examId/auxiliares"
         element={guarded('examenes.gestionar', <ExamAssistantsPage />)}
       />
@@ -111,6 +116,11 @@ function DocenteRoutes() {
       <Route
         path="/examenes/:examId"
         element={guarded('examenes.gestionar', <ExamDetailPage />)}
+      />
+
+      <Route
+        path="/examenes/:examId/reporte-final"
+        element={guarded('examenes.gestionar', <FinalReportPage />)}
       />
       <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
       <Route
@@ -141,10 +151,6 @@ function AuxiliarRoutes() {
         path="/examenes/:examId/control-ingreso"
         element={guarded('ingreso.operar', <EntryControlPage />)}
         />
-      <Route
-        path="/examenes/:examId/reporte-final"
-        element={guarded('examenes.gestionar', <FinalReportPage />)}
-      />
       <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
     </Routes>
   )
