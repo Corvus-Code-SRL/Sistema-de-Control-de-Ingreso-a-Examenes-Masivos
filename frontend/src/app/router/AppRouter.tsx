@@ -15,7 +15,7 @@ import {
   type Capability,
 } from '@/features/auth'
 import { EntryControlPage, OpenEntryControlsPage } from '@/features/entry-control'
-import { CreateExamPage, EditExamPage, ExamDetailPage, ExamsPage } from '@/features/exams'
+import { CreateExamPage, EditExamPage, ExamDetailPage, ExamsPage, ExamHistoryPage, ExamHistorySummaryPage } from '@/features/exams'
 import {
   GroupAssistantsPage,
   GroupDetailPage,
@@ -118,6 +118,8 @@ function DocenteRoutes() {
         element={guarded('ingreso.operar', <EntryControlPage />)}
       />
       <Route path="/incidencias" element={guarded('examenes.gestionar', <IncidentsPage />)} />
+      <Route path="/historial" element={guarded('examenes.gestionar', <ExamHistoryPage />)} />
+      <Route path="/historial/:id" element={guarded('examenes.gestionar', <ExamHistorySummaryPage />)} />
       <Route
         path="/central-riesgo/:id?"
         element={guarded('riesgo.consultar', <RiskCenterPage />)}
