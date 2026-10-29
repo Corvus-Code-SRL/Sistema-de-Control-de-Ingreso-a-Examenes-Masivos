@@ -7,7 +7,8 @@ import { examInProgressService } from '../services/examInProgressService';
 import type {
   ExamInProgress,
   InProgressStudent,
-} from '../types/examInProgress.types';import {
+} from '../types/examInProgress.types';
+import {
   remainingExamSeconds,
   type ExamClockSync,
 } from '../utils/examClock';
@@ -17,11 +18,11 @@ type Filter = 'presentes' | 'retraso' | 'ausentes' | 'todos';
 const CAMPUS_TIME_ZONE = 'America/La_Paz';
 
 function clock(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
 
-  return [h, m, s]
+  return [hours, minutes, remainingSeconds]
     .map((value) => String(value).padStart(2, '0'))
     .join(':');
 }
@@ -50,14 +51,13 @@ export function ExamInProgressPage() {
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const [monoNow, setMonoNow] = useState(() => performance.now());
-  const [clockSync, setClockSync] =
-    useState<ExamClockSync | null>(null);
+  const [clockSync, setClockSync] = useState<ExamClockSync | null>(null);
   const [filter, setFilter] = useState<Filter>('presentes');
   const [search, setSearch] = useState('');
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-        setMonoNow(performance.now());
+      setMonoNow(performance.now());
     }, 1000);
 
     return () => window.clearInterval(timer);
@@ -78,30 +78,20 @@ export function ExamInProgressPage() {
       inFlight = true;
 
       try {
-        const result = await examInProgressService.get(
-            id,
-            controller.signal
-        );
-
+        const result = await examInProgressService.get(id, controller.signal);
         const serverNowMs = Date.parse(result.hora_servidor_en);
 
         if (!Number.isFinite(serverNowMs)) {
-            throw new Error(
-                'El servidor no devolvió una hora válida.'
-            );
+          throw new Error('El servidor no devolvió una hora válida.');
         }
 
         if (!controller.signal.aborted) {
-            const sampledMonoMs = performance.now();
+          const sampledMonoMs = performance.now();
 
-            setClockSync({
-                serverNowMs,
-                sampledMonoMs,
-            });
-
-            setMonoNow(sampledMonoMs);
-            setData(result);
-            setError(null);
+          setClockSync({ serverNowMs, sampledMonoMs });
+          setMonoNow(sampledMonoMs);
+          setData(result);
+          setError(null);
         }
       } catch (cause) {
         if (!controller.signal.aborted) {
@@ -131,24 +121,40 @@ export function ExamInProgressPage() {
 
   const remaining =
     data?.estado === 'EN_CURSO' && clockSync
-        ? remainingExamSeconds(
-            data.fin_programado_en,
-            clockSync,
-            monoNow
-        )
-        : 0;
+      ? remainingExamSeconds(data.fin_programado_en, clockSync, monoNow)
+      : 0;
+
+  const filterOptions: { value: Filter; label: string; count: number }[] = [
+    {
+      value: 'presentes',
+      label: 'Presentes',
+      count: data?.totales.presentes ?? 0,
+    },
+    {
+      value: 'retraso',
+      label: 'Con retraso',
+      count: data?.totales.con_retraso ?? 0,
+    },
+    {
+      value: 'ausentes',
+      label: 'Ausentes',
+      count: data?.totales.ausentes ?? 0,
+    },
+    {
+      value: 'todos',
+      label: 'Todos',
+      count: data?.totales.total ?? 0,
+    },
+  ];
 
   const query = normalizeSearch(search);
 
   const students = (data?.estudiantes ?? []).filter((student) => {
     const matchesStatus =
       filter === 'todos' ||
-      (filter === 'presentes' &&
-        student.estado_ingreso !== 'NO_INGRESO') ||
-      (filter === 'retraso' &&
-        student.estado_ingreso === 'CON_RETRASO') ||
-      (filter === 'ausentes' &&
-        student.estado_ingreso === 'NO_INGRESO');
+      (filter === 'presentes' && student.estado_ingreso !== 'NO_INGRESO') ||
+      (filter === 'retraso' && student.estado_ingreso === 'CON_RETRASO') ||
+      (filter === 'ausentes' && student.estado_ingreso === 'NO_INGRESO');
 
     const matchesSearch = normalizeSearch([
       student.nombre_completo,
@@ -158,6 +164,16 @@ export function ExamInProgressPage() {
 
     return matchesStatus && matchesSearch;
   });
+
+  const emptyMessage = search.trim()
+    ? 'No hay estudiantes que coincidan con la búsqueda.'
+    : filter === 'presentes'
+      ? 'Todavía no hay estudiantes presentes.'
+      : filter === 'retraso'
+        ? 'No hay estudiantes con retraso.'
+        : filter === 'ausentes'
+          ? 'No hay estudiantes ausentes.'
+          : 'No hay estudiantes registrados en la nómina.';
 
   return (
     <AppShell
@@ -175,12 +191,14 @@ export function ExamInProgressPage() {
           <h1 className="sciem-h1 mt-1">Examen en curso</h1>
         </div>
 
-        <Button
-          variant="outline"
-          onClick={() => setRetry((value) => value + 1)}
-        >
-          Actualizar
-        </Button>
+        {error && (
+          <Button
+            variant="outline"
+            onClick={() => setRetry((value) => value + 1)}
+          >
+            Reintentar
+          </Button>
+        )}
       </div>
 
       {loading && !data && (
@@ -205,18 +223,14 @@ export function ExamInProgressPage() {
           <section className="rounded-xl border bg-card p-5 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-xl font-semibold">
-                  {data.nombre_examen}
-                </h2>
+                <h2 className="text-xl font-semibold">{data.nombre_examen}</h2>
                 <p className="text-sm text-muted-foreground">
                   {data.materia ?? 'Examen'}
                 </p>
               </div>
 
               <span className="rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-brand-deep">
-                {data.estado === 'FINALIZADO'
-                  ? 'Finalizado'
-                  : 'En curso'}
+                {data.estado === 'FINALIZADO' ? 'Finalizado' : 'En curso'}
               </span>
             </div>
 
@@ -229,7 +243,9 @@ export function ExamInProgressPage() {
                   className="sciem-tnum mt-1 text-3xl font-semibold"
                   aria-label="Tiempo restante del examen"
                 >
-                  {data.estado === 'EN_CURSO' && !clockSync ? 'Sincronizando…' : clock(remaining)}
+                  {data.estado === 'EN_CURSO' && !clockSync
+                    ? 'Sincronizando…'
+                    : clock(remaining)}
                 </p>
                 <p className="mt-2 text-xs text-muted-foreground">
                   Fin programado: {localTime(data.fin_programado_en)}
@@ -276,58 +292,68 @@ export function ExamInProgressPage() {
           </section>
 
           <section className="grid gap-3 sm:grid-cols-3">
-            {[
+            {([
               ['A tiempo', data.totales.a_tiempo],
               ['Con retraso', data.totales.con_retraso],
               ['Ausentes', data.totales.ausentes],
-            ].map(([label, value]) => (
+            ] as const).map(([label, value]) => (
               <div
                 key={label}
                 className="rounded-xl border bg-card p-4 shadow-sm"
               >
                 <p className="text-sm text-muted-foreground">{label}</p>
-                <p className="sciem-tnum text-3xl font-semibold">
-                  {value}
-                </p>
+                <p className="sciem-tnum text-3xl font-semibold">{value}</p>
               </div>
             ))}
           </section>
 
           <section className="rounded-xl border bg-card p-4 shadow-sm">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="font-semibold">Estudiantes</h3>
                 <p className="text-xs text-muted-foreground">
-                  {students.length} resultados ·
+                  {students.length} resultados ·{' '}
                   {data.rol_controlador === 'AUXILIAR'
-                    ? ' Solo su ambiente'
-                    : ' Todos los ambientes'}
+                    ? 'Solo su ambiente'
+                    : 'Todos los ambientes'}
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <input
-                  aria-label="Buscar estudiante"
-                  className="h-9 rounded-lg border bg-background px-3 text-sm"
-                  placeholder="Nombre, SIS o CI"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
+              <input
+                aria-label="Buscar estudiante"
+                className="h-9 w-full rounded-lg border bg-background px-3 text-sm sm:w-56"
+                placeholder="Nombre, SIS o CI"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </div>
 
-                <select
-                  aria-label="Filtrar estudiantes"
-                  className="h-9 rounded-lg border bg-background px-3 text-sm"
-                  value={filter}
-                  onChange={(event) =>
-                    setFilter(event.target.value as Filter)
-                  }
-                >
-                  <option value="presentes">Presentes</option>
-                  <option value="retraso">Con retraso</option>
-                  <option value="ausentes">Ausentes</option>
-                  <option value="todos">Todos</option>
-                </select>
-              </div>
+            <div
+              role="group"
+              aria-label="Filtrar estudiantes por estado de ingreso"
+              className="mb-4 flex max-w-full gap-2 overflow-x-auto pb-2"
+            >
+              {filterOptions.map((option) => {
+                const selected = filter === option.value;
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setFilter(option.value)}
+                    className={[
+                      'shrink-0 rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
+                      selected
+                        ? 'border-brand-deep bg-brand-deep text-white'
+                        : 'bg-background text-foreground hover:bg-sunken',
+                    ].join(' ')}
+                  >
+                    {option.label}
+                    <span className="ml-2 opacity-75">({option.count})</span>
+                  </button>
+                );
+              })}
             </div>
 
             <div className="overflow-x-auto">
@@ -350,18 +376,10 @@ export function ExamInProgressPage() {
                       className="border-b last:border-0"
                     >
                       <td className="px-3 py-3">{student.cod_sis}</td>
-                      <td className="px-3 py-3">
-                        {student.nombre_completo}
-                      </td>
-                      <td className="px-3 py-3">
-                        {student.ambiente ?? '—'}
-                      </td>
-                      <td className="px-3 py-3">
-                        {student.hora_ingreso ?? '—'}
-                      </td>
-                      <td className="px-3 py-3">
-                        {entryLabel(student)}
-                      </td>
+                      <td className="px-3 py-3">{student.nombre_completo}</td>
+                      <td className="px-3 py-3">{student.ambiente ?? '—'}</td>
+                      <td className="px-3 py-3">{student.hora_ingreso ?? '—'}</td>
+                      <td className="px-3 py-3">{entryLabel(student)}</td>
                       <td className="px-3 py-3">
                         {/* HU-042 y HU-057: acciones por estudiante */}
                         <div
@@ -377,7 +395,7 @@ export function ExamInProgressPage() {
 
             {students.length === 0 && (
               <p className="py-6 text-center text-sm text-muted-foreground">
-                No hay estudiantes que coincidan con los filtros.
+                {emptyMessage}
               </p>
             )}
           </section>

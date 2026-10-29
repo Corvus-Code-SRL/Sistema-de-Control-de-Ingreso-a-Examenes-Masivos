@@ -306,7 +306,7 @@ function EntryControlContent({ examId }: { examId: number }) {
             disabled={starting}
             onClick={() => setStartDialogOpen(false)}
           >
-            Todavía no
+            Cancelar
           </Button>
 
           <Button

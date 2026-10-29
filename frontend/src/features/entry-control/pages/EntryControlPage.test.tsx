@@ -668,7 +668,7 @@ describe('EntryControlPage', () => {
     expect(within(dialog).getByText('Pendientes')).toBeInTheDocument()
 
     await user.click(
-      within(dialog).getByRole('button', { name: 'Todavía no' })
+      within(dialog).getByRole('button', { name: 'Cancelar' })
     )
 
     expect(
