@@ -304,6 +304,7 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'teacher-exam-in-progress',
         label: 'En curso',
         icon: PlaySquare,
+        to: '/examenes/en-curso',
         capability: 'ingreso.operar'
       },
       {
@@ -404,6 +405,7 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'assistant-exam-in-progress',
         label: 'En curso',
         icon: PlaySquare,
+        to: '/examenes/en-curso',
         capability: 'ingreso.operar'
       },
       {

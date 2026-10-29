@@ -35,6 +35,7 @@ import {
 import { CuentaDetallePage, CuentasPage } from '@/features/users'
 import { IncidentsPage } from '@/features/incidents'
 import { ExamInProgressPage } from '@/features/exams/pages/ExamInProgressPage'
+import { InProgressExamsPage } from '@/features/exams/pages/InProgressExamsPage'
 
 /** Envuelve una pantalla con la capacidad que exige. Sin sesión redirige al login (ver ProtectedRoute). */
 function guarded(capability: Capability, element: ReactElement) {
@@ -122,6 +123,11 @@ function DocenteRoutes() {
       />
 
       <Route
+        path="/examenes/en-curso"
+        element={guarded('ingreso.operar', <InProgressExamsPage />)}
+      />
+
+      <Route
         path="/examenes/:examId/en-curso"
         element={guarded('ingreso.operar', <ExamInProgressPage />)}
       />
@@ -152,6 +158,10 @@ function AuxiliarRoutes() {
       <Route
         path="/examenes/:examId/control-ingreso"
         element={guarded('ingreso.operar', <EntryControlPage />)}
+      />
+      <Route
+        path="/examenes/en-curso"
+        element={guarded('ingreso.operar', <InProgressExamsPage />)}
       />
       <Route
         path="/examenes/:examId/en-curso"
