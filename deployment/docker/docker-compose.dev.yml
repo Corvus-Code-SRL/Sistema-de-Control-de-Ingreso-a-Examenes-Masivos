@@ -9,7 +9,7 @@ services:
       context: ./php
     image: sciem-php:dev
     working_dir: /var/www/sciem/backend
-    command: php artisan serve --host=0.0.0.0 --port=8000
+    command: php artisan serve --host=0.0.0.0 --port=8000 --no-reload
     volumes:
       # Repo completo: DatabaseSchemaTest lee docs/database/creation-script.sql y database/schema/baseline.sql.
       - ../..:/var/www/sciem
