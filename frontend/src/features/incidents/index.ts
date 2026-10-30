@@ -8,3 +8,5 @@ export { ExamSituationDialog } from './components/ExamSituationDialog'
 export { ExamSituationsPanel } from './components/ExamSituationsPanel'
 export type { ExamSituationContext, SituationCreated } from './types/exam-situation.types'
 export { ExamSituationsPage } from './pages/ExamSituationsPage'
+
+export { InProgressSituationAction, InProgressSituationsPanel } from './components/InProgressSituations'

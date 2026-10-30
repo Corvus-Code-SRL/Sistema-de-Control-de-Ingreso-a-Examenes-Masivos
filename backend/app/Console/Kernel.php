@@ -21,6 +21,8 @@ class Kernel extends ConsoleKernel
         // La apertura corre cada minuto sin depender de un trabajador de cola.
         $schedule->call(function (): void {
             app()->call([app(OpenEntryControlJob::class), 'handle']);
+            // Misma programación de apertura: iniciar al cumplirse los diez minutos.
+            app(ExamLifecycleService::class)->startExpired();
         })->name('open-entry-control')->everyMinute()->withoutOverlapping(2);
 
         $schedule->call(function (): void {

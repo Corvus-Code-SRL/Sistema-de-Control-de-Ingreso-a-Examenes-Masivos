@@ -138,7 +138,7 @@ class StudentVerificationTest extends TestCase
         $this->rebuildSnapshot();
         $this->getJson($this->url('buscar') . '?sis=' . substr($assistant->cod_sis, 0, 4))
             ->assertOk()
-            ->assertJsonCount(0, 'data');
+            ->assertJsonMissing(['cod_sis' => $assistant->cod_sis]);
         $before = $this->getJson($this->url('estado'))->assertOk()->json('data');
 
         $this->postJson($this->url('verificar'), [

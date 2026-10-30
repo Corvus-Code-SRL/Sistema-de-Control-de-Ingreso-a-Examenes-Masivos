@@ -217,6 +217,13 @@ export function ExamDetailPage() {
               <DoorOpen className="size-4" aria-hidden="true" />
               Controlar ingreso
             </Button>
+          ) : exam?.estado === 'EN_CURSO' ? (
+            <Button
+              type="button"
+              onClick={() => navigate(`/examenes/${id}/en-curso`)}
+            >
+              Ver examen en curso
+            </Button>
           ) : null
         }
       />

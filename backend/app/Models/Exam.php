@@ -47,7 +47,11 @@ class Exam extends Model
         'id_tipo_examen' => 'integer',
         'id_carrera' => 'integer',
         'id_materia' => 'integer',
-        'id_usuario_docente' => 'string'
+        'id_usuario_docente' => 'string',
+        'inicio_real_en' => 'datetime',
+        'fin_real_en' => 'datetime',
+        'inicio_automatico' => 'boolean',
+        'fin_automatico' => 'boolean',
     ];
 
     protected $fillable = [

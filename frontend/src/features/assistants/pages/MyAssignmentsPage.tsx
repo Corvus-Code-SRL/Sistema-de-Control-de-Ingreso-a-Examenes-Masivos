@@ -93,6 +93,14 @@ function AssistantExamCard({ exam }: { exam: AssistantExam }) {
           </Link>
         </Button>
       )}
+
+      {exam.estado === 'EN_CURSO' && (
+        <Button asChild size="sm">
+          <Link to={`/examenes/${exam.id_examen}/en-curso`}>
+            Ver examen en curso
+          </Link>
+        </Button>
+      )}
     </article>
   )
 }

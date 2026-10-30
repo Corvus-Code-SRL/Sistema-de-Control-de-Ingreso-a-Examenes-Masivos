@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,18 @@ import { RecentEntries } from '../components/RecentEntries'
 import { VerificationResult } from '../components/VerificationResult'
 import { useEntryStatus } from '../hooks/useEntryStatus'
 import { useStudentVerification } from '../hooks/useStudentVerification'
+import { ApiError } from '@/lib/api-client'
+import { examsService } from '@/features/exams/services/examsService'
+import { examInProgressService } from '@/features/exams/services/examInProgressService'
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 const CAMPUS_TIME_ZONE = 'America/La_Paz'
 
@@ -37,6 +49,15 @@ function EntryControlContent({ examId }: { examId: number }) {
   const [rejectionCount, setRejectionCount] = useState<number | null>(null)
   const [reportContext, setReportContext] = useState<ReportIncidentContext | null>(null)
   const [rejectionsVersion, setRejectionsVersion] = useState(0)
+  const navigate = useNavigate()
+
+  const [startDialogOpen, setStartDialogOpen] = useState(false)
+  const [starting, setStarting] = useState(false)
+  const [startError, setStartError] = useState<string | null>(null)
+
+  const [afterEntryPhase, setAfterEntryPhase] = useState<
+    'EN_CURSO' | 'FINALIZADO' | null
+  >(null)
   const verification = useStudentVerification(examId, roomId, () => {
     void refresh(true)
     setRejectionsVersion((value) => value + 1)
@@ -47,7 +68,41 @@ function EntryControlContent({ examId }: { examId: number }) {
     setRoomId(context.id_ambiente_asignado ?? context.ambientes[0]?.id_ambiente ?? null)
   }, [context])
 
-  const open = context?.estado === 'EN_INGRESO' && !ended
+  const open =
+    context?.estado === 'EN_INGRESO' &&
+    !ended &&
+    !error &&
+    afterEntryPhase === null
+
+  const canStart =
+    open &&
+    context?.rol_controlador === 'DOCENTE' &&
+    status !== null &&
+    statusError === null
+
+  useEffect(() => {
+    const alreadyStarted =
+      context?.estado === 'EN_CURSO' ||
+      context?.estado === 'FINALIZADO'
+
+    if (!ended && !error && !alreadyStarted) return
+
+    const controller = new AbortController()
+
+    void examInProgressService
+      .get(examId, controller.signal)
+      .then((exam) => {
+        if (!controller.signal.aborted) {
+          setAfterEntryPhase(exam.estado)
+        }
+      })
+      .catch(() => {
+        // El control pudo cerrarse por otra causa.
+        // No afirmamos que inició sin confirmarlo.
+      })
+
+    return () => controller.abort()
+  }, [examId, ended, error, context?.estado])
   const hasRoom = roomId !== null && context?.ambientes.some((room) => room.id_ambiente === roomId)
 
   useEffect(() => { setReportContext(null); setRejectionCount(null) }, [roomId])
@@ -75,18 +130,94 @@ function EntryControlContent({ examId }: { examId: number }) {
     setRejectionsVersion((value) => value + 1)
   }
 
+  async function startExam() {
+    if (!canStart || starting) return
+
+    setStarting(true)
+    setStartError(null)
+
+    try {
+      await examsService.startExam(examId)
+
+      setStartDialogOpen(false)
+
+      navigate(`/examenes/${examId}/en-curso`, {
+        replace: true,
+      })
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 409) {
+        setStartDialogOpen(false)
+        void reload()
+      } else {
+        setStartError(
+          cause instanceof Error
+            ? cause.message
+            : 'No se pudo iniciar el examen.'
+        )
+      }
+    } finally {
+      setStarting(false)
+    }
+  }
+
   return <AppShell mobileTitle="Control de ingreso" mobileSubtitle={context?.nombre_examen} breadcrumbs={[{ label: 'Control de ingreso', to: '/control-ingreso' }, { label: context?.nombre_examen ?? 'Examen' }]}>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><Link to="/control-ingreso" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-brand-deep"><ArrowLeft className="size-4" />Control de ingreso</Link><h1 className="sciem-h1 mt-1">Control de ingreso</h1></div>
       <Button type="button" variant="outline" size="sm" onClick={() => { setRejectionsVersion((value) => value + 1); void reload() }} disabled={!context}><RefreshCw className="size-4" />Actualizar</Button>
     </div>
 
+    {canStart && (
+      <Button
+        type="button"
+        onClick={() => {
+          setStartError(null)
+          setStartDialogOpen(true)
+        }}
+      >
+        Iniciar examen
+      </Button>
+    )}
+
+    {afterEntryPhase && (
+      <div
+        role="status"
+        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ok/30 bg-ok-soft p-4"
+      >
+        <div>
+          <p className="font-semibold text-ok-fg">
+            {afterEntryPhase === 'EN_CURSO'
+              ? 'El examen ya inició'
+              : 'El examen ha finalizado'}
+          </p>
+
+          <p className="text-sm text-muted-foreground">
+            El control de ingreso normal ya no está disponible.
+          </p>
+        </div>
+
+        <Button
+          type="button"
+          onClick={() =>
+            navigate(`/examenes/${examId}/en-curso`)
+          }
+        >
+          Ir a En curso
+        </Button>
+      </div>
+    )}
+
     {loading && <div role="status" className="rounded-xl border bg-card p-8 text-sm text-muted-foreground">Cargando examen y estado del ingreso…</div>}
-    {!loading && error && <div role="alert" className="rounded-xl border border-danger/30 bg-danger-soft p-5"><p className="font-medium text-danger-fg">Datos sin actualizar desde {timeLabel(lastUpdatedAt ?? Date.now())}</p><p className="mt-1 text-sm">No se pudo abrir el control de ingreso. {error}</p><Button variant="outline" className="mt-4" onClick={() => { setRejectionsVersion((value) => value + 1); void reload() }}>Reintentar</Button></div>}
+    {!loading && error && !afterEntryPhase && <div role="alert" className="rounded-xl border border-danger/30 bg-danger-soft p-5"><p className="font-medium text-danger-fg">Datos sin actualizar desde {timeLabel(lastUpdatedAt ?? Date.now())}</p><p className="mt-1 text-sm">No se pudo abrir el control de ingreso. {error}</p><Button variant="outline" className="mt-4" onClick={() => { setRejectionsVersion((value) => value + 1); void reload() }}>Reintentar</Button></div>}
 
     {!loading && context && <>
-      <div className={verification.result && !ended ? 'hidden lg:block' : ''}><EntryExamCard context={context} status={status} stale={statusError !== null} roomId={roomId} roomDisabled={verification.busy !== null || ended || reportContext !== null} ended={ended} onRoomChange={(id) => { setRoomId(id); verification.reset() }} /></div>
-      {!open && <div role="status" className="rounded-lg border border-warn-border bg-warn-soft p-4 text-sm text-warn-fg">{ended ? 'El control de ingreso ha terminado.' : openingFailure?.mensaje ?? `El control de ingreso no está abierto. Estado del examen: ${context.estado.replace(/_/g, ' ')}.`}</div>}
+      {!afterEntryPhase && (
+        <div className={verification.result && !ended ? 'hidden lg:block' : ''}>
+          <EntryExamCard
+            context={context} status={status} stale={statusError !== null} roomId={roomId} roomDisabled={verification.busy !== null || ended || reportContext !== null} ended={ended} onRoomChange={(id) => { setRoomId(id); verification.reset() }}
+          />
+        </div>
+      )}
+      {!open && !afterEntryPhase && <div role="status" className="rounded-lg border border-warn-border bg-warn-soft p-4 text-sm text-warn-fg">{ended ? 'El control de ingreso ha terminado.' : openingFailure?.mensaje ?? `El control de ingreso no está abierto. Estado del examen: ${context.estado.replace(/_/g, ' ')}.`}</div>}
       {!hasRoom && !openingFailure && <div role="alert" className="rounded-lg border border-danger/30 bg-danger-soft p-4 text-sm text-danger-fg">No hay un ambiente de control asignado. Solicite al docente que asigne uno.</div>}
       {statusError && <div role="alert" className="rounded-lg border border-warn-border bg-warn-soft p-3 text-sm text-warn-fg">Datos sin actualizar desde {timeLabel(lastUpdatedAt ?? Date.now())}. {statusError}</div>}
       {verification.notice && <div role="status" className="flex items-center justify-between gap-2 rounded-lg border border-ok/30 bg-ok-soft p-3 text-sm font-medium text-ok-fg"><span>{verification.notice}</span><button type="button" onClick={() => verification.setNotice(null)} aria-label="Cerrar aviso" className="px-2">×</button></div>}
@@ -123,5 +254,70 @@ function EntryControlContent({ examId }: { examId: number }) {
         onClose={() => setReportContext(null)} onReported={reported}
       />}
     </>}
+    <Dialog
+      open={startDialogOpen}
+      onOpenChange={(value) => {
+        if (starting) return
+        setStartDialogOpen(value)
+        setStartError(null)
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>¿Iniciar el examen?</DialogTitle>
+
+          <DialogDescription>
+            Al iniciar el examen se cerrará el control de ingreso
+            normal. Los ingresos posteriores se gestionarán
+            según las reglas de ingreso con retraso.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-lg bg-sunken p-4 text-center">
+            <p className="sciem-tnum text-2xl font-semibold">
+              {status?.ingresados ?? '—'}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Ingresados
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-sunken p-4 text-center">
+            <p className="sciem-tnum text-2xl font-semibold">
+              {status?.pendientes ?? '—'}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Pendientes
+            </p>
+          </div>
+        </div>
+
+        {startError && (
+          <p role="alert" className="text-sm text-danger">
+            {startError}
+          </p>
+        )}
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={starting}
+            onClick={() => setStartDialogOpen(false)}
+          >
+            Todavía no
+          </Button>
+
+          <Button
+            type="button"
+            disabled={starting || !canStart}
+            onClick={() => void startExam()}
+          >
+            {starting ? 'Iniciando…' : 'Iniciar examen'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </AppShell>
 }

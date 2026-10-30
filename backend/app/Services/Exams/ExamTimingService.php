@@ -22,6 +22,12 @@ class ExamTimingService
         return $this->startsAt($exam)->addMinutes((int) $exam->duracion);
     }
 
+    /** Hito de inicio automático: diez minutos después del inicio programado. */
+    public function startsAutomaticallyAt(Exam $exam): Carbon
+    {
+        return $this->startsAt($exam)->addMinutes(10);
+    }
+
     public function finishesAutomaticallyAt(Exam $exam): Carbon
     {
         return $this->endsAt($exam)->addHours(2);

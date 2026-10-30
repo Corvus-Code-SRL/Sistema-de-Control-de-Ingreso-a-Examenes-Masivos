@@ -311,7 +311,9 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'teacher-exam-in-progress',
         label: 'En curso',
         icon: PlaySquare,
-        capability: 'ingreso.operar'
+        to: '/examenes/en-curso',
+        capability: 'ingreso.operar',
+        matches: ['/examenes/:examId/en-curso']
       },
       {
         id: 'teacher-late-student',
@@ -418,7 +420,9 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'assistant-exam-in-progress',
         label: 'En curso',
         icon: PlaySquare,
-        capability: 'ingreso.operar'
+        to: '/examenes/en-curso',
+        capability: 'ingreso.operar',
+        matches: ['/examenes/:examId/en-curso']
       },
       {
         id: 'assistant-late-student',

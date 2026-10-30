@@ -57,20 +57,20 @@ class DeleteLegacyAccionRowsTest extends TestCase
             ->all();
     }
 
-    public function test_elimina_las_cuatro_filas_heredadas_y_no_toca_las_dieciseis_vigentes(): void
+    public function test_elimina_las_cuatro_filas_heredadas_y_no_toca_las_diecisiete_vigentes(): void
     {
         $this->seed(ActionSeeder::class);
         $this->insertLegacyRows();
         $before = $this->currentCatalog();
 
-        $this->assertCount(16, $before);
+        $this->assertCount(17, $before);
         $this->assertSame(4, $this->legacyCount());
 
         $this->migrate();
 
         $this->assertSame(0, $this->legacyCount());
         $this->assertSame($before, $this->currentCatalog());
-        $this->assertSame(16, DB::table('accion')->count());
+        $this->assertSame(17, DB::table('accion')->count());
     }
 
     public function test_aborta_sin_borrar_nada_si_la_bitacora_referencia_una_fila_heredada(): void
@@ -112,8 +112,11 @@ class DeleteLegacyAccionRowsTest extends TestCase
 
         $this->migrate();
 
-        $this->assertSame($afterFirst, DB::table('accion')->orderBy('id_accion')->get()->map(fn ($row) => (array) $row)->all());
-        $this->assertSame(16, DB::table('accion')->count());
+        $this->assertSame(
+            $afterFirst,
+            DB::table('accion')->orderBy('id_accion')->get()->map(fn ($row) => (array) $row)->all()
+        );
+        $this->assertSame(17, DB::table('accion')->count());
     }
 
     public function test_no_hace_nada_en_una_base_sin_filas_heredadas(): void
@@ -121,13 +124,13 @@ class DeleteLegacyAccionRowsTest extends TestCase
         $before = $this->currentCatalog();
 
         $this->assertSame(0, $this->legacyCount());
-        $this->assertCount(16, $before);
+        $this->assertCount(17, $before);
 
         $this->migrate();
 
         $this->assertSame(0, $this->legacyCount());
         $this->assertSame($before, $this->currentCatalog());
-        $this->assertSame(16, DB::table('accion')->count());
+        $this->assertSame(17, DB::table('accion')->count());
     }
 
     public function test_el_down_no_hace_nada(): void
