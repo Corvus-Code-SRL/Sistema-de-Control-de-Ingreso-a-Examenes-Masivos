@@ -10,3 +10,10 @@ Route::post('examenes/{examen}/estudiantes/{estudiante}/situaciones', [ExamSitua
 Route::get('examenes/{examen}/situaciones', [ExamSituationController::class, 'index'])
     ->where('examen', '[0-9]{1,9}')
     ->name('situaciones.index');
+
+Route::get('situaciones/examenes', [ExamSituationController::class, 'exams'])
+    ->name('situaciones.exams');
+
+Route::get('situaciones/examenes/{examen}/contexto', [ExamSituationController::class, 'context'])
+    ->where('examen', '[0-9]{1,9}')
+    ->name('situaciones.context');

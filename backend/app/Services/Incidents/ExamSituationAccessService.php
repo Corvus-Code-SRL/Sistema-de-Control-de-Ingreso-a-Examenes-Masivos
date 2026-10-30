@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\Security\UserRoleService;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 /** Autoriza por examen y ambiente sin aplicar los horarios del control de ingreso. */
@@ -62,6 +63,43 @@ class ExamSituationAccessService
         }
 
         return $roomId;
+    }
+
+    /** Filtra el catálogo sin consultar asignaciones una por una. */
+    public function visibleExams(User $actor): Builder
+    {
+        if ($actor->estado !== User::ESTADO_ACTIVO
+            || ! $this->roles->hasAnyActiveRole($actor->id_usuario, [Role::DOCENTE, Role::AUXILIAR])) {
+            throw new AuthorizationException('No tiene permiso para consultar situaciones.');
+        }
+
+        $isTeacher = $this->roles->isTeacher($actor->id_usuario);
+
+        return Exam::query()->whereNotNull('examen.id_carrera')
+            ->where(function ($query) use ($actor, $isTeacher) {
+                $query->whereRaw('1 = 0');
+
+                if ($isTeacher) {
+                    $query->orWhere('examen.id_usuario_docente', $actor->id_usuario);
+                }
+
+                $query->orWhereExists(function ($assignment) use ($actor) {
+                    $assignment->selectRaw('1')->from('examen_auxiliar as ea')
+                        ->whereColumn('ea.id_examen', 'examen.id_examen')
+                        ->where('ea.id_usuario', $actor->id_usuario)
+                        ->where(function ($room) {
+                            $room->whereExists(function ($assigned) {
+                                $assigned->selectRaw('1')->from('examen_ambiente as er')
+                                    ->whereColumn('er.id_examen', 'ea.id_examen')
+                                    ->whereColumn('er.id_ambiente', 'ea.id_ambiente');
+                            })->orWhere(function ($single) {
+                                $single->whereNull('ea.id_ambiente')->whereRaw(
+                                    '(SELECT count(*) FROM examen_ambiente er WHERE er.id_examen = ea.id_examen) = 1'
+                                );
+                            });
+                        });
+                });
+            });
     }
 
     public function assertRoomAllowed(Exam $exam, int $roomId, ?int $roomScope): void

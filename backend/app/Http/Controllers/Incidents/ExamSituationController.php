@@ -3,11 +3,16 @@
 namespace App\Http\Controllers\Incidents;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Incidents\BrowseExamSituationsRequest;
+use App\Http\Requests\Incidents\ExamSituationContextRequest;
 use App\Http\Requests\Incidents\ListExamSituationsRequest;
 use App\Http\Requests\Incidents\StoreExamSituationRequest;
+use App\Http\Resources\Incidents\ExamSituationContextResource;
 use App\Http\Resources\Incidents\ExamSituationResource;
+use App\Http\Resources\Incidents\SituationExamResource;
 use App\Services\Incidents\ExamSituationQueryService;
 use App\Services\Incidents\ExamSituationService;
+use App\Services\Incidents\ExamSituationWorkspaceService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
@@ -39,5 +44,29 @@ class ExamSituationController extends Controller
                 'total' => $page->total(),
             ],
         ]);
+    }
+
+    public function exams(BrowseExamSituationsRequest $request, ExamSituationWorkspaceService $workspace): JsonResponse
+    {
+        $page = $workspace->exams($request->validated(), $request->user());
+
+        return response()->json([
+            'data' => SituationExamResource::collection($page->getCollection())->resolve($request),
+            'meta' => [
+                'current_page' => $page->currentPage(),
+                'last_page' => $page->lastPage(),
+                'total' => $page->total(),
+            ],
+        ]);
+    }
+
+    public function context(
+        ExamSituationContextRequest $request,
+        ExamSituationWorkspaceService $workspace
+    ): JsonResponse {
+        $filters = $request->validated();
+        $context = $workspace->context((int) $filters['examen'], $filters, $request->user());
+
+        return ApiResponse::success(new ExamSituationContextResource($context));
     }
 }
