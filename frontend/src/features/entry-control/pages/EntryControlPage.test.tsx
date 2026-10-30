@@ -668,12 +668,17 @@ describe('EntryControlPage', () => {
     expect(within(dialog).getByText('Pendientes')).toBeInTheDocument()
 
     await user.click(
-      within(dialog).getByRole('button', { name: 'Cancelar' })
+      within(dialog).getByRole('button', { name: 'Todavía no' })
     )
 
     expect(
       screen.queryByRole('dialog', { name: '¿Iniciar el examen?' })
     ).not.toBeInTheDocument()
+
+    // El examen sigue En ingreso: el control sigue abierto y se puede iniciar.
+    expect(screen.getByText('Ingreso abierto')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Iniciar examen' })).toBeInTheDocument()
+    expect(screen.queryByText('El examen ya inició')).not.toBeInTheDocument()
 
     expect(
       vi.mocked(fetch).mock.calls.some(
