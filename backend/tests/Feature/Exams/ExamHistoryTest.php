@@ -4,6 +4,7 @@ namespace Tests\Feature\Exams;
 
 use App\Models\Exam;
 use App\Services\Security\AuditLogService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\SeedsExamCatalog;
@@ -65,8 +66,56 @@ class ExamHistoryTest extends TestCase
         $this->assertContains('inicio', $types);
         $this->assertContains('ingreso', $types);
         $this->assertContains('fin', $types);
+        $this->assertNull($summary->json('data.inicio_real_en'));
+        $scheduledStart = collect($summary->json('data.linea_tiempo'))->firstWhere('tipo', 'inicio');
+        $this->assertSame('Inicio programado del examen', $scheduledStart['descripcion']);
+        $this->assertSame('Horario previsto', $scheduledStart['detalle']);
         $this->getJson('/api/historial/examenes/' . $foreign->id_examen)->assertNotFound();
         $this->getJson('/api/historial/examenes/' . $scheduled->id_examen)->assertNotFound();
+    }
+
+    public function test_muestra_inicio_real_manual_registrado_por_hu_038(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::EN_INGRESO]);
+
+        $this->postJson('/api/examenes/' . $exam->id_examen . '/iniciar')->assertOk();
+        $this->postJson('/api/examenes/' . $exam->id_examen . '/finalizar')->assertOk();
+
+        $startedAt = $exam->fresh()->inicio_real_en;
+        $this->assertNotNull($startedAt);
+        $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)
+            ->assertOk()
+            ->assertJsonPath('data.inicio_real_en', $startedAt->toIso8601String())
+            ->assertJsonPath('data.inicio_automatico', false);
+
+        $starts = collect($summary->json('data.linea_tiempo'))->where('tipo', 'inicio')->values();
+        $this->assertCount(1, $starts);
+        $this->assertSame('Examen iniciado', $starts[0]['descripcion']);
+        $this->assertSame('Inicio manual', $starts[0]['detalle']);
+        $this->assertSame(
+            $startedAt->setTimezone(config('sciem.zona_horaria'))->format('Y-m-d H:i:s'),
+            $starts[0]['fecha_hora']
+        );
+    }
+
+    public function test_muestra_inicio_real_automatico_sin_duplicar_el_hito(): void
+    {
+        $exam = $this->createExam(['fecha' => '2026-10-28', 'estado' => Exam::FINALIZADO]);
+        $startedAt = Carbon::parse('2026-10-28 08:10:00', config('sciem.zona_horaria'));
+        $exam->forceFill([
+            'inicio_real_en' => $startedAt->copy()->utc(),
+            'inicio_automatico' => true,
+        ])->save();
+
+        $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)
+            ->assertOk()
+            ->assertJsonPath('data.inicio_automatico', true);
+
+        $starts = collect($summary->json('data.linea_tiempo'))->where('tipo', 'inicio')->values();
+        $this->assertCount(1, $starts);
+        $this->assertSame('Examen iniciado', $starts[0]['descripcion']);
+        $this->assertSame('Inicio automático', $starts[0]['detalle']);
+        $this->assertSame('2026-10-28 08:10:00', $starts[0]['fecha_hora']);
     }
 
     public function test_valida_filtros_y_sesion(): void
