@@ -118,6 +118,62 @@ class ExamHistoryTest extends TestCase
         $this->assertSame('2026-10-28 08:10:00', $starts[0]['fecha_hora']);
     }
 
+    public function test_usa_fin_real_y_tipo_automatico_sin_duplicar_el_cierre(): void
+    {
+        $exam = $this->createExam(['fecha' => '2026-10-28', 'estado' => Exam::FINALIZADO]);
+        $finishedAt = Carbon::parse('2026-10-28 09:41:00', config('sciem.zona_horaria'));
+        $exam->forceFill([
+            'fin_real_en' => $finishedAt->copy()->utc(),
+            'fin_automatico' => true,
+        ])->save();
+        app(AuditLogService::class)->registrar('FINALIZAR', 'examen', null, [
+            'id_examen' => $exam->id_examen,
+            'estado' => Exam::FINALIZADO,
+        ], $this->docenteId);
+
+        $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)
+            ->assertOk()
+            ->assertJsonPath('data.fin_real_en', $exam->fresh()->fin_real_en->toIso8601String())
+            ->assertJsonPath('data.fin_automatico', true);
+
+        $closures = collect($summary->json('data.linea_tiempo'))->where('tipo', 'fin')->values();
+        $this->assertCount(1, $closures);
+        $this->assertSame('2026-10-28 09:41:00', $closures[0]['fecha_hora']);
+        $this->assertSame('Automático', $closures[0]['detalle']);
+    }
+
+    public function test_muestra_fin_real_aunque_no_exista_auditoria_antigua(): void
+    {
+        $exam = $this->createExam(['fecha' => '2026-10-28', 'estado' => Exam::FINALIZADO]);
+        $exam->forceFill([
+            'fin_real_en' => Carbon::parse('2026-10-28 09:15:00', config('sciem.zona_horaria'))->utc(),
+            'fin_automatico' => false,
+        ])->save();
+
+        $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)->assertOk();
+        $closures = collect($summary->json('data.linea_tiempo'))->where('tipo', 'fin')->values();
+        $this->assertCount(1, $closures);
+        $this->assertSame('2026-10-28 09:15:00', $closures[0]['fecha_hora']);
+        $this->assertSame('Finalización manual', $closures[0]['detalle']);
+    }
+
+    public function test_mantiene_cierre_automatico_auditado_sin_fin_real(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::FINALIZADO]);
+        app(AuditLogService::class)->registrar('FINALIZAR', 'examen', null, [
+            'id_examen' => $exam->id_examen,
+            'estado' => Exam::FINALIZADO,
+            'tipo_finalizacion' => 'AUTOMATICA',
+        ], $this->docenteId);
+
+        $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)
+            ->assertOk()
+            ->assertJsonPath('data.fin_real_en', null);
+        $closures = collect($summary->json('data.linea_tiempo'))->where('tipo', 'fin')->values();
+        $this->assertCount(1, $closures);
+        $this->assertSame('Automático', $closures[0]['detalle']);
+    }
+
     public function test_valida_filtros_y_sesion(): void
     {
         $this->getJson('/api/historial/examenes?materia=-1')->assertStatus(422);
