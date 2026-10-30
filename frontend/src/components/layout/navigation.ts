@@ -301,6 +301,13 @@ export const NAVIGATION: readonly NavSection[] = [
         matches: ['/examenes/:examId/control-ingreso']
       },
       {
+        id: 'teacher-exam-situations',
+        label: 'Registrar situación excepcional',
+        icon: AlertTriangle,
+        capability: 'situaciones.registrar',
+        to: '/situacion-excepcional'
+      },
+      {
         id: 'teacher-exam-in-progress',
         label: 'En curso',
         icon: PlaySquare,
@@ -401,6 +408,13 @@ export const NAVIGATION: readonly NavSection[] = [
         capability: 'ingreso.operar',
         to: '/control-ingreso',
         matches: ['/examenes/:examId/control-ingreso']
+      },
+      {
+        id: 'assistant-exam-situations',
+        label: 'Registrar situación excepcional',
+        icon: AlertTriangle,
+        capability: 'situaciones.registrar',
+        to: '/situacion-excepcional'
       },
       {
         id: 'assistant-exam-in-progress',

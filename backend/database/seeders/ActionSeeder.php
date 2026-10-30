@@ -30,5 +30,7 @@ class ActionSeeder extends Seeder
         foreach ($acciones as $accion) {
             DB::table('accion')->updateOrInsert(['operacion' => $accion['operacion']], $accion);
         }
+
+        $this->call(ExamSituationActionSeeder::class);
     }
 }

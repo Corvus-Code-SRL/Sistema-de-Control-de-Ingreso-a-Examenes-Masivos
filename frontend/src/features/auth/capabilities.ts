@@ -18,7 +18,7 @@ import type { Area, RoleName } from './types/auth.types'
  */
 
 /** Lo que el Auxiliar y el Docente comparten: operar el ingreso y registrar incidencias. */
-const SHARED_OPERATION_CAPABILITIES = ['ingreso.operar', 'incidencias.registrar'] as const
+const SHARED_OPERATION_CAPABILITIES = ['ingreso.operar', 'incidencias.registrar', 'situaciones.registrar'] as const
 
 /** Consultar los grupos y exámenes donde se fue habilitado como auxiliar; solo del Auxiliar. */
 const AUXILIAR_ONLY_CAPABILITIES = ['asignaciones.consultar'] as const

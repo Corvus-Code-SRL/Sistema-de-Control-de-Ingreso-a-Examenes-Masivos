@@ -56,10 +56,16 @@ class GroupStudentService
                 'estudiante.apellido_paterno',
                 'estudiante.apellido_materno',
             ])
-            ->orderBy('estudiante.apellido_paterno')
+            ->orderByRaw(
+                "lower(translate(estudiante.apellido_paterno, 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu')) ASC"
+            )
             // Sin apellido materno va primero: «Pérez» antes que «Pérez Mamani».
-            ->orderByRaw('estudiante.apellido_materno ASC NULLS FIRST')
-            ->orderBy('estudiante.nombre')
+            ->orderByRaw(
+                "lower(translate(estudiante.apellido_materno, 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu')) ASC NULLS FIRST"
+            )
+            ->orderByRaw(
+                "lower(translate(estudiante.nombre, 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu')) ASC"
+            )
             // Desempate estable: sin él, dos homónimos podrían saltar de página.
             ->orderBy('estudiante.id_estudiante');
 

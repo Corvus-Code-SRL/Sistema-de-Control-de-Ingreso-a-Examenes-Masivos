@@ -41,11 +41,14 @@ import {
   SubjectsPage,
 } from '@/features/subjects'
 import { CuentaDetallePage, CuentasPage } from '@/features/users'
-import { IncidentsPage } from '@/features/incidents'
+import { IncidentsPage, ExamSituationsPage, InProgressSituationAction, InProgressSituationsPanel } from '@/features/incidents'
 
 // Punto de composición de HU-037, HU-038-B, HU-042 y HU-057.
 // Cada feature puede aportar componentes aquí sin editar ExamInProgressPage.
-const examInProgressExtensions: ExamInProgressExtensions = {}
+const examInProgressExtensions: ExamInProgressExtensions = {
+  studentActions: (student, exam) => <InProgressSituationAction student={student} exam={exam} />,
+  panels: (exam) => <InProgressSituationsPanel exam={exam} />,
+}
 
 /** Envuelve una pantalla con la capacidad que exige. Sin sesión redirige al login (ver ProtectedRoute). */
 function guarded(capability: Capability, element: ReactElement) {
@@ -125,6 +128,7 @@ function DocenteRoutes() {
         element={guarded('examenes.gestionar', <ExamDetailPage />)}
       />
 
+      <Route path="/situacion-excepcional" element={guarded('situaciones.registrar', <ExamSituationsPage />)} />
       <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
 
       <Route
@@ -164,6 +168,7 @@ function AuxiliarRoutes() {
     <Routes>
       <Route path="/" element={<Navigate to="/mis-examenes" replace />} />
       <Route path="/mis-examenes" element={guarded('ingreso.operar', <MyAssignmentsPage />)} />
+      <Route path="/situacion-excepcional" element={guarded('situaciones.registrar', <ExamSituationsPage />)} />
       <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
       <Route
         path="/examenes/:examId/control-ingreso"
