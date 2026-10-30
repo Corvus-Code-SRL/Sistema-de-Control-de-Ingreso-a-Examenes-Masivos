@@ -21,6 +21,8 @@ export interface HistorySummary {
   nombre_examen: string
   fecha: string
   materia: string | null
+  inicio_real_en: string | null
+  inicio_automatico: boolean
   totales: { a_tiempo: number; con_retraso: number; ausentes: number; incidencias: number }
   linea_tiempo: { tipo: 'apertura' | 'inicio' | 'ingreso' | 'retraso' | 'incidencia' | 'fin'; fecha_hora: string; descripcion: string; detalle: string }[]
   ambientes: { id_ambiente: number; nro_aula: string; presentes: number; auxiliares: string[] }[]

@@ -133,16 +133,19 @@ class ExamHistoryService
                 ? 'Aprobada · en Central de Riesgo' : ucfirst(strtolower($report->estado)),
         ]));
 
-        $scheduledStart = Carbon::createFromFormat(
+        $startedAt = $exam->inicio_real_en ?? Carbon::createFromFormat(
             'Y-m-d H:i',
             $exam->fecha->format('Y-m-d') . ' ' . substr($exam->hora_inicio, 0, 5),
             config('sciem.zona_horaria')
         );
+        $hasActualStart = $exam->inicio_real_en !== null;
         $timeline->push([
             'tipo' => 'inicio',
-            'fecha_hora' => $scheduledStart->toIso8601String(),
-            'descripcion' => 'Inicio programado del examen',
-            'detalle' => 'Horario previsto',
+            'fecha_hora' => $startedAt->toIso8601String(),
+            'descripcion' => $hasActualStart ? 'Examen iniciado' : 'Inicio programado del examen',
+            'detalle' => $hasActualStart
+                ? ($exam->inicio_automatico ? 'Inicio automático' : 'Inicio manual')
+                : 'Horario previsto',
         ]);
         $timeline = $timeline
             ->sortBy(fn (array $event) => Carbon::parse($event['fecha_hora'])->getTimestamp())
@@ -178,6 +181,8 @@ class ExamHistoryService
             'nombre_examen' => $exam->nombre_examen,
             'fecha' => $exam->fecha->format('Y-m-d'),
             'materia' => $exam->subject?->nombre,
+            'inicio_real_en' => $exam->inicio_real_en?->toIso8601String(),
+            'inicio_automatico' => (bool) $exam->inicio_automatico,
             'totales' => [
                 'a_tiempo' => $counts['a_tiempo'],
                 'con_retraso' => $counts['con_retraso'],
