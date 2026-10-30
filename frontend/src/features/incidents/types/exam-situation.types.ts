@@ -61,3 +61,48 @@ export function formatSituationTime(value: string): string {
     timeZone: 'America/La_Paz', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
   }).format(date)
 }
+
+export interface SituationExam {
+  id_examen: number
+  nombre_examen: string
+  fecha: string
+  estado: 'EN_CURSO' | 'FINALIZADO'
+}
+
+export interface SituationExamsPage {
+  data: SituationExam[]
+  meta: SituationPage['meta']
+}
+
+export interface SituationStudent {
+  id_estudiante: number
+  cod_sis: string
+  nombre_completo: string
+  estado_ingreso: 'INGRESO' | 'CON_RETRASO'
+  ambiente: SituationRoom
+  situaciones: {
+    identidad_observada: boolean
+    ultimo_cambio_ambiente: null | {
+      id_situacion: number
+      registrado_en: string
+      ambiente_origen: SituationRoom
+      ambiente_destino: SituationRoom
+    }
+  }
+}
+
+export interface SituationWorkspace {
+  examen: SituationExam
+  ambiente_control: number | null
+  ambientes: SituationRoom[]
+  hora_servidor: string
+  estudiantes: SituationStudent[]
+  paginacion: SituationPage['meta']
+}
+
+export interface SituationWorkspaceFilters {
+  page?: number
+  id_ambiente?: number
+  id_estudiante?: number
+  q?: string
+}

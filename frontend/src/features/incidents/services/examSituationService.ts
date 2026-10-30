@@ -1,8 +1,21 @@
 import { apiClient, apiPost } from '@/lib/api-client'
-import type { SituationCreated, SituationInput, SituationPage } from '../types/exam-situation.types'
+import type {
+  SituationCreated, SituationInput, SituationPage, SituationExam, SituationExamsPage,
+  SituationWorkspace, SituationWorkspaceFilters,
+} from '../types/exam-situation.types'
 
-/** Contrato propuesto de la HU-057; requiere los endpoints del backend. */
+/** Registro, historial y contexto de la HU-057 mediante el cliente autenticado compartido. */
 export const examSituationService = {
+  exams(state: SituationExam['estado'], page: number, signal?: AbortSignal): Promise<SituationExamsPage> {
+    return apiClient('/situaciones/examenes', { query: { estado: state, page }, signal })
+  },
+
+  context(examId: number, filters: SituationWorkspaceFilters, signal?: AbortSignal) {
+    return apiClient<{ data: SituationWorkspace }>(`/situaciones/examenes/${examId}/contexto`, {
+      query: { ...filters }, signal,
+    })
+  },
+
   create(examId: number, studentId: number, input: SituationInput): Promise<SituationCreated> {
     const body = {
       tipo: input.type,

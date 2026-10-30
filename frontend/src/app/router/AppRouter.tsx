@@ -33,7 +33,7 @@ import {
   SubjectsPage,
 } from '@/features/subjects'
 import { CuentaDetallePage, CuentasPage } from '@/features/users'
-import { IncidentsPage } from '@/features/incidents'
+import { IncidentsPage, ExamSituationsPage } from '@/features/incidents'
 
 /** Envuelve una pantalla con la capacidad que exige. Sin sesión redirige al login (ver ProtectedRoute). */
 function guarded(capability: Capability, element: ReactElement) {
@@ -112,6 +112,7 @@ function DocenteRoutes() {
         path="/examenes/:examId"
         element={guarded('examenes.gestionar', <ExamDetailPage />)}
       />
+      <Route path="/situacion-excepcional" element={guarded('situaciones.registrar', <ExamSituationsPage />)} />
       <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
       <Route
         path="/examenes/:examId/control-ingreso"
@@ -136,6 +137,7 @@ function AuxiliarRoutes() {
     <Routes>
       <Route path="/" element={<Navigate to="/mis-examenes" replace />} />
       <Route path="/mis-examenes" element={guarded('ingreso.operar', <MyAssignmentsPage />)} />
+      <Route path="/situacion-excepcional" element={guarded('situaciones.registrar', <ExamSituationsPage />)} />
       <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
       <Route
         path="/examenes/:examId/control-ingreso"

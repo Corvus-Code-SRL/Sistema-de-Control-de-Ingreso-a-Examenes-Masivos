@@ -12,19 +12,20 @@ import {
 
 interface Props {
   context: ExamSituationContext
+  readOnly?: boolean
   onClose: () => void
   onRegistered: (result: SituationCreated) => void
 }
 
 /** Registra cambios de ambiente y observaciones de identidad durante el examen. */
-export function ExamSituationDialog({ context, onClose, onRegistered }: Props) {
+export function ExamSituationDialog({ context, onClose, onRegistered, readOnly = false }: Props) {
   const id = useId()
   const destinations = context.rooms.filter((room) => room.id_ambiente !== context.room.id_ambiente)
   const [type, setType] = useState<SituationType>(destinations.length ? 'CAMBIO_AMBIENTE' : 'IDENTIFICACION')
   const [reason, setReason] = useState('')
   const [destinationRoomId, setDestinationRoomId] = useState('')
   const registration = useRegisterExamSituation(context, onRegistered)
-  const disabled = registration.busy || registration.blocked
+  const disabled = registration.busy || registration.blocked || readOnly
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !registration.busy) onClose() }}>
@@ -35,7 +36,7 @@ export function ExamSituationDialog({ context, onClose, onRegistered }: Props) {
         </DialogHeader>
         <form className="flex min-h-0 flex-col" noValidate onSubmit={(event) => {
           event.preventDefault()
-          void registration.submit({ type, reason, destinationRoomId })
+          if (!disabled) void registration.submit({ type, reason, destinationRoomId })
         }}>
           <div className="min-h-0 space-y-4 overflow-y-auto p-4">
             <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 rounded-lg border bg-muted/50 p-3 text-sm">
@@ -83,6 +84,7 @@ export function ExamSituationDialog({ context, onClose, onRegistered }: Props) {
               </p>
               {registration.errors.motivo && <p role="alert" className="text-sm text-danger-fg">{registration.errors.motivo}</p>}
             </div>
+            {readOnly && <p role="alert" className="text-sm text-warn-fg">El examen cambió o no se pudo actualizar. Cierre el formulario y revise la vista.</p>}
             {registration.error && <p role="alert" className="text-sm text-danger-fg">{registration.error}</p>}
           </div>
           <DialogFooter className="m-0 shrink-0 rounded-none p-4">
