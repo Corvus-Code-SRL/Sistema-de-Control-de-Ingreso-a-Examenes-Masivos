@@ -27,7 +27,7 @@ class StudentEntryController extends Controller
         if (! $result['creado']) {
             return ApiResponse::error(
                 $result['motivo'],
-                $result['veredicto'] === 'DUPLICADO' ? 409 : 422,
+                in_array($result['veredicto'], ['DUPLICADO', 'EXAMEN_INICIADO', 'INGRESO_CERRADO'], true) ? 409 : 422,
                 ['veredicto' => $result['veredicto'], 'ingreso_previo' => $result['ingreso_previo'] ?? null]
             );
         }

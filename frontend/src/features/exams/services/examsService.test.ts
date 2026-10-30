@@ -114,4 +114,23 @@ describe('examsService', () => {
     const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
     expect(String(url)).toContain('/examenes?vista=programados')
   })
+
+  it('inicia un examen mediante el endpoint de HU-038', async () => {
+    const started = {
+      ...exam,
+      estado: 'EN_CURSO' as const,
+      inicio_real_en: '2026-10-28T08:25:00-04:00',
+      inicio_automatico: false,
+    };
+
+    mockApiOnce({ body: { data: started } });
+
+    await expect(examsService.startExam(7)).resolves.toEqual(started);
+
+    const [url, options] =
+      (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+
+    expect(String(url)).toContain('/examenes/7/iniciar');
+    expect(options).toMatchObject({ method: 'POST' });
+  });
 })
