@@ -304,6 +304,7 @@ describe('AppSidebar — entradas y estado activo', () => {
       ['Programados', '/examenes/programados'],
       ['Registrar examen', '/examenes/nuevo'],
       ['Control de ingreso', '/control-ingreso'],
+          ['Registrar situación excepcional', '/situacion-excepcional'],
       ['Revisar reportes de incidencias', '/incidencias'],
       ['Central de riesgo', '/central-riesgo']
     ])
