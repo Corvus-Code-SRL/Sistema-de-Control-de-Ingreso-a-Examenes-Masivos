@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Exams\ExamInProgressController;
 use App\Http\Controllers\Exams\AssistantClassroomController;
 use App\Http\Controllers\Exams\ExamController;
 use App\Http\Controllers\Exams\ExamHistoryController;
@@ -41,6 +42,10 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
         ->where('exam', '[0-9]{1,9}')
         ->name('show');
 
+    Route::get('/{exam}/en-curso', [ExamInProgressController::class, 'show'])
+        ->where('exam', '[0-9]{1,9}')
+        ->name('en-curso');
+
     Route::put('/{exam}', [ExamController::class, 'update'])
         ->where('exam', '[0-9]{1,9}')
         ->name('update');
@@ -48,6 +53,10 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
     Route::post('/{exam}/cancelar', [ExamController::class, 'cancel'])
         ->where('exam', '[0-9]{1,9}')
         ->name('cancelar');
+
+    Route::post('/{exam}/iniciar', [ExamController::class, 'start'])
+        ->where('exam', '[0-9]{1,9}')
+        ->name('iniciar');
 
     Route::post('/{exam}/finalizar', [ExamController::class, 'finish'])
         ->where('exam', '[0-9]{1,9}')

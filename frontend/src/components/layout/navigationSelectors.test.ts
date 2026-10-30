@@ -29,6 +29,8 @@ describe('findActiveItem', () => {
     ['/examenes/nuevo', 'teacher-create-exam'],
     ['/control-ingreso', 'teacher-entry-control'],
     ['/examenes/12/control-ingreso', 'teacher-entry-control'],
+    ['/examenes/en-curso', 'teacher-exam-in-progress'],
+    ['/examenes/12/en-curso', 'teacher-exam-in-progress'],
     ['/incidencias', 'teacher-incident-reports'],
     ['/central-riesgo', 'teacher-risk-query'],
     ['/central-riesgo/9941', 'teacher-risk-query']
@@ -51,7 +53,9 @@ describe('findActiveItem', () => {
   it.each([
     ['/mis-examenes', 'assistant-my-exams'],
     ['/control-ingreso', 'assistant-entry-control'],
-    ['/examenes/3/control-ingreso', 'assistant-entry-control']
+    ['/examenes/3/control-ingreso', 'assistant-entry-control'],
+    ['/examenes/en-curso', 'assistant-exam-in-progress'],
+    ['/examenes/3/en-curso', 'assistant-exam-in-progress']
   ])('auxiliar: %s resalta %s', (pathname, expected) => {
     expect(activeItemId('Auxiliar', pathname)).toBe(expected)
   })

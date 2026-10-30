@@ -13,3 +13,7 @@ export * from './services/examsService';
 export { examDetailPath } from './utils/paths';
 export { ExamHistoryPage } from './pages/ExamHistoryPage';
 export { ExamHistorySummaryPage } from './pages/ExamHistorySummaryPage';
+export { ExamInProgressPage } from './pages/ExamInProgressPage';
+export { InProgressExamsPage } from './pages/InProgressExamsPage';
+export type { ExamInProgressExtensions } from './components/ExamInProgressExtensions';
+export type { ExamInProgress, InProgressStudent } from './types/examInProgress.types';

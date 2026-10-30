@@ -102,4 +102,27 @@ describe('MyAssignmentsPage', () => {
     expect(screen.queryByText(/asignado por el docente/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Aún sin ambiente asignado/)).not.toBeInTheDocument()
   })
+
+  it('permite volver a En curso desde Mis exámenes', async () => {
+    listMyExams.mockResolvedValue([
+      {
+        ...assignedExam,
+        id_examen: 10,
+        estado: 'EN_CURSO',
+      },
+    ])
+
+    renderWithRouter(<MyAssignmentsPage />, {
+      route: '/mis-examenes',
+    })
+
+    expect(
+      await screen.findByRole('link', {
+        name: 'Ver examen en curso',
+      })
+    ).toHaveAttribute(
+      'href',
+      '/examenes/10/en-curso'
+    )
+  })
 })

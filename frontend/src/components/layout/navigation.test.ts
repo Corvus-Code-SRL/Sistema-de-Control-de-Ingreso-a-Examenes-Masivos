@@ -108,7 +108,7 @@ describe('menú por capacidades', () => {
         label: 'Control de ingreso y examen en curso',
         items: [
           ['Control de ingreso', '/control-ingreso'],
-          ['En curso', undefined],
+          ['En curso', '/examenes/en-curso'],
           ['Registrar estudiante con retraso', undefined],
           ['Registrar estudiante excepcional', undefined]
         ]
@@ -143,7 +143,7 @@ describe('menú por capacidades', () => {
         label: 'Control de ingreso y reportes',
         items: [
           ['Control de ingreso', '/control-ingreso'],
-          ['En curso', undefined],
+          ['En curso', '/examenes/en-curso'],
           ['Registrar estudiante con retraso', undefined]
         ]
       }
@@ -189,4 +189,17 @@ describe('menú por capacidades', () => {
       'Rectificar registro de la central'
     ])
   })
+
+  it('docente y auxiliar pueden abrir En curso', () => {
+    for (const role of ['Docente', 'Auxiliar'] as const) {
+      const items = menuOf(role).flatMap(
+        (section) => section.items
+      );
+
+      expect(items).toContainEqual([
+        'En curso',
+        '/examenes/en-curso',
+      ]);
+    }
+  });
 })

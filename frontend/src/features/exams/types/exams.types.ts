@@ -50,6 +50,10 @@ export interface Exam {
   duracion: number;
   normas: string | null;
   estado: ExamStatus;
+  inicio_real_en?: string | null;
+  fin_real_en?: string | null;
+  inicio_automatico?: boolean;
+  fin_automatico?: boolean;
   id_tipo_examen: number;
   id_carrera: number;
   id_materia: number;

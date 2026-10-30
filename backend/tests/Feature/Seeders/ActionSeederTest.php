@@ -17,16 +17,16 @@ class ActionSeederTest extends TestCase
         return DB::table('accion')->orderBy('id_accion')->get()->map(fn ($row) => (array) $row)->all();
     }
 
-    public function test_dos_ejecuciones_dejan_catorce_acciones_sin_duplicados(): void
+    public function test_dos_ejecuciones_dejan_quince_acciones_sin_duplicados(): void
     {
         $this->seed(ActionSeeder::class);
         $afterFirst = $this->catalog();
 
         $this->seed(ActionSeeder::class);
 
-        $this->assertCount(14, $afterFirst);
+        $this->assertCount(15, $afterFirst);
         $this->assertSame($afterFirst, $this->catalog());
-        $this->assertSame(14, DB::table('accion')->distinct()->count('operacion'));
+        $this->assertSame(15, DB::table('accion')->distinct()->count('operacion'));
     }
 
     public function test_incluye_las_acciones_de_aprobacion_y_rechazo_de_reportes(): void
@@ -71,6 +71,6 @@ class ActionSeederTest extends TestCase
                 ->value('descripcion')
         );
 
-        $this->assertSame(14, DB::table('accion')->count());
+        $this->assertSame(15, DB::table('accion')->count());
     }
 }

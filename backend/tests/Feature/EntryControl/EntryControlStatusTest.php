@@ -5,6 +5,7 @@ namespace Tests\Feature\EntryControl;
 use App\Models\Exam;
 use App\Models\User;
 use App\Services\EntryControl\RoomAssignmentService;
+use App\Services\Exams\ExamLifecycleService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -156,5 +157,40 @@ class EntryControlStatusTest extends TestCase
             ->assertJsonPath('data.rol_controlador', 'DOCENTE')
             ->assertJsonPath('data.id_ambiente_asignado', null)
             ->assertJsonCount(2, 'data.ambientes');
+    }
+
+    public function test_no_muestra_snapshot_tras_iniciar_examen(): void
+    {
+        $this->seedExamCatalog();
+
+        $exam = $this->createExam([], [$this->aulaId]);
+
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
+
+        app(RoomAssignmentService::class)->prepare($exam->id_examen);
+
+        $url = "/api/control-ingreso/examenes/{$exam->id_examen}/estado";
+
+        $this->actingAs(User::query()->findOrFail($this->docenteId))
+            ->getJson($url)
+            ->assertOk();
+
+        // Inicia el examen mediante el servicio real.
+        app(ExamLifecycleService::class)->startManually(
+            $exam,
+            (string) $this->docenteId
+        );
+
+        // PostgreSQL debe registrar la transición.
+        $this->assertSame(
+            Exam::EN_CURSO,
+            $exam->fresh()->estado
+        );
+
+        // Control de ingreso ya no debe servir el snapshot anterior.
+        $this->getJson($url)->assertStatus(409);
     }
 }

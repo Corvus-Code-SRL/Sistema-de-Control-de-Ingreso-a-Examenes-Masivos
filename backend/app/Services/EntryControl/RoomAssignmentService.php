@@ -25,7 +25,7 @@ class RoomAssignmentService
      */
     public function prepare(int $examId): void
     {
-        $token = DB::transaction(function () use ($examId): string {
+        DB::transaction(function () use ($examId): void {
             $exam = Exam::query()->whereKey($examId)->lockForUpdate()->firstOrFail();
 
             if (! in_array($exam->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO], true)) {
@@ -79,10 +79,8 @@ class RoomAssignmentService
                 );
             }
 
-            return $token;
+            $this->snapshots->activate($examId, $token);
         });
-
-        $this->snapshots->activate($examId, $token);
     }
 
     /**

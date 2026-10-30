@@ -53,6 +53,15 @@ export const examsService = {
     return response.data;
   },
 
+  async startExam(examId: number): Promise<Exam> {
+    const response = await apiPost<DataResponse<Exam>>(
+      `/examenes/${examId}/iniciar`,
+      {}
+    );
+
+    return response.data;
+  },
+
   async assignGroups(examId: number, payload: AssignGroupsPayload): Promise<Exam> {
     const response = await apiPost<DataResponse<Exam>>(
       `/examenes/${examId}/grupos`,
