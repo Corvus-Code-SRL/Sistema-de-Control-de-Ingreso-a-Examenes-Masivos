@@ -108,17 +108,30 @@ class ExamHistoryService
             ->orderBy('l.fecha_hora')
             ->get();
 
-        $timeline = $transitions->map(function ($log) {
+        $timeline = $transitions->map(function ($log) use ($exam) {
             $after = json_decode($log->nuevo_valor, true) ?? [];
             $opening = ($after['evento'] ?? null) === 'APERTURA_CONTROL';
+            $automatic = $exam->fin_real_en !== null
+                ? $exam->fin_automatico
+                : ($after['tipo_finalizacion'] ?? null) === 'AUTOMATICA';
             return [
                 'tipo' => $opening ? 'apertura' : 'fin',
-                'fecha_hora' => $log->fecha_hora,
+                'fecha_hora' => $opening
+                    ? $log->fecha_hora
+                    : ($exam->fin_real_en?->toIso8601String() ?? $log->fecha_hora),
                 'descripcion' => $opening ? 'Se abrió el control de ingreso' : 'Examen terminado',
-                'detalle' => ($after['tipo_finalizacion'] ?? null) === 'AUTOMATICA' || $opening
-                    ? 'Automático' : 'Finalización manual',
+                'detalle' => $opening || $automatic ? 'Automático' : 'Finalización manual',
             ];
-        })->concat($entries->map(fn ($entry) => [
+        });
+        if ($exam->fin_real_en !== null && ! $transitions->contains('operacion', 'FINALIZAR')) {
+            $timeline->push([
+                'tipo' => 'fin',
+                'fecha_hora' => $exam->fin_real_en->toIso8601String(),
+                'descripcion' => 'Examen terminado',
+                'detalle' => $exam->fin_automatico ? 'Automático' : 'Finalización manual',
+            ]);
+        }
+        $timeline = $timeline->concat($entries->map(fn ($entry) => [
             'tipo' => $entry->estado_ingreso === 'CON_RETRASO' ? 'retraso' : 'ingreso',
             'fecha_hora' => $entry->registrado_en,
             'descripcion' => $entry->estado_ingreso === 'CON_RETRASO'
@@ -183,6 +196,8 @@ class ExamHistoryService
             'materia' => $exam->subject?->nombre,
             'inicio_real_en' => $exam->inicio_real_en?->toIso8601String(),
             'inicio_automatico' => (bool) $exam->inicio_automatico,
+            'fin_real_en' => $exam->fin_real_en?->toIso8601String(),
+            'fin_automatico' => (bool) $exam->fin_automatico,
             'totales' => [
                 'a_tiempo' => $counts['a_tiempo'],
                 'con_retraso' => $counts['con_retraso'],
