@@ -181,4 +181,68 @@ describe('HU-038-A: consulta y filtros de En curso', () => {
     expect(screen.getByText('Juan López')).toBeInTheDocument();
     expect(screen.queryByText('Álvaro Núñez')).not.toBeInTheDocument();
   });
+
+  it('con el filtro Todos, la búsqueda deja solo al estudiante que coincide', async () => {
+    const user = userEvent.setup();
+    vi.mocked(examInProgressService.get).mockResolvedValue({
+      ...exam,
+      totales: {
+        ...exam.totales,
+        con_retraso: 1,
+        presentes: 2,
+        total: 3,
+      },
+      estudiantes: [
+        ...exam.estudiantes,
+        {
+          id_estudiante: 12,
+          cod_sis: '202300300',
+          ci: '9876543',
+          nombre_completo: 'Álvaro Núñez',
+          estado_ingreso: 'CON_RETRASO',
+          hora_ingreso: '10:12',
+          id_ambiente: 1,
+          ambiente: '692C',
+        },
+      ],
+    });
+
+    renderWithRouter(<ExamInProgressPage />, {
+      route: '/examenes/8/en-curso',
+      path: '/examenes/:examId/en-curso',
+    });
+
+    expect(await screen.findByText('Álvaro Núñez')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Todos (3)' }));
+    expect(screen.getByText('María Pérez')).toBeInTheDocument();
+    expect(screen.getByText('Juan López')).toBeInTheDocument();
+    expect(screen.getByText('Álvaro Núñez')).toBeInTheDocument();
+
+    const search = screen.getByRole('textbox', { name: 'Buscar estudiante' });
+    await user.type(search, 'alvaro');
+    expect(screen.getByText('Álvaro Núñez')).toBeInTheDocument();
+    expect(screen.queryByText('María Pérez')).not.toBeInTheDocument();
+    expect(screen.queryByText('Juan López')).not.toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, '202300200');
+    expect(screen.getByText('Juan López')).toBeInTheDocument();
+    expect(screen.queryByText('María Pérez')).not.toBeInTheDocument();
+    expect(screen.queryByText('Álvaro Núñez')).not.toBeInTheDocument();
+  });
+});
+
+describe('HU-038-A: navegación de En curso', () => {
+  it('«Volver a exámenes» lleva a la lista En curso', async () => {
+    renderWithRouter(<ExamInProgressPage />, {
+      route: '/examenes/8/en-curso',
+      path: '/examenes/:examId/en-curso',
+    });
+
+    expect(await screen.findByText('María Pérez')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Volver a exámenes' })).toHaveAttribute(
+      'href',
+      '/examenes/en-curso'
+    );
+  });
 });
