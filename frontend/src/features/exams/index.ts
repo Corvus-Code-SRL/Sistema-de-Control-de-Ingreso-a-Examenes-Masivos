@@ -14,3 +14,4 @@ export { examDetailPath } from './utils/paths';
 export { ExamInProgressPage } from './pages/ExamInProgressPage';
 export { InProgressExamsPage } from './pages/InProgressExamsPage';
 export type { ExamInProgressExtensions } from './components/ExamInProgressExtensions';
+export type { ExamInProgress, InProgressStudent } from './types/examInProgress.types';
