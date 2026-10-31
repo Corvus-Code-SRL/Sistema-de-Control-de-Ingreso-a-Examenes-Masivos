@@ -7,6 +7,9 @@ use App\Models\User;
 
 class IdentificationService
 {
+    /** Veredicto de identify() cuando encuentra al estudiante. */
+    public const IDENTIFIED = 'IDENTIFICADO';
+
     private EntryControlSnapshotService $snapshots;
 
     public function __construct(EntryControlSnapshotService $snapshots)
@@ -30,11 +33,14 @@ class IdentificationService
             return ['veredicto' => 'NO_ENCONTRADO', 'registro' => null];
         }
 
-        return ['veredicto' => 'IDENTIFICADO', 'registro' => $record];
+        return ['veredicto' => self::IDENTIFIED, 'registro' => $record];
     }
 
-    /** Consulta solo el identificador exacto presentado; nunca añade ajenos al snapshot. */
-    private function outsideStudentBy(string $column, string $value): ?array
+    /**
+     * Consulta solo el identificador exacto presentado; nunca añade ajenos al snapshot.
+     * El ingreso con retraso (HU-037) la usa para el estudiante que no pertenece al examen.
+     */
+    public function outsideStudentBy(string $column, string $value): ?array
     {
         $student = Student::query()->where($column, $value)->first([
             'id_estudiante', 'cod_sis', 'ci', 'foto_url',

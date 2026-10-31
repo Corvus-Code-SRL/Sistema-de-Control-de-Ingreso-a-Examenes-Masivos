@@ -10,6 +10,7 @@ use App\Support\Database\AccentInsensitiveSearch;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Cache\Repository;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -36,40 +37,12 @@ class EntryControlSnapshotService
         $token = (string) Str::uuid();
         $expiresAt = $this->expirationFor($exam);
 
-        $rooms = DB::table('examen_ambiente as ea')
-            ->join('ambiente as a', 'a.id_ambiente', '=', 'ea.id_ambiente')
-            ->where('ea.id_examen', $examId)
-            ->orderBy('ea.id_ambiente')
-            ->get(['ea.id_ambiente', 'a.nro_aula', 'a.capacidad'])
-            ->map(fn ($room) => [
-                'id_ambiente' => (int) $room->id_ambiente,
-                'nro_aula' => $room->nro_aula,
-                'capacidad' => (int) $room->capacidad,
-            ])->all();
-
-        $memberships = DB::table('grupo_estudiante as gs')
-            ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
-            ->join('grupo as g', 'g.id_grupo', '=', 'gs.id_grupo')
-            ->where('gx.id_examen', $examId)
-            ->orderBy('gs.id_estudiante')
-            ->orderBy('gs.id_grupo')
-            ->get(['gs.id_estudiante', 'gs.id_grupo', 'g.num_grupo']);
-
-        $membersByStudent = [];
-        foreach ($memberships as $membership) {
-            $studentId = (int) $membership->id_estudiante;
-            if (! isset($membersByStudent[$studentId])) {
-                $membersByStudent[$studentId] = [
-                    'id_grupo' => (int) $membership->id_grupo,
-                    'num_grupo' => $membership->num_grupo,
-                ];
-            }
-        }
-
+        $rooms = $this->rooms($examId);
+        $membersByStudent = $this->memberships($examId);
         $assignedRooms = self::assignRooms(array_keys($membersByStudent), $rooms);
         $entries = $this->entries($examId);
         $risks = $this->riskCenter->summariesForSnapshot(array_keys($membersByStudent));
-        $career = DB::table('carrera')->where('id_carrera', $exam->id_carrera)->value('nombre');
+        $career = $this->careerName($exam);
 
         $controllers = [
             (string) $exam->id_usuario_docente => [
@@ -118,10 +91,7 @@ class EntryControlSnapshotService
             'expira_en' => $expiresAt->toIso8601String(),
         ];
 
-        $students = DB::table('estudiante')
-            ->whereIn('id_estudiante', array_keys($membersByStudent))
-            ->orderBy('id_estudiante')
-            ->get();
+        $students = $this->students(array_keys($membersByStudent));
         $search = [];
         $values = [$this->key($examId, $token, 'meta') => $meta];
         foreach ($assistantRecords as $sisHash => $assistant) {
@@ -131,29 +101,15 @@ class EntryControlSnapshotService
         foreach ($students as $student) {
             $studentId = (int) $student->id_estudiante;
             $group = $membersByStudent[$studentId] ?? null;
-            $entry = $entries[$studentId] ?? null;
-            $fullName = trim(
-                $student->nombre . ' ' . $student->apellido_paterno . ' ' . $student->apellido_materno
+            $payload = $this->studentRecord(
+                $student,
+                $group,
+                $entries[$studentId] ?? null,
+                $assignedRooms[$studentId] ?? null,
+                $risks[$studentId] ?? ['total' => 0, 'latest' => null],
+                $career
             );
-            $payload = [
-                'estudiante' => [
-                    'id_estudiante' => $studentId,
-                    'cod_sis' => $student->cod_sis,
-                    'ci' => $student->ci,
-                    'ci_pendiente' => $student->ci === null,
-                    'nombre_completo' => $fullName,
-                    'carrera' => $career,
-                    'foto_url' => $student->foto_url,
-                ],
-                'nombre' => $student->nombre,
-                'apellido_paterno' => $student->apellido_paterno,
-                'apellido_materno' => $student->apellido_materno,
-                'grupo' => $group,
-                'estado_habilitacion' => $entry['estado_habilitacion'] ?? null,
-                'ambiente_asignado' => $assignedRooms[$studentId] ?? null,
-                'antecedentes' => $risks[$studentId] ?? ['total' => 0, 'latest' => null],
-                'ingreso_previo' => $entry['ingreso_previo'] ?? null,
-            ];
+            $fullName = $payload['estudiante']['nombre_completo'];
 
             $values[$this->key($examId, $token, 'student', $studentId)] = $payload;
             $values[$this->key($examId, $token, 'sis', sha1((string) $student->cod_sis))] = $studentId;
@@ -499,13 +455,155 @@ class EntryControlSnapshotService
         ];
     }
 
-    private function entries(int $examId): array
+    /**
+     * Registro de verificación de un estudiante de la nómina, armado desde PostgreSQL con
+     * las mismas piezas que stage() guarda en Redis. Lo usa el ingreso con retraso
+     * (HU-037), cuando el snapshot ya no está activo. Null si no pertenece al examen.
+     *
+     * @return array{
+     *     estudiante: array{id_estudiante: int, cod_sis: string, ci: string|null, ci_pendiente: bool,
+     *         nombre_completo: string, carrera: string|null, foto_url: string|null},
+     *     nombre: string, apellido_paterno: string|null, apellido_materno: string|null,
+     *     grupo: array{id_grupo: int, num_grupo: string},
+     *     estado_habilitacion: string|null,
+     *     ambiente_asignado: array{id_ambiente: int, nro_aula: string}|null,
+     *     antecedentes: array{total: int, latest: array{tipo_falta: string, fecha_registro: string}|null},
+     *     ingreso_previo: array{registrado_en: string|null, hora_ingreso: string|null,
+     *         id_ambiente: int|null, nro_aula: string|null, controlador: string}|null
+     * }|null
+     */
+    public function recordFor(Exam $exam, int $studentId): ?array
+    {
+        $examId = (int) $exam->id_examen;
+        $membersByStudent = $this->memberships($examId);
+        $student = isset($membersByStudent[$studentId]) ? $this->students([$studentId])->first() : null;
+
+        if ($student === null) {
+            return null;
+        }
+
+        $assignedRooms = self::assignRooms(array_keys($membersByStudent), $this->rooms($examId));
+
+        return $this->studentRecord(
+            $student,
+            $membersByStudent[$studentId],
+            $this->entries($examId, $studentId)[$studentId] ?? null,
+            $assignedRooms[$studentId] ?? null,
+            $this->riskCenter->summariesForSnapshot([$studentId])[$studentId] ?? ['total' => 0, 'latest' => null],
+            $this->careerName($exam)
+        );
+    }
+
+    /** @return array<int, array{id_ambiente: int, nro_aula: string, capacidad: int}> */
+    private function rooms(int $examId): array
+    {
+        return DB::table('examen_ambiente as ea')
+            ->join('ambiente as a', 'a.id_ambiente', '=', 'ea.id_ambiente')
+            ->where('ea.id_examen', $examId)
+            ->orderBy('ea.id_ambiente')
+            ->get(['ea.id_ambiente', 'a.nro_aula', 'a.capacidad'])
+            ->map(fn ($room) => [
+                'id_ambiente' => (int) $room->id_ambiente,
+                'nro_aula' => $room->nro_aula,
+                'capacidad' => (int) $room->capacidad,
+            ])->all();
+    }
+
+    /**
+     * Grupo de cada estudiante de la nómina: el menor de los grupos del examen en que está inscrito.
+     *
+     * @return array<int, array{id_grupo: int, num_grupo: string}>
+     */
+    private function memberships(int $examId): array
+    {
+        $memberships = DB::table('grupo_estudiante as gs')
+            ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
+            ->join('grupo as g', 'g.id_grupo', '=', 'gs.id_grupo')
+            ->where('gx.id_examen', $examId)
+            ->orderBy('gs.id_estudiante')
+            ->orderBy('gs.id_grupo')
+            ->get(['gs.id_estudiante', 'gs.id_grupo', 'g.num_grupo']);
+
+        $membersByStudent = [];
+        foreach ($memberships as $membership) {
+            $studentId = (int) $membership->id_estudiante;
+            if (! isset($membersByStudent[$studentId])) {
+                $membersByStudent[$studentId] = [
+                    'id_grupo' => (int) $membership->id_grupo,
+                    'num_grupo' => $membership->num_grupo,
+                ];
+            }
+        }
+
+        return $membersByStudent;
+    }
+
+    /** @param array<int, int> $studentIds */
+    private function students(array $studentIds): Collection
+    {
+        return DB::table('estudiante')
+            ->whereIn('id_estudiante', $studentIds)
+            ->orderBy('id_estudiante')
+            ->get();
+    }
+
+    private function careerName(Exam $exam): ?string
+    {
+        return DB::table('carrera')->where('id_carrera', $exam->id_carrera)->value('nombre');
+    }
+
+    /**
+     * @param array{id_grupo: int, num_grupo: string}|null $group
+     * @param array{
+     *     estado_habilitacion: string,
+     *     ingreso_previo: array{registrado_en: string|null, hora_ingreso: string|null,
+     *         id_ambiente: int|null, nro_aula: string|null, controlador: string}|null,
+     *     reciente: array{id_estudiante: int, cod_sis: string, nombre: string, apellido_paterno: string|null,
+     *         apellido_materno: string|null, hora_ingreso: string|null, registrado_en: string|null,
+     *         nro_aula: string|null, controlador_nombre: string|null, controlador_apellido: string|null}|null
+     * }|null $entry
+     * @param array{id_ambiente: int, nro_aula: string}|null $assignedRoom
+     * @param array{total: int, latest: array{tipo_falta: string, fecha_registro: string}|null} $risk
+     */
+    private function studentRecord(
+        object $student,
+        ?array $group,
+        ?array $entry,
+        ?array $assignedRoom,
+        array $risk,
+        ?string $career
+    ): array {
+        return [
+            'estudiante' => [
+                'id_estudiante' => (int) $student->id_estudiante,
+                'cod_sis' => $student->cod_sis,
+                'ci' => $student->ci,
+                'ci_pendiente' => $student->ci === null,
+                'nombre_completo' => trim(
+                    $student->nombre . ' ' . $student->apellido_paterno . ' ' . $student->apellido_materno
+                ),
+                'carrera' => $career,
+                'foto_url' => $student->foto_url,
+            ],
+            'nombre' => $student->nombre,
+            'apellido_paterno' => $student->apellido_paterno,
+            'apellido_materno' => $student->apellido_materno,
+            'grupo' => $group,
+            'estado_habilitacion' => $entry['estado_habilitacion'] ?? null,
+            'ambiente_asignado' => $assignedRoom,
+            'antecedentes' => $risk,
+            'ingreso_previo' => $entry['ingreso_previo'] ?? null,
+        ];
+    }
+
+    private function entries(int $examId, ?int $studentId = null): array
     {
         return DB::table('examen_estudiante as ee')
             ->join('estudiante as est', 'est.id_estudiante', '=', 'ee.id_estudiante')
             ->leftJoin('ambiente as a', 'a.id_ambiente', '=', 'ee.id_ambiente')
             ->leftJoin('usuario as u', 'u.id_usuario', '=', 'ee.id_usuario_controlador')
             ->where('ee.id_examen', $examId)
+            ->when($studentId !== null, fn ($query) => $query->where('ee.id_estudiante', $studentId))
             ->get([
                 'ee.id_estudiante', 'ee.estado_habilitacion', 'ee.estado_ingreso',
                 'ee.hora_ingreso', 'ee.registrado_en', 'ee.id_ambiente', 'a.nro_aula',
