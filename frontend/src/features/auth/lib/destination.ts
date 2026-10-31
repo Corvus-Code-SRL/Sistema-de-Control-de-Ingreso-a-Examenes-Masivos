@@ -3,8 +3,8 @@
  *
  * El diseño muestra /docente/inicio, /auxiliar/inicio y /admin/inicio, pero el panel de inicio es de
  * otro sprint y esas rutas no existen. Cada rol va a la pantalla de entrada que ya tiene hoy:
- * - Administrador → /cuentas (la home de su área).
- * - Docente → /materias (la home de su área).
+ * - Administrador → /cuentas/nueva (la home de su área).
+ * - Docente e Invitado → /materias (la home de su área).
  * - Auxiliar → «/»: el router del área Auxiliar lo lleva a /mis-examenes, su home (HU-09).
  */
 export const LOGIN_PATH = '/login'
@@ -13,8 +13,9 @@ export const LOGIN_PATH = '/login'
 export const CHANGE_PASSWORD_PATH = '/cambiar-contrasena'
 
 const HOME_BY_ROLE: Record<string, string> = {
-  Administrador: '/cuentas',
+  Administrador: '/cuentas/nueva',
   Docente: '/materias',
+  Invitado: '/materias',
   Auxiliar: '/',
 }
 

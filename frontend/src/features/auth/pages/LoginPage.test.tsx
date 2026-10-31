@@ -216,7 +216,7 @@ describe('LoginPage — validación al enviar (L.3)', () => {
     expect(passwordField()).toHaveFocus()
   })
 
-  it('un código con formato no reconocido dice los tres formatos y no sale ninguna petición', async () => {
+  it('un código con formato no reconocido dice cómo escribirlo y no sale ninguna petición', async () => {
     const user = userEvent.setup()
     const { calls } = stubServer(loginErrors.credentials)
 
@@ -228,12 +228,12 @@ describe('LoginPage — validación al enviar (L.3)', () => {
     expect(calls).toHaveLength(0)
     expect(screen.getByText(SIS_FORMAT_ERROR)).toBeInTheDocument()
     expect(SIS_FORMAT_ERROR).toBe(
-      'El código no tiene un formato válido. Use 5 o 9 dígitos, o un código como ADM0001.'
+      'El código no tiene un formato válido. Use de 3 a 15 letras o dígitos, sin espacios ni guiones.'
     )
     expect(sisField()).toHaveFocus()
   })
 
-  it.each(['10452', '201800451', 'ADM0001', 'adm0001'])('acepta %s como formato reconocido', async (sis) => {
+  it.each(['10452', '201800451', 'ADM0001', 'adm0001', 'INV4821', 'inv4821'])('acepta %s como formato reconocido', async (sis) => {
     const user = userEvent.setup()
     const { calls } = stubServer(loginErrors.credentials)
 

@@ -90,13 +90,15 @@ export const NAVIGATION: readonly NavSection[] = [
         label: 'Registrar cuenta nueva',
         icon: UserPlus,
         capability: 'administracion.gestionar',
-        to: '/cuentas'
+        to: '/cuentas/nueva'
       },
       {
         id: 'admin-change-role',
         label: 'Modificar rol',
         icon: UserCog,
-        capability: 'administracion.gestionar'
+        capability: 'administracion.gestionar',
+        to: '/cuentas/roles',
+        matches: ['/cuentas/:idUsuario']
       }
     ]
   },
@@ -264,7 +266,7 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'teacher-enable-assistant',
         label: 'Habilitar auxiliar para el examen',
         icon: UserPlus,
-        capability: 'examenes.gestionar'
+        capability: 'auxiliares.examen'
       },
       {
         id: 'teacher-upload-eligible',
@@ -276,7 +278,7 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'teacher-invite-collaborators',
         label: 'Invitar docentes colaboradores',
         icon: UserRoundPlus,
-        capability: 'examenes.gestionar'
+        capability: 'docentes.invitar'
       },
       {
         id: 'teacher-exam-invitations',
@@ -318,7 +320,7 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'teacher-exceptional-student',
         label: 'Registrar estudiante excepcional',
         icon: UserRoundCheck,
-        capability: 'examenes.gestionar'
+        capability: 'casos-especiales.gestionar'
       }
     ]
   },
@@ -332,7 +334,7 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'teacher-incident-reports',
         label: 'Revisar reportes de incidencias',
         icon: AlertTriangle,
-        capability: 'examenes.gestionar',
+        capability: 'incidencias.revisar',
         to: '/incidencias',
         badge: 'pendingIncidents'
       },
