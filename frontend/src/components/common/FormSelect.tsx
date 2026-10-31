@@ -21,6 +21,8 @@ interface FormSelectProps {
   onValueChange: (value: string) => void
   disabled?: boolean
   invalid?: boolean
+  /** Nombre accesible para lectores de pantalla y `getByRole('combobox', { name })`. */
+  ariaLabel?: string
   className?: string
 }
 
@@ -33,12 +35,14 @@ export function FormSelect({
   onValueChange,
   disabled = false,
   invalid = false,
+  ariaLabel,
   className,
 }: FormSelectProps) {
   return (
     <Select value={value ?? ''} onValueChange={onValueChange} disabled={disabled}>
       <SelectTrigger
         id={id}
+        aria-label={ariaLabel}
         aria-invalid={invalid || undefined}
         className={cn('h-11 w-full bg-background px-3.5 text-left text-xs font-medium', className)}
       >
