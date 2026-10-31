@@ -21,7 +21,8 @@ const buttonVariants = cva(
         // Nueva: botón de peligro sólido (fondo rojo, texto blanco).
         danger:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:border-destructive focus-visible:ring-destructive/40",
-        
+        // Acción pendiente que requiere atención (por ejemplo, asignar el rol a una cuenta sin rol).
+        warning: "bg-warn text-warn-fg hover:bg-warn/80",
       },
       size: {
         default:
