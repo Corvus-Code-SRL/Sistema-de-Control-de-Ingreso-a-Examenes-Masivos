@@ -1,8 +1,16 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { AlertTriangle, CheckCircle2, CircleX, DoorOpen, Flag, RotateCcw, ShieldAlert, UserRound } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import type { EntryStudent, Verification } from '../types/entry-control.types'
+import type { EntryStudent, Verification, VerificationActions } from '../types/entry-control.types'
+
+/** Acciones del control de ingreso normal (HU-032). */
+export const ENTRY_VERIFICATION_ACTIONS: VerificationActions = {
+  confirmLabel: 'Aceptar ingreso',
+  busyLabel: 'Registrando…',
+  rejectLabel: 'Rechazar',
+  recordsAttempt: true,
+}
 
 interface Props {
   result: Verification
@@ -14,6 +22,11 @@ interface Props {
   reported?: boolean
   presentedCi?: string
   subjectName?: string | null
+  actions?: VerificationActions
+  /** Contenido propio del flujo antes de los botones, como el selector de ambiente. */
+  extra?: ReactNode
+  /** Reemplaza la fila de botones cuando el flujo decide otras acciones. */
+  footer?: ReactNode
 }
 
 function verdictLabel(value: string): string {
@@ -84,7 +97,10 @@ function AssistantDetails({ result }: { result: Verification }) {
   </div>
 }
 
-export function VerificationResult({ result, busy, onConfirm, onReject, onNext, onReport, reported = false, presentedCi, subjectName }: Props) {
+export function VerificationResult({
+  result, busy, onConfirm, onReject, onNext, onReport, reported = false, presentedCi, subjectName,
+  actions = ENTRY_VERIFICATION_ACTIONS, extra, footer,
+}: Props) {
   const allowed = result.autorizado
   const isAssistant = result.veredicto === 'AUXILIAR_EXAMEN' && result.auxiliar != null
   const canReport = !allowed && result.estudiante != null && result.veredicto !== 'AULA_NO_ASIGNADA'
@@ -94,7 +110,7 @@ export function VerificationResult({ result, busy, onConfirm, onReject, onNext, 
       <Icon className={`mt-0.5 size-6 shrink-0 ${allowed ? 'text-ok' : isAssistant ? 'text-brand-deep' : 'text-danger'}`} aria-hidden="true" />
       <div><h2 id="entry-verdict" className={`text-lg font-bold ${allowed ? 'text-ok-fg' : isAssistant ? 'text-brand-deep' : 'text-danger-fg'}`}>{verdictLabel(result.veredicto)}</h2><p className="mt-1 text-sm">{result.motivo}</p></div>
     </div>
-    {!allowed && !isAssistant && result.veredicto !== 'AULA_NO_ASIGNADA' && <p className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground">Intento registrado con hora, ambiente y controlador.</p>}
+    {actions.recordsAttempt && !allowed && !isAssistant && result.veredicto !== 'AULA_NO_ASIGNADA' && <p className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground">Intento registrado con hora, ambiente y controlador.</p>}
     <StudentDetails result={result} presentedCi={presentedCi} subjectName={subjectName} />
     <AssistantDetails result={result} />
     {result.ambiente_asignado && result.veredicto === 'AULA_INCORRECTA' && <p className="flex items-center gap-2 rounded-lg border border-warn-border bg-warn-soft p-3 text-sm font-medium text-warn-fg"><DoorOpen className="size-4" />Dirija al estudiante a {result.ambiente_asignado.nro_aula}.</p>}
@@ -104,11 +120,12 @@ export function VerificationResult({ result, busy, onConfirm, onReject, onNext, 
       {result.antecedentes.latest && <p className="mt-1">{result.antecedentes.latest.tipo_falta} · {result.antecedentes.latest.fecha_registro}</p>}
     </div>}
     {allowed && <p className="flex items-center gap-2 text-sm text-ok-fg"><AlertTriangle className="size-4" />Compare el nombre y el código SIS con la documentación disponible antes de decidir.</p>}
-    <div className="flex flex-col gap-2 sm:flex-row">
-      {allowed ? <><Button type="button" variant="outline" className="h-11 flex-1 border-danger/40 text-danger-fg hover:bg-danger-soft" disabled={busy} onClick={onReject}>Rechazar</Button><Button type="button" className="h-11 flex-1" disabled={busy} onClick={onConfirm}>{busy ? 'Registrando…' : 'Aceptar ingreso'}</Button></> : <>
+    {extra}
+    {footer ?? <div className="flex flex-col gap-2 sm:flex-row">
+      {allowed ? <><Button type="button" variant="outline" className="h-11 flex-1 border-danger/40 text-danger-fg hover:bg-danger-soft" disabled={busy} onClick={onReject}>{actions.rejectLabel}</Button><Button type="button" className="h-11 flex-1" disabled={busy} onClick={onConfirm}>{busy ? actions.busyLabel : actions.confirmLabel}</Button></> : <>
         {canReport && onReport && <Button type="button" variant="outline" className="h-11 flex-1 border-danger/40 text-danger-fg hover:bg-danger-soft" disabled={busy || reported} onClick={onReport}><Flag className="size-4" />{reported ? 'Ya reportado' : 'Reportar incidencia'}</Button>}
         <Button type="button" variant="outline" className="h-11 flex-1" onClick={onNext}><RotateCcw className="size-4" />{isAssistant ? 'Nueva verificación' : 'Siguiente estudiante'}</Button>
       </>}
-    </div>
+    </div>}
   </section>
 }

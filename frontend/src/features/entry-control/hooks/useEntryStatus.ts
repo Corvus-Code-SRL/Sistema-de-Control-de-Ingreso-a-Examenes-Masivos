@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '@/lib/api-client'
+import { ENTRY_CONTROL_POLL_MS as NORMAL_POLL_MS } from '../constants'
 import { entryControlService, isFullStatus, isPendingStatus } from '../services/entryControlService'
 import type { EntryContext, EntryOpeningFailure, EntryStatus } from '../types/entry-control.types'
 
-const NORMAL_POLL_MS = 2000
 const FIRST_RETRY_MS = 3000
 const MAX_RETRY_MS = 30000
 
