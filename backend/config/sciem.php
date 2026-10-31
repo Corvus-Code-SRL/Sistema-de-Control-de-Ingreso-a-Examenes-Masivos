@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Role;
+
 return [
 
     /*
@@ -86,6 +88,53 @@ return [
     'evidencia_discos' => array_values(array_filter(array_map(
         'trim',
         explode(',', (string) env('SCIEM_EVIDENCIA_DISCOS', 'local,public'))
+    ))),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Acceso por función y rol
+    |--------------------------------------------------------------------------
+    |
+    | ÚNICO lugar del backend que decide qué roles ejercen cada función
+    | (UserRoleService::canUse). Cambiar el acceso de un rol es editar su lista aquí.
+    |
+    | DEBE mantenerse igual que ACCESS_BY_FEATURE en
+    | frontend/src/features/auth/capabilities.ts: el menú y las rutas del cliente salen de ese
+    | espejo, y capabilities.access.test.ts falla si los dos mapas difieren.
+    |
+    | El Auxiliar no figura: su acceso (control de ingreso, reportes de falta) es del rol, no de
+    | estas funciones. El Invitado (docente sin código SIS) ejerce la docencia, habilita auxiliares
+    | por examen, toma incidencias y opera el ingreso; no consulta la Central de Riesgo, no gestiona
+    | auxiliares de grupo, no reporta auxiliares, no acepta casos especiales y, mientras no haya una
+    | decisión de producto, no invita a otros docentes.
+    |
+    */
+
+    'access' => [
+        'teaching'         => [Role::DOCENTE, Role::INVITADO],
+        'exam_assistants'  => [Role::DOCENTE, Role::INVITADO],
+        'incidents'        => [Role::DOCENTE, Role::INVITADO],
+        'risk_center'      => [Role::ADMINISTRADOR, Role::DOCENTE],
+        'group_assistants' => [Role::DOCENTE],
+        'report_assistant' => [Role::DOCENTE],
+        'special_cases'    => [Role::DOCENTE],
+        'invite_teachers'  => [Role::DOCENTE],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cuentas de sistema que nunca pueden iniciar sesión
+    |--------------------------------------------------------------------------
+    |
+    | Códigos (separados por comas) de las cuentas que firman la bitácora de las automatizaciones.
+    | AuthService las rechaza con el mismo mensaje genérico que una contraseña incorrecta,
+    | aunque la contraseña sea la correcta y sea cual sea su rol. Ver App\Support\SystemAccounts.
+    |
+    */
+
+    'cuentas_sistema' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('SCIEM_CUENTAS_SISTEMA', '000000000'))
     ))),
 
 ];

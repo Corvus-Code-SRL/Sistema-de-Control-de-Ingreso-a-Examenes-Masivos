@@ -77,24 +77,25 @@ class StoreUserTest extends TestCase
     }
 
     /** @test */
-    public function rechaza_un_cod_sis_no_reconocido_por_el_sis()   // CA 3
+    public function registra_un_cod_sis_que_el_sis_no_reconoce()
     {
-        $datos = array_merge($this->datosValidos, ['cod_sis' => '999999999']);
+        $datos = array_merge($this->datosValidos, ['cod_sis' => '201999999']);
 
         $this->postJson('/api/usuarios', $datos)
-             ->assertStatus(422)
-             ->assertJsonValidationErrors('cod_sis');
+             ->assertStatus(201)
+             ->assertJsonPath('data.cod_sis', '201999999');
     }
 
     /** @test */
-    public function responde_503_si_el_sis_no_esta_disponible()     // CA 10
+    public function registra_aunque_el_sis_no_este_disponible()
     {
         $mock = Mockery::mock(SisGateway::class);
         $mock->shouldReceive('estaDisponible')->andReturn(false);
+        $mock->shouldNotReceive('existePersona');
         $this->app->instance(SisGateway::class, $mock);
 
         $this->postJson('/api/usuarios', $this->datosValidos)
-             ->assertStatus(503);
+             ->assertStatus(201);
     }
 
     /** @test */

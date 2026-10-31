@@ -16,6 +16,15 @@ namespace App\Support;
  */
 final class SisCode
 {
+    /** Prefijo de los códigos de acceso de docentes invitados, que no tienen código SIS. */
+    public const GUEST_PREFIX = 'INV';
+
+    /** ¿Es el código de acceso de un docente invitado? Recibe el código ya normalizado. */
+    public static function isGuest(string $code): bool
+    {
+        return strncmp($code, self::GUEST_PREFIX, strlen(self::GUEST_PREFIX)) === 0;
+    }
+
     public static function normalize(string $code): string
     {
         // \p{Z} cubre el espacio duro (U+00A0) que Excel deja en las celdas copiadas.

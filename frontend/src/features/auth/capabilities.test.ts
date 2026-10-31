@@ -40,7 +40,7 @@ describe('capacidades por rol', () => {
   })
 
   it('un rol desconocido o ausente no concede nada', () => {
-    expect(capabilitiesOf('Invitado')).toEqual([])
+    expect(capabilitiesOf('Rol inexistente')).toEqual([])
     expect(capabilitiesOf(null)).toEqual([])
     expect(hasCapability(undefined, 'ingreso.operar')).toBe(false)
   })
@@ -49,6 +49,7 @@ describe('capacidades por rol', () => {
     expect(areaForRole('Administrador')).toBe('administrador')
     expect(areaForRole('Docente')).toBe('docente')
     expect(areaForRole('Auxiliar')).toBe('auxiliar')
+    expect(areaForRole('Invitado')).toBe('docente')
     expect(areaForRole(null)).toBe('docente')
   })
 })

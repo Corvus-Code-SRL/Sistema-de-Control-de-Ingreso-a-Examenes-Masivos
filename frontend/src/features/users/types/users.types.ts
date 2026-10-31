@@ -1,3 +1,5 @@
+import { GUEST_ROLE_NAME } from '@/lib/roleLabel'
+
 /**
  * Tipos del feature users, tal como los devuelve el módulo Security.
  */
@@ -27,6 +29,8 @@ export interface UserAccount {
   nombre_completo: string
   correo: string
   estado: AccountStatus
+  /** Docente invitado: su código lo generó el sistema (INV + 4 dígitos) y no es un código SIS. */
+  es_invitado: boolean
   /** `null` mientras la cuenta no tenga rol asignado. */
   rol: AccountRole | null
 }
@@ -48,9 +52,17 @@ export interface AccountsMeta {
   id_usuario_actual: string | null
 }
 
+/** Meta de `GET /usuarios`: el usuario actual y la paginación del servidor. */
+export interface AccountsListMeta extends AccountsMeta {
+  current_page: number
+  last_page: number
+  per_page: number
+  total: number
+}
+
 export interface UserAccountsResponse {
   data: UserAccount[]
-  meta: AccountsMeta
+  meta: AccountsListMeta
 }
 
 export interface UserAccountDetailResponse {
@@ -66,9 +78,24 @@ export interface ActiveAssignments {
   tiene_activas: boolean
 }
 
+/** Una página del listado de cuentas, tal como la paginó el servidor. */
 export interface UserAccounts {
   accounts: UserAccount[]
   currentUserId: string | null
+  page: number
+  perPage: number
+  total: number
+  totalPages: number
+}
+
+/** Valor de `?rol=` para las cuentas que aún no tienen rol. */
+export const WITHOUT_ROLE_FILTER = 'sin-rol'
+
+/** Filtros del listado, guardados en la URL: búsqueda, rol (id o `sin-rol`) y página. */
+export interface AccountFilters {
+  q: string
+  rol: string | null
+  page: number
 }
 
 export interface UserAccountWithContext {
@@ -85,9 +112,17 @@ export interface SisPerson {
   facultad: string
 }
 
-/** Cuerpo de `POST /usuarios`: exactamente los campos que declara StoreUserRequest. */
+/**
+ * Cuerpo de `POST /usuarios`: exactamente los campos que declara StoreUserRequest.
+ *
+ * Un docente invitado envía `sin_codigo_sis` en lugar de `cod_sis`; `id_rol: null` la deja sin rol.
+ */
 export interface NewUserAccount {
-  cod_sis: string
+  cod_sis?: string
+  sin_codigo_sis?: boolean
+  /** Código INV que el administrador vio antes de registrar; el servidor lo vuelve a comprobar. */
+  cod_invitado?: string
+  id_rol: number | null
   nombre: string
   apellido_paterno: string
   apellido_materno: string | null
@@ -96,14 +131,13 @@ export interface NewUserAccount {
   contrasenia_temporal: string
 }
 
-/** Lo que el registro dejó al terminar: la cuenta y el rol que recibió (`null` si quedó sin rol). */
-export interface RegistrationResult {
-  account: UserAccount
-  role: Role | null
-}
+/** Rol del docente invitado (nombre interno; en pantalla se muestra con `roleLabel`). */
+export const GUEST_ROLE = GUEST_ROLE_NAME
 
-/** Nombre del rol Docente en el catálogo; su cambio exige revisar asignaciones. */
-export const TEACHER_ROLE = 'Docente'
+/**
+ * Roles cuyo cambio exige revisar asignaciones. El docente invitado no está: su rol no se cambia.
+ */
+export const TEACHING_ROLES: readonly string[] = ['Docente']
 
 type AccountName = Pick<UserAccount, 'nombre' | 'apellido_paterno' | 'apellido_materno'>
 

@@ -16,7 +16,7 @@ export const AREA_LABELS: Record<Area, string> = {
 }
 
 /** Nombres de rol tal como los devuelve el backend (`rol.nombre_rol`). */
-export type RoleName = 'Administrador' | 'Docente' | 'Auxiliar'
+export type RoleName = 'Administrador' | 'Docente' | 'Auxiliar' | 'Invitado'
 
 /** Usuario que la aplicación muestra como conectado (avatar y nombre del sidebar). */
 export interface CurrentUser {
@@ -24,6 +24,8 @@ export interface CurrentUser {
   /** Iniciales para el avatar, que es lo único que el diseño muestra. */
   iniciales: string
   area: Area
+  /** Nombre del rol para mostrar («Docente invitado» en lugar del interno «Invitado»); sin sesión no hay. */
+  rolEtiqueta?: string
 }
 
 /*

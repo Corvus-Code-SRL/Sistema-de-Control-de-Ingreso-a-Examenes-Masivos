@@ -8,6 +8,11 @@ namespace App\Http\Requests\Academic;
  */
 class ShowGroupAssistantsRequest extends AssistantManagementRequest
 {
+    protected function feature(): string
+    {
+        return 'group_assistants';
+    }
+
     public function rules(): array
     {
         return [

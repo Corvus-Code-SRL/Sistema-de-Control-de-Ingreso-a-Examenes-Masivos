@@ -33,7 +33,12 @@ class UserQueryController extends Controller
     /** GET /api/usuarios */
     public function index(IndexUserRequest $request): AnonymousResourceCollection
     {
-        return UserResource::collection($this->users->listUsers())
+        return UserResource::collection($this->users->paginate(
+            $request->search(),
+            $request->roleFilter(),
+            $request->page(),
+            $request->perPage()
+        ))
             ->additional(['meta' => $this->users->meta($this->currentUser->id())]);
     }
 

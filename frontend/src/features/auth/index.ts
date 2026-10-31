@@ -14,9 +14,9 @@ export {
   safeDestination,
 } from './lib/destination'
 export { isRecognisedSis } from './lib/sis'
-export { areaForRole, capabilitiesOf, hasCapability } from './capabilities'
+export { ACCESS_BY_FEATURE, areaForRole, capabilitiesOf, hasCapability } from './capabilities'
 export { AREA_LABELS } from './types/auth.types'
-export type { Capability } from './capabilities'
+export type { AccessFeature, Capability } from './capabilities'
 export type {
   Area,
   AuthState,
