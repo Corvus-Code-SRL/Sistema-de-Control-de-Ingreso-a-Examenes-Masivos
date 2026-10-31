@@ -14,7 +14,15 @@ import {
   useCurrentUser,
   type Capability,
 } from '@/features/auth'
-import { EntryControlPage, OpenEntryControlsPage } from '@/features/entry-control'
+import {
+  EntryControlPage,
+  LATE_ENTRY_EXAMS_PATH,
+  LATE_ENTRY_PATH,
+  LateEntryExamsPage,
+  LateEntryPage,
+  OpenEntryControlsPage,
+  lateEntryExtensions,
+} from '@/features/entry-control'
 import {
   CreateExamPage,
   EditExamPage,
@@ -45,7 +53,10 @@ import { IncidentsPage } from '@/features/incidents'
 
 // Punto de composición de HU-037, HU-038-B, HU-042 y HU-057.
 // Cada feature puede aportar componentes aquí sin editar ExamInProgressPage.
-const examInProgressExtensions: ExamInProgressExtensions = {}
+const examInProgressExtensions: ExamInProgressExtensions = {
+  headerActions: lateEntryExtensions.headerActions,
+  panels: lateEntryExtensions.panels,
+}
 
 /** Envuelve una pantalla con la capacidad que exige. Sin sesión redirige al login (ver ProtectedRoute). */
 function guarded(capability: Capability, element: ReactElement) {
@@ -141,6 +152,8 @@ function DocenteRoutes() {
         path="/examenes/:examId/en-curso"
         element={guarded('ingreso.operar', <ExamInProgressPage extensions={examInProgressExtensions} />)}
       />
+      <Route path={LATE_ENTRY_EXAMS_PATH} element={guarded('ingreso.operar', <LateEntryExamsPage />)} />
+      <Route path={LATE_ENTRY_PATH} element={guarded('ingreso.operar', <LateEntryPage />)} />
 
       <Route path="/incidencias" element={guarded('examenes.gestionar', <IncidentsPage />)} />
 
@@ -177,6 +190,8 @@ function AuxiliarRoutes() {
         path="/examenes/:examId/en-curso"
         element={guarded('ingreso.operar', <ExamInProgressPage extensions={examInProgressExtensions} />)}
       />
+      <Route path={LATE_ENTRY_EXAMS_PATH} element={guarded('ingreso.operar', <LateEntryExamsPage />)} />
+      <Route path={LATE_ENTRY_PATH} element={guarded('ingreso.operar', <LateEntryPage />)} />
       <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
     </Routes>
   )

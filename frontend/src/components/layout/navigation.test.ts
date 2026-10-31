@@ -109,7 +109,7 @@ describe('menú por capacidades', () => {
         items: [
           ['Control de ingreso', '/control-ingreso'],
           ['En curso', '/examenes/en-curso'],
-          ['Registrar estudiante con retraso', undefined],
+          ['Registrar estudiante con retraso', '/retrasos'],
           ['Registrar estudiante excepcional', undefined]
         ]
       },
@@ -144,7 +144,7 @@ describe('menú por capacidades', () => {
         items: [
           ['Control de ingreso', '/control-ingreso'],
           ['En curso', '/examenes/en-curso'],
-          ['Registrar estudiante con retraso', undefined]
+          ['Registrar estudiante con retraso', '/retrasos']
         ]
       }
     ])

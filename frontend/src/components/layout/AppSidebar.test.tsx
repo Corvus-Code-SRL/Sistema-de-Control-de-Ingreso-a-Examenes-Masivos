@@ -305,6 +305,7 @@ describe('AppSidebar — entradas y estado activo', () => {
       ['Registrar examen', '/examenes/nuevo'],
       ['Control de ingreso', '/control-ingreso'],
       ['En curso', '/examenes/en-curso'],
+      ['Registrar estudiante con retraso', '/retrasos'],
       ['Revisar reportes de incidencias', '/incidencias'],
       ['Central de riesgo', '/central-riesgo']
     ])
@@ -324,6 +325,15 @@ describe('AppSidebar — entradas y estado activo', () => {
     await openAllSections(user)
 
     expect(screen.getByRole('link', { name: 'Control de ingreso' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Programados' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('/examenes/:id/retrasos resalta Registrar estudiante con retraso y no Programados', async () => {
+    const user = userEvent.setup()
+    renderSidebar('Docente', '/examenes/12/retrasos')
+    await openAllSections(user)
+
+    expect(screen.getByRole('link', { name: 'Registrar estudiante con retraso' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Programados' })).not.toHaveAttribute('aria-current')
   })
 
