@@ -16,6 +16,7 @@ export interface FinalReportAttendance {
   a_tiempo: number
   con_retraso: number
   ausentes: number
+  sin_clasificar: number
 }
 
 export interface FinalReportGroup extends FinalReportAttendance {

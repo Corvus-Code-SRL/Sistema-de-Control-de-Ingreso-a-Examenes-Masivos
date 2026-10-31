@@ -12,7 +12,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow
+  TableRow,
 } from '@/components/ui/table'
 import { useFinalReport } from '../hooks/useFinalReport'
 import { useFinalReportPdf } from '../hooks/useFinalReportPdf'
@@ -64,7 +64,7 @@ function HeaderSection({ report }: { report: FinalReport }) {
     ['Fecha del examen', formatDate(cabecera.fecha)],
     ['Hora de inicio', orDash(cabecera.hora_inicio)],
     ['Hora de fin', orDash(cabecera.hora_fin)],
-    ['Reporte generado', formatGeneratedAt(cabecera.generado_en)]
+    ['Reporte generado', formatGeneratedAt(cabecera.generado_en)],
   ]
 
   return (
@@ -81,6 +81,7 @@ function HeaderSection({ report }: { report: FinalReport }) {
 
 function AttendanceSection({ report }: { report: FinalReport }) {
   const { grupos, totales } = report.asistencia
+  const showUnclassified = totales.sin_clasificar > 0
 
   return (
     <div className="overflow-x-auto">
@@ -92,6 +93,7 @@ function AttendanceSection({ report }: { report: FinalReport }) {
             <TableHead className="text-right">A tiempo</TableHead>
             <TableHead className="text-right">Con retraso</TableHead>
             <TableHead className="text-right">Ausentes</TableHead>
+            {showUnclassified && <TableHead className="text-right">Sin clasificar</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -102,6 +104,9 @@ function AttendanceSection({ report }: { report: FinalReport }) {
               <TableCell className="text-right">{group.a_tiempo}</TableCell>
               <TableCell className="text-right">{group.con_retraso}</TableCell>
               <TableCell className="text-right">{group.ausentes}</TableCell>
+              {showUnclassified && (
+                <TableCell className="text-right">{group.sin_clasificar}</TableCell>
+              )}
             </TableRow>
           ))}
           <TableRow className="font-semibold">
@@ -110,6 +115,9 @@ function AttendanceSection({ report }: { report: FinalReport }) {
             <TableCell className="text-right">{totales.a_tiempo}</TableCell>
             <TableCell className="text-right">{totales.con_retraso}</TableCell>
             <TableCell className="text-right">{totales.ausentes}</TableCell>
+            {showUnclassified && (
+              <TableCell className="text-right">{totales.sin_clasificar}</TableCell>
+            )}
           </TableRow>
         </TableBody>
       </Table>
@@ -189,7 +197,7 @@ export function FinalReportPage() {
   const breadcrumbs = [
     { label: 'Exámenes' },
     { label: 'Resumen del examen', to: summaryPath },
-    { label: 'Reporte final' }
+    { label: 'Reporte final' },
   ]
 
   if (notFound) {
