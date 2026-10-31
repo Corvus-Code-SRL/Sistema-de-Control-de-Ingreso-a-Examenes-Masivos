@@ -80,8 +80,7 @@ class SeededSisCodesTest extends TestCase
 
     /**
      * Un estudiante puede ser auxiliar, así que sus códigos de 8 y 9 dígitos deben pasar el formato de
-     * Auxiliar. El seeder de QA genera además 2021600100–2021600118 con 10 dígitos (su `%02d` se
-     * desborda): no son cuentas y cumplen la regla de la nómina (config sciem.estudiante_cod_sis).
+     * Auxiliar, y todos deben cumplir la regla de la nómina (config sciem.estudiante_cod_sis).
      */
     public function test_cada_codigo_de_estudiante_sembrado_cumple_la_regla_de_la_nomina_y_los_de_8_o_9_digitos_la_de_auxiliar(): void
     {
@@ -104,6 +103,27 @@ class SeededSisCodesTest extends TestCase
 
         $this->assertSame([], $outsideRoster, 'Códigos de estudiante fuera de la regla de la nómina.');
         $this->assertSame([], $notAssistantFormat, 'Códigos de estudiante de 8 o 9 dígitos que el formato de Auxiliar rechaza.');
+    }
+
+    public function test_los_153_estudiantes_de_qa_tienen_codigos_de_9_digitos_distintos_y_sembrarlos_de_nuevo_no_los_cambia(): void
+    {
+        $qaCodes = fn () => DB::table('estudiante')
+            ->where('cod_sis', 'like', '20216%')
+            ->orderBy('id_estudiante')
+            ->pluck('cod_sis');
+        $first = $qaCodes();
+
+        $this->assertCount(153, $first);
+        $this->assertSame([], $first->reject(fn ($code) => preg_match('/^\d{9}$/', $code) === 1)->values()->all());
+        $this->assertCount(153, $first->unique());
+        $this->assertSame('202160118', $first->get(117));
+
+        $qa = new Sprint3QaSeeder();
+        $reflection = new ReflectionMethod($qa, 'seedStudents');
+        $reflection->setAccessible(true);
+        $reflection->invoke($qa);
+
+        $this->assertSame($first->all(), $qaCodes()->all());
     }
 
     public function test_ningun_codigo_sembrado_usa_el_prefijo_reservado_de_invitados(): void
