@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Ban, DoorOpen, Pencil, Users } from 'lucide-react'
+import { Ban, DoorOpen, FileText, Pencil, Users } from 'lucide-react'
 import { groupExamsPath, groupIdFrom } from '@/features/groups'
 import { ApiError } from '@/lib/api-client'
 import { AppShell } from '@/components/layout/AppShell'
@@ -21,6 +21,7 @@ import { ShieldAlert } from 'lucide-react'
 import { examsService } from '../services/examsService'
 import { ExamStatusBadge } from '../components/ExamStatusBadge'
 import { examLockedMessage } from '../utils/examLockedMessage'
+import { examFinalReportPath } from '../utils/paths'
 import type { Exam } from '../types/exams.types'
 import { AssistantClassroomManager } from '@/features/assistants/components/AssistantClassroomManager'
 
@@ -223,6 +224,14 @@ export function ExamDetailPage() {
               onClick={() => navigate(`/examenes/${id}/en-curso`)}
             >
               Ver examen en curso
+            </Button>
+         ) : exam?.estado === 'FINALIZADO' ? (
+            <Button
+              type="button"
+              onClick={() => navigate(examFinalReportPath(id))}
+            >
+              <FileText className="size-4" aria-hidden="true" />
+              Generar reporte
             </Button>
           ) : null
         }
