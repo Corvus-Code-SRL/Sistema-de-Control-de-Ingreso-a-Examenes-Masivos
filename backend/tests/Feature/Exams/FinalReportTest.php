@@ -205,4 +205,30 @@ class FinalReportTest extends TestCase
 
         $this->getJson($this->url($exam) . '/pdf')->assertForbidden();
     }
+
+    public function test_el_pdf_de_un_examen_con_1000_estudiantes_no_agota_la_memoria(): void
+    {
+        $exam = $this->finishedExam();
+        $this->enrollStudents($this->grupoPropioId, 998);
+
+        $rows = [];
+
+        foreach (array_slice($this->groupStudentIds(), 2) as $studentId) {
+            $rows[] = [
+                'id_examen' => $exam->id_examen,
+                'id_estudiante' => $studentId,
+                'id_grupo' => $this->grupoPropioId,
+                'estado_habilitacion' => 'HABILITADO',
+                'estado_ingreso' => 'INGRESO',
+                'hora_ingreso' => '08:05',
+                'id_ambiente' => $this->aulaId,
+            ];
+        }
+
+        DB::table('examen_estudiante')->insert($rows);
+
+        $response = $this->get($this->url($exam) . '/pdf')->assertOk();
+
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+    }
 }
