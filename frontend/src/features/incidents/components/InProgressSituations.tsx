@@ -20,6 +20,7 @@ export function InProgressSituationAction({ exam, student }: ActionProps) {
   const [message, setMessage] = useState('')
   const pending = useRef<AbortController | null>(null)
   const canRegister = exam.situaciones_habilitadas !== false && exam.estado === 'EN_CURSO'
+    && !student.expulsado_en
     && ['INGRESO', 'CON_RETRASO'].includes(student.estado_ingreso)
     && student.id_ambiente !== null
     && (exam.rol_controlador === 'DOCENTE' || student.id_ambiente === exam.id_ambiente_asignado)

@@ -41,12 +41,19 @@ import {
   SubjectsPage,
 } from '@/features/subjects'
 import { CuentaDetallePage, CuentasPage } from '@/features/users'
-import { IncidentsPage, ExamSituationsPage, InProgressSituationAction, InProgressSituationsPanel } from '@/features/incidents'
+import {
+  IncidentsPage, ExamSituationsPage, InProgressSituationAction, InProgressSituationsPanel,
+  InProgressIncidentAction, InProgressIncidentsCount,
+} from '@/features/incidents'
 
 // Punto de composición de HU-037, HU-038-B, HU-042 y HU-057.
 // Cada feature puede aportar componentes aquí sin editar ExamInProgressPage.
 const examInProgressExtensions: ExamInProgressExtensions = {
-  studentActions: (student, exam) => <InProgressSituationAction student={student} exam={exam} />,
+  headerActions: (exam) => <InProgressIncidentsCount exam={exam} />,
+  studentActions: (student, exam) => <div className="space-y-2">
+    <InProgressSituationAction student={student} exam={exam} />
+    <InProgressIncidentAction key={`${exam.id_examen}-${student.id_estudiante}`} student={student} exam={exam} />
+  </div>,
   panels: (exam) => <InProgressSituationsPanel exam={exam} />,
 }
 

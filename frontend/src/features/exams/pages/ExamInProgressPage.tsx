@@ -14,7 +14,7 @@ import {
   type ExamClockSync,
 } from '../utils/examClock';
 
-type Filter = 'presentes' | 'retraso' | 'ausentes' | 'todos';
+type Filter = 'presentes' | 'retraso' | 'ausentes' | 'expulsados' | 'todos';
 
 const CAMPUS_TIME_ZONE = 'America/La_Paz';
 
@@ -38,6 +38,7 @@ function localTime(value: string): string {
 }
 
 function entryLabel(student: InProgressStudent): string {
+  if (student.expulsado_en) return `Expulsado · ${localTime(student.expulsado_en)}`;
   if (student.estado_ingreso === 'INGRESO') return 'A tiempo';
   if (student.estado_ingreso === 'CON_RETRASO') return 'Con retraso';
   return 'Ausente';
@@ -146,6 +147,11 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
       count: data?.totales.ausentes ?? 0,
     },
     {
+      value: 'expulsados',
+      label: 'Expulsados',
+      count: data?.totales.expulsados ?? 0,
+    },
+    {
       value: 'todos',
       label: 'Todos',
       count: data?.totales.total ?? 0,
@@ -157,9 +163,10 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
   const students = (data?.estudiantes ?? []).filter((student) => {
     const matchesStatus =
       filter === 'todos' ||
-      (filter === 'presentes' && student.estado_ingreso !== 'NO_INGRESO') ||
-      (filter === 'retraso' && student.estado_ingreso === 'CON_RETRASO') ||
-      (filter === 'ausentes' && student.estado_ingreso === 'NO_INGRESO');
+      (filter === 'expulsados' && !!student.expulsado_en) ||
+      (filter === 'presentes' && !student.expulsado_en && student.estado_ingreso !== 'NO_INGRESO') ||
+      (filter === 'retraso' && !student.expulsado_en && student.estado_ingreso === 'CON_RETRASO') ||
+      (filter === 'ausentes' && !student.expulsado_en && student.estado_ingreso === 'NO_INGRESO');
 
     const matchesSearch = normalizeSearch([
       student.nombre_completo,
@@ -178,7 +185,9 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
         ? 'No hay estudiantes con retraso.'
         : filter === 'ausentes'
           ? 'No hay estudiantes ausentes.'
-          : 'No hay estudiantes registrados en la nómina.';
+          : filter === 'expulsados'
+            ? 'No hay estudiantes expulsados.'
+            : 'No hay estudiantes registrados en la nómina.';
 
   return (
     <AppShell
@@ -298,11 +307,12 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
 
           </section>
 
-          <section className="grid gap-3 sm:grid-cols-3">
+          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {([
               ['A tiempo', data.totales.a_tiempo],
               ['Con retraso', data.totales.con_retraso],
               ['Ausentes', data.totales.ausentes],
+              ['Expulsados', data.totales.expulsados ?? 0],
             ] as const).map(([label, value]) => (
               <div
                 key={label}
