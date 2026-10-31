@@ -18,6 +18,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class StudentExam extends Pivot
 {
+    /** Valores de public.estado_ingreso. */
+    public const INGRESO = 'INGRESO';
+    public const CON_RETRASO = 'CON_RETRASO';
+    public const NO_INGRESO = 'NO_INGRESO';
+
     protected $table = 'examen_estudiante';
     protected $primaryKey = null;
     public $incrementing = false;
