@@ -7,6 +7,7 @@ import { mockApi } from '@/test/http'
 import {
   assignmentsResponse,
   assistant,
+  guestTeacher,
   makeAccount,
   roles,
   teacher,
@@ -161,5 +162,28 @@ describe('AsignarRolModal', () => {
 
     expect(await screen.findByText('No se pudo cargar la información')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /reintentar/i })).toBeInTheDocument()
+  })
+
+  it('una cuenta con código SIS no puede recibir el rol Invitado', async () => {
+    mockApi([{ matches: userMatchers.roles, body: { data: roles } }])
+
+    renderModal(makeAccount())
+
+    await screen.findByRole('radio', { name: /docente/i })
+
+    expect(screen.queryByRole('radio', { name: /invitado/i })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('radio')).toHaveLength(3)
+  })
+
+  it('una cuenta de docente invitado solo puede recibir el rol Invitado y muestra su código INV', async () => {
+    mockApi([{ matches: userMatchers.roles, body: { data: roles } }])
+
+    renderModal({ ...guestTeacher, rol: null })
+
+    const options = await screen.findAllByRole('radio')
+
+    expect(options).toHaveLength(1)
+    expect(options[0]).toHaveAccessibleName(/invitado/i)
+    expect(screen.getByText('Código INV INV4821')).toBeInTheDocument()
   })
 })
