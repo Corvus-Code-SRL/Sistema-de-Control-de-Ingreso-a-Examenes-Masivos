@@ -28,7 +28,18 @@ function formatDate(date: string): string {
 
 function formatGeneratedAt(value: string): string {
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('es-BO')
+
+  if (Number.isNaN(date.getTime())) return value
+
+  return date.toLocaleString('es-BO', {
+    timeZone: 'America/La_Paz',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
 }
 
 function orDash(value: string | null): string {
