@@ -24,6 +24,8 @@ class FinalReportService
         'NO_INGRESO' => 'Ausente',
     ];
 
+    private const UNCLASSIFIED_LABEL = 'Sin clasificar';
+
     private const DECISION_LABELS = [
         ReportStatus::APPROVED => 'Aprobada',
         ReportStatus::REJECTED => 'Rechazada',
@@ -124,6 +126,9 @@ class FinalReportService
                 'a_tiempo' => $group->where('estado_ingreso', 'INGRESO')->count(),
                 'con_retraso' => $group->where('estado_ingreso', 'CON_RETRASO')->count(),
                 'ausentes' => $group->where('estado_ingreso', 'NO_INGRESO')->count(),
+                'sin_clasificar' => $group
+                    ->whereNotIn('estado_ingreso', array_keys(self::ENTRY_LABELS))
+                    ->count(),
             ])
             ->sortBy('num_grupo', SORT_NATURAL)
             ->values();
@@ -135,6 +140,7 @@ class FinalReportService
                 'a_tiempo' => $groups->sum('a_tiempo'),
                 'con_retraso' => $groups->sum('con_retraso'),
                 'ausentes' => $groups->sum('ausentes'),
+                'sin_clasificar' => $groups->sum('sin_clasificar'),
             ],
         ];
     }
@@ -147,7 +153,7 @@ class FinalReportService
             'nombre' => trim("{$row->nombre} {$row->apellido_paterno} {$row->apellido_materno}"),
             'ambiente' => $row->nro_aula,
             'hora_ingreso' => $this->shortTime($row->hora_ingreso),
-            'estado' => self::ENTRY_LABELS[$row->estado_ingreso] ?? $row->estado_ingreso,
+            'estado' => self::ENTRY_LABELS[$row->estado_ingreso] ?? self::UNCLASSIFIED_LABEL,
         ])->all();
     }
 

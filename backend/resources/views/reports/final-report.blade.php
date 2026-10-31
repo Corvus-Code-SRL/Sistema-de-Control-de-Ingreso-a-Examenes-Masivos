@@ -30,6 +30,8 @@
         <tr><td>Reporte generado:</td><td>{{ \Carbon\Carbon::parse($c['generado_en'])->format('d/m/Y H:i') }}</td></tr>
     </table>
 
+    @php($showUnclassified = $report['asistencia']['totales']['sin_clasificar'] > 0)
+
     <h2>Asistencia por grupo</h2>
     <table>
         <thead>
@@ -39,6 +41,9 @@
                 <th class="num">A tiempo</th>
                 <th class="num">Con retraso</th>
                 <th class="num">Ausentes</th>
+                @if ($showUnclassified)
+                    <th class="num">Sin clasificar</th>
+                @endif
             </tr>
         </thead>
         <tbody>
@@ -49,6 +54,9 @@
                     <td class="num">{{ $group['a_tiempo'] }}</td>
                     <td class="num">{{ $group['con_retraso'] }}</td>
                     <td class="num">{{ $group['ausentes'] }}</td>
+                    @if ($showUnclassified)
+                        <td class="num">{{ $group['sin_clasificar'] }}</td>
+                    @endif
                 </tr>
             @endforeach
             <tr class="total">
@@ -57,6 +65,9 @@
                 <td class="num">{{ $report['asistencia']['totales']['a_tiempo'] }}</td>
                 <td class="num">{{ $report['asistencia']['totales']['con_retraso'] }}</td>
                 <td class="num">{{ $report['asistencia']['totales']['ausentes'] }}</td>
+                @if ($showUnclassified)
+                    <td class="num">{{ $report['asistencia']['totales']['sin_clasificar'] }}</td>
+                @endif
             </tr>
         </tbody>
     </table>

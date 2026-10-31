@@ -3,6 +3,7 @@
 namespace Tests\Feature\Exams;
 
 use App\Models\Exam;
+use App\Services\Exams\FinalReportService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\SeedsExamCatalog;
@@ -230,5 +231,45 @@ class FinalReportTest extends TestCase
         $response = $this->get($this->url($exam) . '/pdf')->assertOk();
 
         $this->assertStringStartsWith('%PDF', $response->getContent());
+    }
+
+    public function test_un_estado_de_ingreso_desconocido_no_rompe_las_sumas_por_grupo(): void
+    {
+        $rows = collect(['INGRESO', 'CON_RETRASO', 'NO_INGRESO', 'ESTADO_NUEVO'])
+            ->map(fn (string $state, int $index) => (object) [
+                'id_grupo' => 1,
+                'num_grupo' => '1',
+                'estado_ingreso' => $state,
+                'hora_ingreso' => null,
+                'cod_sis' => '20260000' . $index,
+                'nombre' => 'Ana',
+                'apellido_paterno' => 'Rojas',
+                'apellido_materno' => 'Paz',
+                'nro_aula' => null,
+            ]);
+
+        $service = app(FinalReportService::class);
+
+        $attendance = $this->callPrivate($service, 'attendanceByGroup', [$rows]);
+        $group = $attendance['grupos'][0];
+
+        $this->assertSame(4, $group['inscritos']);
+        $this->assertSame(1, $group['sin_clasificar']);
+        $this->assertSame(
+            $group['inscritos'],
+            $group['a_tiempo'] + $group['con_retraso'] + $group['ausentes'] + $group['sin_clasificar']
+        );
+        $this->assertSame(1, $attendance['totales']['sin_clasificar']);
+
+        $students = $this->callPrivate($service, 'studentList', [$rows]);
+        $this->assertContains('Sin clasificar', array_column($students, 'estado'));
+    }
+
+    private function callPrivate(object $object, string $method, array $arguments): mixed
+    {
+        $reflection = new \ReflectionMethod($object, $method);
+        $reflection->setAccessible(true);
+
+        return $reflection->invokeArgs($object, $arguments);
     }
 }
