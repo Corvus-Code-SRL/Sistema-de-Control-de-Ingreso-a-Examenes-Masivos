@@ -11,9 +11,13 @@ use Illuminate\Http\Request;
  */
 class DuplicateAccountException extends Exception
 {
-    public function __construct(string $fullName)
+    private ?string $userId;
+
+    public function __construct(string $fullName, ?string $userId = null)
     {
         parent::__construct("Ya existe una cuenta con este código SIS: {$fullName}.");
+
+        $this->userId = $userId;
     }
 
     public function render(Request $request): JsonResponse
@@ -22,6 +26,8 @@ class DuplicateAccountException extends Exception
         return response()->json([
             'message' => 'Los datos proporcionados no son válidos.',
             'errors'  => ['cod_sis' => [$this->getMessage()]],
+            // Permite ofrecer «Ver la cuenta existente».
+            'cuenta_existente' => ['id_usuario' => $this->userId],
         ], 422);
     }
 }

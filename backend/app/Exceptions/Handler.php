@@ -17,7 +17,9 @@ use App\Exceptions\Security\InvalidCredentialsException;
 use App\Exceptions\Security\NoCurrentRoleException;
 use App\Exceptions\Security\PasswordChangeRequiredException;
 use App\Exceptions\Security\SelfRoleAssignmentException;
-use App\Exceptions\Security\SisNoValidoException;
+use App\Exceptions\Security\GuestCodeTakenException;
+use App\Exceptions\Security\GuestCodesExhaustedException;
+use App\Exceptions\Security\RoleNotAllowedForAccountException;
 use App\Support\ApiResponse;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
@@ -57,7 +59,9 @@ class Handler extends ExceptionHandler
         NoCurrentRoleException::class,
         PasswordChangeRequiredException::class,
         SelfRoleAssignmentException::class,
-        SisNoValidoException::class,
+        GuestCodeTakenException::class,
+        GuestCodesExhaustedException::class,
+        RoleNotAllowedForAccountException::class,
         IncidentAlreadyReviewedException::class,
         IncidentOwnershipException::class,
         IncidentReportNotFoundException::class,
