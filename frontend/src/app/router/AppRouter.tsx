@@ -34,6 +34,7 @@ import {
 } from '@/features/subjects'
 import { CuentaDetallePage, CuentasPage } from '@/features/users'
 import { IncidentsPage } from '@/features/incidents'
+import { AlienAttemptsReportPage } from '@/features/reports/academic'
 
 /** Envuelve una pantalla con la capacidad que exige. Sin sesión redirige al login (ver ProtectedRoute). */
 function guarded(capability: Capability, element: ReactElement) {
@@ -200,6 +201,10 @@ function AdministradorRoutes() {
       <Route
         path="/central-riesgo/:id?"
         element={guarded('riesgo.consultar', <RiskCenterPage />)}
+      />
+      <Route
+        path="/reportes/intentos"
+        element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
       />
 
       <Route path="*" element={<Navigate to="/cuentas" replace />} />

@@ -8,6 +8,7 @@ import {
   Clock,
   DoorOpen,
   FilePenLine,
+  FileSearch,
   FileText,
   FileUp,
   GraduationCap,
@@ -191,6 +192,13 @@ export const NAVIGATION: readonly NavSection[] = [
         label: 'Generar reporte de bitácora',
         icon: FileText,
         capability: 'administracion.gestionar'
+      },
+      {
+        id: 'admin-alien-attempts-report',
+        label: 'Reporte intentos a exámenes ajenos',
+        icon: FileSearch,
+        capability: 'administracion.gestionar',
+        to: '/reportes/intentos'
       }
     ]
   },
