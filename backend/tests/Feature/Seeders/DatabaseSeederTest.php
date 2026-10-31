@@ -9,7 +9,7 @@ use Tests\TestCase;
 
 /**
  * Una base recién migrada (el esquema que TestCase arma con DROP SCHEMA + migrate) queda con los
- * catálogos del sistema al correr `db:seed`, sin pasos manuales: 4 tipos de falta y 14 acciones.
+ * catálogos del sistema al correr `db:seed`, sin pasos manuales: 4 tipos de falta y 15 acciones.
  */
 class DatabaseSeederTest extends TestCase
 {
@@ -25,16 +25,16 @@ class DatabaseSeederTest extends TestCase
         ];
     }
 
-    public function test_el_seeder_general_carga_los_cuatro_tipos_de_falta_y_las_catorce_acciones(): void
+    public function test_el_seeder_general_carga_los_cuatro_tipos_de_falta_y_las_quince_acciones(): void
     {
         $this->assertSame(0, DB::table('tipo_falta')->count());
-        $this->assertSame(14, DB::table('accion')->count());
+        $this->assertSame(15, DB::table('accion')->count());
 
         $this->seed(DatabaseSeeder::class);
 
         $counts = $this->counts();
         $this->assertSame(4, $counts['tipo_falta']);
-        $this->assertSame(14, $counts['accion']);
+        $this->assertSame(15, $counts['accion']);
         $this->assertSame(
             ['Conducta indebida', 'Copia en examen', 'Material no permitido', 'Suplantación de identidad'],
             DB::table('tipo_falta')->orderBy('nombre')->pluck('nombre')->all()

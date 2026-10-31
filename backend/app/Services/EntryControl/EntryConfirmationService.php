@@ -27,6 +27,25 @@ class EntryConfirmationService
     {
         try {
             $result = DB::transaction(function () use ($exam, $input, $actor): array {
+                // Primero bloquear el examen, igual que el inicio manual/automático.
+                // El re-chequeo impide guardar un ingreso con un estado obsoleto.
+                $currentExam = Exam::query()
+                    ->whereKey($exam->id_examen)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if ($currentExam->estado !== Exam::EN_INGRESO) {
+                    $started = in_array($currentExam->estado, [Exam::EN_CURSO, Exam::FINALIZADO], true);
+
+                    return [
+                        'creado' => false,
+                        'veredicto' => $started ? 'EXAMEN_INICIADO' : 'INGRESO_CERRADO',
+                        'motivo' => $started
+                            ? 'El examen ya inició.'
+                            : 'El control de ingreso no está disponible.',
+                    ];
+                }
+
                 $student = Student::query()
                     ->whereKey((int) $input['id_estudiante'])
                     ->lockForUpdate()
