@@ -1,3 +1,7 @@
 export { EntryControlPage } from './pages/EntryControlPage'
 export { OpenEntryControlsPage } from './pages/OpenEntryControlsPage'
 export { ENTRY_CONTROL_POLL_MS } from './constants'
+export { LateEntryExamsPage } from './pages/LateEntryExamsPage'
+export { LateEntryPage } from './pages/LateEntryPage'
+export { lateEntryExtensions } from './components/lateEntryExtensions'
+export { LATE_ENTRY_EXAMS_PATH, LATE_ENTRY_PATH } from './paths'
