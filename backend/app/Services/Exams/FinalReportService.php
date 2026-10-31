@@ -64,18 +64,30 @@ class FinalReportService
     private function header(Exam $exam): array
     {
         $teacher = $exam->teacher;
+        $timezone = config('sciem.zona_horaria');
 
-        // Hasta que HU-038 guarde la hora real, se muestra el horario programado del examen.
         return [
             'id_examen' => (int) $exam->id_examen,
             'nombre_examen' => $exam->nombre_examen,
             'materia' => $exam->subject?->nombre,
             'docente' => $teacher ? trim("{$teacher->nombre} {$teacher->apellido_paterno}") : null,
             'fecha' => $exam->fecha->toDateString(),
-            'hora_inicio' => $this->shortTime($exam->hora_inicio),
-            'hora_fin' => $this->shortTime($exam->hora_fin),
-            'generado_en' => Carbon::now(config('sciem.zona_horaria'))->toIso8601String(),
+            'hora_inicio' => $this->realOrScheduledTime($exam->inicio_real_en, $exam->hora_inicio, $timezone),
+            'hora_fin' => $this->realOrScheduledTime($exam->fin_real_en, $exam->hora_fin, $timezone),
+            'generado_en' => Carbon::now($timezone)->toIso8601String(),
         ];
+    }
+
+    /** Hora real en La Paz; si falta, la programada con su etiqueta para no confundirlas. */
+    private function realOrScheduledTime(?Carbon $real, ?string $scheduled, string $timezone): ?string
+    {
+        if ($real !== null) {
+            return $real->copy()->setTimezone($timezone)->format('H:i');
+        }
+
+        $time = $this->shortTime($scheduled);
+
+        return $time === null ? null : $time . ' (programada)';
     }
 
     /** Todos los esperados están en examen_estudiante porque al finalizar se registra a los ausentes. */

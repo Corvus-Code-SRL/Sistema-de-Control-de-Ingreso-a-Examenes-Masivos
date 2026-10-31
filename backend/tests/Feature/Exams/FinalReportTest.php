@@ -10,7 +10,7 @@ use Tests\TestCase;
 
 /**
  * Reporte final del examen (HU-051): cabecera, asistencia por grupo, estudiantes,
- * incidencias y restricción de acceso.
+ * incidencias, PDF y restricción de acceso.
  */
 class FinalReportTest extends TestCase
 {
@@ -83,7 +83,7 @@ class FinalReportTest extends TestCase
         $response = $this->getJson($this->url($exam))
             ->assertOk()
             ->assertJsonPath('data.cabecera.nombre_examen', 'Parcial final')
-            ->assertJsonPath('data.cabecera.hora_inicio', '08:00')
+            ->assertJsonPath('data.cabecera.hora_inicio', '08:00 (programada)')
             ->assertJsonPath('data.asistencia.totales.inscritos', 2)
             ->assertJsonPath('data.asistencia.totales.a_tiempo', 1)
             ->assertJsonPath('data.asistencia.totales.con_retraso', 0)
@@ -95,6 +95,35 @@ class FinalReportTest extends TestCase
             ['A tiempo', 'Ausente'],
             array_column($response->json('data.estudiantes'), 'estado')
         );
+    }
+
+    public function test_encabezado_usa_las_horas_reales_en_hora_de_la_paz(): void
+    {
+        $exam = $this->finishedExam();
+
+        DB::table('examen')->where('id_examen', $exam->id_examen)->update([
+            'inicio_real_en' => '2026-10-28 12:14:00+00',
+            'fin_real_en' => '2026-10-28 13:52:00+00',
+        ]);
+
+        $this->getJson($this->url($exam))
+            ->assertOk()
+            ->assertJsonPath('data.cabecera.hora_inicio', '08:14')
+            ->assertJsonPath('data.cabecera.hora_fin', '09:52');
+    }
+
+    public function test_si_falta_una_hora_real_muestra_la_programada_con_su_etiqueta(): void
+    {
+        $exam = $this->finishedExam();
+
+        DB::table('examen')->where('id_examen', $exam->id_examen)->update([
+            'inicio_real_en' => '2026-10-28 12:14:00+00',
+        ]);
+
+        $this->getJson($this->url($exam))
+            ->assertOk()
+            ->assertJsonPath('data.cabecera.hora_inicio', '08:14')
+            ->assertJsonPath('data.cabecera.hora_fin', '09:30 (programada)');
     }
 
     public function test_sin_incidencias_la_lista_viene_vacia(): void
@@ -156,7 +185,7 @@ class FinalReportTest extends TestCase
         $this->getJson('/api/examenes/abc/reporte-final')->assertNotFound();
     }
 
-        public function test_docente_descarga_el_pdf_con_nombre_de_examen_y_fecha(): void
+    public function test_docente_descarga_el_pdf_con_nombre_de_examen_y_fecha(): void
     {
         $exam = $this->finishedExam(['nombre_examen' => 'Parcial final']);
 
