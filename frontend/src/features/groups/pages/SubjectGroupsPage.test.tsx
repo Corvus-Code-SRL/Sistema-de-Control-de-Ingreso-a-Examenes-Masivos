@@ -1,0 +1,221 @@
+import { render, screen, waitForElementToBeRemoved, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { describe, expect, it } from 'vitest'
+import { SubjectGroupsPage } from './SubjectGroupsPage'
+import {
+  makeForeignGroup,
+  makeGroup,
+  makeGroupWithoutRoster,
+  makeSubject,
+  periodsResponse,
+  subjectGroupsResponse,
+} from '@/test/fixtures'
+import { matchers, mockApi, mockApiOnce } from '@/test/http'
+import { renderWithRouter } from '@/test/render'
+
+const ROUTE = '/carreras/1/materias/10/grupos'
+const PATH = '/carreras/:idCarrera/materias/:idMateria/grupos'
+
+function renderPage() {
+  return renderWithRouter(<SubjectGroupsPage />, { route: ROUTE, path: PATH })
+}
+
+async function waitForLoad() {
+  await waitForElementToBeRemoved(() => screen.queryByRole('status'))
+}
+
+describe('SubjectGroupsPage', () => {
+  const materia = makeSubject()
+
+  it('anuncia la carga antes de tener datos', async () => {
+    mockApiOnce({ body: subjectGroupsResponse(materia, [makeGroup()]) })
+
+    renderPage()
+
+    expect(screen.getByRole('status')).toBeInTheDocument()
+
+    await waitForLoad()
+  })
+
+  it('lista los grupos del par con su docente dueño', async () => {
+    mockApiOnce({
+      body: subjectGroupsResponse(materia, [makeGroup(), makeForeignGroup()]),
+    })
+
+    renderPage()
+    await waitForLoad()
+
+    expect(screen.getAllByText('Grupo 1').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Grupo 2').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Victor Perez').length).toBeGreaterThan(0)
+  })
+
+  it('no ofrece el detalle de los grupos ajenos', async () => {
+    mockApiOnce({ body: subjectGroupsResponse(materia, [makeForeignGroup()]) })
+
+    renderPage()
+    await waitForLoad()
+
+    expect(screen.queryByRole('link', { name: /ver detalles/i })).not.toBeInTheDocument()
+    expect(screen.getAllByText('Solo lectura').length).toBeGreaterThan(0)
+  })
+
+  it('avisa, sin bloquear, cuando el docente no tiene grupos propios en el par', async () => {
+    mockApiOnce({ body: subjectGroupsResponse(materia, [makeForeignGroup()]) })
+
+    renderPage()
+    await waitForLoad()
+
+    expect(screen.getByText('Usted no tiene grupos en esta materia')).toBeInTheDocument()
+    expect(screen.getAllByText('Grupo 2').length).toBeGreaterThan(0)
+  })
+
+  it('muestra el estado vacío de un par sin grupos, sin lenguaje de error', async () => {
+    mockApiOnce({ body: subjectGroupsResponse(materia, []) })
+
+    renderPage()
+    await waitForLoad()
+
+    expect(screen.getByText('Sin grupos registrados')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByText(/no se pudo cargar/i)).not.toBeInTheDocument()
+  })
+
+  it('marca el grupo sin nómina en el listado', async () => {
+    mockApiOnce({
+      body: subjectGroupsResponse(materia, [makeGroup(), makeGroupWithoutRoster()]),
+    })
+
+    renderPage()
+    await waitForLoad()
+
+    expect(screen.getAllByText('Sin nómina').length).toBeGreaterThan(0)
+  })
+
+  it('quita el filtro de materia y vuelve a la selección de materias', async () => {
+    mockApiOnce({ body: subjectGroupsResponse(materia, [makeGroup()]) })
+
+    render(
+      <MemoryRouter initialEntries={[ROUTE]}>
+        <Routes>
+          <Route path={PATH} element={<SubjectGroupsPage />} />
+          <Route path="/materias" element={<p>Selección de materias</p>} />
+        </Routes>
+      </MemoryRouter>
+    )
+    await waitForLoad()
+
+    expect(screen.getByText(/materia: bases de datos i/i)).toBeInTheDocument()
+
+    const removeFilter = screen.getByRole('link', { name: /quitar el filtro de materia/i })
+    // El chip no depende de un punto de quiebre: está en escritorio y en móvil.
+    expect(removeFilter.closest('.hidden')).toBeNull()
+
+    await userEvent.click(removeFilter)
+
+    expect(screen.getByText('Selección de materias')).toBeInTheDocument()
+  })
+
+  it('el formulario de registro muestra el docente del backend y no el de otro grupo del listado', async () => {
+    mockApi([
+      { matches: matchers.groupsOfPair, body: subjectGroupsResponse(materia, [makeForeignGroup()]) },
+      { matches: (url) => url.includes('/periodos'), body: periodsResponse() },
+    ])
+
+    renderPage()
+    await waitForLoad()
+    await userEvent.click(screen.getByRole('button', { name: /añadir grupo/i }))
+
+    const dialog = await screen.findByRole('dialog')
+
+    expect(within(dialog).getByText('Paola Careaga')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Victor Perez')).not.toBeInTheDocument()
+  })
+
+  it('al registrar, el aviso no inventa cifras de estudiantes', async () => {
+    mockApi([
+      {
+        matches: (url) => matchers.groupsOfPair(url),
+        body: subjectGroupsResponse(materia, [makeGroup()]),
+      },
+      { matches: (url) => url.includes('/periodos'), body: periodsResponse() },
+      {
+        matches: (url) => /\/grupos$/.test(url) && !url.includes('/carreras/'),
+        status: 201,
+        body: {
+          data: { grupo: makeGroup({ num_grupo: 'A' }), materia },
+          mensaje: 'Grupo registrado correctamente.',
+        },
+      },
+    ])
+
+    renderPage()
+    await waitForLoad()
+    await userEvent.click(screen.getByRole('button', { name: /añadir grupo/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.type(within(dialog).getByLabelText(/N° de grupo/i), 'A')
+    await userEvent.click(within(dialog).getByRole('button', { name: /registrar grupo/i }))
+
+    expect(await screen.findByText('Grupo A registrado')).toBeInTheDocument()
+    expect(screen.queryByText(/61 estudiantes/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/filas quedaron fuera/i)).not.toBeInTheDocument()
+  })
+
+  async function registerGroup(createdGroup: ReturnType<typeof makeGroup>) {
+    mockApi([
+      { matches: (url) => matchers.groupsOfPair(url), body: subjectGroupsResponse(materia, [makeGroup()]) },
+      { matches: (url) => url.includes('/periodos'), body: periodsResponse() },
+      {
+        matches: (url) => /\/grupos$/.test(url) && !url.includes('/carreras/'),
+        status: 201,
+        body: { data: { grupo: createdGroup, materia }, mensaje: 'Grupo registrado correctamente.' },
+      },
+    ])
+
+    renderPage()
+    await waitForLoad()
+    await userEvent.click(screen.getByRole('button', { name: /añadir grupo/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.type(within(dialog).getByLabelText(/N° de grupo/i), 'A')
+    await userEvent.click(within(dialog).getByRole('button', { name: /registrar grupo/i }))
+
+    await screen.findByText(/Grupo .* registrado/)
+  }
+
+  it('al registrar un grupo del período activo, el aviso ofrece «Cargar nómina» hacia el grupo', async () => {
+    await registerGroup(makeGroup({ id_grupo: 321, num_grupo: 'A' }))
+
+    const action = screen.getByRole('link', { name: 'Cargar nómina' })
+
+    expect(action).toHaveAttribute('href', '/grupos/321/nomina')
+  })
+
+  it('si el grupo no es del período activo, el aviso no ofrece cargar la nómina', async () => {
+    await registerGroup(
+      makeGroup({
+        id_grupo: 322,
+        num_grupo: 'A',
+        periodo: { id_periodo: 2, nombre_periodo: 'Semestre 1', etiqueta: '1/2026', gestion: 2026 },
+      })
+    )
+
+    expect(screen.queryByRole('link', { name: 'Cargar nómina' })).not.toBeInTheDocument()
+  })
+
+  it('muestra el mensaje del servidor cuando el par está inactivo', async () => {
+    mockApiOnce({
+      status: 422,
+      body: { message: 'La materia seleccionada no está activa en esta carrera.' },
+    })
+
+    renderPage()
+    await waitForLoad()
+
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(screen.getByText(/no está activa en esta carrera/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /reintentar/i })).toBeInTheDocument()
+  })
+})

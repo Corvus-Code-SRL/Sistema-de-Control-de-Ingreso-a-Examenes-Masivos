@@ -1,0 +1,386 @@
+import { env } from '@/config/env'
+import type { ApiErrorBody } from '@/types/api.types'
+
+/**
+ * Cómo terminó una petición fallida:
+ * - `network`: no hubo conexión; la petición no llegó o no volvió. `status` es 0.
+ * - `timeout`: pasaron los 15 s sin respuesta. `status` es 0.
+ * - `server`: el servidor respondió con un error 5xx.
+ * - `http`: el servidor respondió con un error del cliente (4xx) que la vista interpreta.
+ *
+ * Una petición que no se completó (`network`, `timeout`) no dice nada sobre la cuenta ni sobre los
+ * datos enviados: nunca debe presentarse como un problema de credenciales.
+ */
+export type ApiErrorKind = 'network' | 'timeout' | 'server' | 'http'
+
+interface ApiErrorExtras {
+  kind?: ApiErrorKind
+  retryAfter?: number
+  codigoSugerido?: string
+  cuentaExistenteId?: string | null
+}
+
+/**
+ * Error de una petición a la API, con el estado HTTP ya interpretado.
+ *
+ * Las vistas distinguen casos por `status` —403 sin permiso, 404 inexistente,
+ * 422 regla de negocio— sin volver a leer el cuerpo de la respuesta. Para los rechazos de
+ * autenticación llegan además el código estable `motivo` y, en un 429, los segundos de
+ * `Retry-After`.
+ */
+export class ApiError extends Error {
+  readonly status: number
+
+  /** Si la petición se completó y de qué manera; ver `ApiErrorKind`. */
+  readonly kind: ApiErrorKind
+
+  /** Segundos que indica la cabecera `Retry-After`; solo en las respuestas que la traen (429). */
+  readonly retryAfter?: number
+
+  /** Campos rechazados en un 422; vacío en el resto de los errores. */
+  readonly errors: Record<string, string[]>
+
+  /** Código estable de los rechazos de autenticación (`cuenta_inactiva`, `sin_rol_vigente`…). */
+  readonly motivo?: string
+
+  /** Código INV libre que propone el servidor cuando el que se mostró ya lo tomó otra cuenta (409). */
+  readonly codigoSugerido?: string
+
+  /** Cuenta que ya usa el código consultado, cuando el servidor la informa (422 de la verificación). */
+  readonly cuentaExistenteId?: string | null
+
+  constructor(
+    status: number,
+    message: string,
+    errors: Record<string, string[]> = {},
+    motivo?: string,
+    extras: ApiErrorExtras = {}
+  ) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.errors = errors
+    this.motivo = motivo
+    this.kind = extras.kind ?? defaultKind(status)
+    this.retryAfter = extras.retryAfter
+    this.codigoSugerido = extras.codigoSugerido
+    this.cuentaExistenteId = extras.cuentaExistenteId
+  }
+
+  /** La petición nunca se completó: sin conexión o sin respuesta a tiempo. */
+  get isNetworkFailure(): boolean {
+    return this.kind === 'network' || this.kind === 'timeout'
+  }
+
+  get isTimeout(): boolean {
+    return this.kind === 'timeout'
+  }
+
+  /** El servidor respondió, pero falló por su cuenta (5xx). */
+  get isServerError(): boolean {
+    return this.kind === 'server'
+  }
+
+  /** No se obtuvo una respuesta útil: la petición no se completó o el servidor falló. */
+  get isUnavailable(): boolean {
+    return this.isNetworkFailure || this.isServerError
+  }
+
+  get isUnauthorized(): boolean {
+    return this.status === 401
+  }
+
+  get isTooManyRequests(): boolean {
+    return this.status === 429
+  }
+
+  /** El recurso existe pero no es del docente. */
+  get isForbidden(): boolean {
+    return this.status === 403
+  }
+
+  get isNotFound(): boolean {
+    return this.status === 404
+  }
+
+  /** Regla de negocio rechazada, como el par materia-carrera inactivo o una duplicidad. */
+  get isValidation(): boolean {
+    return this.status === 422
+  }
+}
+
+function defaultKind(status: number): ApiErrorKind {
+  if (status === 0) return 'network'
+
+  return status >= 500 ? 'server' : 'http'
+}
+
+/**
+ * Plazos máximos de espera. El plazo depende del tipo de petición, no de la URL, para que una carga
+ * de archivos futura reciba el plazo correcto sin que nadie tenga que acordarse:
+ * - peticiones normales: 15 s. Es corto a propósito: con la red caída, el login lo informa pronto.
+ * - cuerpo `FormData` (subida de archivos, como la nómina de hasta 10 MB): 120 s.
+ * `timeoutMs` en las opciones gana siempre sobre ambos.
+ */
+export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000
+export const UPLOAD_REQUEST_TIMEOUT_MS = 120_000
+
+const NETWORK_ERROR = 'No se pudo conectar con el servidor. Revise su conexión.'
+const TIMEOUT_ERROR = 'El servidor tardó demasiado en responder. Intente de nuevo.'
+const UNEXPECTED_ERROR = 'Ocurrió un error inesperado al consultar el servidor.'
+
+export type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+type Query = Record<string, string | number | undefined>
+
+/** Código `motivo` con el que el servidor rechaza a una cuenta deshabilitada que aún tenía un token. */
+export const INACTIVE_ACCOUNT_MOTIVO = 'cuenta_inactiva'
+
+/**
+ * Código `motivo` con el que el servidor rechaza TODA ruta (salvo /auth/yo, logout y cambiar-contrasenia)
+ * mientras la cuenta tiene una contraseña temporal por cambiar. La sesión sigue viva.
+ */
+export const PASSWORD_CHANGE_REQUIRED_MOTIVO = 'cambio_de_clave_pendiente'
+
+/** Por qué terminó la sesión cuando no fue un simple vencimiento del token (401). */
+export type SessionEndReason = typeof INACTIVE_ACCOUNT_MOTIVO
+
+/**
+ * Lo que el cliente HTTP necesita saber de la sesión sin depender del feature `auth`:
+ * el token a enviar y qué hacer cuando una petición con token deja la sesión sin efecto: un 401
+ * (sin `reason`) o un 403 `cuenta_inactiva` (con `reason`).
+ */
+export interface SessionHandlers {
+  getToken: () => string | null
+  onSessionExpired: (reason?: SessionEndReason) => void
+  /** Un 403 `cambio_de_clave_pendiente` con token: la sesión sigue, pero solo sirve para cambiar la contraseña. */
+  onPasswordChangeRequired?: () => void
+}
+
+let sessionHandlers: SessionHandlers | null = null
+
+/** El proveedor de sesión se registra aquí al montarse y se da de baja al desmontarse. */
+export function configureSessionHandlers(handlers: SessionHandlers | null): void {
+  sessionHandlers = handlers
+}
+
+export interface ApiClientOptions {
+  method?: ApiMethod
+  /**
+   * Cuerpo de la petición. Se serializa como JSON, salvo que sea un `FormData`
+   * —el caso de la carga de nómina—, que se envía tal cual. Ignorado en GET.
+   */
+  body?: unknown
+  signal?: AbortSignal
+  query?: Query
+  /**
+   * Tiempo máximo de espera en milisegundos. Sin él: `DEFAULT_REQUEST_TIMEOUT_MS` (15 s), o
+   * `UPLOAD_REQUEST_TIMEOUT_MS` (120 s) si el cuerpo es `FormData`. Al vencer, el error es de tipo
+   * `timeout`; una subida también puede fallar por plazo.
+   */
+  timeoutMs?: number
+  /**
+   * La petición no usa la sesión: no lleva token y NINGÚN rechazo recibe tratamiento genérico.
+   * Es el caso del inicio de sesión, donde el 401 (credenciales incorrectas) y los dos 403
+   * (cuenta inactiva, sin rol) son resultados que la pantalla muestra, no una sesión caída ni un
+   * permiso negado: llegan al llamador como `ApiError` con su `status`, `motivo` y `retryAfter`.
+   */
+  skipAuth?: boolean
+  /**
+   * Cómo se lee una respuesta correcta: `json` (por defecto) o `blob`, para entregar un archivo
+   * —como una evidencia— que solo se puede pedir con el token. Los errores siempre llegan como JSON.
+   */
+  responseType?: 'json' | 'blob'
+  /**
+   * La petición lleva el token, pero un 401 lo resuelve quien la hace y no pone la app en
+   * «sesión expirada» (rehidratar la sesión y cerrarla).
+   */
+  ignoreUnauthorized?: boolean
+}
+
+/**
+ * Único punto de salida HTTP de la aplicación.
+ *
+ * Toda llamada a la API pasa por aquí: ningún feature usa `fetch` directamente.
+ */
+export async function apiClient<TResponse>(
+  path: string,
+  options: ApiClientOptions = {}
+): Promise<TResponse> {
+  const method = options.method ?? 'GET'
+  const hasBody = options.body !== undefined && method !== 'GET'
+  const url = buildUrl(path, options.query)
+  const isFormData = options.body instanceof FormData
+
+  const headers: Record<string, string> = { Accept: 'application/json' }
+
+  const token = options.skipAuth ? null : sessionHandlers?.getToken() ?? null
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
+  /*
+   * Un multipart lo arma el navegador, que es quien conoce el `boundary` con el
+   * que separa las partes: fijar aquí el Content-Type dejaría el cuerpo ilegible
+   * para el servidor.
+   */
+  if (hasBody && !isFormData) {
+    headers['Content-Type'] = 'application/json'
+  }
+
+  /*
+   * Un solo AbortController gobierna la petición: lo dispara el plazo de espera o la cancelación del
+   * llamador. `timedOut` distingue las dos causas, que no son lo mismo: la cancelación se propaga
+   * tal cual y el plazo vencido es un fallo que la vista debe poder mostrar.
+   */
+  const controller = new AbortController()
+  let timedOut = false
+
+  const timer = setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, options.timeoutMs ?? defaultTimeoutFor(hasBody && isFormData))
+
+  const forwardCancellation = () => controller.abort()
+
+  if (options.signal?.aborted) {
+    controller.abort()
+  } else {
+    options.signal?.addEventListener('abort', forwardCancellation, { once: true })
+  }
+
+  const interrupted = (cause: unknown): unknown => {
+    if (!(cause instanceof DOMException && cause.name === 'AbortError')) {
+      return new ApiError(0, NETWORK_ERROR)
+    }
+
+    return timedOut ? new ApiError(0, TIMEOUT_ERROR, {}, undefined, { kind: 'timeout' }) : cause
+  }
+
+  try {
+    let response: Response
+
+    try {
+      response = await fetch(url, {
+        method,
+        headers,
+        body: toRequestBody(options.body),
+        signal: controller.signal,
+      })
+    } catch (cause) {
+      throw interrupted(cause)
+    }
+
+    if (!response.ok) {
+      const apiError = await toApiError(response)
+
+      /*
+       * Un 401 con token enviado es una sesión muerta. Sin token no lo es: sin sesión la app sigue
+       * funcionando y algunas rutas ya responden 401 a los anónimos. Y las peticiones `skipAuth`
+       * (el login) no llegan aquí con token: su 401 son credenciales incorrectas.
+       *
+       * Un 403 `cuenta_inactiva` con token también termina la sesión: el servidor ya revocó el token
+       * y cualquier otro 403 sigue siendo un permiso negado que la pantalla muestra sin cerrarla.
+       */
+      if (token && response.status === 401 && !options.ignoreUnauthorized) {
+        sessionHandlers?.onSessionExpired()
+      } else if (token && apiError.isForbidden && apiError.motivo === INACTIVE_ACCOUNT_MOTIVO) {
+        sessionHandlers?.onSessionExpired(INACTIVE_ACCOUNT_MOTIVO)
+      } else if (token && apiError.isForbidden && apiError.motivo === PASSWORD_CHANGE_REQUIRED_MOTIVO) {
+        sessionHandlers?.onPasswordChangeRequired?.()
+      }
+
+      throw apiError
+    }
+
+    // Una respuesta sin cuerpo (ej. 204) no tiene JSON que parsear.
+    if (response.status === 204) {
+      return undefined as TResponse
+    }
+
+    try {
+      return (options.responseType === 'blob' ? await response.blob() : await response.json()) as TResponse
+    } catch (cause) {
+      throw interrupted(cause)
+    }
+  } finally {
+    clearTimeout(timer)
+    options.signal?.removeEventListener('abort', forwardCancellation)
+  }
+}
+
+/** Helpers directos para peticiones POST y PUT. */
+export async function apiPost<TResponse>(
+  path: string,
+  body: unknown,
+  options: Omit<ApiClientOptions, 'method' | 'body'> = {}
+): Promise<TResponse> {
+  return apiClient<TResponse>(path, { ...options, method: 'POST', body })
+}
+
+export async function apiPut<TResponse>(
+  path: string,
+  body: unknown,
+  options: Omit<ApiClientOptions, 'method' | 'body'> = {}
+): Promise<TResponse> {
+  return apiClient<TResponse>(path, { ...options, method: 'PUT', body })
+}
+
+/** Un `FormData` viaja tal cual; cualquier otro cuerpo se serializa como JSON. */
+function toRequestBody(body: unknown): BodyInit | undefined {
+  if (body === undefined) return undefined
+  if (body instanceof FormData) return body
+
+  return JSON.stringify(body)
+}
+
+function buildUrl(path: string, query?: Query): string {
+  const url = new URL(`${env.apiUrl}${path}`)
+
+  Object.entries(query ?? {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      url.searchParams.set(key, String(value))
+    }
+  })
+
+  return url.toString()
+}
+
+/**
+ * El backend responde `{message, errors?}`, pero un 500 puede devolver HTML:
+ * por eso el cuerpo se lee de forma tolerante y nunca se propaga el fallo de parseo.
+ */
+async function toApiError(response: Response): Promise<ApiError> {
+  const body = (await response.json().catch(() => null)) as ApiErrorBody | null
+
+  return new ApiError(
+    response.status,
+    body?.message ?? UNEXPECTED_ERROR,
+    body?.errors ?? {},
+    body?.motivo,
+    {
+      retryAfter: response.status === 429 ? parseRetryAfter(response.headers.get('Retry-After')) : undefined,
+      codigoSugerido: body?.codigo_sugerido,
+      cuentaExistenteId: body?.cuenta_existente?.id_usuario,
+    }
+  )
+}
+
+/**
+ * `Retry-After` llega en segundos enteros (así lo envía Laravel) o, según el estándar, como una
+ * fecha HTTP. Se devuelve en segundos; sin cabecera o ilegible, `undefined` y decide la pantalla.
+ */
+function parseRetryAfter(value: string | null): number | undefined {
+  if (!value) return undefined
+
+  if (/^\d+$/.test(value.trim())) return Number(value)
+
+  const date = Date.parse(value)
+
+  return Number.isNaN(date) ? undefined : Math.max(0, Math.ceil((date - Date.now()) / 1000))
+}
+
+/** Una subida de archivos tarda más que una consulta; sigue teniendo plazo, no espera sin límite. */
+function defaultTimeoutFor(isUpload: boolean): number {
+  return isUpload ? UPLOAD_REQUEST_TIMEOUT_MS : DEFAULT_REQUEST_TIMEOUT_MS
+}

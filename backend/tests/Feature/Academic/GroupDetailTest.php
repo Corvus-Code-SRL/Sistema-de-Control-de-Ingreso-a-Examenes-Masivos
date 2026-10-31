@@ -1,0 +1,151 @@
+<?php
+
+namespace Tests\Feature\Academic;
+
+use App\Models\Exam;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Tests\Concerns\SeedsAssistantManagement;
+use Tests\TestCase;
+
+class GroupDetailTest extends TestCase
+{
+    use DatabaseTransactions;
+    // Aporta el catálogo académico y la creación de exámenes vinculados a un grupo.
+    use SeedsAssistantManagement;
+
+    public function test_ubica_el_grupo_con_su_par_periodo_y_docente(): void
+    {
+        $this->seedAcademicCatalog();
+        $this->enrollStudents($this->grupoPropioId, 4);
+
+        $this->getJson($this->groupUrl($this->grupoPropioId))
+            ->assertOk()
+            ->assertJsonPath('data.grupo.id_grupo', $this->grupoPropioId)
+            ->assertJsonPath('data.grupo.num_grupo', '1')
+            ->assertJsonPath('data.grupo.es_mio', true)
+            ->assertJsonPath('data.grupo.cantidad_estudiantes', 4)
+            ->assertJsonPath('data.grupo.docente.nombre_completo', 'Ana Rojas')
+            ->assertJsonPath('data.grupo.periodo.id_periodo', $this->periodoActivoId)
+            ->assertJsonPath('data.grupo.periodo.etiqueta', '1/2026')
+            ->assertJsonPath('data.grupo.periodo.nombre_periodo', 'Semestre 1')
+            ->assertJsonPath('data.grupo.periodo.gestion', 2026)
+            ->assertJsonPath('data.grupo.gestion', '2026')
+            ->assertJsonPath('data.materia.id_materia', $this->calculoId)
+            ->assertJsonPath('data.materia.id_carrera', $this->sistemasId)
+            ->assertJsonPath('data.materia.carrera.codigo', 'SIS')
+            ->assertJsonPath('meta.es_periodo_activo', true)
+            ->assertJsonStructure([
+                'data' => [
+                    'grupo' => [
+                        'id_grupo',
+                        'num_grupo',
+                        'gestion',
+                        'activo',
+                        'es_mio',
+                        'cantidad_estudiantes',
+                        'docente' => ['nombre_completo'],
+                        'periodo' => ['id_periodo', 'nombre_periodo', 'etiqueta', 'gestion'],
+                    ],
+                    'materia' => ['id_materia', 'id_carrera', 'nombre', 'codigo', 'carrera'],
+                ],
+                'meta' => ['id_periodo_activo', 'es_periodo_activo'],
+            ]);
+    }
+
+    public function test_rechaza_con_403_el_grupo_de_otro_docente(): void
+    {
+        $this->seedAcademicCatalog();
+        $this->enrollStudents($this->grupoAjenoId, 3);
+
+        $response = $this->getJson($this->groupUrl($this->grupoAjenoId))
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Solo el docente que dicta el grupo puede ver su detalle.')
+            ->assertDontSee('Luis Vargas');
+
+        $this->assertArrayNotHasKey('data', $response->json());
+    }
+
+    public function test_la_propiedad_se_resuelve_con_el_docente_de_configuracion(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $this->actAsTeacher($this->otroDocenteId);
+
+        $this->getJson($this->groupUrl($this->grupoAjenoId))
+            ->assertOk()
+            ->assertJsonPath('data.grupo.es_mio', true)
+            ->assertJsonPath('data.grupo.docente.nombre_completo', 'Luis Vargas');
+
+        $this->getJson($this->groupUrl($this->grupoPropioId))
+            ->assertForbidden();
+    }
+
+    public function test_indica_cuando_el_grupo_no_es_del_periodo_activo(): void
+    {
+        $this->seedAcademicCatalog();
+
+        // Calculo II de Informatica: mismo nombre de materia, otra carrera y otro periodo.
+        $this->getJson($this->groupUrl($this->grupoPeriodoAnteriorId))
+            ->assertOk()
+            ->assertJsonPath('data.materia.id_carrera', $this->informaticaId)
+            ->assertJsonPath('data.grupo.periodo.etiqueta', '2/2025')
+            ->assertJsonPath('data.grupo.periodo.nombre_periodo', 'Semestre 2')
+            ->assertJsonPath('data.grupo.gestion', '2025')
+            ->assertJsonPath('meta.es_periodo_activo', false);
+    }
+
+    public function test_rechaza_el_grupo_cuyo_par_esta_inactivo(): void
+    {
+        $this->seedAcademicCatalog();
+
+        // El grupo lo dicta el otro docente: se consulta como él para llegar a la regla del par.
+        $this->actAsTeacher($this->otroDocenteId);
+
+        $this->getJson($this->groupUrl($this->grupoParInactivoId))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('id_materia');
+    }
+
+    public function test_devuelve_404_cuando_el_grupo_no_existe(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $this->getJson($this->groupUrl(999999))
+            ->assertNotFound()
+            ->assertJsonPath('message', 'No existe el grupo indicado.');
+    }
+
+    public function test_rechaza_identificador_no_numerico(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $this->getJson('/api/grupos/abc')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('id_grupo');
+    }
+
+    /** HU-019: la vista de edición sabe antes de guardar si un examen del grupo la bloquea. */
+    public function test_indica_si_la_edicion_esta_bloqueada_por_un_examen(): void
+    {
+        $this->seedAcademicCatalog();
+
+        $this->getJson($this->groupUrl($this->grupoPropioId))
+            ->assertOk()
+            ->assertJsonPath('meta.edicion_bloqueada', false);
+
+        $this->createExamLinkedTo([$this->grupoPropioId], Exam::PROGRAMADO);
+
+        $this->getJson($this->groupUrl($this->grupoPropioId))
+            ->assertJsonPath('meta.edicion_bloqueada', false);
+
+        $this->createExamLinkedTo([$this->grupoPropioId], Exam::EN_CURSO, null, 'Parcial 2');
+
+        $this->getJson($this->groupUrl($this->grupoPropioId))
+            ->assertJsonPath('meta.edicion_bloqueada', true);
+    }
+
+    private function groupUrl(int $groupId): string
+    {
+        return "/api/grupos/{$groupId}";
+    }
+}

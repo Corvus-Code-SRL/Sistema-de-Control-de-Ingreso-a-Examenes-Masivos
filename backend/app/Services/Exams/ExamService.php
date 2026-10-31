@@ -1,0 +1,642 @@
+<?php
+
+namespace App\Services\Exams;
+
+use App\Exceptions\Exams\ExamOwnershipException;
+use App\Exceptions\Exams\ExamStateException;
+use App\Exceptions\Exams\ExamWarningsException;
+use App\Models\Classroom;
+use App\Models\Exam;
+use App\Models\ExamType;
+use App\Models\Group;
+use App\Services\Academic\SubjectCatalogService;
+use App\Services\Security\AuditLogService;
+use App\Support\RecordStatus;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use RuntimeException;
+
+/**
+ * Gestiona el registro y las operaciones sobre exámenes.
+ *
+ * El examen pertenece a un par materia-carrera y queda asociado al docente que lo
+ * crea. Solo mientras está PROGRAMADO admite cambios o cancelación: desde que se
+ * abre el control de ingreso su información general queda fija.
+ */
+class ExamService
+{
+    private const DEFAULT_CATEGORY = 'REGULAR';
+
+    private SubjectCatalogService $subjectCatalog;
+
+    private AuditLogService $auditLog;
+
+    private ExamGroupService $groupService;
+
+    private AssistantAvailabilityService $assistantAvailability;
+
+    private ExamParticipantService $participants;
+
+    public function __construct(
+        SubjectCatalogService $subjectCatalog,
+        AuditLogService $auditLog,
+        ExamGroupService $groupService,
+        AssistantAvailabilityService $assistantAvailability,
+        ExamParticipantService $participants
+    ) {
+        $this->subjectCatalog = $subjectCatalog;
+        $this->auditLog = $auditLog;
+        $this->groupService = $groupService;
+        $this->assistantAvailability = $assistantAvailability;
+        $this->participants = $participants;
+    }
+
+    /**
+     * Catálogos del formulario: pares materia-carrera activos, ambientes activos y los
+     * grupos del docente en el periodo activo.
+     */
+    public function formOptions(string $teacherId): array
+    {
+        $this->assertTeacherGiven($teacherId);
+
+        $pairs = $this->subjectCatalog->listSubjectCareers($teacherId)['pairs']
+            ->filter(function ($pair) {
+                return $pair->estado === RecordStatus::ACTIVE
+                    && $pair->subject->estado === RecordStatus::ACTIVE
+                    && $pair->cantidad_grupos > 0;
+            })
+            ->values();
+
+        $classrooms = Classroom::query()
+            ->where('estado', RecordStatus::ACTIVE)
+            ->orderBy('nro_aula')
+            ->get();
+
+        $groups = Group::query()
+            ->withStudentCount()
+            ->with('period')
+            ->where('id_usuario_docente', $teacherId)
+            ->where('id_gestion_periodo', $this->subjectCatalog->activePeriodId())
+            ->where('estado', RecordStatus::ACTIVE)
+            ->orderBy('id_carrera')
+            ->orderBy('id_materia')
+            ->orderBy('num_grupo')
+            ->get();
+
+        return [
+            'pairs'      => $pairs,
+            'classrooms' => $classrooms,
+            'groups'     => $groups,
+        ];
+    }
+
+    /**
+     * Exámenes del docente indicado, del más próximo al más lejano (vista Programados).
+     */
+    public function listForTeacher(string $teacherId): Collection
+    {
+        $this->assertTeacherGiven($teacherId);
+
+        $exams = Exam::query()
+            ->with($this->listRelations())
+            ->where('id_usuario_docente', $teacherId)
+            ->orderBy('fecha')
+            ->orderBy('hora_inicio')
+            ->get();
+
+        $this->participants->applyFrozenStudentCounts($exams);
+
+        return $exams;
+    }
+
+    /** Lo que muestra cada fila del listado: materia, ambientes y grupos con su cantidad de estudiantes. */
+    private function listRelations(): array
+    {
+        return [
+            'examType',
+            'subject',
+            'career',
+            'classrooms',
+            'groups' => fn ($query) => $query->withStudentCount(),
+            'groups.period',
+        ];
+    }
+
+    /**
+     * Exámenes vigentes del docente (vista Programados): PROGRAMADO o EN_INGRESO, del más
+     * próximo al más lejano.
+     *
+     * El examen no guarda su período: lo da el período de sus grupos. Entra el que tiene al
+     * menos un grupo del período activo y también el que aún no tiene grupos asignados, para que
+     * un examen recién creado aparezca en la vista antes de vincularle sus grupos.
+     */
+    public function listScheduledForTeacher(string $teacherId): Collection
+    {
+        $this->assertTeacherGiven($teacherId);
+
+        $activePeriodId = $this->subjectCatalog->activePeriodId();
+
+        $exams = Exam::query()
+            ->with($this->listRelations())
+            ->where('id_usuario_docente', $teacherId)
+            ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_INGRESO])
+            ->where(function (Builder $query) use ($activePeriodId) {
+                $query->whereDoesntHave('groups')
+                    ->orWhereHas('groups', function (Builder $groups) use ($activePeriodId) {
+                        $groups->where('grupo.id_gestion_periodo', $activePeriodId);
+                    });
+            })
+            ->orderBy('fecha')
+            ->orderBy('hora_inicio')
+            ->orderBy('id_examen')
+            ->get();
+
+        $this->participants->applyFrozenStudentCounts($exams);
+
+        return $exams;
+    }
+
+    /** Detalle de un examen propio, para editarlo o gestionar sus grupos. */
+    public function find(Exam $exam, string $teacherId): Exam
+    {
+        $this->assertTeacherGiven($teacherId);
+        $this->assertOwnedBy($exam, $teacherId);
+
+        return $this->loadDetail($exam);
+    }
+
+    public function create(array $data, string $teacherId): Exam
+    {
+        $this->assertTeacherGiven($teacherId);
+
+        $exam = DB::transaction(function () use ($data, $teacherId) {
+            $attributes = $this->prepareAttributes($data, $teacherId);
+
+            $this->lockSchedules($teacherId, $data['ambientes']);
+            $this->assertNoUnconfirmedWarnings($data, $teacherId, null);
+
+            $exam = Exam::create($attributes + [
+                'id_usuario_docente' => $teacherId,
+                'estado'             => Exam::PROGRAMADO,
+            ]);
+
+            $exam->classrooms()->attach($data['ambientes']);
+
+            $this->groupService->assignGroups(
+                $exam,
+                $data['grupos'],
+                $teacherId
+            );
+
+            $after = $exam->getAttributes();
+            $after['ambientes'] = $data['ambientes'];
+            $after['grupos'] = $data['grupos'];
+
+            $this->auditLog->registrar(
+                'CREAR',
+                'examen',
+                null,
+                $after,
+                $teacherId
+            );
+
+            return $exam;
+        });
+
+        return $this->loadDetail($exam);
+    }
+
+    /**
+     * Criterios 10 y 11: la información general solo cambia mientras el examen está
+     * PROGRAMADO. Desde EN_INGRESO nombre, fecha, hora, duración y materia quedan fijos.
+     */
+    public function update(Exam $exam, array $data, string $teacherId): Exam
+    {
+        $this->assertTeacherGiven($teacherId);
+
+        $exam = DB::transaction(function () use ($exam, $data, $teacherId) {
+            // Mantener el orden de bloqueo: auxiliar -> examen.
+            $lockedAssistantIds = $this->lockCurrentAssistantUsers(
+                (int) $exam->id_examen
+            );
+
+            $exam = $this->lockExam($exam);
+
+            $this->assertOwnedBy($exam, $teacherId);
+
+            if ($exam->estado !== Exam::PROGRAMADO) {
+                throw new ExamStateException($this->notEditableMessage($exam->estado));
+            }
+
+            // Detectar auxiliares habilitados mientras se esperaban los bloqueos.
+            $currentAssistantIds = DB::table('examen_auxiliar')
+                ->where('id_examen', $exam->id_examen)
+                ->pluck('id_usuario')
+                ->all();
+
+            if (array_diff($currentAssistantIds, $lockedAssistantIds) !== []) {
+                throw ValidationException::withMessages([
+                    'auxiliares' => [
+                        'La lista de auxiliares cambió durante la edición. Vuelva a intentarlo.',
+                    ],
+                ]);
+            }
+
+            $before = $exam->getAttributes();
+            $before['ambientes'] = $exam->classrooms()
+                ->pluck('ambiente.id_ambiente')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $attributes = $this->prepareAttributes($data, $teacherId);
+
+            $this->lockSchedules($teacherId, $data['ambientes']);
+            $this->assertNoUnconfirmedWarnings(
+                $data,
+                $teacherId,
+                $exam->id_examen
+            );
+
+            $exam->update($attributes);
+            $this->releaseRemovedClassrooms($exam, $data['ambientes']);
+            $exam->classrooms()->sync($data['ambientes']);
+
+            // Revalidar utilizando el horario y los ambientes actualizados.
+            $assistants = DB::table('examen_auxiliar')
+                ->where('id_examen', $exam->id_examen)
+                ->orderBy('id_usuario')
+                ->get(['id_usuario', 'id_ambiente']);
+
+            foreach ($assistants as $assistant) {
+                $this->assistantAvailability->assertAvailable(
+                    $exam,
+                    (string) $assistant->id_usuario,
+                    $assistant->id_ambiente === null
+                        ? null
+                        : (int) $assistant->id_ambiente
+                );
+            }
+
+            $after = $exam->getAttributes();
+            $after['ambientes'] = $exam->classrooms()
+                ->pluck('ambiente.id_ambiente')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $this->auditLog->registrar(
+                'MODIFICAR',
+                'examen',
+                $before,
+                $after,
+                $teacherId
+            );
+
+            return $exam;
+        });
+
+        return $this->loadDetail($exam);
+    }
+
+    /**
+     * Bloquea los auxiliares habilitados antes de bloquear el examen.
+     *
+     * Mantiene el orden utilizado al habilitar y asignar auxiliares.
+     */
+    private function lockCurrentAssistantUsers(int $examId): array
+    {
+        $assistantIds = DB::table('examen_auxiliar')
+            ->where('id_examen', $examId)
+            ->orderBy('id_usuario')
+            ->pluck('id_usuario')
+            ->all();
+
+        foreach ($assistantIds as $assistantId) {
+            DB::table('usuario')
+                ->where('id_usuario', $assistantId)
+                ->lockForUpdate()
+                ->first();
+        }
+
+        return $assistantIds;
+    }
+
+    /**
+     * Un auxiliar no puede quedar en un ambiente que el examen ya no tiene (FK
+     * examen_auxiliar → examen_ambiente). Antes del sync quedan sin ambiente solo
+     * los auxiliares de los ambientes quitados; el docente les asigna otro desde
+     * la sección Personal del examen (HU-09).
+     */
+    private function releaseRemovedClassrooms(Exam $exam, array $classroomIds): void
+    {
+        $exam->assistants()
+            ->whereNotNull('id_ambiente')
+            ->whereNotIn('id_ambiente', $classroomIds)
+            ->update(['id_ambiente' => null]);
+    }
+
+    /**
+     * Criterio 12: se cancela solo mientras el control de ingreso no empezó. El examen
+     * no se borra: pasa a CANCELADO y la bitácora guarda quién lo canceló y cuándo.
+     */
+    public function cancel(Exam $exam, string $teacherId): Exam
+    {
+        $this->assertTeacherGiven($teacherId);
+
+        $exam = DB::transaction(function () use ($exam, $teacherId) {
+            $exam = $this->lockExam($exam);
+
+            $this->assertOwnedBy($exam, $teacherId);
+
+            if ($exam->estado !== Exam::PROGRAMADO) {
+                throw new ExamStateException($this->notCancellableMessage($exam->estado));
+            }
+
+            $exam->update(['estado' => Exam::CANCELADO]);
+
+            $this->auditLog->registrar(
+                'CANCELAR',
+                'examen',
+                ['id_examen' => $exam->id_examen, 'estado' => Exam::PROGRAMADO],
+                ['id_examen' => $exam->id_examen, 'estado' => Exam::CANCELADO],
+                $teacherId
+            );
+
+            return $exam;
+        });
+
+        return $this->loadDetail($exam);
+    }
+
+    private function assertTeacherGiven(string $teacherId): void
+    {
+        if ($teacherId === '') {
+            throw new RuntimeException('No hay un docente autenticado que ejecute la operación.');
+        }
+    }
+
+    /**
+     * Columnas del examen a partir de los datos validados. El par debe estar activo
+     * (materia y materia_carrera, regla de HU-16) y el tipo sale del catálogo.
+     */
+    private function prepareAttributes(array $data, string $teacherId): array
+    {
+        $this->subjectCatalog->findSelectablePair(
+            (int) $data['id_carrera'],
+            (int) $data['id_materia'],
+            $teacherId
+        );
+
+        $startsAt = $this->startsAt($data);
+
+        return [
+            'nombre_examen'  => $data['nombre_examen'],
+            'fecha'          => $data['fecha'],
+            'hora_inicio'    => $data['hora_inicio'],
+            // Puede quedar menor que hora_inicio si el examen cruza la medianoche.
+            'hora_fin'       => $startsAt->copy()->addMinutes((int) $data['duracion'])->format('H:i'),
+            'duracion'       => (int) $data['duracion'],
+            'normas'         => $data['normas'] ?? null,
+            'id_tipo_examen' => $this->resolveExamTypeId($data['categoria'] ?? self::DEFAULT_CATEGORY),
+            'id_carrera'     => (int) $data['id_carrera'],
+            'id_materia'     => (int) $data['id_materia'],
+        ];
+    }
+
+    /**
+     * El tipo se toma del catálogo tipo_examen; crear un examen nunca crea tipos.
+     */
+    private function resolveExamTypeId(string $category): int
+    {
+        $typeId = ExamType::query()
+            ->where('categoria', $category)
+            ->orderBy('id_tipo_examen')
+            ->value('id_tipo_examen');
+
+        if ($typeId === null) {
+            throw ValidationException::withMessages([
+                'categoria' => ["No hay un tipo de examen registrado para la categoría {$category}."],
+            ]);
+        }
+
+        return (int) $typeId;
+    }
+
+    /**
+     * Serializa las altas y cambios que compiten por el mismo docente o los mismos
+     * ambientes, para que dos peticiones simultáneas no pasen ambas la revisión de
+     * superposición.
+     */
+    private function lockSchedules(string $teacherId, array $classroomIds): void
+    {
+        DB::table('usuario')->where('id_usuario', $teacherId)->lockForUpdate()->first();
+
+        Classroom::query()
+            ->whereIn('id_ambiente', $classroomIds)
+            ->orderBy('id_ambiente')
+            ->lockForUpdate()
+            ->get();
+    }
+
+    private function lockExam(Exam $exam): Exam
+    {
+        return Exam::query()->whereKey($exam->id_examen)->lockForUpdate()->firstOrFail();
+    }
+
+    private function assertOwnedBy(Exam $exam, string $teacherId): void
+    {
+        if ((string) $exam->id_usuario_docente !== $teacherId) {
+            throw new ExamOwnershipException();
+        }
+    }
+
+    /**
+     * Criterios 6, 8 y 9: nombre duplicado en la fecha y superposición con otro examen
+     * del docente o de un ambiente. Son advertencias: el examen se guarda si el docente
+     * las confirma.
+     */
+    private function assertNoUnconfirmedWarnings(array $data, string $teacherId, ?int $ignoredExamId): void
+    {
+        $this->assertNoForeignClassroomConflicts($data, $teacherId, $ignoredExamId);
+
+        if (! empty($data['confirmar_advertencias'])) {
+            return;
+        }
+
+        $warnings = $this->detectWarnings($data, $teacherId, $ignoredExamId);
+
+        if ($warnings !== []) {
+            throw new ExamWarningsException($warnings);
+        }
+    }
+
+    /**
+     * Un ambiente reservado por otro docente no puede confirmarse
+     * como una simple advertencia.
+     */
+    private function assertNoForeignClassroomConflicts(
+        array $data,
+        string $teacherId,
+        ?int $ignoredExamId
+    ): void {
+        $startsAt = $this->startsAt($data);
+        $endsAt = $startsAt->copy()->addMinutes((int) $data['duracion']);
+
+        $occupied = $this->overlapping($startsAt, $endsAt, $ignoredExamId)
+            ->join(
+                'examen_ambiente',
+                'examen_ambiente.id_examen',
+                '=',
+                'examen.id_examen'
+            )
+            ->join(
+                'ambiente',
+                'ambiente.id_ambiente',
+                '=',
+                'examen_ambiente.id_ambiente'
+            )
+            ->where('examen.id_usuario_docente', '<>', $teacherId)
+            ->whereIn('examen_ambiente.id_ambiente', $data['ambientes'])
+            ->orderBy('ambiente.nro_aula')
+            ->pluck('ambiente.nro_aula')
+            ->unique()
+            ->values();
+
+        if ($occupied->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'ambientes' => [
+                    'Los ambientes ' . $occupied->implode(', ')
+                    . ' ya están reservados por otro docente en ese horario. '
+                    . 'Seleccione otro ambiente u horario.',
+                ],
+            ]);
+        }
+    }
+
+    private function detectWarnings(array $data, string $teacherId, ?int $ignoredExamId): array
+    {
+        $startsAt = $this->startsAt($data);
+        $endsAt = $startsAt->copy()->addMinutes((int) $data['duracion']);
+
+        $warnings = [];
+
+        $sameName = $this->activeExams($ignoredExamId)
+            ->where('id_usuario_docente', $teacherId)
+            ->whereDate('fecha', $data['fecha'])
+            ->whereRaw('lower(nombre_examen) = lower(?)', [$data['nombre_examen']])
+            ->exists();
+
+        if ($sameName) {
+            $warnings['nombre_duplicado'] = [
+                "Ya tiene un examen llamado «{$data['nombre_examen']}» en la misma fecha.",
+            ];
+        }
+
+        $teacherOverlaps = $this->overlapping($startsAt, $endsAt, $ignoredExamId)
+            ->where('id_usuario_docente', $teacherId)
+            ->orderBy('fecha')
+            ->orderBy('hora_inicio')
+            ->pluck('nombre_examen');
+
+        if ($teacherOverlaps->isNotEmpty()) {
+            $warnings['superposicion_horario'] = $teacherOverlaps
+                ->map(fn (string $name) => "Ya tiene el examen «{$name}» en un horario que se superpone.")
+                ->all();
+        }
+
+        $classroomOverlaps = $this->overlapping($startsAt, $endsAt, $ignoredExamId)
+            ->join('examen_ambiente', 'examen_ambiente.id_examen', '=', 'examen.id_examen')
+            ->join('ambiente', 'ambiente.id_ambiente', '=', 'examen_ambiente.id_ambiente')
+            ->where('examen.id_usuario_docente', $teacherId)
+            ->whereIn('examen_ambiente.id_ambiente', $data['ambientes'])
+            ->orderBy('ambiente.nro_aula')
+            ->get(['ambiente.nro_aula', 'examen.nombre_examen']);
+
+        if ($classroomOverlaps->isNotEmpty()) {
+            $warnings['superposicion_ambiente'] = $classroomOverlaps
+                ->map(fn ($row) => "El ambiente {$row->nro_aula} ya está reservado para "
+                    . "«{$row->nombre_examen}» en ese horario.")
+                ->all();
+        }
+
+        if ($ignoredExamId === null) {
+            $totalStudents = DB::table('grupo_estudiante')
+                ->whereIn('id_grupo', $data['grupos'])
+                ->count();
+
+            $totalCapacity = Classroom::query()
+                ->whereIn('id_ambiente', $data['ambientes'])
+                ->sum('capacidad');
+
+            if ($totalCapacity < $totalStudents) {
+                $warnings['capacidad_insuficiente'] = [
+                    "La capacidad ({$totalCapacity}) es menor que los estudiantes de los grupos ({$totalStudents})",
+                ];
+            }
+        }
+
+        return $warnings;
+    }
+
+    /**
+     * Exámenes cuyo intervalo [inicio, fin) se cruza con el dado.
+     *
+     * Se compara fecha + hora como timestamp, no la hora sola: así un examen de 23:00
+     * a 01:00 choca con otro a las 00:30 del día siguiente. Como ninguno dura un día,
+     * basta buscar desde la víspera del inicio hasta la fecha del fin.
+     */
+    private function overlapping(Carbon $startsAt, Carbon $endsAt, ?int $ignoredExamId): Builder
+    {
+        return $this->activeExams($ignoredExamId)
+            ->whereBetween('examen.fecha', [
+                $startsAt->copy()->subDay()->toDateString(),
+                $endsAt->toDateString(),
+            ])
+            ->whereRaw('(examen.fecha + examen.hora_inicio) < ?::timestamp', [$endsAt->format('Y-m-d H:i:s')])
+            ->whereRaw(
+                '(examen.fecha + examen.hora_inicio + make_interval(mins => coalesce(examen.duracion, 0)))'
+                . ' > ?::timestamp',
+                [$startsAt->format('Y-m-d H:i:s')]
+            );
+    }
+
+    /** Un examen cancelado ya no ocupa horario ni ambientes. */
+    private function activeExams(?int $ignoredExamId): Builder
+    {
+        return Exam::query()
+            ->where('examen.estado', '<>', Exam::CANCELADO)
+            ->when($ignoredExamId !== null, function (Builder $query) use ($ignoredExamId) {
+                $query->where('examen.id_examen', '<>', $ignoredExamId);
+            });
+    }
+
+    private function startsAt(array $data): Carbon
+    {
+        return Carbon::createFromFormat('Y-m-d H:i', $data['fecha'] . ' ' . $data['hora_inicio']);
+    }
+
+    private function loadDetail(Exam $exam): Exam
+    {
+        $exam = $exam->fresh($this->listRelations());
+
+        $this->participants->applyFrozenStudentCounts([$exam]);
+
+        return $exam;
+    }
+
+    private function notEditableMessage(string $status): string
+    {
+        return $status === Exam::CANCELADO
+            ? 'El examen está cancelado y ya no puede modificarse.'
+            : 'El control de ingreso del examen ya se inició: su información general no puede modificarse.';
+    }
+
+    private function notCancellableMessage(string $status): string
+    {
+        return $status === Exam::CANCELADO
+            ? 'El examen ya está cancelado.'
+            : 'El control de ingreso del examen ya se inició: el examen no puede cancelarse.';
+    }
+}

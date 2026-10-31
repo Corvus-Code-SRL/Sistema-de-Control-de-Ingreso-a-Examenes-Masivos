@@ -1,29 +1,31 @@
-# Sistema de Control de Ingreso a Exámenes Masivos
+# SCIEM — Sistema de Control de Ingreso a Exámenes Masivos
 
 Plataforma web para el control de ingreso, validación de estudiantes y gestión de incidentes en exámenes universitarios.
 
-# SCIEM
-
 Proyecto desarrollado por **Corvus Code** para la materia TIS de la Universidad Mayor de San Simón.
 
-## Estructura del proyecto
+Plataforma web para el control de ingreso, la validación de estudiantes y la gestión de incidentes en exámenes universitarios.
 
-```text
-SCIEM/
-├── backend/
-├── frontend/
-├── docs/
-├── deployment/
-├── .gitignore
-├── mise.toml
-└── README.md
-```
+Proyecto desarrollado por **Corvus Code S.R.L.** para la Convocatoria Pública **CPTIS-452026-2026**, en el marco de la materia **Taller de Ingeniería de Software (TIS)** de la Universidad Mayor de San Simón (UMSS).
 
-### Backend
+---
 
+# Contenido
 El directorio `backend/` contiene la API, las reglas de negocio y el acceso a datos desarrollados con Laravel.
 
-Tecnologías principales:
+- [Funcionalidades principales](#funcionalidades-principales)
+- [Arquitectura](#arquitectura)
+- [Stack tecnológico](#stack-tecnológico)
+- [Estructura del repositorio](#estructura-del-repositorio)
+- [Requisitos previos](#requisitos-previos)
+- [Instalación y ejecución](#instalación-y-ejecución)
+- [Base de datos compartida](#base-de-datos-compartida)
+- [Datos de prueba compartidos](#datos-de-prueba-compartidos)
+- [Pruebas](#pruebas)
+- [Convenciones](#convenciones)
+- [Flujo de trabajo](#flujo-de-trabajo)
+- [Documentación](#documentación)
+- [Empresa](#empresa)
 
 - PHP 8.0.30
 - Laravel Framework 8.83.29
@@ -32,12 +34,39 @@ Tecnologías principales:
 - PostgreSQL 15.0
 - Redis 7.4.3
 
-### Frontend
+## Funcionalidades principales
 
+- **Seguridad:** cuentas de usuario, roles (Administrador, Docente, Auxiliar), permisos y bitácora de operaciones.
+- **Gestión académica:** materias, grupos y carga de nóminas de estudiantes (CSV, XLSX y PDF).
+- **Exámenes:** creación de exámenes, asignación de grupos y ambientes, invitación a docentes colaboradores y habilitación de auxiliares.
+- **Control de ingreso:** punto de control, identificación y validación de estudiantes, registro de tardanzas e intentos no autorizados, en tiempo real.
+- **Incidencias:** registro y revisión de faltas durante el examen, con evidencia y trazabilidad.
+- **Centrales de riesgo:** historial de antecedentes disciplinarios, con una central académica y otra de admisión independientes entre sí.
+- **Admisión** *(fase posterior)*: modalidades, convocatorias y exámenes de admisión.
+
+---
+
+## Arquitectura
 El directorio `frontend/` contiene la aplicación web desarrollada con React y TypeScript.
 
-Tecnologías principales:
+SCIEM utiliza un **monolito modular desacoplado** con **MVC + capa de Services**:
 
+- **Frontend:** SPA en React + TypeScript, organizada por *features*.
+- **Backend:** API REST en Laravel. Los controladores delegan la lógica de negocio a Services organizados por módulo.
+- **Despliegue:** una sola aplicación. Apache sirve el frontend compilado y la API desde el mismo origen.
+
+```mermaid
+flowchart LR
+    A["React + TypeScript<br/>(SPA)"] -- "HTTP / JSON" --> B["API REST<br/>Laravel"]
+    B --> C["FormRequest<br/>(validación)"]
+    C --> D["Services<br/>(lógica de negocio)"]
+    D --> E["Eloquent ORM"]
+    E --> F[("PostgreSQL")]
+    D -. "caché" .-> G[("Redis")]
+    D --> H["Resources<br/>(respuesta JSON)"]
+```
+
+### Módulos
 - Node.js 22.23.2
 - npm 10.9.8
 - React 18.3.1
@@ -51,48 +80,57 @@ Tecnologías principales:
 - Lucide React 1.45.0
 - tw-animate-css 1.4.0
 
-### Documentación
+| Módulo backend | Feature(s) frontend | Responsabilidad |
+|---|---|---|
+| `Security` | `auth`, `users`, `audit-log` | Autenticación, cuentas, roles, permisos y bitácora |
+| `Academic` | `subjects`, `groups`, `students` | Materias, grupos y nóminas |
+| `Exams` | `exams`, `classrooms`, `assistants` | Exámenes, ambientes, auxiliares y reportes |
+| `EntryControl` | `entry-control` | Punto de control y validación de ingreso |
+| `Incidents` | `incidents` | Registro y revisión de incidencias |
+| `RiskCenter/Academic` | `risk-center/academic` | Central de Riesgo Académica |
+| `RiskCenter/Admission` | `risk-center/admission` | Central de Riesgo de Admisión |
+| `Admissions` | `admissions` | Procesos de admisión |
 
-El directorio `docs/` contiene la documentación técnica y funcional del sistema.
+### Actualización en tiempo real
 
-```text
-docs/
-├── architecture/
-├── database/
-├── api/
-├── qa/
-├── user-stories/
-└── diagrams/
-```
+Las pantallas de control de ingreso, seguimiento del examen e incidencias se actualizan sin recargar mediante **consulta periódica** (*polling*) contra la API.
 
-### Deployment
+Se evaluó WebSockets + Redis y **se descartó**: el servidor del laboratorio de la UMSS mantiene abiertos únicamente los puertos de PHP y PostgreSQL y unos pocos más, sin lugar para el puerto adicional ni para el proceso permanente que ese enfoque necesita. La justificación completa está en [`docs/architecture/decisions/0001-actualizacion-en-tiempo-real-por-consulta-periodica.md`](docs/architecture/decisions/0001-actualizacion-en-tiempo-real-por-consulta-periodica.md).
 
+**Regla de implementación:** el sondeo vive en exactamente dos lugares — `RedControlService` en el backend y el hook `useRedControl()` en el frontend. Ninguna otra feature llama al endpoint de estado ni monta su propio temporizador: todas consumen el hook. Si cada pantalla sondea por su cuenta, las peticiones se multiplican por pantalla abierta y el objetivo de rendimiento de RNF-14 se cae.
 El directorio `deployment/` contiene la configuración relacionada con el despliegue del sistema.
 
-```text
-deployment/
-└── docker/
-    ├── backend/
-    ├── frontend/
-    ├── apache/
-    └── redis/
-```
+El endpoint de estado se cachea 2 segundos y responde «sin cambios» cuando la versión del cliente coincide con la actual. Esa mitigación no es opcional: sin ella cada sondeo reejecuta la consulta agregada. El intervalo es de 3 segundos con la pestaña visible, 10 con la pestaña oculta, y **nunca por debajo de 2 segundos**.
+
+> La justificación completa de la arquitectura se documentará en `docs/architecture/justificacion-arquitectura.md` (pendiente de redactar).
+
+---
 
 > Docker no es requerido para el desarrollo local. Los integrantes trabajan con las dependencias instaladas directamente en su entorno de desarrollo.
 
 ## Stack tecnológico
 
-### Backend
+Las versiones están fijadas por compatibilidad con los servidores de despliegue de la UMSS. **No actualizar dependencias sin coordinación previa con el equipo.**
 
-- PHP: 8.0.30
-- Laravel Framework: 8.83.29
-- Composer: 2.9.6
-- Apache HTTP Server: 2.4.62
-- PostgreSQL: 15.0
-- Redis: 7.4.3
-- Eloquent ORM: incluido con Laravel
+| Capa | Tecnología | Versión |
+|---|---|---|
+| Backend | PHP | 8.0.30 |
+| | Laravel Framework | 8.83.29 |
+| | Composer | 2.9.6 |
+| | Eloquent ORM | incluido con Laravel |
+| Servidor | Apache HTTP Server | 2.4.62 |
+| Datos | PostgreSQL | 15.0 |
+| | Redis | 7.4.3 |
+| Frontend | Node.js | 22.23.2 |
+| | npm | 10.9.8 |
+| | React / React DOM | 18.3.1 |
+| | TypeScript | 5.7.3 |
+| | Vite | 6.4.3 |
+| | Tailwind CSS / @tailwindcss/vite | 4.3.3 |
+| | shadcn CLI | 4.21.0 |
+| UI base | shadcn/ui · Radix · Lucide Icons · Preset Nova | — |
 
-### Frontend
+Detalle en [`docs/architecture/stack.md`](docs/architecture/stack.md).
 
 - Node.js: 22.23.2
 - npm: 10.9.8
@@ -126,475 +164,398 @@ El proyecto utiliza `mise` para fijar la versión de Node.js mediante el archivo
 mise.toml
 ```
 
-## Instalación
+## Estructura del repositorio
+
+> La estructura de abajo es la **estructura objetivo** documentada en `docs/architecture/`. El scaffold actual ya cubre la mayor parte (carpetas por módulo en `Http/Controllers`, `Http/Requests`, `Services`, `routes/api/`; `deployment/docker/{apache,postgres,redis}`), pero todavía faltan por crear: el `docker-compose.yml` de despliegue y el `Dockerfile`/`sciem.conf` de Apache, `frontend/.env.example`, la configuración de ESLint del frontend, y las traducciones en `backend/resources/lang/es/`.
+
+```text
+.
+├── backend/                    # API REST (Laravel 8)
+│   ├── app/
+│   │   ├── Http/
+│   │   │   ├── Controllers/    # Por módulo
+│   │   │   ├── Requests/       # Validación, por módulo
+│   │   │   ├── Resources/      # Formato de respuesta, por módulo
+│   │   │   └── Middleware/
+│   │   ├── Models/             # Modelos Eloquent
+│   │   ├── Policies/           # Autorización
+│   │   ├── Services/           # Lógica de negocio, por módulo
+│   │   └── Support/            # Utilidades transversales (caché, almacenamiento, respuestas)
+│   ├── database/               # Migraciones, factories y seeders
+│   ├── routes/
+│   │   ├── api.php             # Carga las rutas de cada módulo
+│   │   └── api/                # Rutas por módulo
+│   └── tests/                  # Feature/ y Unit/Services/, por módulo
+├── frontend/                   # SPA (React + TypeScript + Vite)
+│   └── src/
+│       ├── app/                # App, providers y router
+│       ├── components/         # ui/ (shadcn), layout/, common/
+│       ├── features/           # Un directorio por funcionalidad
+│       ├── hooks/               # Hooks reutilizables
+│       ├── lib/                # Cliente HTTP y utilidades
+│       ├── types/               # Tipos compartidos
+│       └── config/              # Configuración y variables de entorno
+├── deployment/
+│   └── docker/                 # docker-compose, Apache, PostgreSQL, Redis
+└── docs/
+    └── architecture/           # Arquitectura, stack y decisiones (ADR)
+```
+
+Cada feature del frontend sigue esta plantilla (las subcarpetas se crean solo cuando se necesitan):
+
+```text
+features/<feature>/
+├── components/
+├── hooks/
+├── pages/
+├── services/
+├── types/
+└── index.ts        # API pública del feature
+```
+
+---
+
+## Requisitos previos
+
+- PHP 8.0 con las extensiones `pdo_pgsql`, `pgsql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json` y `bcmath`
+- Extensión `redis` de PHP (o el paquete `predis/predis`, según `REDIS_CLIENT`)
+- Composer 2
+- Node.js 22 y npm 10
+- PostgreSQL 15 — **local, para la base de pruebas** (ver [Pruebas](#pruebas)); la base de desarrollo es compartida y está en la nube
+- Redis 7
+- Docker y Docker Compose *(opcional; permite ejecutar el backend sin instalar PHP, PostgreSQL ni Redis: ver [`deployment/docker/README.md`](deployment/docker/README.md))*
+
+---
+
+## Instalación y ejecución
 
 ### 1. Clonar el repositorio
 
 ```bash
 git clone https://github.com/Corvus-Code-SRL/Sistema-de-Control-de-Ingreso-a-Examenes-Masivos.git
 cd Sistema-de-Control-de-Ingreso-a-Examenes-Masivos
-```
-
-### 2. Cambiar a la rama de desarrollo
-
-```bash
 git checkout develop
-git pull origin develop
 ```
 
-La rama `develop` constituye la base para el desarrollo de nuevas funcionalidades.
-
-### 3. Configurar Node.js
-
-Si se utiliza `mise`:
-
-```bash
-mise install
-```
-
-Comprobar las versiones:
-
-```bash
-node -v
-npm -v
-```
-
-Versiones esperadas:
-
-```text
-Node.js 22.23.2
-npm 10.9.8
-```
-
-## Configuración del Backend
-
-Entrar al directorio:
+### 2. Backend
 
 ```bash
 cd backend
-```
-
-Instalar exactamente las dependencias definidas en `composer.lock`:
-
-```bash
 composer install
-```
-
-Crear el archivo local de variables de entorno:
-
-```bash
 cp .env.example .env
-```
-
-En Windows PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Generar la clave de Laravel:
-
-```bash
 php artisan key:generate
 ```
 
-### Base de datos
-
-SCIEM utiliza PostgreSQL.
-
-Cada desarrollador debe crear una base de datos local para el proyecto y configurar sus credenciales en:
-
-```text
-backend/.env
-```
-
-Ejemplo:
-
-```env
-DB_CONNECTION=pgsql
-DB_HOST=127.0.0.1
-DB_PORT=5432
-DB_DATABASE=sciem
-DB_USERNAME=postgres
-DB_PASSWORD=
-```
-
-Las credenciales son locales y no deben subirse al repositorio.
-
-Cuando existan migraciones pendientes:
+Configurar la conexión a la **base de datos compartida**: los valores y la contraseña están en [`docs/Guia_Conexion_Supabase_SCIEM.md`](docs/Guia_Conexion_Supabase_SCIEM.md). Leer esa guía completa antes de conectarse — contiene las operaciones prohibidas sobre una base que usan siete personas a la vez.
 
 ```bash
-php artisan migrate
+php artisan serve        # http://localhost:8000
 ```
 
-> No utilizar `php artisan migrate:fresh` sobre una base de datos con información que se desee conservar, ya que elimina las tablas antes de volver a ejecutar las migraciones.
+**No ejecutar `php artisan migrate` a ciegas contra la base compartida.** El esquema ya está cargado; las migraciones nuevas se aplican después de un `git pull` y coordinando con el equipo.
 
-## Configuración del Frontend
+**Control de ingreso (HU-10 y HU-11).** Todas sus rutas exigen iniciar sesión: no hay usuario de desarrollo implícito. Un examen pasa a `EN_INGRESO` solo por el planificador de Laravel (`php artisan schedule:work`), que abre el control según `minutos_apertura` de cada examen (10 minutos por defecto). **Nunca ejecutes el planificador con el `.env` de la base compartida**: movería exámenes reales de estado. Los pasos para correrlo contra una base local están en [`deployment/docker/README.md`](deployment/docker/README.md#apertura-automática-de-ingreso). El servicio `scheduler` de Docker no arranca con `up -d`: pertenece al perfil opcional `scheduler`.
 
-Desde la raíz del proyecto:
+> Usar `composer install`, **nunca** `composer update`, para respetar las versiones de `composer.lock`.
 
-```bash
-cd frontend
-```
-
-Instalar exactamente las dependencias definidas en `package-lock.json`:
-
-```bash
-npm ci
-```
-
-Validar que el frontend compile correctamente:
-
-```bash
-npm run build
-```
-
-### shadcn/ui
-
-shadcn ya se encuentra configurado dentro del proyecto.
-
-No es necesario instalarlo globalmente.
-
-Antes de agregar un componente nuevo se debe comprobar si ya existe en:
-
-```text
-frontend/src/components/ui/
-```
-
-Para agregar un componente nuevo se debe utilizar la versión definida por el proyecto:
-
-```bash
-npm run shadcn -- add <componente>
-```
-
-Ejemplo:
-
-```bash
-npm run shadcn -- add checkbox
-```
-
-No utilizar versiones diferentes del CLI sin coordinación previa con el equipo.
-
-## Ejecución en desarrollo
-
-Para trabajar con el sistema se recomienda utilizar dos terminales.
-
-### Backend
-
-Desde la raíz del proyecto:
-
-```bash
-cd backend
-php artisan serve
-```
-
-Por defecto estará disponible en:
-
-```text
-http://127.0.0.1:8000
-```
-
-### Frontend
-
-En otra terminal:
-
-```bash
-cd frontend
-npm run dev
-```
-
-Por defecto estará disponible en:
-
-```text
-http://localhost:5173
-```
-
-Apache no es necesario para ejecutar el proyecto durante el desarrollo local. Su configuración se considera principalmente para el entorno de despliegue.
-
-## Validación del entorno
-
-Antes de comenzar a desarrollar, cada integrante debe comprobar que los siguientes comandos funcionan correctamente.
-
-### Backend
-
-```bash
-cd backend
-composer install
-php artisan --version
-```
-
-La versión esperada de Laravel es:
-
-```text
-Laravel Framework 8.83.29
-```
-
-### Frontend
+### 3. Frontend
 
 ```bash
 cd frontend
 npm ci
-npm run build
+npm run dev              # http://localhost:5173
 ```
 
-El build debe finalizar sin errores.
+En desarrollo, Vite redirige las peticiones de `/api` al backend (`http://localhost:8000`) para simular el mismo origen del despliegue.
 
-## Arquitectura
+> Usar `npm ci`, **nunca** `npm update`, para respetar las versiones de `package-lock.json`.
 
-SCIEM utiliza una arquitectura cliente-servidor.
+### 4. Entorno con Docker (opcional)
 
-El flujo general es:
+Para desarrollar sin instalar PHP ni Redis en el sistema, el backend puede ejecutarse con Docker Compose. La guía está en [`deployment/docker/README.md`](deployment/docker/README.md).
 
-```text
-React + TypeScript
-        ↓
-      API REST
-        ↓
-      Laravel
-        ↓
-     Services
-        ↓
-     Eloquent
-        ↓
-    PostgreSQL
-```
+Si PHP corre en Docker, el contenedor tiene que poder salir a internet por el puerto 5432 para alcanzar la base compartida, y la verificación de la conexión debe hacerse **dentro del contenedor**, no en el host.
 
-En el backend se utiliza principalmente el siguiente flujo:
+El despliegue con un solo contenedor Apache (frontend compilado + API en el mismo origen) sigue pendiente: el `docker-compose.yml` de despliegue, el `Dockerfile` de Apache y `sciem.conf` todavía no existen.
 
-```text
-Route
-  ↓
-Controller
-  ↓
-Form Request
-  ↓
-Service
-  ↓
-Eloquent Model
-  ↓
-PostgreSQL
-```
+---
 
-Redis se considera infraestructura transversal para caché y otros mecanismos que se definan durante el desarrollo.
+## Base de datos compartida
 
-La documentación detallada de arquitectura se encuentra en:
+Desde el Sprint 2 y hasta el Sprint 5, el equipo desarrolla contra **una sola base PostgreSQL en la nube (Supabase)**, para que todos trabajen con los mismos datos. En el Sprint 6 se migra a un PostgreSQL local para el despliegue en el servidor del laboratorio (RNF-15).
 
-```text
-docs/architecture/overview.md
-```
+Todo lo que se escriba en estos sprints debe poder moverse a ese PostgreSQL sin reescribir nada, así que **no se usa ninguna función exclusiva de Supabase** (Auth, Storage, Realtime, Edge Functions). La autenticación es RNF-02 con Sanctum y el tiempo real es HU-10, ambos en nuestro propio backend.
 
-El stack tecnológico se encuentra documentado en:
+Lo esencial, con el detalle completo y las credenciales en [`docs/Guia_Conexion_Supabase_SCIEM.md`](docs/Guia_Conexion_Supabase_SCIEM.md):
 
-```text
-docs/architecture/stack.md
-```
+- Se usa el **Session Pooler, puerto 5432**. Nunca el Transaction Pooler (6543): rompe Eloquent.
+- `DB_SSLMODE=require` y `DB_SCHEMA=public`.
+- **Nunca** `migrate:fresh`, `migrate:refresh`, `migrate:reset`, `db:wipe` ni `migrate:rollback` contra la base compartida.
+- **Nunca** `php artisan test` con el `.env` apuntando a la base compartida: la suite trunca y recrea. Usar `.env.testing` con una base local.
+- Los cambios estructurales van por migración de Laravel, nunca editando tablas desde el panel web.
 
-## Convención de ramas
+Compartir una sola base tiene una consecuencia que conviene tener presente: un error individual afecta a los siete a la vez, y en el mismo segundo.
 
-Las ramas principales son:
+---
 
-```text
-main
-develop
-```
+## Datos de prueba compartidos
 
-`main` representa las versiones estables del sistema.
+> **Datos temporales, solo para desarrollo.** Son inventados: no corresponden a personas reales y el dominio de correo `sciem.test` no existe. Se eliminarán cuando haya datos reales. No los cargue en producción.
 
-`develop` constituye la rama base para el desarrollo.
+Todo el equipo trabaja con los mismos registros: cada valor está escrito a mano en `backend/database/seeders/TestData/` (sin Faker), incluidos los ids y los uuid. Cargarlos dos veces no duplica nada: cada tabla se escribe con *upsert* por clave primaria y el historial de roles de las cuentas de prueba se restablece a su estado original.
 
-No se debe desarrollar directamente sobre `main` ni `develop`.
+### Cómo cargarlos
 
-Las ramas de trabajo siguen las siguientes convenciones:
+1. Partir de una base creada con `docs/database/creation-script.sql`. Si la base ya tiene datos armados a mano con los mismos códigos (por ejemplo la carrera `SIS` o la gestión `2026` con otro id), el seeder se detiene sin escribir nada y lo explica.
+2. En `backend/.env`, `APP_ENV=local` (o `development`) y este valor, que ya trae `.env.example`:
 
-```text
-feature/<descripcion>
-fix/<descripcion>
-hotfix/<descripcion>
-chore/<descripcion>
-release/<version>
-```
+    ```dotenv
+    SCIEM_USUARIO_PRUEBA=00000000-0000-4000-8000-000000000001
+    ```
 
-Ejemplos:
+    El período vigente **ya no se configura por entorno**: el seeder deja vigente el período `9303` (`2/2026`) en `gestion_periodo.vigente`. Sin ningún período vigente, los endpoints que lo necesitan responden 500 con un mensaje que lo indica (`GET /api/periodos` sigue funcionando, con `id_periodo_activo` en `null`). Cómo fijar otro, la diferencia entre `estado` y `vigente`, y cómo migrar una base con datos: `docs/database/periodo-vigente.md`.
 
-```text
-feature/registro-estudiantes
-feature/configuracion-examen
-fix/validacion-codigo-sis
-chore/configurar-shadcn
-release/v1.0.0
-```
+    > `SCIEM_DOCENTE_FIJO_ID` **ya no existe** (RNF-02): el usuario que actúa es el autenticado con su token. Un `.env` anterior que todavía la tenga no se rompe: la variable se ignora. `SCIEM_USUARIO_PRUEBA` queda solo para los seeders (`SystemActor`, ver `docs/architecture/usuario-actual.md`).
 
-Las descripciones deben escribirse:
+3. Ejecutar:
 
-- en español;
-- en minúsculas;
-- utilizando guiones;
-- sin espacios;
-- sin tildes;
-- sin `ñ`;
-- sin caracteres especiales.
+    ```bash
+    cd backend
+    php artisan config:clear
+    php artisan db:seed --class="Database\Seeders\TestData\TestDataSeeder"
+    ```
 
-### Crear una rama de trabajo
+El seeder no está registrado en `DatabaseSeeder`, así que `php artisan db:seed` a secas no lo carga. Se niega a correr con cualquier `APP_ENV` que no sea `local` o `development` y rechaza expresamente la base `sciem_test`, incluso en entorno local. La suite construye su propio esquema y nunca usa estos datos. También ejecuta `RoleSeeder`, `ActionSeeder` y `ExamTypeSeeder`, que son idempotentes.
 
-Antes de iniciar una tarea:
+**Estos seeders ya no se pueden ejecutar contra la base compartida:** escriben ids fijos con *upsert* y se niegan a correr si `DB_HOST` no es `postgres`, `127.0.0.1` ni `localhost` (ver «Seeders: para qué sirve cada uno»). Si hay que cargarlos en un servidor remoto, el cambio de la guarda se decide primero con el equipo.
+
+### Comprobar qué datos ve el frontend
+
+Cambiar `.env.example` no modifica un `.env` existente. La API debe usar el periodo `9303` y la misma base donde se ejecutó el seeder; el docente es quien inicie sesión (por ejemplo `10452`, uuid `…0011`). Después de modificar su `.env`, limpiar la configuración y reiniciar el servidor PHP. Si PHP corre en Docker, ejecutar estos pasos **en el contenedor que atiende el puerto 8000**; un contenedor sin el repositorio montado conserva su propia copia del código y de `.env`.
+
+Para trabajar contra una base propia en lugar de la compartida, crear una base local vacía (por ejemplo `sciem_demo`), cargar en ella `docs/database/creation-script.sql` y seleccionar `DB_DATABASE=sciem_demo` antes de sembrar. No ejecutar el script de creación sobre tablas existentes. El esquema de exámenes debe incluir los cambios de HU-06; el seeder lo comprueba antes de escribir.
+
+La verificación de la carga debe mostrar 8 materias, 15 pares materia-carrera, 11 grupos, 24 estudiantes y 8 exámenes en una base nueva. `GET /api/materias` debe devolver los pares y `GET /api/carreras/9101/materias/9201/grupos` los grupos propios y ajenos de Cálculo I en Sistemas.
+
+**Limitación actual de la aplicación:** `ExamsPage.tsx` inicializa su lista con `[]` y no consulta el backend; tampoco existe `GET /api/examenes`. Por eso «Exámenes programados» seguirá vacío aun con datos cargados. El formulario de creación sí consulta `/api/examenes/formulario`, y los exámenes sembrados permiten probar las advertencias de superposición y las operaciones de edición/cancelación por API. Conectar el listado es parte de la corrección de HU-06.
+
+`UserSeeder` escribe en el mismo uuid del Administrador de prueba. Si después se corre `php artisan db:seed`, el nombre y el código SIS de esa cuenta vuelven a los de `UserSeeder`; basta con volver a cargar los datos de prueba.
+
+### Cuentas
+
+Todas tienen la contraseña `password` (hash bcrypt fijo). Se entra con `POST /api/auth/login` (o la pantalla de ingreso): toda la API, salvo el login, exige el token.
+
+| Cuenta | uuid (`usuario.id_usuario`) | cod_sis | Correo | Rol vigente |
+| --- | --- | --- | --- | --- |
+| Valeria Montaño Ríos | `00000000-0000-4000-8000-000000000001` | `ADM0001` | valeria.montano@sciem.test | Administrador (uuid de `SCIEM_USUARIO_PRUEBA`, la cuenta de sistema de los seeders) |
+| Marcelo Quiroga Andrade | `00000000-0000-4000-8000-000000000011` | `10452` | marcelo.quiroga@sciem.test | Docente; antes Auxiliar |
+| Rosario Salazar Vidal | `00000000-0000-4000-8000-000000000012` | `10487` | rosario.salazar@sciem.test | Docente |
+| Gustavo Rocha | `00000000-0000-4000-8000-000000000013` | `10533` | gustavo.rocha@sciem.test | Docente (sin apellido materno) |
+| Daniela Ferrufino Soliz | `00000000-0000-4000-8000-000000000021` | `201800451` | daniela.ferrufino@sciem.test | Auxiliar |
+| Iván Choque Mamani | `00000000-0000-4000-8000-000000000022` | `201900782` | ivan.choque@sciem.test | Auxiliar |
+| Lucía Terrazas Paz | `00000000-0000-4000-8000-000000000031` | `202000315` | lucia.terrazas@sciem.test | ninguno |
+| Óscar Villarroel Gutiérrez | `00000000-0000-4000-8000-000000000041` | `10398` | oscar.villarroel@sciem.test | ninguno; cuenta INACTIVA con rol Docente cerrado |
+
+Los códigos SIS siguen el formato de cada tipo de cuenta: el Administrador es alfanumérico, los docentes tienen 5 dígitos, y los auxiliares y estudiantes, 9. **El inicio de sesión de RNF-02 usa el código SIS como identificador**, así que debe aceptar los dos formatos: la validación estricta de la carga de nóminas (solo dígitos, 8 a 12) no se reutiliza en el login.
+
+### Casos borde
+
+| Caso | Registro de prueba | Historia |
+| --- | --- | --- |
+| Materia compartida por carreras de facultades distintas | Cálculo I en Sistemas, Informática (FCYT) y Economía (FCE) | HU-03 |
+| Materia INACTIVA con par activo | Taller de Sistemas Operativos en Sistemas | HU-03 |
+| Par INACTIVO con materia activa | Base de Datos I en Informática; su grupo 1 (9409) responde 422 en el detalle | HU-03 |
+| Par sin grupos del docente 10452 | Contabilidad General en Administración (solo Rosario Salazar) | HU-03 |
+| Par sin ningún grupo | Microeconomía en Economía | HU-03 |
+| Mismo número de grupo, misma materia, otra carrera | Grupo 1 de Cálculo I en Sistemas (9401) y en Economía (9403) | HU-03 |
+| Grupos de otro docente en el mismo par | Cálculo I en Sistemas: grupo 1 del docente 10452 y grupo 2 de Rosario Salazar (9402), abierto en el listado y con 403 en el detalle | HU-03 |
+| Grupo sin nómina | Base de Datos I en Sistemas, grupo 1 (9404) | HU-03 |
+| Estudiante existente que no está en la nómina de un grupo | Gabriela Guzmán (`202150007`) respecto del grupo 9401: al cargarla se inscribe sin crear otro estudiante | HU-05 |
+| Grupo de un periodo anterior | Cálculo I en Sistemas, grupo 1 del periodo 1-2026 (9410) | HU-03 |
+| Cuenta sin rol | Lucía Terrazas | RNF-01, RNF-02 |
+| Cuenta deshabilitada | Óscar Villarroel | RNF-01, RNF-02 |
+| Historial de roles de dos tramos | Marcelo Quiroga: Auxiliar → Docente | RNF-01 |
+| Docente con asignaciones activas | Marcelo Quiroga, Rosario Salazar, Gustavo Rocha | RNF-01 |
+| Código SIS con cuenta existente | Cualquier cod_sis de la tabla de cuentas, por ejemplo `10452` | HU-01 |
+| Código SIS libre y reconocido por el SIS simulado | `202312345`, `202312346`, `202312347`, `201900001` | HU-01 |
+| Código SIS no reconocido | `999999999` | HU-01 |
+| Ambiente fuera de servicio | Aula `612` (INACTIVO) | HU-06, HU-07 |
+| Tipos de examen Parcial y Final | `tipo_examen` 9701 y 9702 (categoría REGULAR) | HU-06 |
+| Exámenes propios y ajenos en el mismo par | 9801 (Marcelo) y 9803 (Rosario), Cálculo I/Sistemas, 15-10-2026 a las 08:00 | HU-06 |
+| Misma materia en otra facultad | 9802, Final Cálculo ECO, 20-11-2026 a las 10:00 | HU-06 |
+| Examen cancelado, sin reserva efectiva de horario | 9804, Base de Datos I/Sistemas, 16-10-2026 a las 14:00 | HU-06 |
+| Estados que bloquean edición y cancelación | 9805 EN_INGRESO, 9806 EN_CURSO, 9807 FINALIZADO | HU-06 |
+| Examen que cruza medianoche | 9808, Programación/Sistemas, 17-10-2026 de 23:00 a 01:00 (120 minutos) | HU-06 |
+| Intento de ingreso rechazado con reporte | 9901–9909: cada uno originó un reporte (9921–9929) de los exámenes 9807 y 9805, controlados por Daniela Ferrufino e Iván Choque | HU-042 |
+| Intento rechazado de un estudiante identificado, sin reporte | 9910, Diego Delgadillo en el examen 9807 | HU-042 |
+| Intento de un estudiante que no figura en el sistema | 9911, motivo `NO_ENCONTRADO`, `cod_sis` `202199999`, sin `id_estudiante` | HU-042 |
+| Reportes en los tres estados, con y sin evidencia | 2 PENDIENTE, 2 RECHAZADO y 5 APROBADO; los revisa Marcelo Quiroga. Los que tienen evidencia apuntan a `evidencias/reportes/<id>.<ext>` del disco público, donde el seeder deja un archivo mínimo si el path está libre (nunca pisa uno existente) | HU-045 |
+| Central de riesgo con reincidentes | 5 filas (9941–9945) de 3 estudiantes y los 4 tipos de falta: José Pérez Mamani (`202150025`, id 9525), Camila Camacho y Bruno Balderrama | HU-046 |
+
+Periodos: `2-2025` (9301), `1-2026` (9302) y `2-2026` (9303, el activo). Hay 25 estudiantes, repartidos entre 2 y 7 por grupo (José Pérez Mamani, 9525, se suma a los grupos 9401 y 9407 solo con `RiskCenterTestDataSeeder`, que también habilita a los dos auxiliares en los exámenes 9805 y 9807). Los ocho exámenes (9801–9808) tienen un ambiente y un grupo del mismo par cada uno. Sus fechas y estados son fijos: no avanzan con el reloj. Cuando esas fechas queden en el pasado, el formulario de HU-06 rechazará reutilizarlas para crear o editar; actualizar el conjunto compartido de forma coordinada si se necesita otro calendario.
+
+### Cómo retirarlos
+
+Todos los ids numéricos de prueba están en el rango 9000–9999 y todos los uuid empiezan con `00000000-0000-4000-8000-`. Para retirar los datos, recrear la base desde el script de creación y borrar `backend/database/seeders/TestData/`, esta sección y los valores de datos de prueba de `.env.example`.
+
+### Seeders: para qué sirve cada uno
+
+| Seeder | Qué hace | ¿Base compartida? |
+| --- | --- | --- |
+| `ActionSeeder` | Catálogo `accion`: las 14 acciones de la bitácora, en MAYÚSCULAS (incluye `APROBAR_REPORTE` y `RECHAZAR_REPORTE`). `updateOrInsert` por `operacion`. | **Sí**, siempre con `--class` |
+| `IncidentTypeSeeder` | Catálogo `tipo_falta`: 4 tipos de falta. Solo inserta los que faltan y nunca actualiza: una fila existente con otra descripción se deja como está. | **Sí**, siempre con `--class` |
+| `RoleSeeder`, `ExamTypeSeeder` | Catálogos `rol` y `tipo_examen`. Usan `updateOrInsert`: reescriben la descripción o la categoría si cambiaron. | Ya aplicados; no repetir sin necesidad |
+| `UserSeeder`, `AdministratorAccountSeeder` | La cuenta de sistema que firma la bitácora de seeders y comandos (`SCIEM_USUARIO_PRUEBA`, vía `SystemActor`). `UserSeeder` sobrescribe su nombre y su SIS (`000000000`) y le deja una contraseña inutilizable: es una cuenta de firma, nadie puede iniciar sesión con ella (RNF-02); conserva el rol Administrador. | Solo local |
+| `TestData\*` | Datos temporales con ids fijos y *upsert* por clave primaria (ver arriba). | Solo local: se niegan a correr si el host no es local |
+| `DatabaseSeeder` (`php artisan db:seed` a secas) | Llama a `UserSeeder`, `RoleSeeder`, `ActionSeeder`, `AdministratorAccountSeeder`, `ExamTypeSeeder` e `IncidentTypeSeeder`. No carga `TestData`. | Solo local: **nunca** sobre la compartida |
+
+Sobre la base compartida solo se ejecutan los dos seguros, y **siempre por clase**, nunca con `db:seed` a secas:
 
 ```bash
-git checkout develop
-git pull origin develop
+php artisan db:seed --class="Database\Seeders\ActionSeeder"
+php artisan db:seed --class="Database\Seeders\IncidentTypeSeeder"
 ```
 
-Crear la nueva rama:
+**Guarda de host.** `TestDataSeeder` y los cuatro seeders que llama (`CatalogTestDataSeeder`, `AccountTestDataSeeder`, `GroupTestDataSeeder`, `ExamTestDataSeeder`) llaman a `Database\Seeders\Support\LocalDatabaseGuard` como primera instrucción: si `DB_HOST` de la conexión por defecto no es `postgres`, `127.0.0.1` ni `localhost`, se detienen con un error claro y sin escribir nada, incluso si se ejecutan con `--class` por separado. Con un `.env` que apunte a Supabase, estos seeders no pueden correr.
+
+### Eliminar las acciones heredadas de `accion` (Supabase)
+
+La migración `2026_10_04_000000_delete_legacy_accion_rows` borra del catálogo `accion` las cuatro filas que se insertaron a mano antes de que existiera `ActionSeeder` (`Crear`, `Actualizar`, `Leer` y `Desactivar`, ids 1 a 4). Ningún código las usa. Las busca por el texto exacto de `operacion`, no hace nada si no existen y **aborta sin borrar nada** si alguna fila de `log` las referencia. Pasos, desde `backend` y con el `.env` compartido, **coordinando antes con el equipo**:
+
+1. `php artisan migrate:status`: las cinco migraciones anteriores en `Yes` y `2026_10_04_000000_delete_legacy_accion_rows` en `No`.
+2. Verificación previa, solo lectura (consola SQL de Supabase):
+
+    ```sql
+    select id_accion, operacion, tipo_operacion from accion
+     where operacion in ('Crear', 'Actualizar', 'Leer', 'Desactivar') order by id_accion;
+
+    select a.operacion, count(*) as filas_de_log from log l
+      join accion a on a.id_accion = l.id_accion
+     where a.operacion in ('Crear', 'Actualizar', 'Leer', 'Desactivar') group by a.operacion;
+    ```
+
+    Esperado: la primera devuelve 4 filas (ids 1 a 4) y la segunda ninguna. Si la segunda devuelve filas, la migración abortará sin borrar nada: avisar al equipo antes de seguir.
+3. `php artisan migrate --pretend`. En este modo Laravel no ejecuta las consultas, así que la selección vuelve vacía y **no se ve el `DELETE`**. La salida esperada es exactamente esta línea:
+
+    ```text
+    DeleteLegacyAccionRows: select "id_accion" from "accion" where "operacion" in (?, ?, ?, ?)
+    ```
+4. `php artisan migrate`.
+5. Verificación:
+
+    ```sql
+    select count(*) from accion;                                             -- 12, o 14 si ya corrió ActionSeeder con las acciones de reportes
+    select min(id_accion), max(id_accion) from accion;                       -- 5 y 16
+    select count(*) from accion
+     where operacion in ('Crear', 'Actualizar', 'Leer', 'Desactivar');       -- 0
+    ```
+
+    Y `php artisan migrate:status` con las seis en `Yes`.
+
+---
+
+## Pruebas
+
+**La base de pruebas es local y obligatoria.** La suite usa `RefreshDatabase`, que trunca y recrea la base entera. Un `.env` apuntando a la base compartida más un `php artisan test` destruye el trabajo de los siete, y es más fácil de cometer que cualquier comando destructivo, porque correr las pruebas es algo que uno hace sin pensar.
+
+Cada integrante crea su propia base local llamada `sciem_test` y un `.env.testing` que apunte ahí (plantilla en `.env.testing.example`). `tests/TestCase.php` aborta si la base no se llama `sciem_test`: esa red de seguridad no se debilita ni se elude.
 
 ```bash
-git checkout -b feature/<descripcion>
-```
+# Backend
+cd backend
+php artisan test
 
-Ejemplo:
-
-```bash
-git checkout -b feature/registro-estudiantes
-```
-
-Al terminar el trabajo se debe realizar un Pull Request hacia:
-
-```text
-develop
-```
-
-No se deben realizar Pull Requests de una rama `feature/*` directamente hacia `main`.
-
-## Convención de commits
-
-Se recomienda utilizar mensajes breves y descriptivos.
-
-Ejemplos:
-
-```text
-feat: implementar registro de estudiantes
-fix: corregir validacion de codigo sis
-chore: agregar componente checkbox
-docs: actualizar configuracion de desarrollo
-```
-
-## Gestión de dependencias
-
-Después de clonar el repositorio se debe utilizar:
-
-### Backend
-
-```bash
-composer install
-```
-
-### Frontend
-
-```bash
-npm ci
-```
-
-No utilizar:
-
-```text
-composer update
-npm update
-```
-
-ni actualizar dependencias sin coordinación previa con el equipo.
-
-Los archivos:
-
-```text
-composer.lock
-package-lock.json
-```
-
-deben mantenerse dentro del repositorio para garantizar que todos los integrantes trabajen con las mismas versiones.
-
-El proyecto utiliza versiones exactas de sus dependencias para reducir diferencias entre entornos de desarrollo.
-
-## Estándares del Frontend
-
-Los componentes reutilizables de interfaz se encuentran principalmente en:
-
-```text
-frontend/src/components/ui/
-```
-
-Los componentes globales y reutilizables que no pertenezcan estrictamente al conjunto base de UI pueden ubicarse en:
-
-```text
-frontend/src/components/common/
-```
-
-Los componentes de estructura general de la aplicación se encuentran en:
-
-```text
-frontend/src/components/layout/
-```
-
-Los componentes específicos de una funcionalidad deben mantenerse dentro de su correspondiente `feature`.
-
-Ejemplos:
-
-```text
-frontend/src/features/students/
-frontend/src/features/exams/
-frontend/src/features/groups/
-frontend/src/features/admissions/
-```
-
-Cuando exista un componente base en shadcn o en `components/ui`, debe reutilizarse y adaptarse antes de crear un componente equivalente desde cero.
-
-No se deben crear colores, radios, espaciados o estilos arbitrarios cuando ya exista un token o una regla definida por el Design System de SCIEM.
-
-La interfaz utiliza Lucide como sistema principal de iconografía.
-
-## Centrales de Riesgo
-
-SCIEM mantiene dos contextos independientes para la gestión de riesgo:
-
-```text
-Central de Riesgo Académica
-→ estudiantes de la universidad
-
-Central de Riesgo de Admisión
-→ postulantes
-```
-
-Los registros de ambas centrales no deben mezclarse.
-
-## Recomendaciones de trabajo en equipo
-
-Antes de comenzar a trabajar en una Historia de Usuario:
-
-```bash
-git checkout develop
-git pull origin develop
-git checkout -b feature/<descripcion>
-```
-
-Durante el desarrollo:
-
-- reutilizar componentes existentes antes de crear nuevos;
-- respetar la arquitectura definida;
-- no modificar dependencias sin coordinación;
-- no subir archivos `.env`;
-- no desarrollar directamente sobre `main` o `develop`;
-- mantener los cambios relacionados con una tarea dentro de su rama correspondiente;
-- ejecutar las validaciones del frontend y backend antes de realizar un Pull Request.
-
-Antes de enviar un Pull Request se recomienda comprobar:
-
-```bash
+# Frontend
 cd frontend
 npm run build
 ```
 
-y, para el backend:
+> El frontend todavía no tiene ESLint configurado (`npm run lint` no existe como script); la única validación disponible hoy es que `npm run build` (type-check + build) termine sin errores.
 
-```bash
-cd backend
-php artisan --version
-```
+---
 
-El Pull Request debe realizarse hacia `develop`.
+## Convenciones
+
+### Backend
+
+- Flujo obligatorio: `Controller → FormRequest → Service → Model`; la respuesta se devuelve mediante un `Resource`.
+- Los controladores no contienen lógica de negocio ni consultas Eloquent directas.
+- Las transacciones se abren en los Services.
+- Los modelos usan nombres en inglés y declaran la tabla explícitamente (`protected $table = 'grupo';`).
+- **Los Services no leen la sesión ni el usuario actual por su cuenta**: lo reciben del controlador como argumento explícito. Es lo que permite que las pruebas controlen quién actúa.
+- Las Centrales de Riesgo Académica y de Admisión no se referencian entre sí.
+
+Detalle completo (idioma, PSR-12, naming, capas) en [`.claude/rules/code-style-backend.md`](.claude/rules/code-style-backend.md).
+
+### Frontend
+
+| Elemento | Convención | Ejemplo |
+|---|---|---|
+| Componente | `PascalCase.tsx` | `StudentTable.tsx` |
+| Página | `NombrePage.tsx` | `StudentsPage.tsx` |
+| Hook | `useNombre.ts` | `useStudents.ts` |
+| Servicio | `nombreService.ts` | `studentService.ts` |
+| Tipos | `nombre.types.ts` | `student.types.ts` |
+
+- `.tsx` solo para archivos con JSX; el resto, `.ts`.
+- Un feature solo importa de otro feature a través de su `index.ts`.
+- `components/ui/` se gestiona solo con el CLI de shadcn (`npm run shadcn -- add <componente>`); los componentes propios van en `components/common/`.
+- Todas las peticiones HTTP pasan por `lib/api-client.ts`.
+
+### General
+
+- No subir archivos `.env` ni `.env.testing` (ya excluidos vía `.gitignore`). Ninguna credencial real va en un archivo versionado.
+- `composer.lock` y `package-lock.json` se mantienen versionados.
+
+---
+
+## Flujo de trabajo
+
+- `develop` es la rama de integración; `main` representa versiones estables. No se desarrolla directamente sobre ninguna de las dos.
+- Cada ítem del backlog se desarrolla en una rama propia creada desde `develop`, siguiendo el formato y los tipos definidos en [`.claude/skills/git-branches/SKILL.md`](.claude/skills/git-branches/SKILL.md):
+
+| Tipo | Uso | Ejemplo |
+|---|---|---|
+| `feature/` | Historia de Usuario del Product Backlog (HU-01 a HU-35): entrega valor al cliente o al usuario | `feature/HU-11-verificar-informacion-estudiante` |
+| `tech/` | Requerimiento no funcional (RNF-01 a RNF-18): seguridad, rendimiento, despliegue, respaldos | `tech/RNF-02-autenticacion` |
+| `fix/` | Corrección sobre un ítem ya integrado | `fix/HU-05-modelo-nomina` |
+| `refactor/` | Reestructuración sin cambio de comportamiento, sin ID de backlog | `refactor/reorganizar-modulo-autenticacion` |
+| `release/` | Preparación de versión | `release/v1.3.0` |
+| `hotfix/` | Corrección urgente sobre una versión publicada | `hotfix/v1.2.1-login-docente` |
+
+- Los identificadores funcionales (`HU-`) y no funcionales (`RNF-`) son **dos secuencias independientes y correlativas**, y no llevan información autocontenida: `HU-11` no dice de qué módulo es ni qué hace, y eso es a propósito. El significado vive en el Product Backlog y en la tarjeta de Trello.
+- Las ramas creadas antes del Product Backlog v5 usan la numeración anterior de tres dígitos (`HU-017`, `HU-021`) y **no se renombran**, para no romper la trazabilidad del historial. Los dos formatos se cruzan y no significan lo mismo: `HU-012` del backlog original es hoy `HU-07`, mientras que `HU-12` del actual es otra historia.
+- Los commits siguen el formato Conventional Commits definido en [`.claude/rules/git-commits.md`](.claude/rules/git-commits.md) (`feat:`, `fix:`, `refactor:`, `docs:`, `style:`, `test:`, `perf:`, `build:`, `ci:`, `chore:`).
+- Los cambios se integran mediante Pull Request hacia `develop`, con revisión de al menos un integrante.
+- Al fusionar, la rama se elimina del remoto.
+
+---
+
+## Documentación
+
+| Documento | Descripción |
+|---|---|
+| [`docs/architecture/overview.md`](docs/architecture/overview.md) | Descripción de la arquitectura y sus capas |
+| `docs/architecture/justificacion-arquitectura.md` | Justificación de la arquitectura y de la estructura del repositorio *(pendiente de redactar)* |
+| [`docs/architecture/stack.md`](docs/architecture/stack.md) | Stack tecnológico y versiones |
+| [`docs/Guia_Conexion_Supabase_SCIEM.md`](docs/Guia_Conexion_Supabase_SCIEM.md) | Conexión a la base compartida y buenas prácticas del equipo |
+| [`deployment/docker/README.md`](deployment/docker/README.md) | Entorno de desarrollo con Docker (PHP, PostgreSQL y Redis) |
+| [`docs/architecture/decisions/`](docs/architecture/decisions/) | Registro de decisiones de arquitectura (ADR) |
+| [`docs/architecture/decisions/0001-actualizacion-en-tiempo-real-por-consulta-periodica.md`](docs/architecture/decisions/0001-actualizacion-en-tiempo-real-por-consulta-periodica.md) | ADR 0001 — por qué la actualización en tiempo real es por consulta periódica |
+| [`.claude/skills/git-branches/SKILL.md`](.claude/skills/git-branches/SKILL.md) | Convención de nombres de ramas |
+| [`.claude/rules/git-commits.md`](.claude/rules/git-commits.md) | Convención de mensajes de commit |
+| [`.claude/rules/code-style-backend.md`](.claude/rules/code-style-backend.md) | Estándares de código del backend |
+
+---
+
+## Empresa
+
+| | |
+|---|---|
+| **Razón social** | Corvus Code S.R.L. |
+| **Representante legal** | Carlos Diego Mariscal Segovia |
+| **Correo** | corvuscodesrl@gmail.com |
+| **Consultora TIS** | Leticia Blanco Coca |
+| **Convocatoria** | CPTIS-452026-2026 |
+
+Proyecto académico desarrollado para la materia Taller de Ingeniería de Software — UMSS.

@@ -1,0 +1,576 @@
+<?php
+
+namespace Tests\Feature\Exams;
+
+use App\Models\Exam;
+use App\Models\ExamAssistant;
+use App\Models\AuditLog;
+use App\Support\RecordStatus;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
+use Tests\Concerns\SeedsExamCatalog;
+use Tests\TestCase;
+
+/**
+ * HU-24 — criterios 10 y 11: la información general se edita solo mientras el
+ * examen está PROGRAMADO.
+ */
+class UpdateExamTest extends TestCase
+{
+    use DatabaseTransactions;
+    use SeedsExamCatalog;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seedExamCatalog();
+    }
+
+    private function url(Exam $exam): string
+    {
+        return "/api/examenes/{$exam->id_examen}";
+    }
+
+    public function test_criterio_10_edita_la_informacion_general_mientras_esta_programado(): void
+    {
+        $exam = $this->createExam(['nombre_examen' => 'Primer parcial'], [$this->aulaId]);
+        $newDate = $this->futureDate(10);
+
+        $this->putJson($this->url($exam), $this->validPayload([
+            'nombre_examen' => 'Parcial reprogramado',
+            'id_carrera'    => $this->informaticaId,
+            'id_materia'    => $this->calculoId,
+            'categoria'     => 'MESA',
+            'fecha'         => $newDate,
+            'hora_inicio'   => '10:15',
+            'duracion'      => 120,
+            'ambientes'     => [$this->otraAulaId],
+            'normas'        => 'Solo calculadora.',
+        ]))
+            ->assertOk()
+            ->assertJsonPath('mensaje', 'Examen actualizado correctamente.')
+            ->assertJsonPath('data.estado', Exam::PROGRAMADO)
+            ->assertJsonPath('data.hora_fin', '12:15')
+            ->assertJsonPath('data.carrera.nombre', 'Ingenieria Informatica');
+
+        $this->assertDatabaseHas('examen', [
+            'id_examen'          => $exam->id_examen,
+            'nombre_examen'      => 'Parcial reprogramado',
+            'id_carrera'         => $this->informaticaId,
+            'id_materia'         => $this->calculoId,
+            'id_tipo_examen'     => $this->examTypeId('MESA'),
+            'fecha'              => $newDate,
+            'duracion'           => 120,
+            'normas'             => 'Solo calculadora.',
+            'id_usuario_docente' => $this->docenteId,
+            'estado'             => Exam::PROGRAMADO,
+        ]);
+        $this->assertSame(
+            [$this->otraAulaId],
+            $exam->classrooms()->pluck('ambiente.id_ambiente')->all()
+        );
+    }
+
+    /**
+     * Descubierto en HU-09: quitar del examen un ambiente que ya tenía un auxiliar
+     * asignado violaba la FK compuesta examen_auxiliar → examen_ambiente (500).
+     * El auxiliar de ese ambiente queda sin ambiente y los demás no cambian.
+     */
+    public function test_quitar_un_ambiente_deja_sin_ambiente_solo_a_sus_auxiliares(): void
+    {
+        $exam = $this->createExam([], [$this->aulaId, $this->otraAulaId]);
+
+        $releasedId = '00000000-0000-4000-8000-000000000091';
+        $keptId = '00000000-0000-4000-8000-000000000092';
+
+        DB::table('usuario')->insert([
+            [
+                'id_usuario'       => $releasedId,
+                'nombre'           => 'Auxiliar',
+                'apellido_paterno' => 'Liberado',
+                'apellido_materno' => null,
+                'correo'           => 'auxiliar.liberado@umss.edu',
+                'contrasenia'      => 'x',
+                'cod_sis'          => '209900091',
+                'estado'           => RecordStatus::ACTIVE,
+            ],
+            [
+                'id_usuario'       => $keptId,
+                'nombre'           => 'Auxiliar',
+                'apellido_paterno' => 'Conservado',
+                'apellido_materno' => null,
+                'correo'           => 'auxiliar.conservado@umss.edu',
+                'contrasenia'      => 'x',
+                'cod_sis'          => '209900092',
+                'estado'           => RecordStatus::ACTIVE,
+            ],
+        ]);
+
+        foreach ([$releasedId => $this->aulaId, $keptId => $this->otraAulaId] as $userId => $classroomId) {
+            ExamAssistant::create([
+                'id_examen'                   => $exam->id_examen,
+                'id_usuario'                  => $userId,
+                'id_usuario_docente_habilita' => $exam->id_usuario_docente,
+                'id_ambiente'                 => $classroomId,
+            ]);
+        }
+
+        $this->putJson($this->url($exam), $this->validPayload([
+            'fecha'     => $this->futureDate(10),
+            'ambientes' => [$this->otraAulaId],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('examen_auxiliar', [
+            'id_examen'   => $exam->id_examen,
+            'id_usuario'  => $releasedId,
+            'id_ambiente' => null,
+        ]);
+        $this->assertDatabaseHas('examen_auxiliar', [
+            'id_examen'   => $exam->id_examen,
+            'id_usuario'  => $keptId,
+            'id_ambiente' => $this->otraAulaId,
+        ]);
+        $this->assertDatabaseMissing('examen_ambiente', [
+            'id_examen'   => $exam->id_examen,
+            'id_ambiente' => $this->aulaId,
+        ]);
+    }
+
+    public function test_la_edicion_no_se_advierte_contra_el_propio_examen(): void
+    {
+        $exam = $this->createExam(['nombre_examen' => 'Primer parcial'], [$this->aulaId]);
+
+        // Mismo nombre, fecha, horario y ambiente que ya tiene: no es un duplicado de sí mismo.
+        $this->putJson($this->url($exam), $this->validPayload([
+            'fecha'       => $exam->fecha->toDateString(),
+            'normas'      => 'Normas corregidas.',
+        ]))->assertOk();
+    }
+
+    public function test_la_edicion_advierte_superposicion_con_otros_examenes(): void
+    {
+        $this->createExam(['nombre_examen' => 'Otro examen', 'hora_inicio' => '10:00'], [$this->otraAulaId]);
+        $exam = $this->createExam(['nombre_examen' => 'Primer parcial'], [$this->aulaId]);
+
+        $this->putJson($this->url($exam), $this->validPayload(['hora_inicio' => '10:30']))
+            ->assertStatus(409)
+            ->assertJsonStructure(['errors' => ['superposicion_horario']]);
+
+        $this->assertDatabaseHas('examen', ['id_examen' => $exam->id_examen, 'hora_inicio' => '08:00']);
+    }
+
+    public function test_la_edicion_valida_los_mismos_datos_que_la_creacion(): void
+    {
+        $exam = $this->createExam([], [$this->aulaId]);
+
+        $this->putJson($this->url($exam), $this->validPayload([
+            'duracion'   => 0,
+            'id_carrera' => $this->informaticaId,
+            'id_materia' => $this->basesDatosId,
+        ]))->assertUnprocessable()->assertJsonValidationErrors('duracion');
+
+        // Par INACTIVO (regla de HU-16).
+        $this->putJson($this->url($exam), $this->validPayload([
+            'id_carrera' => $this->informaticaId,
+            'id_materia' => $this->basesDatosId,
+        ]))->assertUnprocessable()->assertJsonValidationErrors('id_materia');
+
+        $this->assertDatabaseHas('examen', ['id_examen' => $exam->id_examen, 'id_carrera' => $this->sistemasId]);
+    }
+
+    public function test_criterio_11_desde_en_ingreso_la_informacion_general_queda_bloqueada(): void
+    {
+        foreach ([Exam::EN_INGRESO, Exam::EN_CURSO, Exam::FINALIZADO] as $status) {
+            $exam = $this->createExam(['nombre_examen' => "Examen {$status}", 'estado' => $status], [$this->aulaId]);
+
+            $this->putJson($this->url($exam), $this->validPayload([
+                'nombre_examen' => 'Cambiado',
+                'fecha'         => $this->futureDate(20),
+                'hora_inicio'   => '15:00',
+                'duracion'      => 45,
+                'id_carrera'    => $this->informaticaId,
+            ]))
+                ->assertStatus(409)
+                ->assertJsonPath(
+                    'message',
+                    'El control de ingreso del examen ya se inició: su información general no puede modificarse.'
+                );
+
+            $this->assertDatabaseHas('examen', [
+                'id_examen'     => $exam->id_examen,
+                'nombre_examen' => "Examen {$status}",
+                'fecha'         => $exam->fecha->toDateString(),
+                'hora_inicio'   => '08:00:00',
+                'duracion'      => 90,
+                'id_carrera'    => $this->sistemasId,
+                'id_materia'    => $this->calculoId,
+                'estado'        => $status,
+            ]);
+        }
+    }
+
+    public function test_un_examen_cancelado_no_se_puede_editar(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::CANCELADO], [$this->aulaId]);
+
+        $this->putJson($this->url($exam), $this->validPayload(['nombre_examen' => 'Cambiado']))
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'El examen está cancelado y ya no puede modificarse.');
+    }
+
+    public function test_solo_el_docente_creador_puede_editar(): void
+    {
+        $exam = $this->createExam(['id_usuario_docente' => $this->otroDocenteId], [$this->aulaId]);
+
+        $this->putJson($this->url($exam), $this->validPayload(['nombre_examen' => 'Cambiado']))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('examen', ['id_examen' => $exam->id_examen, 'nombre_examen' => 'Examen existente']);
+    }
+
+    public function test_responde_404_si_el_examen_no_existe(): void
+    {
+        $this->putJson('/api/examenes/999999', $this->validPayload())->assertNotFound();
+        $this->putJson('/api/examenes/abc', $this->validPayload())->assertNotFound();
+    }
+
+    public function test_modificar_examen_registra_valores_anteriores_y_nuevos(): void
+    {
+        $exam = $this->createExam(
+            ['nombre_examen' => 'Primer parcial'],
+            [$this->aulaId]
+        );
+
+        $this->putJson($this->url($exam), $this->validPayload([
+            'nombre_examen' => 'Parcial actualizado',
+            'fecha' => $this->futureDate(10),
+            'ambientes' => [$this->otraAulaId],
+        ]))->assertOk();
+
+        $log = AuditLog::query()
+            ->where('tabla_afectada', 'examen')
+            ->sole();
+
+        $actionId = DB::table('accion')
+            ->where('operacion', 'MODIFICAR')
+            ->value('id_accion');
+
+        $this->assertNotNull($actionId);
+        $this->assertSame((int) $actionId, $log->id_accion);
+        $this->assertSame($this->docenteId, $log->id_usuario);
+
+        $this->assertSame(
+            $exam->id_examen,
+            $log->antiguo_valor['id_examen']
+        );
+
+        $this->assertSame(
+            'Primer parcial',
+            $log->antiguo_valor['nombre_examen']
+        );
+
+        $this->assertSame(
+            'Parcial actualizado',
+            $log->nuevo_valor['nombre_examen']
+        );
+
+        $this->assertEquals(
+            [$this->aulaId],
+            $log->antiguo_valor['ambientes']
+        );
+
+        $this->assertEquals(
+            [$this->otraAulaId],
+            $log->nuevo_valor['ambientes']
+        );
+    }
+
+    public function test_modificacion_rechazada_no_genera_bitacora(): void
+    {
+        $exam = $this->createExam(
+            [
+                'nombre_examen' => 'Primer parcial',
+                'estado' => Exam::EN_INGRESO,
+            ],
+            [$this->aulaId]
+        );
+
+        $this->putJson($this->url($exam), $this->validPayload([
+            'nombre_examen' => 'Nombre actualizado',
+        ]))->assertStatus(409);
+
+        $this->assertSame(
+            0,
+            AuditLog::query()
+                ->where('tabla_afectada', 'examen')
+                ->count()
+        );
+
+        $this->assertDatabaseHas('examen', [
+            'id_examen' => $exam->id_examen,
+            'nombre_examen' => 'Primer parcial',
+        ]);
+    }
+
+    public function test_no_permite_editar_hacia_ambiente_reservado_por_otro_docente(): void
+    {
+        $this->createExam([
+            'nombre_examen'      => 'Examen de otro docente',
+            'id_usuario_docente' => $this->otroDocenteId,
+            'hora_inicio'        => '10:00',
+        ], [$this->aulaId]);
+
+        $exam = $this->createExam([
+            'nombre_examen' => 'Mi examen',
+            'hora_inicio'   => '08:00',
+        ], [$this->otraAulaId]);
+
+        $this->putJson($this->url($exam), $this->validPayload([
+            'nombre_examen'          => 'Mi examen',
+            'hora_inicio'            => '10:30',
+            'ambientes'              => [$this->aulaId],
+            'confirmar_advertencias' => true,
+        ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ambientes');
+
+        // La modificación rechazada no altera la reserva anterior.
+        $this->assertDatabaseHas('examen', [
+            'id_examen'   => $exam->id_examen,
+            'hora_inicio' => '08:00:00',
+        ]);
+
+        $this->assertDatabaseHas('examen_ambiente', [
+            'id_examen'   => $exam->id_examen,
+            'id_ambiente' => $this->otraAulaId,
+        ]);
+    }
+
+    public function test_rechaza_edicion_que_deja_auxiliar_en_aulas_distintas(): void
+    {
+        $day = $this->futureDate(10);
+
+        $firstExam = $this->createExam([
+            'nombre_examen' => 'Examen de la mañana',
+            'fecha' => $day,
+            'hora_inicio' => '08:00',
+            'duracion' => 90,
+        ], [$this->aulaId]);
+
+        $secondExam = $this->createExam([
+            'nombre_examen' => 'Examen de la tarde',
+            'fecha' => $day,
+            'hora_inicio' => '12:00',
+            'duracion' => 90,
+        ], [$this->otraAulaId]);
+
+        $assistantId = '00000000-0000-4000-8000-000000000093';
+
+        DB::table('usuario')->insert([
+            'id_usuario' => $assistantId,
+            'nombre' => 'Daniela',
+            'apellido_paterno' => 'Prueba',
+            'apellido_materno' => null,
+            'correo' => 'daniela.revalidacion@umss.edu',
+            'contrasenia' => 'x',
+            'cod_sis' => '209900093',
+            'estado' => RecordStatus::ACTIVE,
+        ]);
+
+        foreach ([
+            [$firstExam, $this->aulaId],
+            [$secondExam, $this->otraAulaId],
+        ] as [$exam, $classroomId]) {
+            ExamAssistant::create([
+                'id_examen' => $exam->id_examen,
+                'id_usuario' => $assistantId,
+                'id_usuario_docente_habilita' => $this->docenteId,
+                'id_ambiente' => $classroomId,
+            ]);
+        }
+
+        // Se intenta mover el segundo examen a un horario
+        // que coincide con el primero, pero en otra aula.
+        $this->putJson(
+            $this->url($secondExam),
+            $this->validPayload([
+                'nombre_examen' => 'Examen de la tarde',
+                'fecha' => $day,
+                'hora_inicio' => '09:00',
+                'duracion' => 90,
+                'ambientes' => [$this->otraAulaId],
+                'confirmar_advertencias' => true,
+            ])
+        )
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('id_ambiente');
+
+        // La actualización rechazada debe revertirse por completo.
+        $this->assertDatabaseHas('examen', [
+            'id_examen' => $secondExam->id_examen,
+            'hora_inicio' => '12:00:00',
+            'duracion' => 90,
+        ]);
+
+        $this->assertDatabaseHas('examen_auxiliar', [
+            'id_examen' => $secondExam->id_examen,
+            'id_usuario' => $assistantId,
+            'id_ambiente' => $this->otraAulaId,
+        ]);
+
+        $this->assertSame(
+            0,
+            AuditLog::query()
+                ->where('tabla_afectada', 'examen')
+                ->count()
+        );
+    }
+
+    private function crearExamenesConAuxiliar(
+        int $ambientePrimero,
+        int $ambienteSegundo
+    ): array {
+        $fecha = $this->futureDate(10);
+
+        $primero = $this->createExam([
+            'nombre_examen' => 'Examen A',
+            'fecha' => $fecha,
+            'hora_inicio' => '08:00',
+            'duracion' => 90,
+        ], [$ambientePrimero]);
+
+        $segundo = $this->createExam([
+            'nombre_examen' => 'Examen B',
+            'fecha' => $fecha,
+            'hora_inicio' => '12:00',
+            'duracion' => 90,
+        ], [$ambienteSegundo]);
+
+        $auxiliarId = '00000000-0000-4000-8000-000000000094';
+
+        DB::table('usuario')->insert([
+            'id_usuario' => $auxiliarId,
+            'nombre' => 'Daniela',
+            'apellido_paterno' => 'Disponibilidad',
+            'apellido_materno' => null,
+            'correo' => 'daniela.disponibilidad@umss.edu',
+            'contrasenia' => 'x',
+            'cod_sis' => '209900094',
+            'estado' => RecordStatus::ACTIVE,
+        ]);
+
+        foreach ([
+            [$primero, $ambientePrimero],
+            [$segundo, $ambienteSegundo],
+        ] as [$examen, $ambienteId]) {
+            ExamAssistant::create([
+                'id_examen' => $examen->id_examen,
+                'id_usuario' => $auxiliarId,
+                'id_usuario_docente_habilita' => $this->docenteId,
+                'id_ambiente' => $ambienteId,
+            ]);
+        }
+
+        return [$primero, $segundo, $auxiliarId, $fecha];
+    }
+
+    public function test_permite_editar_examenes_simultaneos_en_la_misma_aula(): void
+    {
+        [, $examen, $auxiliarId, $fecha] = $this->crearExamenesConAuxiliar(
+            $this->aulaId,
+            $this->aulaId
+        );
+
+        $this->putJson($this->url($examen), $this->validPayload([
+            'nombre_examen' => 'Examen B',
+            'fecha' => $fecha,
+            'hora_inicio' => '09:00',
+            'duracion' => 90,
+            'ambientes' => [$this->aulaId],
+            'confirmar_advertencias' => true,
+        ]))
+            ->assertOk()
+            ->assertJsonPath('mensaje', 'Examen actualizado correctamente.');
+
+        $this->assertDatabaseHas('examen', [
+            'id_examen' => $examen->id_examen,
+            'hora_inicio' => '09:00:00',
+        ]);
+
+        $this->assertDatabaseHas('examen_auxiliar', [
+            'id_examen' => $examen->id_examen,
+            'id_usuario' => $auxiliarId,
+            'id_ambiente' => $this->aulaId,
+        ]);
+    }
+
+    public function test_permite_editar_examenes_consecutivos_en_aulas_distintas(): void
+    {
+        [, $examen, $auxiliarId, $fecha] = $this->crearExamenesConAuxiliar(
+            $this->aulaId,
+            $this->otraAulaId
+        );
+
+        // El primer examen termina a las 09:30.
+        // El segundo comienza exactamente a las 09:30.
+        $this->putJson($this->url($examen), $this->validPayload([
+            'nombre_examen' => 'Examen B',
+            'fecha' => $fecha,
+            'hora_inicio' => '09:30',
+            'duracion' => 90,
+            'ambientes' => [$this->otraAulaId],
+        ]))
+            ->assertOk()
+            ->assertJsonPath('mensaje', 'Examen actualizado correctamente.');
+
+        $this->assertDatabaseHas('examen', [
+            'id_examen' => $examen->id_examen,
+            'hora_inicio' => '09:30:00',
+        ]);
+
+        $this->assertDatabaseHas('examen_auxiliar', [
+            'id_examen' => $examen->id_examen,
+            'id_usuario' => $auxiliarId,
+            'id_ambiente' => $this->otraAulaId,
+        ]);
+    }
+
+    public function test_rechaza_cambio_de_ambiente_y_horario_que_conflictua_con_auxiliar(): void
+    {
+        [$primero, $segundo, $auxiliarId, $fecha] =
+            $this->crearExamenesConAuxiliar(
+                $this->aulaId,
+                $this->aulaId
+            );
+
+        $this->putJson($this->url($segundo), $this->validPayload([
+            'nombre_examen' => 'Examen B',
+            'fecha' => $fecha,
+            'hora_inicio' => '09:00',
+            'duracion' => 90,
+            'ambientes' => [$this->otraAulaId],
+            'confirmar_advertencias' => true,
+        ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('id_usuario');
+
+        // Ni el horario ni el ambiente deben modificarse.
+        $this->assertDatabaseHas('examen', [
+            'id_examen' => $segundo->id_examen,
+            'hora_inicio' => '12:00:00',
+        ]);
+
+        $this->assertDatabaseHas('examen_ambiente', [
+            'id_examen' => $segundo->id_examen,
+            'id_ambiente' => $this->aulaId,
+        ]);
+
+        // La asignación original debe restaurarse.
+        $this->assertDatabaseHas('examen_auxiliar', [
+            'id_examen' => $segundo->id_examen,
+            'id_usuario' => $auxiliarId,
+            'id_ambiente' => $this->aulaId,
+        ]);
+    }
+}
