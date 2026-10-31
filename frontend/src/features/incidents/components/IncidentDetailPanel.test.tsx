@@ -71,6 +71,15 @@ afterEach(() => {
 })
 
 describe('IncidentDetailPanel', () => {
+  it('muestra aula, hora de Bolivia y retiro en un reporte durante examen sin intento', async () => {
+    renderPanel({ ...pending, origen: 'EN_CURSO', retiro_examen: true, intento: null,
+      fecha_reporte: '2026-10-30T14:40:00Z' })
+    expect(await screen.findByText('Durante el examen')).toBeInTheDocument()
+    expect(screen.getByText(/Aula 691A/)).toHaveTextContent('10:40')
+    expect(screen.getByText('Sí, registrado al enviar el reporte')).toBeInTheDocument()
+    expect(screen.queryByText('Motivo del rechazo en la puerta')).not.toBeInTheDocument()
+  })
+
   it('muestra los datos del detalle pendiente: estudiante, examen, motivo, descripción', async () => {
     renderPanel(pending)
 

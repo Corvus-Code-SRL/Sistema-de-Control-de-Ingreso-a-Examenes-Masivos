@@ -99,6 +99,12 @@ export function IncidentDetailPanel({ incidentId, onReviewed, onBack }: Incident
             <dt className="text-muted-foreground">Tipo de falta</dt>
             <dd className="font-medium">{incident.tipo_falta.nombre}</dd>
 
+            {incident.origen === 'EN_CURSO' && <>
+              <dt className="text-muted-foreground">Origen</dt><dd>Durante el examen</dd>
+              <dt className="text-muted-foreground">Retiro del examen</dt>
+              <dd>{incident.retiro_examen ? 'Sí, registrado al enviar el reporte' : 'No'}</dd>
+            </>}
+
             {incident.intento?.motivo_legible && (
               <>
                 <dt className="text-muted-foreground">Motivo del rechazo en la puerta</dt>
@@ -111,6 +117,7 @@ export function IncidentDetailPanel({ incidentId, onReviewed, onBack }: Incident
                 <dt className="text-muted-foreground">Ambiente y hora</dt>
                 <dd className="font-medium">
                   Aula {incident.ambiente.nro_aula}
+                  {incident.origen === 'EN_CURSO' && ` · ${formatDateTime(incident.fecha_reporte, true)}`}
                   {incident.intento?.fecha_intento && ` · ${formatDateTime(incident.intento.fecha_intento)}`}
                 </dd>
               </>
@@ -268,7 +275,11 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[1][0]).toUpperCase()
 }
 
-function formatDateTime(iso: string): string {
+function formatDateTime(iso: string, campusTime = false): string {
+  if (campusTime) return new Intl.DateTimeFormat('es-BO', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    hourCycle: 'h23', timeZone: 'America/La_Paz',
+  }).format(new Date(iso))
   const d = new Date(iso)
   const day = String(d.getDate()).padStart(2, '0')
   const month = String(d.getMonth() + 1).padStart(2, '0')

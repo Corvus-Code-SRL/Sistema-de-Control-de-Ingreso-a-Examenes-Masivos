@@ -7,8 +7,20 @@ export interface InProgressStudent {
     nombre_completo: string;
     estado_ingreso: EntryState;
     hora_ingreso: string | null;
+    expulsado_en?: string | null;
+    total_incidencias?: number;
     id_ambiente: number | null;
     ambiente: string | null;
+    /** Resumen completo, independiente de la paginación del historial. */
+    situaciones?: {
+        identidad_observada: boolean;
+        ultimo_cambio_ambiente: null | {
+            id_situacion: number;
+            registrado_en: string;
+            ambiente_origen: { id_ambiente: number; nro_aula: string };
+            ambiente_destino: { id_ambiente: number; nro_aula: string };
+        };
+    };
 }
 
 export interface ExamInProgress {
@@ -34,8 +46,12 @@ export interface ExamInProgress {
     con_retraso: number;
     ausentes: number;
     presentes: number;
+    expulsados?: number;
     total: number;
     incidencias_pendientes: number;
     };
     estudiantes: InProgressStudent[];
+    situaciones_habilitadas?: boolean;
+    incidencias_habilitadas?: boolean;
+    total_situaciones?: number;
 }

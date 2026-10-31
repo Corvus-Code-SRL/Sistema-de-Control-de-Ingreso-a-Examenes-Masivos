@@ -108,6 +108,7 @@ describe('menú por capacidades', () => {
         label: 'Control de ingreso y examen en curso',
         items: [
           ['Control de ingreso', '/control-ingreso'],
+          ['Registrar situación excepcional', '/situacion-excepcional'],
           ['En curso', '/examenes/en-curso'],
           ['Registrar estudiante con retraso', undefined],
           ['Registrar estudiante excepcional', undefined]
@@ -143,6 +144,7 @@ describe('menú por capacidades', () => {
         label: 'Control de ingreso y reportes',
         items: [
           ['Control de ingreso', '/control-ingreso'],
+          ['Registrar situación excepcional', '/situacion-excepcional'],
           ['En curso', '/examenes/en-curso'],
           ['Registrar estudiante con retraso', undefined]
         ]

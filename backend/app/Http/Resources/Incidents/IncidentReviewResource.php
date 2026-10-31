@@ -18,6 +18,8 @@ class IncidentReviewResource extends JsonResource
             'id'                => $r['id'],
             'tipo'              => $r['tipo'],
             'estado'            => $r['estado'],
+            'origen'            => $r['origen'],
+            'retiro_examen'     => $r['retiro_examen'],
             'persona'           => $r['persona'],
             'examen'            => $r['examen'],
             'tipo_falta'        => $r['tipo_falta'],
