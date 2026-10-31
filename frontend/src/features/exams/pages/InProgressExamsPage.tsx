@@ -8,64 +8,18 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/button';
 import { useCurrentUser } from '@/features/auth';
-import { assistantsService } from '@/features/assistants';
-import { useAsyncResource } from '@/hooks/useAsyncResource';
 
-import { examsService } from '../services/examsService';
-
-interface ActiveExamRow {
-  id: number;
-  title: string;
-  subject: string | null;
-  date: string | null;
-  startsAt: string | null;
-  endsAt: string | null;
-  rooms: string;
-}
+import { useInProgressExams } from '../hooks/useInProgressExams';
 
 /**
  * Lista de acceso a los exámenes EN_CURSO, exclusiva de docente y auxiliar.
- * Cada API limita los resultados al usuario autenticado; el cliente solo
- * selecciona EN_CURSO para esta pantalla.
+ * Los datos salen de useInProgressExams.
  */
 export function InProgressExamsPage() {
   const { area } = useCurrentUser();
   const isAssistant = area === 'auxiliar';
 
-  const { status, data, error, reload } = useAsyncResource<ActiveExamRow[]>(
-    async (signal) => {
-      if (isAssistant) {
-        const exams = await assistantsService.listMyExams(signal);
-
-        return exams
-          .filter((exam) => exam.estado === 'EN_CURSO' && exam.ambiente !== null)
-          .map((exam) => ({
-            id: exam.id_examen,
-            title: exam.nombre_examen,
-            subject: exam.materia,
-            date: exam.fecha,
-            startsAt: exam.hora_inicio,
-            endsAt: exam.hora_fin,
-            rooms: exam.ambiente?.nro_aula ?? 'Sin ambiente asignado',
-          }));
-      }
-
-      const exams = await examsService.listExams(signal);
-
-      return exams
-        .filter((exam) => exam.estado === 'EN_CURSO')
-        .map((exam) => ({
-          id: exam.id_examen,
-          title: exam.nombre_examen,
-          subject: exam.materia?.nombre ?? null,
-          date: exam.fecha,
-          startsAt: exam.hora_inicio,
-          endsAt: exam.hora_fin,
-          rooms: exam.ambientes?.map((room) => room.nro_aula).join(', ') || 'Sin ambiente',
-        }));
-    },
-    [isAssistant]
-  );
+  const { status, data, error, reload } = useInProgressExams();
 
   const exams = data ?? [];
 
