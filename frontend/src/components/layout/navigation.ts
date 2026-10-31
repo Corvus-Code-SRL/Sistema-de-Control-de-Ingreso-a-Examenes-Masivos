@@ -361,8 +361,7 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'teacher-exam-report',
         label: 'Generar reporte de examen',
         icon: FileText,
-        capability: 'examenes.gestionar',
-        to: '/examenes/reportes'
+        capability: 'examenes.gestionar'
       }
     ]
   },

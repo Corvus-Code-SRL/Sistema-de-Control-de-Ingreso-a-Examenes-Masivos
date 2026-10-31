@@ -135,9 +135,7 @@ describe('AppSidebar — estructura', () => {
 
     renderSidebar('Auxiliar', '/mis-examenes')
 
-    const headings = screen
-      .getAllByRole('heading', { level: 3 })
-      .map((heading) => heading.textContent)
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)
 
     expect(headings).toEqual(['Exámenes y grupos', 'Control de ingreso y reportes'])
     expect(screen.queryByText(/central de riesgo/i)).not.toBeInTheDocument()
@@ -153,12 +151,7 @@ describe('AppSidebar — estructura', () => {
 })
 
 describe('AppSidebar — desplazamiento', () => {
-  const SCROLL_CLASSES = [
-    'overflow-y-auto',
-    'overflow-auto',
-    'overflow-y-scroll',
-    'overflow-scroll'
-  ]
+  const SCROLL_CLASSES = ['overflow-y-auto', 'overflow-auto', 'overflow-y-scroll', 'overflow-scroll']
 
   it.each([
     ['Administrador', '/cuentas'],
@@ -192,9 +185,7 @@ describe('AppSidebar — secciones colapsables', () => {
     const panelId = open.getAttribute('aria-controls') as string
 
     expect(document.getElementById(panelId)).toBeVisible()
-    expect(
-      document.getElementById(closed.getAttribute('aria-controls') as string)
-    ).not.toBeVisible()
+    expect(document.getElementById(closed.getAttribute('aria-controls') as string)).not.toBeVisible()
     expect(screen.getByRole('link', { name: 'Programados' })).toBeVisible()
     expect(screen.queryByRole('link', { name: 'Materias' })).not.toBeInTheDocument()
   })
@@ -272,9 +263,7 @@ describe('AppSidebar — secciones colapsables', () => {
     await user.click(sectionButton('Central de riesgo'))
 
     expect(sectionButton('Central de riesgo')).toHaveAttribute('aria-expanded', 'true')
-    expect(
-      screen.getByRole('link', { name: 'Revisar reportes de incidencias' })
-    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Revisar reportes de incidencias' })).toBeInTheDocument()
   })
 
   it('dos menús montados a la vez (escritorio y panel) no repiten ids', () => {
@@ -317,8 +306,7 @@ describe('AppSidebar — entradas y estado activo', () => {
       ['Control de ingreso', '/control-ingreso'],
       ['En curso', '/examenes/en-curso'],
       ['Revisar reportes de incidencias', '/incidencias'],
-      ['Central de riesgo', '/central-riesgo'],
-      ['Generar reporte de examen', '/examenes/reportes']
+      ['Central de riesgo', '/central-riesgo']
     ])
   })
 
@@ -327,9 +315,7 @@ describe('AppSidebar — entradas y estado activo', () => {
 
     expect(screen.getByRole('link', { name: 'Mis grupos' })).toHaveAttribute('aria-current', 'page')
     expect(sectionButton('Grupos académicos y nóminas')).toHaveAttribute('aria-expanded', 'true')
-    expect(
-      screen.getAllByRole('link').filter((link) => link.getAttribute('aria-current'))
-    ).toHaveLength(1)
+    expect(screen.getAllByRole('link').filter((link) => link.getAttribute('aria-current'))).toHaveLength(1)
   })
 
   it('/examenes/:id/control-ingreso resalta Control de ingreso y no Programados', async () => {
@@ -337,20 +323,14 @@ describe('AppSidebar — entradas y estado activo', () => {
     renderSidebar('Docente', '/examenes/12/control-ingreso')
     await openAllSections(user)
 
-    expect(screen.getByRole('link', { name: 'Control de ingreso' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    )
+    expect(screen.getByRole('link', { name: 'Control de ingreso' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Programados' })).not.toHaveAttribute('aria-current')
   })
 
   it('la Central de riesgo sigue resaltada con el detalle abierto y la query', () => {
     renderSidebar('Administrador', '/central-riesgo/9941?tipo=3')
 
-    expect(screen.getByRole('link', { name: 'Consultar central' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    )
+    expect(screen.getByRole('link', { name: 'Consultar central' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('administrador: /cuentas/:id resalta Registrar cuenta nueva', () => {
@@ -413,9 +393,7 @@ describe('AppSidebar — contador de incidencias', () => {
     session.pending = 7
     renderSidebar('Docente', '/incidencias')
 
-    expect(screen.getByRole('link', { name: /Revisar reportes de incidencias/ })).toHaveTextContent(
-      '7'
-    )
+    expect(screen.getByRole('link', { name: /Revisar reportes de incidencias/ })).toHaveTextContent('7')
     expect(pendingIncidentsSpy).toHaveBeenCalledWith(true)
   })
 
@@ -456,8 +434,6 @@ describe('AppSidebar — cuenta', () => {
   it('el rol del bloque de cuenta sale del área del usuario', () => {
     renderSidebar('Auxiliar', '/mis-examenes')
 
-    expect(
-      within(screen.getByRole('region', { name: 'Cuenta' })).getByText('Auxiliar')
-    ).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Cuenta' })).getByText('Auxiliar')).toBeInTheDocument()
   })
 })

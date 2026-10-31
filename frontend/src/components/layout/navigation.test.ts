@@ -15,10 +15,7 @@ function menuOf(role: RoleName) {
 
 describe('NAVIGATION', () => {
   it('los ids de secciones y entradas no se repiten', () => {
-    const ids = NAVIGATION.flatMap((section) => [
-      section.id,
-      ...section.items.map((item) => item.id)
-    ])
+    const ids = NAVIGATION.flatMap((section) => [section.id, ...section.items.map((item) => item.id)])
 
     expect(new Set(ids).size).toBe(ids.length)
   })
@@ -127,7 +124,7 @@ describe('menú por capacidades', () => {
         label: 'Historial de exámenes y reportes',
         items: [
           ['Historial de mis exámenes', undefined],
-          ['Generar reporte de examen', '/examenes/reportes']
+          ['Generar reporte de examen', undefined]
         ]
       }
     ])
@@ -169,9 +166,7 @@ describe('menú por capacidades', () => {
       'Central de riesgo',
       'Historial, auditoría y reportes'
     ])
-    expect(sections[2].items.map((item) => item.label)).toEqual([
-      'Rectificar registro de la central'
-    ])
+    expect(sections[2].items.map((item) => item.label)).toEqual(['Rectificar registro de la central'])
   })
 
   it('el Docente no ve secciones del Auxiliar, ni el Auxiliar las del Docente', () => {
