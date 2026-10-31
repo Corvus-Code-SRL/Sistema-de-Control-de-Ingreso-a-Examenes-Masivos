@@ -14,7 +14,7 @@ class IndexFaultTypeRequest extends FormRequest
     {
         return $roles->hasAnyActiveRole(
             $currentUser->id(),
-            [Role::ADMINISTRADOR, Role::DOCENTE, Role::AUXILIAR]
+            array_merge($roles->rolesFor('incidents'), [Role::ADMINISTRADOR, Role::AUXILIAR])
         );
     }
 

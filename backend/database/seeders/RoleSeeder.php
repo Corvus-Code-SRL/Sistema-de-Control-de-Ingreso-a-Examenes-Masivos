@@ -13,6 +13,7 @@ class RoleSeeder extends Seeder
             ['nombre_rol' => 'Administrador', 'descripcion' => 'Gestión global del sistema, seguridad y administración de usuarios.'],
             ['nombre_rol' => 'Docente',       'descripcion' => 'Gestión de exámenes, grupos y supervisión académica.'],
             ['nombre_rol' => 'Auxiliar',      'descripcion' => 'Apoyo en el control de ingreso y supervisión durante exámenes.'],
+            ['nombre_rol' => 'Invitado',      'descripcion' => 'Docente invitado sin código SIS: enseña y toma exámenes, sin acceso a la Central de Riesgo.'],
         ];
 
         foreach ($roles as $rol) {
