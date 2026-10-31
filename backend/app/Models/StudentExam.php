@@ -23,6 +23,9 @@ class StudentExam extends Pivot
     public const CON_RETRASO = 'CON_RETRASO';
     public const NO_INGRESO = 'NO_INGRESO';
 
+    /** Valor de public.estado_habilitacion con el que se registra un ingreso. */
+    public const HABILITADO = 'HABILITADO';
+
     protected $table = 'examen_estudiante';
     protected $primaryKey = null;
     public $incrementing = false;

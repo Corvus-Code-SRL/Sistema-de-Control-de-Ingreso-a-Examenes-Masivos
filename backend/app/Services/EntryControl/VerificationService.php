@@ -204,6 +204,20 @@ class VerificationService
         return $result;
     }
 
+    /**
+     * Resultado para un SIS que no corresponde a ningún estudiante, con el mismo formato de verify().
+     *
+     * @return array{veredicto: string, motivo: string, autorizado: bool, estudiante: null, auxiliar: null,
+     *     grupo: null, ambiente_asignado: null, antecedentes: array{total: int, latest: null}, ingreso_previo: null}
+     */
+    public function notFoundResult(): array
+    {
+        $result = $this->emptyResult(self::NOT_FOUND);
+        $result['motivo'] = self::NOT_FOUND_MESSAGE;
+
+        return $result;
+    }
+
     private function emptyResult(string $verdict): array
     {
         return [

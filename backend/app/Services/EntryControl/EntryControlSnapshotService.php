@@ -21,6 +21,9 @@ class EntryControlSnapshotService
     private const PREFIX = 'entry-control';
 
     public const UNASSIGNED_ROOM_MESSAGE = 'Asigne un ambiente a este auxiliar antes de abrir el control.';
+    public const CONTROL_DENIED_MESSAGE = 'No tiene permiso para controlar este examen.';
+    public const ROOM_NOT_IN_EXAM_MESSAGE = 'El ambiente no pertenece a este examen.';
+    public const FOREIGN_ROOM_MESSAGE = 'No está habilitado para controlar en este ambiente.';
 
     private ExamTimingService $timing;
     private RiskCenterQueryService $riskCenter;
@@ -185,7 +188,7 @@ class EntryControlSnapshotService
     public function roomFor(int $examId, User $actor, int $requestedRoomId): int
     {
         if ($actor->estado !== User::ESTADO_ACTIVO) {
-            throw new AuthorizationException('No tiene permiso para controlar este examen.');
+            throw new AuthorizationException(self::CONTROL_DENIED_MESSAGE);
         }
 
         $meta = $this->meta($examId);
@@ -197,8 +200,8 @@ class EntryControlSnapshotService
         if (! in_array($requestedRoomId, $controller['ambientes'], true)) {
             throw new AuthorizationException(
                 $controller['rol'] === 'DOCENTE'
-                    ? 'El ambiente no pertenece a este examen.'
-                    : 'No está habilitado para controlar en este ambiente.'
+                    ? self::ROOM_NOT_IN_EXAM_MESSAGE
+                    : self::FOREIGN_ROOM_MESSAGE
             );
         }
 
@@ -208,7 +211,7 @@ class EntryControlSnapshotService
     public function assertCanControl(int $examId, User $actor): void
     {
         if ($actor->estado !== User::ESTADO_ACTIVO) {
-            throw new AuthorizationException('No tiene permiso para controlar este examen.');
+            throw new AuthorizationException(self::CONTROL_DENIED_MESSAGE);
         }
 
         $meta = $this->meta($examId);
@@ -239,7 +242,7 @@ class EntryControlSnapshotService
             return new AuthorizationException(self::UNASSIGNED_ROOM_MESSAGE);
         }
 
-        return new AuthorizationException('No tiene permiso para controlar este examen.');
+        return new AuthorizationException(self::CONTROL_DENIED_MESSAGE);
     }
 
     public function studentBySis(int $examId, string $sis): ?array
