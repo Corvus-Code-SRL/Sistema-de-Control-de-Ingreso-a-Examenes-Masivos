@@ -49,6 +49,7 @@ class ExamSituationWorkspaceService
             ->join('ambiente as a', 'a.id_ambiente', '=', 'ee.id_ambiente')
             ->where('ee.id_examen', $examId)
             ->whereIn('ee.estado_ingreso', ['INGRESO', 'CON_RETRASO'])
+            ->whereNull('ee.expulsado_en')
             ->select([
                 'estudiante.id_estudiante', 'estudiante.cod_sis', 'estudiante.nombre',
                 'estudiante.apellido_paterno', 'estudiante.apellido_materno',

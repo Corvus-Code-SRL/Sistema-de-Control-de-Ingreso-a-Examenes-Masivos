@@ -7,6 +7,7 @@ use App\Models\Exam;
 use App\Models\ExamSituation;
 use App\Models\User;
 use App\Services\Security\AuditLogService;
+use App\Services\Exams\ExamExpulsionService;
 use App\Support\ExamSituationType;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -16,11 +17,17 @@ class ExamSituationService
 {
     private ExamSituationAccessService $access;
     private AuditLogService $audit;
+    private ExamExpulsionService $expulsions;
 
-    public function __construct(ExamSituationAccessService $access, AuditLogService $audit)
+    public function __construct(
+        ExamSituationAccessService $access,
+        AuditLogService $audit,
+        ExamExpulsionService $expulsions
+    )
     {
         $this->access = $access;
         $this->audit = $audit;
+        $this->expulsions = $expulsions;
     }
 
     /** $input contiene exclusivamente los datos validados por StoreExamSituationRequest. */
@@ -52,6 +59,7 @@ class ExamSituationService
 
             $sourceRoomId = (int) $attendance->id_ambiente;
             $this->access->assertRoomAllowed($exam, $sourceRoomId, $roomScope);
+            $this->expulsions->assertNotExpelled($attendance->expulsado_en);
 
             if (! in_array($attendance->estado_ingreso, ['INGRESO', 'CON_RETRASO'], true)) {
                 throw new ExamStateException('Solo puede registrar situaciones de estudiantes presentes.');

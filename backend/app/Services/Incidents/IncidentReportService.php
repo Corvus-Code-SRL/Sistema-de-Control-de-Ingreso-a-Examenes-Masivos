@@ -82,6 +82,7 @@ class IncidentReportService
                     'id_estudiante' => $attempt->id_estudiante,
                     'id_examen' => $attempt->id_examen,
                     'id_intento' => $attempt->id_intento,
+                    'origen' => 'CONTROL_INGRESO',
                     'id_tipo_falta' => $input['id_tipo_falta'],
                     'id_usuario_reportante' => $actor->id_usuario,
                     'descripcion' => trim($input['descripcion']),
