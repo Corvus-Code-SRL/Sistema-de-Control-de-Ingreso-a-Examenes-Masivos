@@ -64,7 +64,7 @@ class AlienAttemptsReportService
             ->join('examen as ex', 'ex.id_examen', '=', 'ii.id_examen')
             ->leftJoin('carrera as ca', 'ca.id_carrera', '=', 'ex.id_carrera')
             ->where('ii.motivo', self::MOTIVO)
-            ->whereBetween('ii.registrado_en', $this->range($filters))
+            ->where(fn ($q) => $this->whereInRange($q, $filters))
             ->when($filters['facultad'] ?? null, fn ($q, $facultad) => $q->where('ca.id_facultad', $facultad))
             ->groupBy('e.id_estudiante', 'e.apellido_paterno', 'e.apellido_materno', 'e.nombre')
             ->orderByRaw('COUNT(*) DESC')
@@ -83,7 +83,7 @@ class AlienAttemptsReportService
             ->join('examen as ex', 'ex.id_examen', '=', 'ii.id_examen')
             ->leftJoin('carrera as ca', 'ca.id_carrera', '=', 'ex.id_carrera')
             ->where('ii.motivo', self::MOTIVO)
-            ->whereBetween('ii.registrado_en', $this->range($filters))
+            ->where(fn ($q) => $this->whereInRange($q, $filters))
             ->when($filters['facultad'] ?? null, fn ($q, $facultad) => $q->where('ca.id_facultad', $facultad))
             ->distinct()
             ->count('ii.id_estudiante');
@@ -106,13 +106,13 @@ class AlienAttemptsReportService
             ->join('estudiante as e', 'e.id_estudiante', '=', 'ii.id_estudiante')
             ->join('examen as ex', 'ex.id_examen', '=', 'ii.id_examen')
             ->leftJoin('carrera as ca', 'ca.id_carrera', '=', 'ex.id_carrera')
-            ->leftJoin('central_riesgo as cr', 'cr.id_estudiante', '=', 'ii.id_estudiante')
             ->where('ii.motivo', self::MOTIVO)
-            ->whereBetween('ii.registrado_en', $this->range($filters))
+            ->where(fn ($q) => $this->whereInRange($q, $filters))
             ->when($filters['facultad'] ?? null, fn ($q, $facultad) => $q->where('ca.id_facultad', $facultad))
             ->selectRaw("e.id_estudiante, e.cod_sis, COUNT(*) AS intentos, "
                 . "string_agg(DISTINCT ex.nombre_examen, ' · ') AS examenes, "
-                . "MIN(cr.id_cr_estudiante) AS id_cr_estudiante, "
+                . "(SELECT MIN(cr.id_cr_estudiante) FROM central_riesgo cr "
+                . "WHERE cr.id_estudiante = e.id_estudiante) AS id_cr_estudiante, "
                 . "CONCAT_WS(' ', e.nombre, e.apellido_paterno, e.apellido_materno) AS nombre_completo")
             ->groupBy('e.id_estudiante', 'e.cod_sis', 'e.nombre', 'e.apellido_paterno', 'e.apellido_materno')
             ->orderByDesc('intentos')
@@ -127,7 +127,7 @@ class AlienAttemptsReportService
             ->join('examen as ex', 'ex.id_examen', '=', 'ii.id_examen')
             ->leftJoin('carrera as ca', 'ca.id_carrera', '=', 'ex.id_carrera')
             ->where('ii.motivo', self::MOTIVO)
-            ->whereBetween('ii.registrado_en', $this->range($filters))
+            ->where(fn ($q) => $this->whereInRange($q, $filters))
             ->when($filters['facultad'] ?? null, fn ($q, $facultad) => $q->where('ca.id_facultad', $facultad));
 
         return [
@@ -140,14 +140,18 @@ class AlienAttemptsReportService
         ];
     }
 
-    private function range(array $filters): array
+    /**
+     * Intervalo semiabierto [desde, hasta + 1 día) en hora de La Paz, expresado en UTC con desfase explícito
+     * para que el resultado no dependa de la zona horaria de la sesión de PostgreSQL.
+     */
+    private function whereInRange($query, array $filters): void
     {
         $tz = $this->timezone();
+        $from = Carbon::parse($filters['desde'], $tz)->startOfDay();
+        $until = Carbon::parse($filters['hasta'], $tz)->addDay()->startOfDay();
 
-        return [
-            Carbon::parse($filters['desde'], $tz)->startOfDay(),
-            Carbon::parse($filters['hasta'], $tz)->endOfDay(),
-        ];
+        $query->where('ii.registrado_en', '>=', $from->utc()->format('Y-m-d H:i:sP'))
+            ->where('ii.registrado_en', '<', $until->utc()->format('Y-m-d H:i:sP'));
     }
 
     private function timezone(): string

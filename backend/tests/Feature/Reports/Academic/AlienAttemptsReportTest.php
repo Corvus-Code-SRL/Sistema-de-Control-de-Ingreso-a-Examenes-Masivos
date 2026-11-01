@@ -4,7 +4,9 @@ namespace Tests\Feature\Reports\Academic;
 
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Reports\Academic\AlienAttemptsReportService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\SeedsRiskCenterRecords;
 use Tests\Concerns\SeedsSecurityAccounts;
@@ -328,5 +330,120 @@ class AlienAttemptsReportTest extends TestCase
         $this->getJson($this->url(['desde' => '2026-10-16', 'hasta' => '2026-10-16']))
             ->assertOk()
             ->assertJsonPath('meta.total_intentos', 1);
+    }
+
+    public function test_el_rango_da_las_mismas_filas_con_la_sesion_en_utc_y_en_la_paz(): void
+    {
+        $antes = $this->insertStudent('Antes', 'Del Rango', null, '202300801');
+        $inicio = $this->insertStudent('Inicio', 'Del Rango', null, '202300802');
+        $noche = $this->insertStudent('Noche', 'Del Rango', null, '202300803');
+        $ultimo = $this->insertStudent('Ultimo', 'Segundo', null, '202300804');
+        $medianoche = $this->insertStudent('Media', 'Noche', null, '202300805');
+        $siguiente = $this->insertStudent('Siguiente', 'Dia', null, '202300806');
+
+        // 23:59:59 La Paz del 14/10: fuera por un segundo.
+        $this->insertAttempt('NO_PERTENECE', $antes, '2026-10-15 03:59:59+00');
+        // 00:00:00 La Paz del 15/10: el inicio es inclusivo.
+        $this->insertAttempt('NO_PERTENECE', $inicio, '2026-10-15 04:00:00+00');
+        // 20:00 La Paz del 15/10 (último día del rango): dentro.
+        $this->insertAttempt('NO_PERTENECE', $noche, '2026-10-16 00:00:00+00');
+        // 23:59:59 La Paz del 15/10: dentro, es el último segundo del rango.
+        $this->insertAttempt('NO_PERTENECE', $ultimo, '2026-10-16 03:59:59+00');
+        // 00:00:00 La Paz del 16/10: el fin es exclusivo.
+        $this->insertAttempt('NO_PERTENECE', $medianoche, '2026-10-16 04:00:00+00');
+        // 00:30 La Paz del 16/10: fuera.
+        $this->insertAttempt('NO_PERTENECE', $siguiente, '2026-10-16 04:30:00+00');
+
+        $this->actAs($this->createAccount(Role::ADMINISTRADOR));
+        $filters = ['desde' => '2026-10-15', 'hasta' => '2026-10-15'];
+
+        try {
+            foreach (['UTC', 'America/La_Paz'] as $zone) {
+                DB::statement("SET TIME ZONE '{$zone}'");
+                $this->assertSame($zone, DB::selectOne('SHOW TIME ZONE')->TimeZone);
+
+                $response = $this->getJson($this->url($filters))->assertOk()
+                    ->assertJsonPath('meta.total_intentos', 3)
+                    ->assertJsonPath('meta.total_estudiantes', 3);
+
+                $codes = array_column($response->json('data'), 'cod_sis');
+                sort($codes);
+                $this->assertSame(['202300802', '202300803', '202300804'], $codes, "Zona de sesión {$zone}");
+
+                $this->assertCount(3, app(AlienAttemptsReportService::class)->pdf($filters)['estudiantes']);
+            }
+        } finally {
+            DB::statement('RESET TIME ZONE');
+        }
+    }
+
+    public function test_cuenta_los_intentos_una_sola_vez_aunque_el_estudiante_tenga_varios_registros_de_cr(): void
+    {
+        $estudiante = $this->insertStudent('Varios', 'Registros', null, '202300901');
+        $this->insertAttempt('NO_PERTENECE', $estudiante);
+        $this->insertAttempt('NO_PERTENECE', $estudiante);
+
+        $registros = array_map(
+            fn () => $this->insertApprovedRecord($this->context, ['id_estudiante' => $estudiante])['id_cr_estudiante'],
+            range(1, 3)
+        );
+        $this->assertCount(3, array_unique($registros));
+
+        $this->actAs($this->createAccount(Role::ADMINISTRADOR));
+
+        $this->getJson($this->url())->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.cod_sis', '202300901')
+            ->assertJsonPath('data.0.intentos', 2)
+            ->assertJsonPath('data.0.id_cr_estudiante', min($registros))
+            ->assertJsonPath('meta.total_intentos', 2)
+            ->assertJsonPath('meta.total_estudiantes', 1)
+            ->assertJsonPath('meta.total_en_central_riesgo', 1);
+
+        $pdf = app(AlienAttemptsReportService::class)->pdf(['desde' => '2026-10-01', 'hasta' => '2026-10-31']);
+
+        $this->assertCount(1, $pdf['estudiantes']);
+        $this->assertSame(2, $pdf['estudiantes'][0]['intentos']);
+        $this->assertSame(2, $pdf['meta']['total_intentos']);
+    }
+
+    public function test_el_pdf_muestra_el_nombre_de_la_facultad_y_la_hora_de_la_paz(): void
+    {
+        $this->insertAttempt('NO_PERTENECE', $this->insertStudent('Pdf', 'Cabecera', null, '202300950'));
+
+        Carbon::setTestNow(Carbon::parse('2026-10-15 12:30:00', 'UTC'));
+
+        try {
+            $report = app(AlienAttemptsReportService::class)->pdf([
+                'desde' => '2026-10-01',
+                'hasta' => '2026-10-31',
+                'facultad' => $this->facultyA,
+            ]);
+            $html = view('reports.alien-attempts', ['report' => $report])->render();
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        $this->assertSame('FCyT', $report['cabecera']['facultad']);
+        $this->assertSame('2026-10-15T08:30:00-04:00', $report['cabecera']['generado_en']);
+        $this->assertStringContainsString('<td>Facultad:</td><td>FCyT</td>', $html);
+        $this->assertStringContainsString('15/10/2026 08:30 (La Paz)', $html);
+    }
+
+    public function test_quien_no_es_administrador_recibe_403_con_el_mensaje_en_el_listado_y_en_el_pdf(): void
+    {
+        $query = http_build_query(['desde' => '2026-10-01', 'hasta' => '2026-10-31']);
+
+        foreach ([Role::DOCENTE, Role::INVITADO, Role::AUXILIAR] as $role) {
+            $this->actAs($this->createAccount($role));
+
+            $this->getJson('/api/reportes/intentos-ajenos?' . $query)
+                ->assertForbidden()
+                ->assertJsonPath('message', 'No tiene permiso para ver esta sección.');
+
+            $this->getJson('/api/reportes/intentos-ajenos/pdf?' . $query)
+                ->assertForbidden()
+                ->assertJsonPath('message', 'No tiene permiso para ver esta sección.');
+        }
     }
 }
