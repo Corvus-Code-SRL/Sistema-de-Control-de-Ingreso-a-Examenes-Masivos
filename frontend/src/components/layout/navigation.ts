@@ -365,7 +365,8 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'teacher-exam-history',
         label: 'Historial de mis exámenes',
         icon: History,
-        capability: 'examenes.gestionar'
+        capability: 'examenes.gestionar',
+        to: '/historial'
       },
       {
         id: 'teacher-exam-report',

@@ -15,6 +15,7 @@ import {
   type Capability,
 } from '@/features/auth'
 import { EntryControlPage, OpenEntryControlsPage } from '@/features/entry-control'
+
 import {
   CreateExamPage,
   EditExamPage,
@@ -23,8 +24,11 @@ import {
   ExamsPage,
   FinalReportPage,
   InProgressExamsPage,
+  ExamHistoryPage,
+  ExamHistorySummaryPage,
   type ExamInProgressExtensions,
 } from '@/features/exams'
+
 import {
   GroupAssistantsPage,
   GroupDetailPage,
@@ -149,6 +153,8 @@ function DocenteRoutes() {
         element={guarded('ingreso.operar', <ExamInProgressPage extensions={examInProgressExtensions} />)}
       />
 
+      <Route path="/historial" element={guarded('examenes.gestionar', <ExamHistoryPage />)} />
+      <Route path="/historial/:id" element={guarded('examenes.gestionar', <ExamHistorySummaryPage />)} />
       <Route path="/incidencias" element={guarded('incidencias.revisar', <IncidentsPage />)} />
 
       <Route

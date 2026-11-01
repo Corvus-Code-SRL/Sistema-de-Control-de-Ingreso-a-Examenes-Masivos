@@ -1,0 +1,399 @@
+<?php
+
+namespace Tests\Feature\Exams;
+
+use App\Models\Exam;
+use App\Services\Security\AuditLogService;
+use Carbon\Carbon;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
+use Tests\Concerns\SeedsExamCatalog;
+use Tests\TestCase;
+
+class ExamHistoryTest extends TestCase
+{
+    use DatabaseTransactions;
+    use SeedsExamCatalog;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seedExamCatalog();
+    }
+
+    public function test_lista_y_resumen_solo_de_examenes_finalizados_propios(): void
+    {
+        $exam = $this->createExam(['nombre_examen' => 'Parcial propio', 'estado' => Exam::FINALIZADO], [$this->aulaId]);
+        $foreign = $this->createExam(['estado' => Exam::FINALIZADO, 'id_usuario_docente' => $this->otroDocenteId]);
+        $scheduled = $this->createExam(['estado' => Exam::PROGRAMADO]);
+        DB::table('grupo_examen')->insert(['id_examen' => $exam->id_examen, 'id_grupo' => $this->grupoPropioId]);
+        $students = DB::table('grupo_estudiante')->where('id_grupo', $this->grupoPropioId)
+            ->orderBy('id_estudiante')->pluck('id_estudiante');
+        foreach (['INGRESO', 'NO_INGRESO'] as $index => $state) {
+            DB::table('examen_estudiante')->insert([
+                'id_examen' => $exam->id_examen,
+                'id_estudiante' => $students[$index],
+                'id_grupo' => $this->grupoPropioId,
+                'estado_habilitacion' => 'HABILITADO',
+                'estado_ingreso' => $state,
+                'hora_ingreso' => $state === 'INGRESO' ? '08:05:00' : null,
+                'registrado_en' => $state === 'INGRESO' ? now() : null,
+                'id_ambiente' => $state === 'INGRESO' ? $this->aulaId : null,
+            ]);
+        }
+
+        $audit = app(AuditLogService::class);
+        $audit->registrar('MODIFICAR', 'examen', null, [
+            'id_examen' => $exam->id_examen,
+            'estado' => Exam::EN_INGRESO,
+            'evento' => 'APERTURA_CONTROL',
+        ], $this->docenteId);
+        $audit->registrar('FINALIZAR', 'examen', null, [
+            'id_examen' => $exam->id_examen,
+            'estado' => Exam::FINALIZADO,
+        ], $this->docenteId);
+
+        $this->getJson('/api/historial/examenes?buscar=Parcial')
+            ->assertOk()->assertJsonCount(1, 'data.examenes')
+            ->assertJsonPath('data.examenes.0.esperados', 2)
+            ->assertJsonPath('data.examenes.0.presentes', 1);
+        $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)
+            ->assertOk()->assertJsonPath('data.totales.a_tiempo', 1)
+            ->assertJsonPath('data.totales.ausentes', 1)
+            ->assertJsonPath('data.ambientes.0.presentes', 1);
+        $types = array_column($summary->json('data.linea_tiempo'), 'tipo');
+        $this->assertContains('apertura', $types);
+        $this->assertContains('inicio', $types);
+        $this->assertContains('ingreso', $types);
+        $this->assertContains('fin', $types);
+        $this->assertNull($summary->json('data.inicio_real_en'));
+        $scheduledStart = collect($summary->json('data.linea_tiempo'))->firstWhere('tipo', 'inicio');
+        $this->assertSame('Inicio programado del examen', $scheduledStart['descripcion']);
+        $this->assertSame('Horario previsto', $scheduledStart['detalle']);
+        $this->getJson('/api/historial/examenes/' . $foreign->id_examen)->assertForbidden()->assertJsonPath('message', 'No tiene acceso a este examen.');
+        $this->getJson('/api/historial/examenes/' . $scheduled->id_examen)->assertNotFound();
+    }
+
+    public function test_muestra_inicio_real_manual_registrado_por_hu_038(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::EN_INGRESO]);
+
+        $this->postJson('/api/examenes/' . $exam->id_examen . '/iniciar')->assertOk();
+        $this->postJson('/api/examenes/' . $exam->id_examen . '/finalizar')->assertOk();
+
+        $startedAt = $exam->fresh()->inicio_real_en;
+        $this->assertNotNull($startedAt);
+        $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)
+            ->assertOk()
+            ->assertJsonPath('data.inicio_real_en', $startedAt->toIso8601String())
+            ->assertJsonPath('data.inicio_automatico', false);
+
+        $starts = collect($summary->json('data.linea_tiempo'))->where('tipo', 'inicio')->values();
+        $this->assertCount(1, $starts);
+        $this->assertSame('Examen iniciado', $starts[0]['descripcion']);
+        $this->assertSame('Ana Rojas', $starts[0]['detalle']);
+        $this->assertSame(
+            $startedAt->setTimezone(config('sciem.zona_horaria'))->format('Y-m-d H:i:s'),
+            $starts[0]['fecha_hora']
+        );
+    }
+
+    public function test_muestra_inicio_real_automatico_sin_duplicar_el_hito(): void
+    {
+        $exam = $this->createExam(['fecha' => '2026-10-28', 'estado' => Exam::FINALIZADO]);
+        $startedAt = Carbon::parse('2026-10-28 08:10:00', config('sciem.zona_horaria'));
+        $exam->forceFill([
+            'inicio_real_en' => $startedAt->copy()->utc(),
+            'inicio_automatico' => true,
+        ])->save();
+
+        $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)
+            ->assertOk()
+            ->assertJsonPath('data.inicio_automatico', true);
+
+        $starts = collect($summary->json('data.linea_tiempo'))->where('tipo', 'inicio')->values();
+        $this->assertCount(1, $starts);
+        $this->assertSame('Examen iniciado', $starts[0]['descripcion']);
+        $this->assertSame('Automático', $starts[0]['detalle']);
+        $this->assertSame('2026-10-28 08:10:00', $starts[0]['fecha_hora']);
+    }
+
+    public function test_usa_fin_real_y_tipo_automatico_sin_duplicar_el_cierre(): void
+    {
+        $exam = $this->createExam(['fecha' => '2026-10-28', 'estado' => Exam::FINALIZADO]);
+        $finishedAt = Carbon::parse('2026-10-28 09:41:00', config('sciem.zona_horaria'));
+        $exam->forceFill([
+            'fin_real_en' => $finishedAt->copy()->utc(),
+            'fin_automatico' => true,
+        ])->save();
+        app(AuditLogService::class)->registrar('FINALIZAR', 'examen', null, [
+            'id_examen' => $exam->id_examen,
+            'estado' => Exam::FINALIZADO,
+        ], $this->docenteId);
+
+        $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)
+            ->assertOk()
+            ->assertJsonPath('data.fin_real_en', $exam->fresh()->fin_real_en->toIso8601String())
+            ->assertJsonPath('data.fin_automatico', true);
+
+        $closures = collect($summary->json('data.linea_tiempo'))->where('tipo', 'fin')->values();
+        $this->assertCount(1, $closures);
+        $this->assertSame('2026-10-28 09:41:00', $closures[0]['fecha_hora']);
+        $this->assertSame('Automático', $closures[0]['detalle']);
+    }
+
+    public function test_muestra_fin_real_aunque_no_exista_auditoria_antigua(): void
+    {
+        $exam = $this->createExam(['fecha' => '2026-10-28', 'estado' => Exam::FINALIZADO]);
+        $exam->forceFill([
+            'fin_real_en' => Carbon::parse('2026-10-28 09:15:00', config('sciem.zona_horaria'))->utc(),
+            'fin_automatico' => false,
+        ])->save();
+
+        $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)->assertOk();
+        $closures = collect($summary->json('data.linea_tiempo'))->where('tipo', 'fin')->values();
+        $this->assertCount(1, $closures);
+        $this->assertSame('2026-10-28 09:15:00', $closures[0]['fecha_hora']);
+        $this->assertSame('Responsable no registrado', $closures[0]['detalle']);
+    }
+
+    public function test_mantiene_cierre_automatico_auditado_sin_fin_real(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::FINALIZADO]);
+        app(AuditLogService::class)->registrar('FINALIZAR', 'examen', null, [
+            'id_examen' => $exam->id_examen,
+            'estado' => Exam::FINALIZADO,
+            'tipo_finalizacion' => 'AUTOMATICA',
+        ], $this->docenteId);
+
+        $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)
+            ->assertOk()
+            ->assertJsonPath('data.fin_real_en', null);
+        $closures = collect($summary->json('data.linea_tiempo'))->where('tipo', 'fin')->values();
+        $this->assertCount(1, $closures);
+        $this->assertSame('Automático', $closures[0]['detalle']);
+    }
+
+    public function test_lista_ordenada_filtrada_y_paginada_solo_con_finalizados_del_docente(): void
+    {
+        $first = $this->createExam([
+            'nombre_examen' => 'Examen diagnóstico',
+            'fecha' => '2026-10-01',
+            'estado' => Exam::FINALIZADO,
+        ]);
+        $second = $this->createExam([
+            'nombre_examen' => 'Álgebra final',
+            'fecha' => '2026-10-02',
+            'id_materia' => $this->basesDatosId,
+            'estado' => Exam::FINALIZADO,
+        ]);
+        $third = $this->createExam([
+            'nombre_examen' => 'Cálculo final',
+            'fecha' => '2026-10-03',
+            'estado' => Exam::FINALIZADO,
+        ]);
+        $this->createExam(['nombre_examen' => 'Programado', 'estado' => Exam::PROGRAMADO]);
+        $this->createExam(['nombre_examen' => 'En curso', 'estado' => Exam::EN_CURSO]);
+        $this->createExam(['nombre_examen' => 'Ajeno', 'estado' => Exam::FINALIZADO,
+            'id_usuario_docente' => $this->otroDocenteId]);
+
+        $list = $this->getJson('/api/historial/examenes')->assertOk()->assertJsonCount(3, 'data.examenes');
+        $this->assertSame(
+            [$third->id_examen, $second->id_examen, $first->id_examen],
+            array_column($list->json('data.examenes'), 'id_examen')
+        );
+        $this->getJson('/api/historial/examenes?materia=' . $this->calculoId)
+            ->assertOk()->assertJsonCount(2, 'data.examenes');
+        $this->getJson('/api/historial/examenes?buscar=diagnostico')
+            ->assertOk()->assertJsonCount(1, 'data.examenes')
+            ->assertJsonPath('data.examenes.0.id_examen', $first->id_examen);
+
+        for ($index = 0; $index < 22; $index++) {
+            $this->createExam(['estado' => Exam::FINALIZADO,
+                'nombre_examen' => 'Adicional ' . $index, 'fecha' => '2026-10-04']);
+        }
+        $this->getJson('/api/historial/examenes?page=1')->assertOk()
+            ->assertJsonCount(10, 'data.examenes')->assertJsonPath('data.total', 25)
+            ->assertJsonPath('data.paginas', 3);
+        $last = $this->getJson('/api/historial/examenes?page=3')->assertOk()
+            ->assertJsonCount(5, 'data.examenes')->assertJsonPath('data.pagina', 3);
+        $this->assertSame($first->id_examen, $last->json('data.examenes.4.id_examen'));
+    }
+
+    public function test_resumen_ordena_hitos_y_muestra_controladores_reales_por_ambiente(): void
+    {
+        $exam = $this->createExam([
+            'fecha' => '2026-10-28',
+            'estado' => Exam::FINALIZADO,
+        ], [$this->aulaId]);
+        $zone = config('sciem.zona_horaria');
+        $exam->forceFill([
+            'inicio_real_en' => Carbon::parse('2026-10-28 08:00:00', $zone)->utc(),
+            'inicio_automatico' => false,
+            'fin_real_en' => Carbon::parse('2026-10-28 09:30:00', $zone)->utc(),
+            'fin_automatico' => false,
+        ])->save();
+        DB::table('grupo_examen')->insert(['id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoPropioId]);
+        $students = DB::table('grupo_estudiante')->where('id_grupo', $this->grupoPropioId)
+            ->orderBy('id_estudiante')->pluck('id_estudiante');
+        foreach (['INGRESO', 'CON_RETRASO'] as $index => $state) {
+            DB::table('examen_estudiante')->insert([
+                'id_examen' => $exam->id_examen,
+                'id_estudiante' => $students[$index],
+                'id_grupo' => $this->grupoPropioId,
+                'estado_habilitacion' => 'HABILITADO',
+                'estado_ingreso' => $state,
+                'hora_ingreso' => $index === 0 ? '08:05:00' : '08:20:00',
+                'registrado_en' => now(),
+                'id_ambiente' => $this->aulaId,
+                'id_usuario_controlador' => $this->docenteId,
+            ]);
+        }
+        $typeId = DB::table('tipo_falta')->insertGetId(['nombre' => 'Copia'], 'id_falta');
+        DB::table('reporte_estudiante')->insert([
+            'id_estudiante' => $students[0],
+            'id_examen' => $exam->id_examen,
+            'id_tipo_falta' => $typeId,
+            'id_usuario_reportante' => $this->docenteId,
+            'evidencia_url' => 'https://example.test/evidencia',
+            'evidencia_public_id' => 'evidencia-prueba',
+            'fecha_reporte' => '2026-10-28 08:10:00-04',
+            'estado' => 'PENDIENTE',
+        ]);
+        $audit = app(AuditLogService::class);
+        foreach ([
+            ['MODIFICAR', '07:30:00', ['evento' => 'APERTURA_CONTROL']],
+            ['INICIAR', '08:00:00', ['tipo_inicio' => 'MANUAL']],
+            ['FINALIZAR', '09:30:00', []],
+        ] as [$action, $hour, $extra]) {
+            $audit->registrar($action, 'examen', null, array_merge([
+                'id_examen' => $exam->id_examen,
+                'estado' => $action === 'FINALIZAR' ? Exam::FINALIZADO : Exam::EN_CURSO,
+            ], $extra), $this->docenteId);
+            DB::table('log')->where('id_log', DB::table('log')->max('id_log'))
+                ->update(['fecha_hora' => '2026-10-28 ' . $hour . '-04']);
+        }
+
+        $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)->assertOk()
+            ->assertJsonPath('data.totales.a_tiempo', 0)
+            ->assertJsonPath('data.totales.con_retraso', 1)
+            ->assertJsonPath('data.totales.ausentes', 0)
+            ->assertJsonPath('data.totales.incidencias', 1)
+            ->assertJsonPath('data.ambientes.0.presentes', 2)
+            ->assertJsonPath('data.ambientes.0.auxiliares.0', 'Ana Rojas');
+        $timeline = $summary->json('data.linea_tiempo');
+        $this->assertSame(
+            ['apertura', 'inicio', 'ingreso', 'incidencia', 'retraso', 'fin'],
+            array_column($timeline, 'tipo')
+        );
+        $this->assertSame('Automático', $timeline[0]['detalle']);
+        $this->assertSame('Ana Rojas', $timeline[1]['detalle']);
+        $this->assertStringContainsString('Controló: Ana Rojas', $timeline[2]['detalle']);
+        $this->assertStringContainsString('Reportó: Ana Rojas', $timeline[3]['detalle']);
+        $this->assertSame('08:20:00', substr($timeline[4]['fecha_hora'], 11));
+        $this->assertSame('Ana Rojas', $timeline[5]['detalle']);
+    }
+
+    public function test_incidentes_cuentan_estudiantes_unicos_y_no_como_ausentes(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::FINALIZADO]);
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
+        $this->enrollStudents($this->grupoPropioId, 1);
+        $students = DB::table('grupo_estudiante')->where('id_grupo', $this->grupoPropioId)
+            ->orderBy('id_estudiante')->pluck('id_estudiante');
+        foreach ($students as $index => $studentId) {
+            DB::table('examen_estudiante')->insert([
+                'id_examen' => $exam->id_examen,
+                'id_estudiante' => $studentId,
+                'id_grupo' => $this->grupoPropioId,
+                'estado_habilitacion' => 'HABILITADO',
+                'estado_ingreso' => $index === 0 ? 'INGRESO' : 'NO_INGRESO',
+                'hora_ingreso' => $index === 0 ? '08:05:00' : null,
+                'registrado_en' => $index === 0 ? now() : null,
+            ]);
+        }
+        $this->enrollStudents($this->grupoAjenoId, 1);
+        $outsider = DB::table('grupo_estudiante')->where('id_grupo', $this->grupoAjenoId)
+            ->value('id_estudiante');
+        $typeId = DB::table('tipo_falta')->insertGetId(['nombre' => 'Copia'], 'id_falta');
+        foreach ([$students[0], $students[1], $students[1], $outsider] as $studentId) {
+            DB::table('reporte_estudiante')->insert([
+                'id_estudiante' => $studentId,
+                'id_examen' => $exam->id_examen,
+                'id_tipo_falta' => $typeId,
+                'id_usuario_reportante' => $this->docenteId,
+                'evidencia_url' => 'https://example.test/evidencia',
+                'evidencia_public_id' => 'evidencia-prueba',
+                'fecha_reporte' => now(),
+                'estado' => 'PENDIENTE',
+            ]);
+        }
+
+        $this->getJson('/api/historial/examenes')->assertOk()
+            ->assertJsonPath('data.examenes.0.esperados', 3)
+            ->assertJsonPath('data.examenes.0.presentes', 1)
+            ->assertJsonPath('data.examenes.0.incidencias', 4);
+        $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)
+            ->assertOk()
+            ->assertJsonPath('data.totales.a_tiempo', 0)
+            ->assertJsonPath('data.totales.con_retraso', 0)
+            ->assertJsonPath('data.totales.ausentes', 1)
+            ->assertJsonPath('data.totales.incidencias', 2)
+            ->assertJsonPath('data.total_estudiantes', 3);
+        $this->assertSame(3, array_sum($summary->json('data.totales')));
+        $this->assertCount(4, collect($summary->json('data.linea_tiempo'))
+            ->where('tipo', 'incidencia'));
+    }
+
+    public function test_reporte_sin_fila_de_ingreso_desplaza_una_ausencia(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::FINALIZADO]);
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
+        $studentId = DB::table('grupo_estudiante')->where('id_grupo', $this->grupoPropioId)
+            ->value('id_estudiante');
+        $typeId = DB::table('tipo_falta')->insertGetId(['nombre' => 'Copia'], 'id_falta');
+        DB::table('reporte_estudiante')->insert([
+            'id_estudiante' => $studentId,
+            'id_examen' => $exam->id_examen,
+            'id_tipo_falta' => $typeId,
+            'id_usuario_reportante' => $this->docenteId,
+            'evidencia_url' => 'https://example.test/evidencia',
+            'evidencia_public_id' => 'evidencia-prueba',
+            'fecha_reporte' => now(),
+            'estado' => 'PENDIENTE',
+        ]);
+
+        $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)
+            ->assertOk()
+            ->assertJsonPath('data.totales.a_tiempo', 0)
+            ->assertJsonPath('data.totales.con_retraso', 0)
+            ->assertJsonPath('data.totales.ausentes', 1)
+            ->assertJsonPath('data.totales.incidencias', 1)
+            ->assertJsonPath('data.total_estudiantes', 2);
+        $this->assertSame(2, array_sum($summary->json('data.totales')));
+    }
+
+    public function test_historial_vacio_y_examen_ajeno(): void
+    {
+        $foreign = $this->createExam(['estado' => Exam::FINALIZADO,
+            'id_usuario_docente' => $this->otroDocenteId]);
+        $this->getJson('/api/historial/examenes')->assertOk()
+            ->assertJsonPath('data.total', 0)->assertJsonCount(0, 'data.examenes');
+        $this->getJson('/api/historial/examenes/' . $foreign->id_examen)
+            ->assertForbidden()->assertJsonPath('message', 'No tiene acceso a este examen.');
+    }
+
+    public function test_valida_filtros_y_sesion(): void
+    {
+        $this->getJson('/api/historial/examenes?materia=-1')->assertStatus(422);
+        $this->actAsGuest();
+        $this->getJson('/api/historial/examenes')->assertUnauthorized();
+    }
+}
