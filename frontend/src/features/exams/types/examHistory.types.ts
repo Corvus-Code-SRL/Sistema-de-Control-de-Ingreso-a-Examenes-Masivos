@@ -21,6 +21,7 @@ export interface HistorySummary {
   nombre_examen: string
   fecha: string
   materia: string | null
+  total_estudiantes: number
   inicio_real_en: string | null
   inicio_automatico: boolean
   fin_real_en: string | null
