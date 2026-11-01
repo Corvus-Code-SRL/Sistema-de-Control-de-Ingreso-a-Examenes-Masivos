@@ -22,14 +22,15 @@ class ListRolesTest extends TestCase
         $this->seedSecurityAccounts();
     }
 
-    public function test_lista_los_tres_roles_definidos_para_sciem(): void
+    public function test_lista_los_cuatro_roles_definidos_para_sciem(): void
     {
         $this->getJson('/api/roles')
             ->assertOk()
-            ->assertJsonCount(3, 'data')
+            ->assertJsonCount(4, 'data')
             ->assertJsonPath('data.0.nombre_rol', Role::ADMINISTRADOR)
             ->assertJsonPath('data.1.nombre_rol', Role::DOCENTE)
-            ->assertJsonPath('data.2.nombre_rol', Role::AUXILIAR);
+            ->assertJsonPath('data.2.nombre_rol', Role::AUXILIAR)
+            ->assertJsonPath('data.3.nombre_rol', Role::INVITADO);
     }
 
     public function test_no_ofrece_roles_inactivos(): void

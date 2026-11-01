@@ -92,7 +92,7 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
           </Avatar>
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-white">{user.nombre}</p>
-            <p className="truncate text-xs text-sb-sub">{AREA_LABELS[area]}</p>
+            <p className="truncate text-xs text-sb-sub">{user.rolEtiqueta ?? AREA_LABELS[area]}</p>
           </div>
         </div>
 

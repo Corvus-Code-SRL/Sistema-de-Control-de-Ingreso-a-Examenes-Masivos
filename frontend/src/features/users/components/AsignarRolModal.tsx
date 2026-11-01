@@ -10,11 +10,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { roleLabel } from '@/lib/roleLabel'
 import { useRoles } from '../hooks/useRoles'
+import { rolesAllowedFor } from '../lib/accountRoles'
 import { describeRoleError } from '../lib/describeRoleError'
 import { assignRole, getActiveAssignments } from '../services/usersService'
 import {
-  TEACHER_ROLE,
+  TEACHING_ROLES,
   accountFullName,
   accountInitials,
   type ActiveAssignments,
@@ -73,7 +75,9 @@ function RoleAssignment({ account, onCancel, onAssigned }: RoleAssignmentProps) 
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const currentRole = account.rol
-  const selectedRole = roles.data?.find((role) => role.id_rol === selectedRoleId) ?? null
+  // Una cuenta de docente invitado solo admite el rol Invitado y una con código SIS nunca lo admite.
+  const allowedRoles = { ...roles, data: roles.data ? rolesAllowedFor(roles.data, account) : null }
+  const selectedRole = allowedRoles.data?.find((role) => role.id_rol === selectedRoleId) ?? null
 
   const submit = async () => {
     if (!selectedRole) return
@@ -101,8 +105,8 @@ function RoleAssignment({ account, onCancel, onAssigned }: RoleAssignmentProps) 
 
     setErrorMessage(null)
 
-    // Solo el rol Docente tiene grupos, materias o exámenes que puedan quedar sin responsable.
-    if (currentRole.nombre_rol === TEACHER_ROLE) {
+    // Solo los roles que ejercen la docencia tienen grupos, materias o exámenes que puedan quedar sin responsable.
+    if (TEACHING_ROLES.includes(currentRole.nombre_rol)) {
       setIsSubmitting(true)
 
       try {
@@ -128,17 +132,17 @@ function RoleAssignment({ account, onCancel, onAssigned }: RoleAssignmentProps) 
 
         <div
           className="flex items-center justify-center gap-4 rounded-lg border border-border-soft bg-sunken py-3 text-sm font-semibold"
-          aria-label={`De ${currentRole.nombre_rol} a ${selectedRole.nombre_rol}`}
+          aria-label={`De ${roleLabel(currentRole.nombre_rol)} a ${roleLabel(selectedRole.nombre_rol)}`}
         >
-          <span className="text-muted-foreground">{currentRole.nombre_rol}</span>
+          <span className="text-muted-foreground">{roleLabel(currentRole.nombre_rol)}</span>
           <ArrowRightLeft aria-hidden="true" className="size-4 text-subtle" />
-          <span className="text-brand">{selectedRole.nombre_rol}</span>
+          <span className="text-brand">{roleLabel(selectedRole.nombre_rol)}</span>
         </div>
 
         {assignments?.tiene_activas && (
           <Alert className="border-warn-border bg-warn-soft text-warn-fg">
             <AlertTriangle aria-hidden="true" />
-            <AlertTitle>Tiene asignaciones activas como {currentRole.nombre_rol}</AlertTitle>
+            <AlertTitle>Tiene asignaciones activas como {roleLabel(currentRole.nombre_rol)}</AlertTitle>
             <AlertDescription className="text-warn-fg">
               <ul className="list-disc space-y-1 pl-5">
                 <li>{plural(assignments.grupos, 'grupo', 'grupos')} en el periodo actual.</li>
@@ -187,7 +191,10 @@ function RoleAssignment({ account, onCancel, onAssigned }: RoleAssignmentProps) 
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold text-foreground">{accountFullName(account)}</p>
-          <p className="font-mono text-sm text-muted-foreground">{account.cod_sis}</p>
+          <p className="font-mono text-sm text-muted-foreground">
+            {account.es_invitado ? 'Código INV ' : 'Código SIS '}
+            {account.cod_sis}
+          </p>
         </div>
         <RoleBadge role={currentRole} />
       </div>
@@ -210,7 +217,7 @@ function RoleAssignment({ account, onCancel, onAssigned }: RoleAssignmentProps) 
       )}
 
       <RoleOptions
-        roles={roles}
+        roles={allowedRoles}
         currentRoleId={currentRole?.id_rol}
         selectedRoleId={selectedRoleId}
         disabled={isSubmitting}

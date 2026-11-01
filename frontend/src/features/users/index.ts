@@ -1,13 +1,11 @@
 // API pública del feature users
-export { CuentasPage } from './pages/CuentasPage'
 export { CuentaDetallePage } from './pages/CuentaDetallePage'
-export { RegistrarCuentaModal } from './components/RegistrarCuentaModal'
-export type { ErrorType } from './components/RegistrarCuentaModal'
+export { ModificarRolPage } from './pages/ModificarRolPage'
+export { RegistrarCuentaPage } from './pages/RegistrarCuentaPage'
 export type {
   AccountRole,
   AccountStatus,
   ActiveAssignments,
-  RegistrationResult,
   Role,
   RoleHistoryEntry,
   SisPerson,

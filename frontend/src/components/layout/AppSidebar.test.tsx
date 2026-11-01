@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { roleLabel } from '@/lib/roleLabel'
 import { openAllSections } from '@/test/sidebar'
 import { AppSidebar } from './AppSidebar'
 
@@ -20,7 +21,12 @@ vi.mock('@/features/auth', async (importOriginal) => {
   return {
     ...original,
     useCurrentUser: () => ({
-      user: { nombre: 'Prueba Usuario', iniciales: 'PU', area: areaForRoleOf() },
+      user: {
+        nombre: 'Prueba Usuario',
+        iniciales: 'PU',
+        area: areaForRoleOf(),
+        rolEtiqueta: session.role ? roleLabel(session.role) : undefined
+      },
       area: areaForRoleOf(),
       capabilities: session.hasSession ? original.capabilitiesOf(session.role) : []
     }),
@@ -47,7 +53,7 @@ vi.mock('@/features/incidents', () => ({
   }
 }))
 
-type RoleName = 'Administrador' | 'Docente' | 'Auxiliar'
+type RoleName = 'Administrador' | 'Docente' | 'Auxiliar' | 'Invitado'
 
 function renderSidebar(role: RoleName, route: string, props: { onNavigate?: () => void } = {}) {
   session.role = role
@@ -286,6 +292,20 @@ describe('AppSidebar — secciones colapsables', () => {
   })
 })
 
+describe('AppSidebar — rol del usuario', () => {
+  it('un docente invitado figura como «Docente invitado»', () => {
+    renderSidebar('Invitado', '/materias')
+
+    expect(screen.getByText('Docente invitado')).toBeInTheDocument()
+  })
+
+  it.each(['Administrador', 'Docente', 'Auxiliar'] as const)('%s figura con su nombre', (role) => {
+    renderSidebar(role, '/materias')
+
+    expect(within(screen.getByRole('region', { name: 'Cuenta' })).getByText(role)).toBeInTheDocument()
+  })
+})
+
 describe('AppSidebar — entradas y estado activo', () => {
   it('docente: las entradas conectadas llevan a su ruta', async () => {
     const user = userEvent.setup()
@@ -343,13 +363,48 @@ describe('AppSidebar — entradas y estado activo', () => {
     expect(screen.getByRole('link', { name: 'Consultar central' })).toHaveAttribute('aria-current', 'page')
   })
 
-  it('administrador: /cuentas/:id resalta Registrar cuenta nueva', () => {
+  it('administrador: /cuentas/:id resalta Modificar rol', () => {
     renderSidebar('Administrador', '/cuentas/00000000-0000-4000-8000-000000000011')
 
-    expect(screen.getByRole('link', { name: 'Registrar cuenta nueva' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    )
+    expect(screen.getByRole('link', { name: 'Modificar rol' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Registrar cuenta nueva' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('administrador: cada vista de cuentas resalta su propia entrada', () => {
+    const nueva = renderSidebar('Administrador', '/cuentas/nueva')
+
+    expect(screen.getByRole('link', { name: 'Registrar cuenta nueva' })).toHaveAttribute('aria-current', 'page')
+    nueva.unmount()
+
+    renderSidebar('Administrador', '/cuentas/roles')
+
+    expect(screen.getByRole('link', { name: 'Modificar rol' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('invitado: no ve «Mis auxiliares» ni la entrada de la Central de riesgo', async () => {
+    const user = userEvent.setup()
+
+    renderSidebar('Invitado', '/mis-cursos')
+    await openAllSections(user)
+
+    const nav = screen.getByRole('navigation', { name: MAIN_NAV })
+
+    expect(within(nav).queryByText('Mis auxiliares')).not.toBeInTheDocument()
+    expect(within(nav).queryByRole('link', { name: 'Central de riesgo' })).not.toBeInTheDocument()
+    expect(within(nav).getByRole('link', { name: 'Revisar reportes de incidencias' })).toBeInTheDocument()
+    expect(within(nav).getByRole('link', { name: 'Mis grupos' })).toBeInTheDocument()
+  })
+
+  it('docente: conserva «Mis auxiliares» y la entrada de la Central de riesgo', async () => {
+    const user = userEvent.setup()
+
+    renderSidebar('Docente', '/mis-cursos')
+    await openAllSections(user)
+
+    const nav = screen.getByRole('navigation', { name: MAIN_NAV })
+
+    expect(within(nav).getByRole('link', { name: 'Mis auxiliares' })).toBeInTheDocument()
+    expect(within(nav).getByRole('link', { name: 'Central de riesgo' })).toBeInTheDocument()
   })
 
   it('una entrada sin destino no es un enlace: es un botón deshabilitado con aviso', async () => {

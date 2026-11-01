@@ -288,6 +288,29 @@ describe('ExamDetailPage — navegación a edición', () => {
   })
 })
 
+describe('ExamDetailPage — reporte final (HU-051)', () => {
+  it('un examen finalizado ofrece Generar reporte y lleva al reporte final', async () => {
+    mockExam('FINALIZADO')
+    renderWithRouter(<><ExamDetailPage /><LocationProbe /></>, {
+      route: '/examenes/9',
+      path: '/examenes/:examId/*',
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'Generar reporte' }))
+    expect(screen.getByTestId('location').textContent).toBe('/examenes/9/reporte-final')
+  })
+
+  it.each([
+    'PROGRAMADO',
+    'EN_INGRESO',
+    'EN_CURSO',
+    'CANCELADO',
+  ] as ExamStatus[])('un examen %s no ofrece Generar reporte', async (estado) => {
+    mockExam(estado)
+    await renderDetail()
+    expect(screen.queryByRole('button', { name: 'Generar reporte' })).not.toBeInTheDocument()
+  })
+})
+
 it('un grupo sintácticamente válido que no pertenece al examen usa el regreso y breadcrumbs generales', async () => {
   const { calls } = mockApiWith(({ url }) => {
     if (url.endsWith('/examenes/9')) return { body: { data: makeExam('PROGRAMADO', [{ ...originGroup, id_grupo: 200 }]) } }

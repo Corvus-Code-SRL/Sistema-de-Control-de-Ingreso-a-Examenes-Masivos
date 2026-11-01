@@ -3,7 +3,7 @@ import { capabilitiesOf } from '@/features/auth'
 import { NAVIGATION } from './navigation'
 import { visibleSections } from './navigationSelectors'
 
-type RoleName = 'Administrador' | 'Docente' | 'Auxiliar'
+type RoleName = 'Administrador' | 'Docente' | 'Auxiliar' | 'Invitado'
 
 /** El menú de un rol como lo vería su usuario: secciones y, dentro, [etiqueta, destino]. */
 function menuOf(role: RoleName) {
@@ -48,8 +48,8 @@ describe('menú por capacidades', () => {
       {
         label: 'Cuentas y roles',
         items: [
-          ['Registrar cuenta nueva', '/cuentas'],
-          ['Modificar rol', undefined]
+          ['Registrar cuenta nueva', '/cuentas/nueva'],
+          ['Modificar rol', '/cuentas/roles']
         ]
       },
       {
@@ -152,8 +152,34 @@ describe('menú por capacidades', () => {
 
   it('un rol sin capacidades, o desconocido, no ve ningún menú', () => {
     expect(visibleSections([])).toEqual([])
-    expect(visibleSections(capabilitiesOf('Invitado'))).toEqual([])
+    expect(visibleSections(capabilitiesOf('Rol inexistente'))).toEqual([])
     expect(visibleSections(capabilitiesOf(null))).toEqual([])
+  })
+
+  it('invitado: docencia y revisión de incidencias, sin «Mis auxiliares» ni la Central de riesgo', () => {
+    const menu = menuOf('Invitado')
+    const entries = menu.flatMap((section) => section.items.map(([label]) => label))
+
+    expect(entries).not.toContain('Mis auxiliares')
+    expect(entries).not.toContain('Central de riesgo')
+    expect(entries).not.toContain('Invitar docentes colaboradores')
+    expect(entries).not.toContain('Registrar estudiante excepcional')
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        'Materias',
+        'Registrar examen',
+        'Habilitar auxiliar para el examen',
+        'Control de ingreso',
+        'En curso',
+        'Revisar reportes de incidencias'
+      ])
+    )
+  })
+
+  it('invitado: la única entrada de su sección de riesgo es la revisión de incidencias', () => {
+    const risk = menuOf('Invitado').find((section) => section.label === 'Central de riesgo')
+
+    expect(risk?.items).toEqual([['Revisar reportes de incidencias', '/incidencias']])
   })
 
   it('una sección sin ninguna entrada permitida no se devuelve', () => {
