@@ -27,12 +27,14 @@ class ExamSituationAccessService
             throw new AuthorizationException('No tiene permiso para consultar este examen.');
         }
 
-        if ((string) $exam->id_usuario_docente === (string) $actor->id_usuario
-            && $this->roles->isTeacher($actor->id_usuario)) {
+        if (
+            (string) $exam->id_usuario_docente === (string) $actor->id_usuario
+            && $this->roles->isTeacher($actor->id_usuario)
+        ) {
             return null;
         }
 
-        if (! $this->roles->hasAnyActiveRole($actor->id_usuario, [Role::DOCENTE, Role::AUXILIAR])) {
+        if (! $this->roles->hasAnyActiveRole($actor->id_usuario, $this->controllerRoles())) {
             throw new AuthorizationException('No tiene permiso para consultar este examen.');
         }
 
@@ -68,8 +70,10 @@ class ExamSituationAccessService
     /** Filtra el catálogo sin consultar asignaciones una por una. */
     public function visibleExams(User $actor): Builder
     {
-        if ($actor->estado !== User::ESTADO_ACTIVO
-            || ! $this->roles->hasAnyActiveRole($actor->id_usuario, [Role::DOCENTE, Role::AUXILIAR])) {
+        if (
+            $actor->estado !== User::ESTADO_ACTIVO
+            || ! $this->roles->hasAnyActiveRole($actor->id_usuario, $this->controllerRoles())
+        ) {
             throw new AuthorizationException('No tiene permiso para consultar situaciones.');
         }
 
@@ -112,5 +116,16 @@ class ExamSituationAccessService
         if (! $belongsToExam || ($roomScope !== null && $roomScope !== $roomId)) {
             throw new AuthorizationException('No tiene permiso para controlar este ambiente.');
         }
+    }
+
+    /**
+     * Roles que controlan un examen: los que ejercen la docencia según sciem.access, incluido el
+     * docente invitado, y el Auxiliar habilitado.
+     *
+     * @return array<int, string>
+     */
+    private function controllerRoles(): array
+    {
+        return array_merge($this->roles->rolesFor('teaching'), [Role::AUXILIAR]);
     }
 }

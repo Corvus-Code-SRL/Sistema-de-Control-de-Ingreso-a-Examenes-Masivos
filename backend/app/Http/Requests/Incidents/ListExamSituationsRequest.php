@@ -10,7 +10,10 @@ class ListExamSituationsRequest extends FormRequest
 {
     public function authorize(UserRoleService $roles): bool
     {
-        return $roles->hasAnyActiveRole($this->user()?->id_usuario, [Role::DOCENTE, Role::AUXILIAR]);
+        return $roles->hasAnyActiveRole(
+            $this->user()?->id_usuario,
+            array_merge($roles->rolesFor('teaching'), [Role::AUXILIAR])
+        );
     }
 
     protected function prepareForValidation(): void
