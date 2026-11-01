@@ -1,5 +1,7 @@
 import type { ExamInProgress } from '@/features/exams'
-import type { LateEntryRequest, LateEntryVerification } from '@/features/entry-control/types/late-entry.types'
+import type {
+  LateEntryRequest, LateEntryVerification, OtherExamWarning,
+} from '@/features/entry-control/types/late-entry.types'
 
 /** Datos de prueba del ingreso con retraso (HU-037): un examen EN_CURSO con dos ambientes. */
 
@@ -14,6 +16,7 @@ export function makeLateEntryRequest(overrides: Partial<LateEntryRequest> = {}):
     solicitado_en: '2026-10-31T14:12:00+00:00',
     hora_solicitud: '10:12',
     resuelto_en: null,
+    otro_examen: null,
     ...overrides,
   }
 }
@@ -40,6 +43,7 @@ export function makeLateEntryVerification(
     antecedentes: { total: 0, latest: null },
     ingreso_previo: null,
     solicitud_pendiente: null,
+    otro_examen: null,
     ...overrides,
   }
 }
@@ -64,6 +68,18 @@ export function makeExamInProgress(overrides: Partial<ExamInProgress> = {}): Exa
     hora_servidor_en: '2026-10-31T14:10:00+00:00',
     totales: { a_tiempo: 1, con_retraso: 0, ausentes: 1, presentes: 1, total: 2, incidencias_pendientes: 0 },
     estudiantes: [],
+    ...overrides,
+  }
+}
+
+export function makeOtherExamWarning(overrides: Partial<OtherExamWarning> = {}): OtherExamWarning {
+  return {
+    id_examen: 9,
+    nombre_examen: 'Parcial de Física',
+    materia: 'Física General',
+    docente: 'Ana Rojas',
+    hora_ingreso: '08:05',
+    nro_aula: '691A',
     ...overrides,
   }
 }

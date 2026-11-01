@@ -1,4 +1,5 @@
 import { apiClient, apiPost } from '@/lib/api-client'
+import type { StudentMatch, StudentSearchSource } from '../types/entry-control.types'
 import type {
   LateEntryActionInput, LateEntryRegistration, LateEntryRequest, LateEntryVerification, LateEntryVerificationInput,
 } from '../types/late-entry.types'
@@ -13,6 +14,25 @@ export const lateEntryService = {
     return response.data
   },
 
+  async search(examId: number, name: string, signal?: AbortSignal): Promise<StudentMatch[]> {
+    const response = await apiClient<DataResponse<StudentMatch[]>>(`${base(examId)}/buscar`, {
+      query: { nombre: name }, signal,
+    })
+    return response.data
+  },
+
+  async searchByIdentifier(
+    examId: number,
+    field: 'sis' | 'ci',
+    prefix: string,
+    signal?: AbortSignal
+  ): Promise<StudentMatch[]> {
+    const response = await apiClient<DataResponse<StudentMatch[]>>(`${base(examId)}/buscar`, {
+      query: { [field]: prefix }, signal,
+    })
+    return response.data
+  },
+
   async list(examId: number, signal?: AbortSignal): Promise<LateEntryRequest[]> {
     const response = await apiClient<DataResponse<LateEntryRequest[]>>(`${base(examId)}/solicitudes`, { signal })
     return response.data
@@ -23,9 +43,10 @@ export const lateEntryService = {
     return response.data
   },
 
-  async approve(examId: number, requestId: number): Promise<LateEntryRequest> {
+  /** `confirmOtherExam`: el docente autoriza con la advertencia de otro examen a la vista. */
+  async approve(examId: number, requestId: number, confirmOtherExam = false): Promise<LateEntryRequest> {
     const response = await apiPost<DataResponse<LateEntryRequest>>(
-      `${base(examId)}/solicitudes/${requestId}/autorizar`, {}
+      `${base(examId)}/solicitudes/${requestId}/autorizar`, confirmOtherExam ? { confirmar_otro_examen: true } : {}
     )
     return response.data
   },
@@ -41,4 +62,10 @@ export const lateEntryService = {
     const response = await apiPost<DataResponse<LateEntryRegistration>>(`${base(examId)}/registrar`, input)
     return response.data
   },
+}
+
+/** Sugerencias de la identificación durante EN_CURSO, cuando la búsqueda de HU-032 ya no está disponible. */
+export const LATE_ENTRY_SEARCH: StudentSearchSource = {
+  byName: (examId, name, signal) => lateEntryService.search(examId, name, signal),
+  byIdentifier: (examId, field, prefix, signal) => lateEntryService.searchByIdentifier(examId, field, prefix, signal),
 }

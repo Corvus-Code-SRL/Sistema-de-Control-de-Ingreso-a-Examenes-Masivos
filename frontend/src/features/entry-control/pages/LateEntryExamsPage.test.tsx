@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
-import { render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useInProgressExams, type InProgressExamRow } from '@/features/exams'
 import { ApiError } from '@/lib/api-client'
 import { renderWithRouter } from '@/test/render'
@@ -17,8 +16,8 @@ vi.mock('@/features/exams', async (importOriginal) => ({
 
 const reload = vi.fn()
 
-function exam(id: number, title: string): InProgressExamRow {
-  return { id, title, subject: 'Bases de Datos I', date: '2026-10-31', startsAt: '10:00', endsAt: '12:00', rooms: '691A, 692B' }
+function exam(id: number, title: string, endsAt = '12:00'): InProgressExamRow {
+  return { id, title, subject: 'Bases de Datos I', date: '2026-10-31', startsAt: '10:00', endsAt, rooms: '691A, 692B' }
 }
 
 function withExams(rows: InProgressExamRow[] | null, status: 'loading' | 'success' | 'error' = 'success', error: ApiError | null = null) {
@@ -31,6 +30,12 @@ function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  vi.setSystemTime(new Date('2026-10-31T10:30:00'))
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('HU-037: exámenes para registrar con retraso', () => {
@@ -41,18 +46,12 @@ describe('HU-037: exámenes para registrar con retraso', () => {
     expect(screen.getByText('No tiene exámenes en curso')).toBeInTheDocument()
   })
 
-  it('con un solo examen entra directo a su registro', () => {
+  it('con un solo examen también lista, así volver desde el registro no entra en bucle', () => {
     withExams([exam(7, 'Primer parcial')])
-    render(
-      <MemoryRouter initialEntries={['/retrasos']}>
-        <Routes>
-          <Route path="/retrasos" element={<LateEntryExamsPage />} />
-          <Route path="/examenes/:examId/retrasos" element={<p>Registro del examen</p>} />
-        </Routes>
-      </MemoryRouter>
-    )
+    renderPage()
 
-    expect(screen.getByText('Registro del examen')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Primer parcial' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Registrar con retraso' })).toHaveAttribute('href', '/examenes/7/retrasos')
   })
 
   it('con varios lista las tarjetas con su acceso', () => {
@@ -75,5 +74,34 @@ describe('HU-037: exámenes para registrar con retraso', () => {
     withExams(null, 'error', new ApiError(500, 'Error del servidor'))
     renderPage()
     expect(screen.getByRole('button', { name: /Reintentar/ })).toBeInTheDocument()
+  })
+
+  it('solo lista los exámenes cuyo fin programado no pasó', () => {
+    withExams([exam(7, 'Primer parcial', '10:20'), exam(8, 'Segundo parcial')])
+    renderPage()
+
+    expect(screen.queryByRole('heading', { name: 'Primer parcial' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Segundo parcial' })).toBeInTheDocument()
+  })
+
+  it('al llegar el fin programado el examen sale de la lista sin esperar el cierre', async () => {
+    withExams([exam(7, 'Primer parcial', '10:31'), exam(8, 'Segundo parcial')])
+    renderPage()
+    expect(screen.getByRole('heading', { name: 'Primer parcial' })).toBeInTheDocument()
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+
+    expect(screen.queryByRole('heading', { name: 'Primer parcial' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Segundo parcial' })).toBeInTheDocument()
+  })
+
+  it('recarga al volver a la pestaña y con «Actualizar»', () => {
+    withExams([exam(8, 'Segundo parcial')])
+    renderPage()
+
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }))
+
+    expect(reload).toHaveBeenCalledTimes(2)
   })
 })

@@ -36,13 +36,15 @@ export function LateEntryWaitingStatus({ request, onNext }: LateEntryWaitingStat
           </p>
         )}
       </div>
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="@container">
+        <div className="flex flex-col gap-2 @xl:flex-row">
         {pending && (
-          <Button type="button" className="h-11 flex-1" disabled>
+          <Button type="button" className="h-11 w-full @xl:w-auto @xl:flex-1" disabled>
             {ASSISTANT_LATE_ENTRY_ACTIONS.confirmLabel}
           </Button>
         )}
         <LateEntryNextButton onNext={onNext} />
+        </div>
       </div>
     </div>
   )

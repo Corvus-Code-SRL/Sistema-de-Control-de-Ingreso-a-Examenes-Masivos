@@ -86,12 +86,12 @@ export function useLateEntryRequests(examId: number, role: ControllerRole, enabl
     }
   }, [examId, enabled, apply])
 
-  async function resolve(requestId: number, approve: boolean): Promise<boolean> {
+  async function resolve(requestId: number, approve: boolean, confirmOtherExam = false): Promise<boolean> {
     setBusyId(requestId)
     setActionError(null)
     try {
       const updated = approve
-        ? await lateEntryService.approve(examId, requestId)
+        ? await lateEntryService.approve(examId, requestId, confirmOtherExam)
         : await lateEntryService.reject(examId, requestId)
       previous.current?.set(updated.id_solicitud, updated.estado)
       setRequests((current) => current?.map((item) => item.id_solicitud === updated.id_solicitud ? updated : item) ?? null)
@@ -122,7 +122,8 @@ export function useLateEntryRequests(examId: number, role: ControllerRole, enabl
     announcement,
     busyId,
     actionError,
-    approve: (requestId: number) => resolve(requestId, true),
+    /** `confirmOtherExam`: autoriza con la advertencia de otro examen a la vista. */
+    approve: (requestId: number, confirmOtherExam = false) => resolve(requestId, true, confirmOtherExam),
     reject: (requestId: number) => resolve(requestId, false),
     track,
     clearAnnouncement: () => setAnnouncement(null),

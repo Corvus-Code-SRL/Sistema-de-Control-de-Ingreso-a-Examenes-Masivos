@@ -28,6 +28,20 @@ export type VerificationVerdict =
   | 'AULA_NO_ASIGNADA'
   | 'AULA_INCORRECTA'
 
+/**
+ * Ingreso del estudiante en otro examen abierto cuyo fin programado no pasó. No bloquea: quien
+ * controla decide y, para continuar, confirma con `confirmar_otro_examen`.
+ */
+export interface OtherExamWarning {
+  id_examen: number
+  nombre_examen: string
+  materia: string | null
+  docente: string | null
+  /** HH:MM local. */
+  hora_ingreso: string | null
+  nro_aula: string | null
+}
+
 export interface LateEntryRequest {
   id_solicitud: number
   estado: LateEntryRequestStatus
@@ -39,11 +53,14 @@ export interface LateEntryRequest {
   /** HH:MM local; es la hora de ingreso si se autoriza. */
   hora_solicitud: string
   resuelto_en: string | null
+  /** Solo en la lista y en las pendientes; null en las demás respuestas. */
+  otro_examen: OtherExamWarning | null
 }
 
 export interface LateEntryVerification extends Verification {
   veredicto: VerificationVerdict
   solicitud_pendiente: LateEntryRequest | null
+  otro_examen: OtherExamWarning | null
 }
 
 export interface LateEntryRegistration {
@@ -65,4 +82,6 @@ export interface LateEntryActionInput {
   id_estudiante: number
   ci?: string
   id_ambiente: number
+  /** Continuar pese a la advertencia de otro examen. */
+  confirmar_otro_examen?: true
 }

@@ -1,5 +1,5 @@
 import type { VerificationActions } from '../types/entry-control.types'
-import type { LateEntryRequestStatus } from '../types/late-entry.types'
+import type { LateEntryRequestStatus, OtherExamWarning } from '../types/late-entry.types'
 
 /** Textos del ingreso con retraso (HU-037). */
 export const LATE_ENTRY_MESSAGES = {
@@ -14,10 +14,27 @@ export const LATE_ENTRY_MESSAGES = {
   missingDate: 'Fecha no disponible',
   roomsLabel: 'Ambientes',
   openExam: 'Registrar con retraso',
-  backToInProgress: 'Volver al examen en curso',
+  backToList: 'Volver a la lista de exámenes',
+  backToListShort: 'Volver a la lista',
   refresh: 'Actualizar',
   closedTitle: 'El examen no está en curso',
   closedDescription: 'Solo puede registrar ingresos con retraso mientras el examen está en curso. Las solicitudes quedan como consulta.',
+  timeOverTitle: 'Tiempo del examen cumplido',
+  timeOver: 'El tiempo del examen terminó; ya no se pueden registrar ingresos con retraso.',
+  otherExamTitle: 'Ingreso en otro examen',
+  cautionTitle: 'VERIFIQUE SU IDENTIDAD',
+  otherExamDetail: (warning: OtherExamWarning) => [
+    `Ya ingresó a ${warning.nombre_examen}`,
+    warning.docente ? ` con ${warning.docente}` : '',
+    warning.hora_ingreso ? ` a las ${warning.hora_ingreso}` : '',
+    warning.nro_aula ? ` por el ${warning.nro_aula}` : '',
+    '. Verifique su identidad antes de continuar.',
+  ].join(''),
+  otherExamConfirmTitle: '¿Registrar de todos modos?',
+  otherExamConfirmDescription: (name: string) =>
+    `${name} ya ingresó a otro examen. Confirme que verificó su identidad para registrarlo con retraso en este.`,
+  otherExamConfirm: 'Registrar de todos modos',
+  cancel: 'Cancelar',
   noRoom: 'No tiene un ambiente de control asignado. Solicite al docente que asigne uno.',
   sisRequired: 'Ingrese el código SIS de 9 dígitos.',
   ciInvalid: 'El CI solo puede contener hasta 10 dígitos.',
@@ -38,7 +55,6 @@ export const LATE_ENTRY_MESSAGES = {
   waitingDetail: (time: string) => `Solicitud enviada a las ${time}. No deje ingresar todavía.`,
   waitingApproved: 'Ingreso autorizado',
   waitingRejected: 'Solicitud rechazada por el docente',
-  noticeTitle: 'Solicitud de ingreso con retraso',
   newRequest: (name: string, room: string) => `Solicitud de ingreso con retraso: ${name} · ${room}`,
   listTitle: 'Solicitudes de ingreso con retraso',
   listTitleOwn: 'Sus solicitudes',
@@ -75,4 +91,18 @@ export const ASSISTANT_LATE_ENTRY_ACTIONS: VerificationActions = {
   busyLabel: 'Enviando…',
   rejectLabel: 'Cancelar',
   recordsAttempt: false,
+}
+
+/** Con la advertencia de otro examen: el docente registra de todos modos (previa confirmación). */
+export const TEACHER_OTHER_EXAM_ACTIONS: VerificationActions = {
+  ...TEACHER_LATE_ENTRY_ACTIONS,
+  confirmLabel: 'Registrar de todos modos',
+  rejectLabel: 'Rechazar',
+}
+
+/** Con la advertencia de otro examen: el auxiliar envía la solicitud de todos modos. */
+export const ASSISTANT_OTHER_EXAM_ACTIONS: VerificationActions = {
+  ...ASSISTANT_LATE_ENTRY_ACTIONS,
+  confirmLabel: 'Enviar solicitud de todos modos',
+  rejectLabel: 'Rechazar',
 }

@@ -125,4 +125,15 @@ describe('useLateEntryVerification', () => {
     expect(onConflict).toHaveBeenCalledTimes(1)
     expect(hook.result.current.result).toBeNull()
   })
+
+  it('una sugerencia completa el campo desde el que se eligió', () => {
+    const hook = mount()
+    const student = { id_estudiante: 501, cod_sis: '202301903', nombre_completo: 'Lucía Fernández Rojas', ci: '9342145' }
+
+    act(() => hook.result.current.choose(student, 'sis'))
+    expect(hook.result.current.sis).toBe('202301903')
+
+    act(() => hook.result.current.choose(student, 'ci'))
+    expect(hook.result.current.ci).toBe('9342145')
+  })
 })

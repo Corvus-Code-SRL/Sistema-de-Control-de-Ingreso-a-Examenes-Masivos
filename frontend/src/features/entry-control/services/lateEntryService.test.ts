@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mockApiWith } from '@/test/http'
 import { makeLateEntryRequest, makeLateEntryVerification } from '@/test/lateEntryFixtures'
-import { lateEntryService } from './lateEntryService'
+import { LATE_ENTRY_SEARCH, lateEntryService } from './lateEntryService'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -53,5 +53,18 @@ describe('lateEntryService', () => {
 
     await expect(lateEntryService.register(7, { id_estudiante: 501, id_ambiente: 5 }))
       .rejects.toMatchObject({ status: 409, message: 'Existe una solicitud pendiente para este estudiante.' })
+  })
+
+  it('busca por nombre o por prefijo en la ruta de HU-037, no en la de HU-032', async () => {
+    const match = { id_estudiante: 501, cod_sis: '202301903', nombre_completo: 'Lucía Fernández Rojas' }
+    const { calls } = mockApiWith(() => ({ body: { data: [match] } }))
+
+    await expect(LATE_ENTRY_SEARCH.byName(7, 'lucia')).resolves.toEqual([match])
+    await expect(LATE_ENTRY_SEARCH.byIdentifier(7, 'ci', '9342')).resolves.toEqual([match])
+
+    expect(calls.map(({ url }) => url.slice(url.indexOf('/control-ingreso')))).toEqual([
+      '/control-ingreso/examenes/7/retrasos/buscar?nombre=lucia',
+      '/control-ingreso/examenes/7/retrasos/buscar?ci=9342',
+    ])
   })
 })

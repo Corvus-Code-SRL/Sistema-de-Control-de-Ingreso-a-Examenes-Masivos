@@ -5,8 +5,3 @@ export const LATE_ENTRY_PATH = '/examenes/:examId/retrasos'
 export function lateEntryPath(examId: number): string {
   return `/examenes/${examId}/retrasos`
 }
-
-/** Vista En curso (HU-038-A) a la que vuelve el ingreso con retraso. */
-export function inProgressPath(examId: number): string {
-  return `/examenes/${examId}/en-curso`
-}

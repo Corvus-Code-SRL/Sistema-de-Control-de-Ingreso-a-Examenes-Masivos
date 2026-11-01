@@ -4,13 +4,15 @@ import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { ApiError } from '@/lib/api-client'
 import { LATE_ENTRY_REQUEST_STATUS, type LateEntryRequest } from '../types/late-entry.types'
+import { LateEntryOtherExamNotice } from './LateEntryOtherExamNotice'
 import { LateEntryRequestActions } from './LateEntryRequestActions'
 import { LateEntryRequestStatusBadge } from './LateEntryRequestStatusBadge'
 import { LATE_ENTRY_MESSAGES } from './lateEntryMessages'
 
 export interface LateEntryResolveActions {
   busyId: number | null
-  onApprove: (requestId: number) => void
+  /** Recibe la solicitud para que se autorice confirmando la advertencia que el docente ve. */
+  onApprove: (request: LateEntryRequest) => void
   onReject: (requestId: number) => void
 }
 
@@ -24,14 +26,21 @@ interface LateEntryRequestListProps {
   actions?: LateEntryResolveActions
 }
 
-/** Solicitudes del examen: tabla desde md y lista de tarjetas en pantallas pequeñas. */
+/**
+ * Solicitudes del examen. Tabla o tarjetas según el ancho de la tarjeta (container query), no
+ * de la pantalla: en la columna derecha de un escritorio con menú la tabla no entra.
+ */
 export function LateEntryRequestList({ title, requests, error, showRequester, actions }: LateEntryRequestListProps) {
   const columns = LATE_ENTRY_MESSAGES.columns
   const canResolve = (request: LateEntryRequest) =>
     actions !== undefined && request.estado === LATE_ENTRY_REQUEST_STATUS.PENDIENTE
+  const warning = (request: LateEntryRequest) =>
+    request.estado === LATE_ENTRY_REQUEST_STATUS.PENDIENTE && request.otro_examen
+      ? <LateEntryOtherExamNotice warning={request.otro_examen} />
+      : null
 
   return (
-    <Card className="overflow-hidden p-0" aria-busy={requests === null && error === null}>
+    <Card className="@container overflow-hidden p-0" aria-busy={requests === null && error === null}>
       <h2 className="sciem-h3 border-b border-border px-4 py-3">{title}</h2>
 
       {requests === null && error === null && <LoadingState rows={2} label={LATE_ENTRY_MESSAGES.listLoading} />}
@@ -47,7 +56,7 @@ export function LateEntryRequestList({ title, requests, error, showRequester, ac
 
       {requests !== null && requests.length > 0 && (
         <>
-          <div className="hidden md:block">
+          <div className="hidden @4xl:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -65,6 +74,7 @@ export function LateEntryRequestList({ title, requests, error, showRequester, ac
                     <TableCell className="whitespace-normal">
                       <span className="font-medium">{request.estudiante.nombre_completo}</span>
                       <p className="sciem-tnum text-xs text-muted-foreground">{request.estudiante.cod_sis}</p>
+                      {warning(request) && <div className="mt-2">{warning(request)}</div>}
                     </TableCell>
                     <TableCell>{request.ambiente.nro_aula}</TableCell>
                     <TableCell className="sciem-tnum">{request.hora_solicitud}</TableCell>
@@ -89,7 +99,7 @@ export function LateEntryRequestList({ title, requests, error, showRequester, ac
               </TableBody>
             </Table>
           </div>
-          <ul aria-label={title} className="md:hidden">
+          <ul aria-label={title} className="@4xl:hidden">
             {requests.map((request) => (
               <li key={request.id_solicitud} className="space-y-3 border-b border-border px-4 py-3 last:border-b-0">
                 <div className="flex items-start justify-between gap-2">
@@ -115,6 +125,7 @@ export function LateEntryRequestList({ title, requests, error, showRequester, ac
                     </div>
                   )}
                 </dl>
+                {warning(request)}
                 {actions && canResolve(request) && (
                   <LateEntryRequestActions
                     request={request}

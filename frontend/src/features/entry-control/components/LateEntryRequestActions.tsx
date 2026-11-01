@@ -5,7 +5,7 @@ import { LATE_ENTRY_MESSAGES } from './lateEntryMessages'
 interface LateEntryRequestActionsProps {
   request: LateEntryRequest
   busy: boolean
-  onApprove: (requestId: number) => void
+  onApprove: (request: LateEntryRequest) => void
   onReject: (requestId: number) => void
 }
 
@@ -18,7 +18,7 @@ export function LateEntryRequestActions({ request, busy, onApprove, onReject }: 
       <Button
         type="button"
         variant="outline"
-        className="h-11 sm:min-w-28"
+        className="h-11 w-full sm:w-auto sm:min-w-28"
         disabled={busy}
         aria-label={`${LATE_ENTRY_MESSAGES.reject}: ${student}`}
         onClick={() => onReject(request.id_solicitud)}
@@ -27,10 +27,10 @@ export function LateEntryRequestActions({ request, busy, onApprove, onReject }: 
       </Button>
       <Button
         type="button"
-        className="h-11 sm:min-w-28"
+        className="h-11 w-full sm:w-auto sm:min-w-28"
         disabled={busy}
         aria-label={`${LATE_ENTRY_MESSAGES.approve}: ${student}`}
-        onClick={() => onApprove(request.id_solicitud)}
+        onClick={() => onApprove(request)}
       >
         {LATE_ENTRY_MESSAGES.approve}
       </Button>

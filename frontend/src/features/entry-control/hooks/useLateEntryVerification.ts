@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ApiError } from '@/lib/api-client'
 import { LATE_ENTRY_MESSAGES } from '../components/lateEntryMessages'
 import { lateEntryService } from '../services/lateEntryService'
+import type { StudentMatch } from '../types/entry-control.types'
 import type {
   LateEntryActionInput, LateEntryRequest, LateEntryVerification, LateEntryVerificationInput,
 } from '../types/late-entry.types'
@@ -16,8 +17,9 @@ function messageOf(cause: unknown, fallback: string): string {
 /**
  * Verificación y escritura del ingreso con retraso. `controlRoomId` es el ambiente del auxiliar
  * (lo envía al verificar y al solicitar); el docente no tiene uno y elige el ambiente al registrar.
- * Un 409 (examen cerrado, solicitud pendiente o ingreso duplicado) avisa con `onConflict` y vuelve a
- * verificar, para que el resultado muestre el estado real del estudiante.
+ * Un 409 (examen cerrado, tiempo cumplido, solicitud pendiente, ingreso duplicado u otro examen sin
+ * confirmar) avisa con `onConflict` y vuelve a verificar, para que el resultado muestre el estado
+ * real del estudiante.
  */
 export function useLateEntryVerification(
   examId: number,
@@ -51,6 +53,16 @@ export function useLateEntryVerification(
 
   function changeCi(value: string) {
     setCi(digitsOnly(value, CI_MAX_LENGTH))
+    clearResult()
+  }
+
+  /** Una sugerencia completa el campo desde el que se eligió, como en el control de ingreso. */
+  function choose(student: StudentMatch, field: 'sis' | 'ci') {
+    if (field === 'ci') {
+      setCi(digitsOnly(student.ci ?? '', CI_MAX_LENGTH))
+    } else {
+      setSis(digitsOnly(student.cod_sis, SIS_LENGTH))
+    }
     clearResult()
   }
 
@@ -94,11 +106,16 @@ export function useLateEntryVerification(
     }
   }
 
-  function actionInput(roomId: number): LateEntryActionInput | null {
+  function actionInput(roomId: number, confirmOtherExam: boolean): LateEntryActionInput | null {
     const student = result?.autorizado ? result.estudiante : null
     if (!student) return null
 
-    return { id_estudiante: student.id_estudiante, id_ambiente: roomId, ...(ci ? { ci } : {}) }
+    return {
+      id_estudiante: student.id_estudiante,
+      id_ambiente: roomId,
+      ...(ci ? { ci } : {}),
+      ...(confirmOtherExam ? { confirmar_otro_examen: true } : {}),
+    }
   }
 
   async function handleWriteError(cause: unknown) {
@@ -109,9 +126,12 @@ export function useLateEntryVerification(
     if (payload) await refreshVerdict(payload)
   }
 
-  /** El auxiliar pide la autorización del docente desde su ambiente. */
-  async function request() {
-    const payload = controlRoomId === null ? null : actionInput(controlRoomId)
+  /**
+   * El auxiliar pide la autorización del docente desde su ambiente. `confirmOtherExam`: la envía
+   * pese a la advertencia de otro examen.
+   */
+  async function request(confirmOtherExam = false) {
+    const payload = controlRoomId === null ? null : actionInput(controlRoomId, confirmOtherExam)
     if (!payload) return
     setBusy('request')
     setError(null)
@@ -124,9 +144,9 @@ export function useLateEntryVerification(
     }
   }
 
-  /** El docente registra directamente en el ambiente elegido. */
-  async function register(roomId: number) {
-    const payload = actionInput(roomId)
+  /** El docente registra directamente en el ambiente elegido, también pese a la advertencia si la confirmó. */
+  async function register(roomId: number, confirmOtherExam = false) {
+    const payload = actionInput(roomId, confirmOtherExam)
     const name = result?.estudiante?.nombre_completo ?? ''
     if (!payload) return
     setBusy('register')
@@ -144,6 +164,6 @@ export function useLateEntryVerification(
 
   return {
     sis, ci, result, sentRequest, busy, error, notice,
-    changeSis, changeCi, verify, request, register, reset, setNotice,
+    changeSis, changeCi, choose, verify, request, register, reset, setNotice,
   }
 }

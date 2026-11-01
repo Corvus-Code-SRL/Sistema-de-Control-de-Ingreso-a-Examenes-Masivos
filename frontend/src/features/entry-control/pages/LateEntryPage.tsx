@@ -1,36 +1,39 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { Lock } from 'lucide-react'
+import { Link, useParams } from 'react-router-dom'
+import { Clock, Lock } from 'lucide-react'
 import { ErrorState } from '@/components/common/ErrorState'
 import { FormSelect } from '@/components/common/FormSelect'
 import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { StatePanel } from '@/components/common/StatePanel'
 import { AppShell } from '@/components/layout/AppShell'
+import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { EXAM_STATUS, examInProgressService, type ExamInProgress } from '@/features/exams'
 import { useAsyncResource } from '@/hooks/useAsyncResource'
 import { IdentificationForm } from '../components/IdentificationForm'
 import { LateEntryAnnouncement } from '../components/LateEntryAnnouncement'
 import { LateEntryNextButton } from '../components/LateEntryNextButton'
+import { LateEntryOtherExamDialog } from '../components/LateEntryOtherExamDialog'
+import { LateEntryOtherExamNotice } from '../components/LateEntryOtherExamNotice'
 import { LateEntryRequestActions } from '../components/LateEntryRequestActions'
 import { LateEntryRequestList } from '../components/LateEntryRequestList'
 import { LateEntryWaitingStatus } from '../components/LateEntryWaitingStatus'
 import {
-  ASSISTANT_LATE_ENTRY_ACTIONS, LATE_ENTRY_MESSAGES, TEACHER_LATE_ENTRY_ACTIONS,
+  ASSISTANT_LATE_ENTRY_ACTIONS, ASSISTANT_OTHER_EXAM_ACTIONS, LATE_ENTRY_MESSAGES, TEACHER_LATE_ENTRY_ACTIONS,
+  TEACHER_OTHER_EXAM_ACTIONS,
 } from '../components/lateEntryMessages'
 import { VerificationResult } from '../components/VerificationResult'
+import { useLateEntryDeadline } from '../hooks/useLateEntryDeadline'
 import { useLateEntryRequests } from '../hooks/useLateEntryRequests'
 import { useLateEntryVerification } from '../hooks/useLateEntryVerification'
-import { LATE_ENTRY_EXAMS_PATH, inProgressPath } from '../paths'
+import { LATE_ENTRY_SEARCH } from '../services/lateEntryService'
+import { LATE_ENTRY_EXAMS_PATH } from '../paths'
 import { CONTROLLER_ROLE } from '../types/late-entry.types'
 
 /** Campo SIS de IdentificationForm, al que vuelve el foco con «Siguiente estudiante». */
 const SIS_INPUT_ID = 'entry-sis'
 const ROOM_SELECT_ID = 'late-entry-room'
-
-/** Sin sugerencias (las apaga suggestions={false}) no hay nada que elegir de una lista. */
-function ignoreSuggestion() {}
 
 export function LateEntryPage() {
   const { examId } = useParams<{ examId: string }>()
@@ -48,8 +51,20 @@ export function LateEntryPage() {
 }
 
 function LateEntryContent({ examId }: { examId: number }) {
+  // El examen se carga una vez: solo cambia de estado al finalizar, y eso lo avisa un 409 o la
+  // vuelta a la pestaña. Las solicitudes, que sí necesitan tiempo real, tienen su propia consulta.
   const exam = useAsyncResource((signal) => examInProgressService.get(examId, signal), [examId])
   const data = exam.data
+  const { reload } = exam
+
+  useEffect(() => {
+    function reloadWhenVisible() {
+      if (!document.hidden) reload()
+    }
+
+    document.addEventListener('visibilitychange', reloadWhenVisible)
+    return () => document.removeEventListener('visibilitychange', reloadWhenVisible)
+  }, [reload])
 
   return (
     <AppShell
@@ -63,8 +78,8 @@ function LateEntryContent({ examId }: { examId: number }) {
       <PageHeader
         title={LATE_ENTRY_MESSAGES.title}
         subtitle={data ? [data.nombre_examen, data.materia].filter(Boolean).join(' · ') : undefined}
-        backTo={inProgressPath(examId)}
-        backLabel={LATE_ENTRY_MESSAGES.backToInProgress}
+        backTo={LATE_ENTRY_EXAMS_PATH}
+        backLabel={LATE_ENTRY_MESSAGES.backToList}
       />
 
       {!data && exam.status === 'loading' && <LoadingState rows={3} label={LATE_ENTRY_MESSAGES.loadingExam} />}
@@ -77,16 +92,22 @@ function LateEntryContent({ examId }: { examId: number }) {
 function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConflict: () => void }) {
   const isTeacher = exam.rol_controlador === CONTROLLER_ROLE.DOCENTE
   const open = exam.estado === EXAM_STATUS.EN_CURSO
+  // El ingreso con retraso termina en el fin programado, aunque el examen siga EN_CURSO hasta su cierre.
+  const timeOver = useLateEntryDeadline(exam.fin_programado_en, exam.hora_servidor_en)
   const controlRoomId = isTeacher ? null : exam.id_ambiente_asignado
   const verification = useLateEntryVerification(exam.id_examen, controlRoomId, onConflict)
   const requests = useLateEntryRequests(exam.id_examen, exam.rol_controlador, true)
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null)
+  const [confirmingOtherExam, setConfirmingOtherExam] = useState(false)
   const focusSisOnReset = useRef(false)
 
   const { result, sentRequest, busy } = verification
   const { track } = requests
 
-  useEffect(() => { setSelectedRoomId(null) }, [result])
+  useEffect(() => {
+    setSelectedRoomId(null)
+    setConfirmingOtherExam(false)
+  }, [result])
 
   useEffect(() => {
     if (sentRequest) track(sentRequest)
@@ -103,8 +124,12 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
     verification.reset()
   }
 
+  const warning = result?.autorizado ? result.otro_examen : null
+
   async function resolveInline(requestId: number, approve: boolean) {
-    const done = approve ? await requests.approve(requestId) : await requests.reject(requestId)
+    const done = approve
+      ? await requests.approve(requestId, warning !== null)
+      : await requests.reject(requestId)
     if (done) next()
   }
 
@@ -126,7 +151,7 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
           <LateEntryRequestActions
             request={pending}
             busy={requests.busyId !== null}
-            onApprove={(id) => void resolveInline(id, true)}
+            onApprove={(request) => void resolveInline(request.id_solicitud, true)}
             onReject={(id) => void resolveInline(id, false)}
           />
           <div className="flex"><LateEntryNextButton onNext={next} /></div>
@@ -137,20 +162,44 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
     return undefined
   }
 
+  function register(confirmOtherExam: boolean) {
+    if (roomId === null) return
+    // Si el registro sale bien el resultado se cierra y el foco vuelve al SIS.
+    focusSisOnReset.current = true
+    void verification.register(roomId, confirmOtherExam)
+  }
+
+  function confirm() {
+    if (!isTeacher) {
+      void verification.request(warning !== null)
+    } else if (warning) {
+      setConfirmingOtherExam(true)
+    } else {
+      register(false)
+    }
+  }
+
   function extra() {
+    const notice = warning ? <LateEntryOtherExamNotice warning={warning} /> : null
+
     if (isTeacher && pending) {
       return (
-        <p className="rounded-lg border border-warn-border bg-warn-soft p-3 text-sm text-warn-fg">
+        <div className="space-y-3">
+          {notice}
+          <p className="rounded-lg border border-warn-border bg-warn-soft p-3 text-sm text-warn-fg">
           {LATE_ENTRY_MESSAGES.pendingInline}{' '}
           <span className="sciem-tnum">{pending.hora_solicitud}</span>
           {' · '}{pending.ambiente.nro_aula}
           {' · '}{LATE_ENTRY_MESSAGES.requestedBy(pending.solicitante.nombre_completo)}
-        </p>
+          </p>
+        </div>
       )
     }
     if (isTeacher && result?.autorizado) {
       return (
-        <div className="space-y-1.5">
+        <div className="space-y-3">
+          {notice}
+          <div className="space-y-1.5">
           <Label htmlFor={ROOM_SELECT_ID}>{LATE_ENTRY_MESSAGES.roomField}</Label>
           <FormSelect
             id={ROOM_SELECT_ID}
@@ -160,11 +209,12 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
             onValueChange={(value) => setSelectedRoomId(Number(value))}
             disabled={busy !== null}
           />
+          </div>
         </div>
       )
     }
 
-    return null
+    return notice
   }
 
   const list = (
@@ -173,9 +223,9 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
       requests={requests.requests}
       error={requests.error}
       showRequester={isTeacher}
-      actions={isTeacher && open ? {
+      actions={isTeacher && open && !timeOver ? {
         busyId: requests.busyId,
-        onApprove: (id) => void requests.approve(id),
+        onApprove: (request) => void requests.approve(request.id_solicitud, request.otro_examen !== null),
         onReject: (id) => void requests.reject(id),
       } : undefined}
     />
@@ -191,6 +241,24 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
       </div>
     )
   }
+
+  if (timeOver) {
+    return (
+      <div className="space-y-5">
+        <StatePanel tone="neutral" icon={Clock} title={LATE_ENTRY_MESSAGES.timeOverTitle}>
+          {LATE_ENTRY_MESSAGES.timeOver}
+        </StatePanel>
+        <Button asChild className="h-11 w-full sm:w-auto">
+          <Link to={LATE_ENTRY_EXAMS_PATH}>{LATE_ENTRY_MESSAGES.backToListShort}</Link>
+        </Button>
+        {list}
+      </div>
+    )
+  }
+
+  const actions = isTeacher
+    ? (warning ? TEACHER_OTHER_EXAM_ACTIONS : TEACHER_LATE_ENTRY_ACTIONS)
+    : (warning ? ASSISTANT_OTHER_EXAM_ACTIONS : ASSISTANT_LATE_ENTRY_ACTIONS)
 
   return (
     <div className="space-y-5">
@@ -214,9 +282,9 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
             busy={busy === 'verify'}
             onSisChange={verification.changeSis}
             onCiChange={verification.changeCi}
-            onSelect={ignoreSuggestion}
+            onSelect={verification.choose}
             onVerify={() => void verification.verify()}
-            suggestions={false}
+            searchSource={LATE_ENTRY_SEARCH}
           />
         </div>
         <div className="min-w-0 space-y-5">
@@ -226,16 +294,10 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
               presentedCi={verification.ci}
               subjectName={exam.materia}
               busy={busy !== null}
-              actions={isTeacher ? TEACHER_LATE_ENTRY_ACTIONS : ASSISTANT_LATE_ENTRY_ACTIONS}
-              onConfirm={() => {
-                if (!isTeacher) {
-                  void verification.request()
-                } else if (roomId !== null) {
-                  // Si el registro sale bien el resultado se cierra y el foco vuelve al SIS.
-                  focusSisOnReset.current = true
-                  void verification.register(roomId)
-                }
-              }}
+              actions={actions}
+              caution={warning ? LATE_ENTRY_MESSAGES.cautionTitle : undefined}
+              actionsLayout="card"
+              onConfirm={confirm}
               onReject={next}
               onNext={next}
               extra={extra()}
@@ -244,6 +306,16 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
           ) : list}
         </div>
       </div>
+      <LateEntryOtherExamDialog
+        open={confirmingOtherExam}
+        studentName={result?.estudiante?.nombre_completo ?? ''}
+        busy={busy !== null}
+        onOpenChange={setConfirmingOtherExam}
+        onConfirm={() => {
+          setConfirmingOtherExam(false)
+          register(true)
+        }}
+      />
     </div>
   )
 }
