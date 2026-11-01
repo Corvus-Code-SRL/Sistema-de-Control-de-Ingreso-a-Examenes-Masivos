@@ -92,7 +92,9 @@ class LateEntryVerificationTest extends TestCase
     public function test_estudiante_de_otra_materia_no_pertenece(): void
     {
         $this->enrollStudents($this->grupoAjenoId, 1);
-        $outsiderId = (int) DB::table('grupo_estudiante')->where('id_grupo', $this->grupoAjenoId)->value('id_estudiante');
+        $outsiderId = (int) DB::table('grupo_estudiante')
+            ->where('id_grupo', $this->grupoAjenoId)
+            ->value('id_estudiante');
 
         $this->verify($outsiderId)
             ->assertOk()
@@ -170,7 +172,10 @@ class LateEntryVerificationTest extends TestCase
         $this->postJson($this->lateEntryUrl('verificar'), [])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['cod_sis']);
-        $this->postJson($this->lateEntryUrl('verificar'), ['cod_sis' => '12345678', 'ci' => 'ABC', 'id_ambiente' => 'x'])
+        $this->postJson(
+            $this->lateEntryUrl('verificar'),
+            ['cod_sis' => '12345678', 'ci' => 'ABC', 'id_ambiente' => 'x']
+        )
             ->assertStatus(422)
             ->assertJsonValidationErrors(['cod_sis', 'ci', 'id_ambiente'])
             ->assertJsonPath('errors.cod_sis.0', 'El código SIS debe tener exactamente 9 dígitos.');

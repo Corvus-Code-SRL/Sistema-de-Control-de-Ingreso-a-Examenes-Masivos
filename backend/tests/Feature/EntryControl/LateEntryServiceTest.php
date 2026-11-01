@@ -364,7 +364,9 @@ class LateEntryServiceTest extends TestCase
     public function test_la_verificacion_rechaza_ci_distinto_y_estudiante_ajeno(): void
     {
         $this->enrollStudents($this->grupoAjenoId, 1);
-        $outsiderId = (int) DB::table('grupo_estudiante')->where('id_grupo', $this->grupoAjenoId)->value('id_estudiante');
+        $outsiderId = (int) DB::table('grupo_estudiante')
+            ->where('id_grupo', $this->grupoAjenoId)
+            ->value('id_estudiante');
 
         $this->assertLateEntryError(VerificationService::CI_MISMATCH, 422, fn () => $this->service->request(
             $this->exam,
@@ -594,7 +596,9 @@ class LateEntryServiceTest extends TestCase
         $this->assertForbidden(fn () => $this->service->authorize($this->exam, $request->id_solicitud, $otherTeacher));
         $this->assertForbidden(fn () => $this->service->reject($this->exam, $request->id_solicitud, $otherTeacher));
         $this->assertForbidden(fn () => $this->service->register($this->exam, $register, $otherTeacher));
-        $this->assertForbidden(fn () => $this->service->authorize($this->exam, $request->id_solicitud, $this->assistantB));
+        $this->assertForbidden(
+            fn () => $this->service->authorize($this->exam, $request->id_solicitud, $this->assistantB)
+        );
         $this->assertForbidden(fn () => $this->service->reject($this->exam, $request->id_solicitud, $this->assistantA));
         $this->assertForbidden(fn () => $this->service->register($this->exam, $register, $this->assistantA));
 
@@ -660,8 +664,13 @@ class LateEntryServiceTest extends TestCase
             [$pending->id_solicitud, $resolved->id_solicitud],
             $queries->list($this->exam, $this->teacher)['solicitudes']->pluck('id_solicitud')->all()
         );
-        $this->assertSame([$resolved->id_solicitud], $queries->list($this->exam, $this->assistantB)['solicitudes']->pluck('id_solicitud')->all());
-        $this->assertTrue($queries->list($this->exam, $this->teacher)['solicitudes']->first()->relationLoaded('requester'));
+        $this->assertSame(
+            [$resolved->id_solicitud],
+            $queries->list($this->exam, $this->assistantB)['solicitudes']->pluck('id_solicitud')->all()
+        );
+        $this->assertTrue(
+            $queries->list($this->exam, $this->teacher)['solicitudes']->first()->relationLoaded('requester')
+        );
 
         $this->setExamState(Exam::FINALIZADO);
         $this->assertCount(2, $queries->list($this->exam, $this->teacher)['solicitudes']);

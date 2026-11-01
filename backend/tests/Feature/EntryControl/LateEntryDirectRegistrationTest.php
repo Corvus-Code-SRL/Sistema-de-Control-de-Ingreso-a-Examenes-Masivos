@@ -117,7 +117,9 @@ class LateEntryDirectRegistrationTest extends TestCase
     public function test_los_veredictos_negativos_responden_422_con_su_codigo(): void
     {
         $this->enrollStudents($this->grupoAjenoId, 1);
-        $outsiderId = (int) DB::table('grupo_estudiante')->where('id_grupo', $this->grupoAjenoId)->value('id_estudiante');
+        $outsiderId = (int) DB::table('grupo_estudiante')
+            ->where('id_grupo', $this->grupoAjenoId)
+            ->value('id_estudiante');
 
         $this->register($this->secondStudentId, ['ci' => '1'])
             ->assertStatus(422)
