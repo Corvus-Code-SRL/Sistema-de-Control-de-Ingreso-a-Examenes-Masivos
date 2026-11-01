@@ -11,6 +11,7 @@ use App\Exceptions\Exams\ExamAssistantNotFoundException;
 use App\Exceptions\Exams\ExamOwnershipException;
 use App\Exceptions\Exams\ExamStateException;
 use App\Exceptions\Exams\ExamWarningsException;
+use App\Exceptions\Exams\FinalReportUnavailableException;
 use App\Exceptions\Security\DuplicateAccountException;
 use App\Exceptions\Security\InactiveAccountException;
 use App\Exceptions\Security\InvalidCredentialsException;
@@ -53,6 +54,7 @@ class Handler extends ExceptionHandler
         ExamOwnershipException::class,
         ExamStateException::class,
         ExamWarningsException::class,
+        FinalReportUnavailableException::class,
         DuplicateAccountException::class,
         InactiveAccountException::class,
         InvalidCredentialsException::class,

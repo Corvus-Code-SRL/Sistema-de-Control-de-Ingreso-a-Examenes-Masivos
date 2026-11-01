@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Exams\ClassroomController;
 use App\Http\Controllers\Exams\FinalReportController;
 
-
 // ...
 
 Route::prefix('ambientes')->name('ambientes.')->group(function () {

@@ -225,7 +225,7 @@ export function ExamDetailPage() {
             >
               Ver examen en curso
             </Button>
-         ) : exam?.estado === 'FINALIZADO' ? (
+          ) : exam?.estado === 'FINALIZADO' ? (
             <Button
               type="button"
               onClick={() => navigate(examFinalReportPath(id))}
