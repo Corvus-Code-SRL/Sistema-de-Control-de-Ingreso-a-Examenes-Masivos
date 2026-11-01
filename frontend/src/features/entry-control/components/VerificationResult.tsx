@@ -27,7 +27,22 @@ interface Props {
   extra?: ReactNode
   /** Reemplaza la fila de botones cuando el flujo decide otras acciones. */
   footer?: ReactNode
+  /**
+   * Título de precaución en lugar de «AUTORIZADO»: el resultado autoriza pero hay algo que
+   * verificar (HU-037, ingreso en otro examen). Sin él se ve igual que en el control de ingreso.
+   */
+  caution?: string
+  /**
+   * 'card': la fila de botones se apila según el ancho de la tarjeta (container query), para
+   * etiquetas largas en columnas angostas. 'viewport' (por defecto): según la pantalla, como en HU-032.
+   */
+  actionsLayout?: 'viewport' | 'card'
 }
+
+const ACTION_LAYOUT = {
+  viewport: { row: 'flex flex-col gap-2 sm:flex-row', button: 'h-11 w-full sm:w-auto sm:flex-1' },
+  card: { row: 'flex flex-col gap-2 @xl:flex-row', button: 'h-11 w-full @xl:w-auto @xl:flex-1' },
+} as const
 
 function verdictLabel(value: string): string {
   const labels: Record<string, string> = {
@@ -64,13 +79,15 @@ function StudentDetails({ result, presentedCi, subjectName }: { result: Verifica
   const status = result.grupo === null ? 'No inscrito en este examen'
     : result.veredicto === 'NO_HABILITADO' ? 'No habilitado para este examen' : null
 
-  return <div className="rounded-lg border bg-card p-4">
-    <div className="flex flex-col gap-4 sm:flex-row">
+  // La fila foto + datos depende del ancho de la tarjeta, no del viewport: en la columna derecha
+  // de un escritorio con el menú abierto la tarjeta es angosta aunque la pantalla no lo sea.
+  return <div className="@container rounded-lg border bg-card p-4">
+    <div className="flex flex-col gap-4 sm:@sm:flex-row">
       <StudentPhoto key={`${student.id_estudiante}:${student.foto_url ?? ''}`} student={student} />
       <div className="min-w-0 flex-1">
-        <p className="text-lg font-semibold">{student.nombre_completo}</p>
+        <p className="break-words text-lg font-semibold">{student.nombre_completo}</p>
         {status && <p className="text-xs text-muted-foreground">{status}</p>}
-        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+        <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm [&>dd]:break-words">
           <dt className="text-muted-foreground">Código SIS</dt><dd className="sciem-tnum font-medium">{student.cod_sis}</dd>
           <dt className="text-muted-foreground">CI</dt><dd className="sciem-tnum font-medium">{presentedCi ? <>{presentedCi}{student.ci && (presentedCi === student.ci ? <span className="text-ok-fg"> · coincide</span> : <span className="text-danger-fg"> · registrado: {student.ci}</span>)}</> : 'No ingresado'}</dd>
           <dt className="text-muted-foreground">Carrera</dt><dd className="font-medium">{student.carrera ?? 'No disponible'}</dd>
@@ -99,16 +116,19 @@ function AssistantDetails({ result }: { result: Verification }) {
 
 export function VerificationResult({
   result, busy, onConfirm, onReject, onNext, onReport, reported = false, presentedCi, subjectName,
-  actions = ENTRY_VERIFICATION_ACTIONS, extra, footer,
+  actions = ENTRY_VERIFICATION_ACTIONS, extra, footer, caution, actionsLayout = 'viewport',
 }: Props) {
   const allowed = result.autorizado
+  const cautious = allowed && caution !== undefined
+  const layout = ACTION_LAYOUT[actionsLayout]
   const isAssistant = result.veredicto === 'AUXILIAR_EXAMEN' && result.auxiliar != null
   const canReport = !allowed && result.estudiante != null && result.veredicto !== 'AULA_NO_ASIGNADA'
-  const Icon = allowed ? CheckCircle2 : isAssistant ? UserRound : CircleX
-  return <section aria-live="polite" aria-labelledby="entry-verdict" className={`space-y-4 rounded-xl border p-4 shadow-sm sm:p-6 ${allowed ? 'border-ok/30 bg-ok-soft/35' : isAssistant ? 'border-border bg-card' : 'border-danger/25 bg-danger-soft/35'}`}>
+  const Icon = cautious ? ShieldAlert : allowed ? CheckCircle2 : isAssistant ? UserRound : CircleX
+  const tone = cautious ? 'border-warn-border bg-warn-soft/35' : allowed ? 'border-ok/30 bg-ok-soft/35' : isAssistant ? 'border-border bg-card' : 'border-danger/25 bg-danger-soft/35'
+  return <section aria-live="polite" aria-labelledby="entry-verdict" className={`${actionsLayout === 'card' ? '@container ' : ''}space-y-4 rounded-xl border p-4 shadow-sm sm:p-6 ${tone}`}>
     <div className="flex gap-3">
-      <Icon className={`mt-0.5 size-6 shrink-0 ${allowed ? 'text-ok' : isAssistant ? 'text-brand-deep' : 'text-danger'}`} aria-hidden="true" />
-      <div><h2 id="entry-verdict" className={`text-lg font-bold ${allowed ? 'text-ok-fg' : isAssistant ? 'text-brand-deep' : 'text-danger-fg'}`}>{verdictLabel(result.veredicto)}</h2><p className="mt-1 text-sm">{result.motivo}</p></div>
+      <Icon className={`mt-0.5 size-6 shrink-0 ${cautious ? 'text-warn-fg' : allowed ? 'text-ok' : isAssistant ? 'text-brand-deep' : 'text-danger'}`} aria-hidden="true" />
+      <div><h2 id="entry-verdict" className={`text-lg font-bold ${cautious ? 'text-warn-fg' : allowed ? 'text-ok-fg' : isAssistant ? 'text-brand-deep' : 'text-danger-fg'}`}>{cautious ? caution : verdictLabel(result.veredicto)}</h2><p className="mt-1 text-sm">{result.motivo}</p></div>
     </div>
     {actions.recordsAttempt && !allowed && !isAssistant && result.veredicto !== 'AULA_NO_ASIGNADA' && <p className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground">Intento registrado con hora, ambiente y controlador.</p>}
     <StudentDetails result={result} presentedCi={presentedCi} subjectName={subjectName} />
@@ -119,12 +139,12 @@ export function VerificationResult({
       <p className="flex items-center gap-2 font-semibold text-warn-fg"><ShieldAlert className="size-4" />Este estudiante tiene {result.antecedentes.total === 1 ? 'un registro' : `${result.antecedentes.total} registros`} en la Central de Riesgo</p>
       {result.antecedentes.latest && <p className="mt-1">{result.antecedentes.latest.tipo_falta} · {result.antecedentes.latest.fecha_registro}</p>}
     </div>}
-    {allowed && <p className="flex items-center gap-2 text-sm text-ok-fg"><AlertTriangle className="size-4" />Compare el nombre y el código SIS con la documentación disponible antes de decidir.</p>}
+    {allowed && <p className={`flex items-start gap-2 text-sm ${cautious ? 'font-medium text-danger-fg' : 'text-ok-fg'}`}><AlertTriangle className="mt-0.5 size-4 shrink-0" />Compare el nombre y el código SIS con la documentación disponible antes de decidir.</p>}
     {extra}
-    {footer ?? <div className="flex flex-col gap-2 sm:flex-row">
-      {allowed ? <><Button type="button" variant="outline" className="h-11 flex-1 border-danger/40 text-danger-fg hover:bg-danger-soft" disabled={busy} onClick={onReject}>{actions.rejectLabel}</Button><Button type="button" className="h-11 flex-1" disabled={busy} onClick={onConfirm}>{busy ? actions.busyLabel : actions.confirmLabel}</Button></> : <>
-        {canReport && onReport && <Button type="button" variant="outline" className="h-11 flex-1 border-danger/40 text-danger-fg hover:bg-danger-soft" disabled={busy || reported} onClick={onReport}><Flag className="size-4" />{reported ? 'Ya reportado' : 'Reportar incidencia'}</Button>}
-        <Button type="button" variant="outline" className="h-11 flex-1" onClick={onNext}><RotateCcw className="size-4" />{isAssistant ? 'Nueva verificación' : 'Siguiente estudiante'}</Button>
+    {footer ?? <div className={layout.row}>
+      {allowed ? <><Button type="button" variant="outline" className={`${layout.button} border-danger/40 text-danger-fg hover:bg-danger-soft`} disabled={busy} onClick={onReject}>{actions.rejectLabel}</Button><Button type="button" className={layout.button} disabled={busy} onClick={onConfirm}>{busy ? actions.busyLabel : actions.confirmLabel}</Button></> : <>
+        {canReport && onReport && <Button type="button" variant="outline" className={`${layout.button} border-danger/40 text-danger-fg hover:bg-danger-soft`} disabled={busy || reported} onClick={onReport}><Flag className="size-4" />{reported ? 'Ya reportado' : 'Reportar incidencia'}</Button>}
+        <Button type="button" variant="outline" className={layout.button} onClick={onNext}><RotateCcw className="size-4" />{isAssistant ? 'Nueva verificación' : 'Siguiente estudiante'}</Button>
       </>}
     </div>}
   </section>

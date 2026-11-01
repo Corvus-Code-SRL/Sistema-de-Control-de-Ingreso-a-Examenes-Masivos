@@ -167,3 +167,9 @@ export interface CurrentRejectedAttempt {
   reason: string
   reported: boolean
 }
+
+/** De dónde salen las sugerencias de la identificación; cada flujo aporta la suya. */
+export interface StudentSearchSource {
+  byName: (examId: number, name: string, signal?: AbortSignal) => Promise<StudentMatch[]>
+  byIdentifier: (examId: number, field: 'sis' | 'ci', prefix: string, signal?: AbortSignal) => Promise<StudentMatch[]>
+}
