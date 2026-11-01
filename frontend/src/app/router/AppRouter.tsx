@@ -152,7 +152,6 @@ function DocenteRoutes() {
         element={guarded('ingreso.operar', <ExamInProgressPage extensions={examInProgressExtensions} />)}
       />
 
-      <Route path="/incidencias" element={guarded('examenes.gestionar', <IncidentsPage />)} />
       <Route path="/historial" element={guarded('examenes.gestionar', <ExamHistoryPage />)} />
       <Route path="/historial/:id" element={guarded('examenes.gestionar', <ExamHistorySummaryPage />)} />
       <Route path="/incidencias" element={guarded('incidencias.revisar', <IncidentsPage />)} />
