@@ -21,7 +21,7 @@ trait AssignsIncidentRole
         $this->assignRole($userId, 'Auxiliar');
     }
 
-    private function assignRole(string $userId, string $roleName): void
+    protected function assignRole(string $userId, string $roleName): void
     {
         $roleId = DB::table('rol')->where('nombre_rol', $roleName)->value('id_rol');
 

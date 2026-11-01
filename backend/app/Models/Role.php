@@ -19,6 +19,7 @@ class Role extends Model
     public const ADMINISTRADOR = 'Administrador';
     public const DOCENTE       = 'Docente';
     public const AUXILIAR      = 'Auxiliar';
+    public const INVITADO      = 'Invitado';
 
     protected $table = 'rol';
     protected $primaryKey = 'id_rol';

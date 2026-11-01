@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { cn } from '@/lib/utils'
 
 export interface ToastAction {
   label: string
@@ -7,16 +8,26 @@ export interface ToastAction {
   to: string
 }
 
+export type ToastVariant = 'success' | 'error'
+
 export interface ToastProps {
   title: string
   description: string
   duration?: number
   /** Acción siguiente que ofrece el aviso, como «Cargar nómina». */
   action?: ToastAction
+  variant?: ToastVariant
   onClose: () => void
 }
 
-export function Toast({ title, description, duration = 5000, action, onClose }: ToastProps) {
+export function Toast({
+  title,
+  description,
+  duration = 5000,
+  action,
+  variant = 'success',
+  onClose,
+}: ToastProps) {
   useEffect(() => {
     const timer = setTimeout(() => {
       onClose()
@@ -25,15 +36,20 @@ export function Toast({ title, description, duration = 5000, action, onClose }: 
     return () => clearTimeout(timer)
   }, [duration, onClose])
 
+  const isError = variant === 'error'
+
   return (
     <div
-      className="fixed top-20 inset-x-4 z-50 flex items-start gap-3 bg-card text-card-foreground p-3.5 rounded-lg border border-border shadow-lg animate-in fade-in slide-in-from-top-2 duration-200 sm:inset-x-auto sm:right-8 sm:w-[380px]"
+      className={cn(
+        'fixed top-20 inset-x-4 z-50 flex items-start gap-3 bg-card text-card-foreground p-3.5 rounded-lg border border-border shadow-lg animate-in fade-in slide-in-from-top-2 duration-200 sm:inset-x-auto sm:right-8 sm:w-[380px]',
+        isError && 'border-l-4 border-l-[color:var(--danger)]'
+      )}
       role="status"
       aria-live="polite"
     >
       {/* Ícono de éxito OK */}
       <svg
-        className="size-5 shrink-0 text-[#008A52] mt-0.5"
+        className={cn('size-5 shrink-0 mt-0.5', isError ? 'text-[color:var(--danger-fg)]' : 'text-[#008A52]')}
         width="20"
         height="20"
         viewBox="0 0 24 24"
@@ -43,16 +59,24 @@ export function Toast({ title, description, duration = 5000, action, onClose }: 
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M21.801 10A10 10 0 1 1 17 3.335"></path>
-        <path d="m9 11 3 3L22 4"></path>
+        {isError ? (
+          <>
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 8v4" />
+            <path d="M12 16h.01" />
+          </>
+        ) : (
+          <>
+            <path d="M21.801 10A10 10 0 1 1 17 3.335"></path>
+            <path d="m9 11 3 3L22 4"></path>
+          </>
+        )}
       </svg>
 
       {/* Contenido principal */}
       <div className="flex-1 min-w-0 pr-1">
         <div className="text-sm font-semibold text-[#2C2C2C]">{title}</div>
-        <div className="text-xs text-muted-foreground mt-0.5 leading-normal">
-          {description}
-        </div>
+        <div className="text-xs text-muted-foreground mt-0.5 leading-normal">{description}</div>
         {action && (
           <Link
             to={action.to}

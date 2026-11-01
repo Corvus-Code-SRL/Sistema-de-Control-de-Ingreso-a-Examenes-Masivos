@@ -135,7 +135,7 @@ describe('AppRouter — materias del administrador', () => {
 
     const app = renderApp('/materias/10/editar')
 
-    await waitFor(() => expect(app.pathname).toBe('/cuentas'))
+    await waitFor(() => expect(app.pathname).toBe('/cuentas/nueva'))
     expect(screen.queryByRole('heading', { name: 'Editar materia' })).not.toBeInTheDocument()
   })
 
@@ -189,7 +189,7 @@ describe('AppRouter — control de ingreso por área', () => {
 
     const app = renderApp('/control-ingreso')
 
-    await waitFor(() => expect(app.pathname).toBe('/cuentas'))
+    await waitFor(() => expect(app.pathname).toBe('/cuentas/nueva'))
 
     expect(
       screen.queryByRole('heading', { name: 'Control de ingreso' })

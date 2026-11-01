@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Support\RecordStatus;
 use App\Support\SisCode;
+use App\Support\SystemAccounts;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +47,14 @@ class AuthService
         if ($user === null) {
             Hash::check($password, self::DUMMY_HASH);
             $this->registrarIntentoFallido($codSis, $ip, 'credenciales_invalidas', null);
+
+            throw new InvalidCredentialsException();
+        }
+
+        // Las cuentas de sistema firman la bitácora y no son de nadie: ni con la contraseña correcta ni con ningún rol.
+        if (SystemAccounts::isSystemCode($user->cod_sis)) {
+            Hash::check($password, self::DUMMY_HASH);
+            $this->registrarIntentoFallido($codSis, $ip, 'cuenta_de_sistema', $user);
 
             throw new InvalidCredentialsException();
         }

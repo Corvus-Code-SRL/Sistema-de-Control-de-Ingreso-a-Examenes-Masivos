@@ -284,8 +284,8 @@ describe('pantalla «Cambiar contraseña»', () => {
     const app = renderApp('/ambientes')
     await fillChangeForm(TEMPORARY_PASSWORD, NEW_PASSWORD)
 
-    await waitFor(() => expect(app.pathname).toBe('/cuentas'))
-    expect(await screen.findByRole('heading', { name: 'Cuentas' })).toBeInTheDocument()
+    await waitFor(() => expect(app.pathname).toBe('/cuentas/nueva'))
+    expect(await screen.findByRole('heading', { name: 'Registrar cuenta nueva' })).toBeInTheDocument()
   })
 
   it('cerrar sesión sigue disponible y lleva al login', async () => {

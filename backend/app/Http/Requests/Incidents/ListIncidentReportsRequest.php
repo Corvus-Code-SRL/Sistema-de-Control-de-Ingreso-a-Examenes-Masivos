@@ -12,7 +12,7 @@ class ListIncidentReportsRequest extends FormRequest
 {
     public function authorize(CurrentUser $currentUser, UserRoleService $roles): bool
     {
-        return $roles->hasAnyActiveRole($currentUser->id(), [Role::DOCENTE]);
+        return $roles->canUse($currentUser->id(), 'incidents');
     }
 
     protected function failedAuthorization(): void

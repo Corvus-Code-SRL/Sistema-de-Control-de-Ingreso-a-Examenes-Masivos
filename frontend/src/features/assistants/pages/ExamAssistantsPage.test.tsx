@@ -85,6 +85,20 @@ describe('ExamAssistantsPage', () => {
     removeFromExam.mockResolvedValue(undefined)
   })
 
+  it('sin auxiliares sugeridos (un Invitado no tiene grupos con auxiliares) muestra el aviso y sigue permitiendo buscar', async () => {
+    suggestedForExam.mockResolvedValue([])
+
+    renderPage()
+
+    expect(await screen.findByText('Auxiliares sugeridos')).toBeVisible()
+    expect(
+      screen.getByText(/No hay auxiliares sugeridos. Puede buscar otros auxiliares registrados en el sistema./)
+    ).toBeVisible()
+    expect(
+      screen.getByRole('textbox', { name: /buscar auxiliar por nombre o código sis/i })
+    ).toBeEnabled()
+  })
+
   it.each(['ivan', '209900093'])(
     'busca auxiliares por nombre o SIS usando %s',
     async (criteria) => {

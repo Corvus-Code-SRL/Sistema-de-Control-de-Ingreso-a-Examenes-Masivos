@@ -15,9 +15,11 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-// El login es la única ruta pública de la API.
+// El login es la única ruta pública de la API. Tiene su propio limiter (por código SIS + IP y por IP),
+// así que no pasa por `throttle:api`: su cuota por IP la compartiría todo el NAT del campus.
 Route::post('auth/login', [AuthController::class, 'login'])
-    ->middleware('throttle:10,1')
+    ->withoutMiddleware('throttle:api')
+    ->middleware('throttle:login')
     ->name('auth.login');
 
 // Todo lo demás exige el token de Sanctum, una cuenta ACTIVA y la contraseña temporal ya cambiada.
