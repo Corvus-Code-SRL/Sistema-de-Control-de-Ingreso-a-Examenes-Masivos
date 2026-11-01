@@ -174,6 +174,7 @@ describe('menú por capacidades', () => {
         'Habilitar auxiliar para el examen',
         'Control de ingreso',
         'En curso',
+        'Registrar situación excepcional',
         'Revisar reportes de incidencias'
       ])
     )
