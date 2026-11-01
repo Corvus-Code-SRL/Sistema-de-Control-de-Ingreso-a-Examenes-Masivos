@@ -1,11 +1,12 @@
-import { useCallback, useState } from 'react'
-import { ArrowRightLeft, SearchX } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { ArrowRightLeft, Info, SearchX } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,10 +24,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { roleLabel } from '@/lib/roleLabel'
 import { AsignarRolModal } from '../components/AsignarRolModal'
 import { RoleBadge } from '../components/RoleBadge'
 import { SuccessToast, type ToastMessage } from '../components/SuccessToast'
 import { useUserAccount } from '../hooks/useUserAccount'
+import { GUEST_ROLE_LOCKED_MESSAGE, isGuestAccount } from '../lib/accountRoles'
 import {
   accountFullName,
   accountInitials,
@@ -36,11 +39,14 @@ import {
 
 const SELF_EDIT_MESSAGE = 'No puede cambiar el rol de su propia cuenta. Pídalo a otro administrador.'
 
+const PAGE_TITLE = 'Cambio de rol'
+
 /**
- * Detalle de una cuenta: rol vigente, cambio de rol e historial.
+ * Cambio de rol de una cuenta: rol vigente, cambio e historial.
  *
  * Solo contiene lo de HU-004; la edición de datos, la deshabilitación y la
- * bitácora llegan con sus propias historias.
+ * bitácora llegan con sus propias historias. La cuenta de un docente invitado se
+ * muestra en solo lectura: su rol no se cambia.
  */
 export function CuentaDetallePage() {
   const { idUsuario = '' } = useParams()
@@ -50,31 +56,53 @@ export function CuentaDetallePage() {
 
   const dismissToast = useCallback(() => setToast(null), [])
 
+  useEffect(() => {
+    const previous = document.title
+
+    document.title = `${PAGE_TITLE} · SCIEM`
+
+    return () => {
+      document.title = previous
+    }
+  }, [])
+
   const account = detail?.account ?? null
   const isOwnAccount = account !== null && account.id_usuario === detail?.currentUserId
-  const title = account ? accountFullName(account) : 'Detalle de la cuenta'
+  const fullName = account ? accountFullName(account) : ''
+  const isGuest = account !== null && isGuestAccount(account)
 
   const handleAssigned = (role: Role) => {
     setIsAssigning(false)
     setToast({
       title: account?.rol ? 'Rol actualizado' : 'Rol asignado',
-      description: `${account?.nombre ?? 'La cuenta'} ahora tiene el rol ${role.nombre_rol}. Rige desde su siguiente acceso.`,
+      description: `${account?.nombre ?? 'La cuenta'} ahora tiene el rol ${roleLabel(role.nombre_rol)}. Rige desde su siguiente acceso.`,
     })
     reload()
   }
 
   return (
     <AppShell
-      mobileTitle="Cuenta"
+      mobileTitle={PAGE_TITLE}
       breadcrumbs={[
         { label: 'Administración' },
-        { label: 'Cuentas', to: '/cuentas' },
-        { label: title },
+        { label: 'Modificar rol', to: '/cuentas/roles' },
+        { label: PAGE_TITLE },
       ]}
     >
       <SuccessToast message={toast} onDismiss={dismissToast} />
 
-      <PageHeader title="Detalle de la cuenta" backTo="/cuentas" backLabel="Volver a Cuentas" />
+      <PageHeader
+        title={PAGE_TITLE}
+        subtitle={
+          account && (
+            <>
+              {fullName} · <span className="font-mono">{account.cod_sis}</span>
+            </>
+          )
+        }
+        backTo="/cuentas/roles"
+        backLabel="Volver a Modificar rol"
+      />
 
       {isLoading && (
         <Card className="p-0">
@@ -90,7 +118,7 @@ export function CuentaDetallePage() {
             description="La cuenta que intenta abrir no está registrada en SCIEM."
             action={
               <Button variant="outline" size="sm" asChild>
-                <Link to="/cuentas">Ir a Cuentas</Link>
+                <Link to="/cuentas/roles">Ir a Modificar rol</Link>
               </Button>
             }
           />
@@ -115,7 +143,7 @@ export function CuentaDetallePage() {
               </span>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="sciem-h2 truncate">{title}</h2>
+                  <h2 className="sciem-h2 truncate">{fullName}</h2>
                   {account.estado === 'ACTIVO' ? (
                     <Badge className="bg-ok-soft text-ok-fg">Activa</Badge>
                   ) : (
@@ -124,6 +152,7 @@ export function CuentaDetallePage() {
                   {isOwnAccount && <Badge className="bg-info-soft text-info">Su cuenta</Badge>}
                 </div>
                 <p className="mt-1 truncate text-sm text-muted-foreground">
+                  {account.es_invitado ? 'Código INV ' : 'Código SIS '}
                   <span className="font-mono text-foreground">{account.cod_sis}</span> · {account.correo}
                 </p>
               </div>
@@ -133,13 +162,21 @@ export function CuentaDetallePage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-3">
               <CardTitle className="sciem-h3">Rol</CardTitle>
-              <ChangeRoleButton
-                hasRole={account.rol !== null}
-                isOwnAccount={isOwnAccount}
-                onClick={() => setIsAssigning(true)}
-              />
+              {!isGuest && (
+                <ChangeRoleButton
+                  hasRole={account.rol !== null}
+                  isOwnAccount={isOwnAccount}
+                  onClick={() => setIsAssigning(true)}
+                />
+              )}
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex flex-col gap-3">
+              {isGuest && (
+                <Alert variant="info">
+                  <Info aria-hidden="true" />
+                  <AlertDescription>{GUEST_ROLE_LOCKED_MESSAGE}</AlertDescription>
+                </Alert>
+              )}
               {account.rol ? (
                 <div className="flex flex-wrap items-center gap-3">
                   <RoleBadge role={account.rol} />
@@ -181,7 +218,7 @@ interface ChangeRoleButtonProps {
 }
 
 function ChangeRoleButton({ hasRole, isOwnAccount, onClick }: ChangeRoleButtonProps) {
-  const label = hasRole ? 'Cambiar rol' : 'Asignar rol'
+  const label = hasRole ? 'Modificar rol' : 'Asignar rol'
 
   if (!isOwnAccount) {
     return (
@@ -238,7 +275,7 @@ function RoleHistory({ history }: { history: RoleHistoryEntry[] }) {
       <TableBody>
         {history.map((entry) => (
           <TableRow key={`${entry.id_rol}-${entry.fecha_inicio}`}>
-            <TableCell>{entry.nombre_rol}</TableCell>
+            <TableCell>{roleLabel(entry.nombre_rol)}</TableCell>
             <TableCell>{formatDate(entry.fecha_inicio)}</TableCell>
             <TableCell>
               {entry.fecha_fin ? (

@@ -4,6 +4,11 @@ namespace App\Http\Requests\Academic;
 
 class AddAssistantToGroupsRequest extends AssistantManagementRequest
 {
+    protected function feature(): string
+    {
+        return 'group_assistants';
+    }
+
     private const MAX_ID = 2147483647;
 
     public function rules(): array

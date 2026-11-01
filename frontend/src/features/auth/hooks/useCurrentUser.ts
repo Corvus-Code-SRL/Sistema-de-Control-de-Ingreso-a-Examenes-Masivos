@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { roleLabel } from '@/lib/roleLabel'
 import { areaForRole, capabilitiesOf, type Capability } from '../capabilities'
 import type { Area, CurrentUser } from '../types/auth.types'
 import { useAuth } from './useAuth'
@@ -33,7 +34,12 @@ export function useCurrentUser(): CurrentUserValue {
     const iniciales = `${usuario.nombre.charAt(0)}${usuario.apellido_paterno.charAt(0)}`.toUpperCase()
 
     return {
-      user: { nombre: usuario.nombre_completo, iniciales, area },
+      user: {
+        nombre: usuario.nombre_completo,
+        iniciales,
+        area,
+        rolEtiqueta: rol ? roleLabel(rol.nombre_rol) : undefined,
+      },
       area,
       capabilities: capabilitiesOf(rol?.nombre_rol),
     }
