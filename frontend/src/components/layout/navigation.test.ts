@@ -75,7 +75,8 @@ describe('menú por capacidades', () => {
         label: 'Historial, auditoría y reportes',
         items: [
           ['Bitácora de operaciones', undefined],
-          ['Generar reporte de bitácora', undefined]
+          ['Generar reporte de bitácora', undefined],
+          ['Reporte intentos a exámenes ajenos', '/reportes/intentos']
         ]
       }
     ])

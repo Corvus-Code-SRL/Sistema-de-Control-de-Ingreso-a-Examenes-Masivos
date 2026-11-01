@@ -13,7 +13,7 @@ interface PermissionDeniedProps {
  * sesión ni lleva al login.
  */
 export function PermissionDenied({
-  message = 'Su rol no tiene permiso para ver esta información.',
+  message = 'No tiene permiso para ver esta sección.',
   className,
 }: PermissionDeniedProps) {
   return (
