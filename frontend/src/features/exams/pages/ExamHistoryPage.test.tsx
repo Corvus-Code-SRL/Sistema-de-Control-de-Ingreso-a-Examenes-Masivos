@@ -23,9 +23,9 @@ const list: HistoryList = {
 }
 const summary: HistorySummary = {
   id_examen: 7, nombre_examen: 'Examen diagnóstico', fecha: '2026-10-28',
-  materia: 'Cálculo II', inicio_real_en: null, inicio_automatico: false,
+  materia: 'Cálculo II', total_estudiantes: 55, inicio_real_en: null, inicio_automatico: false,
   fin_real_en: null, fin_automatico: false,
-  totales: { a_tiempo: 53, con_retraso: 1, ausentes: 1, incidencias: 2 },
+  totales: { a_tiempo: 51, con_retraso: 1, ausentes: 1, incidencias: 2 },
   linea_tiempo: [{ tipo: 'retraso', fecha_hora: '2026-10-28 08:20:00',
     descripcion: 'Ingreso con retraso', detalle: 'Luis · Controló: Ana Rojas' }],
   ambientes: [{ id_ambiente: 1, nro_aula: '691A', presentes: 54, auxiliares: ['Ana Rojas'] }],
@@ -82,6 +82,7 @@ describe('HU-052: historial de exámenes', () => {
     renderWithRouter(<ExamHistorySummaryPage />, { route: '/historial/7', path: '/historial/:id' })
     expect(await screen.findByText('Examen diagnóstico · Cálculo II')).toBeInTheDocument()
     expect(screen.getByText('Finalizado')).toBeInTheDocument()
+    expect(screen.getByText('Total de estudiantes:', { exact: false })).toHaveTextContent('55')
     expect(screen.getByText(/Ingreso con retraso/)).toBeInTheDocument()
     expect(screen.getByText('Luis · Controló: Ana Rojas')).toBeInTheDocument()
     expect(screen.getByText('691A')).toBeInTheDocument()
