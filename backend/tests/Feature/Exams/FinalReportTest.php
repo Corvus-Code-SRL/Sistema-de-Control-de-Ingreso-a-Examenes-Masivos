@@ -265,6 +265,50 @@ class FinalReportTest extends TestCase
         $this->assertContains('Sin clasificar', array_column($students, 'estado'));
     }
 
+    public function test_las_sumas_cuadran_en_dos_grupos_de_35_y_20_inscritos(): void
+    {
+        $countsByGroup = [
+            1 => ['INGRESO' => 21, 'CON_RETRASO' => 7, 'NO_INGRESO' => 7],
+            2 => ['INGRESO' => 12, 'CON_RETRASO' => 4, 'NO_INGRESO' => 4],
+        ];
+
+        $rows = collect();
+
+        foreach ($countsByGroup as $groupId => $counts) {
+            foreach ($counts as $state => $quantity) {
+                for ($i = 0; $i < $quantity; $i++) {
+                    $rows->push((object) [
+                        'id_grupo' => $groupId,
+                        'num_grupo' => (string) $groupId,
+                        'estado_ingreso' => $state,
+                    ]);
+                }
+            }
+        }
+
+        $attendance = $this->callPrivate(app(FinalReportService::class), 'attendanceByGroup', [$rows]);
+
+        $this->assertCount(2, $attendance['grupos']);
+
+        $keys = ['inscritos', 'a_tiempo', 'con_retraso', 'ausentes', 'sin_clasificar'];
+        $expected = [[35, 21, 7, 7, 0], [20, 12, 4, 4, 0]];
+
+        foreach ($attendance['grupos'] as $index => $group) {
+            $this->assertSame(
+                array_combine($keys, $expected[$index]),
+                array_intersect_key($group, array_flip($keys))
+            );
+            $this->assertSame(
+                $group['inscritos'],
+                $group['a_tiempo'] + $group['con_retraso'] + $group['ausentes'] + $group['sin_clasificar']
+            );
+        }
+
+        $totals = $attendance['totales'];
+
+        $this->assertSame(array_combine($keys, [55, 33, 11, 11, 0]), $totals);
+    }
+
     private function callPrivate(object $object, string $method, array $arguments): mixed
     {
         $reflection = new \ReflectionMethod($object, $method);
