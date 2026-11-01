@@ -24,6 +24,10 @@ export interface ApiErrorBody {
   errors?: Record<string, string[]>
   /** Código estable de los rechazos de autenticación. */
   motivo?: string
+  /** Código de docente invitado libre, en el 409 de un registro cuyo código ya se tomó. */
+  codigo_sugerido?: string
+  /** Cuenta que ya usa el código verificado, en el 422 de la verificación. */
+  cuenta_existente?: { id_usuario: string | null }
 }
 
 /**

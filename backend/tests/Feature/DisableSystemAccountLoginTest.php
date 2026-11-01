@@ -73,10 +73,13 @@ class DisableSystemAccountLoginTest extends TestCase
             'id_rol' => DB::table('rol')->where('nombre_rol', 'Administrador')->value('id_rol'),
             'fecha_inicio' => now(),
         ]);
+        // Estado de una base antigua: todavía no regía la regla que bloquea las cuentas de sistema.
+        config(['sciem.cuentas_sistema' => []]);
         $this->postJson('/api/auth/login', ['cod_sis' => '000000000', 'password' => 'password'])->assertOk();
         User::findOrFail(self::SYSTEM_ID)->createToken('sesion');
         $this->assertSame(2, DB::table('personal_access_tokens')->count());
 
+        config(['sciem.cuentas_sistema' => ['000000000']]);
         $this->migrate();
 
         $this->assertSame(0, DB::table('personal_access_tokens')->count());

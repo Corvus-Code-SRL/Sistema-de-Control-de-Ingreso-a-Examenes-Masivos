@@ -74,16 +74,16 @@ describe('safeDestination', () => {
 
 describe('destino después de iniciar sesión', () => {
   it('cada rol va a la entrada que ya tiene', () => {
-    expect(homeForRole('Administrador')).toBe('/cuentas')
+    expect(homeForRole('Administrador')).toBe('/cuentas/nueva')
     expect(homeForRole('Docente')).toBe('/materias')
     expect(homeForRole('Auxiliar')).toBe('/')
-    expect(homeForRole('Invitado')).toBe('/')
+    expect(homeForRole('Invitado')).toBe('/materias')
     expect(homeForRole(undefined)).toBe('/')
   })
 
   it('la ruta en la que estaba la persona gana sobre la entrada del rol', () => {
     expect(resolveDestination('/examenes/programados', 'Docente')).toBe('/examenes/programados')
-    expect(resolveDestination(undefined, 'Administrador')).toBe('/cuentas')
+    expect(resolveDestination(undefined, 'Administrador')).toBe('/cuentas/nueva')
     expect(resolveDestination('https://evil.example', 'Docente')).toBe('/materias')
   })
 })

@@ -21,6 +21,7 @@ import {
   ExamDetailPage,
   ExamInProgressPage,
   ExamsPage,
+  FinalReportPage,
   InProgressExamsPage,
   type ExamInProgressExtensions,
 } from '@/features/exams'
@@ -40,7 +41,7 @@ import {
   AdminSubjectCatalogPage,
   SubjectsPage,
 } from '@/features/subjects'
-import { CuentaDetallePage, CuentasPage } from '@/features/users'
+import { CuentaDetallePage, ModificarRolPage, RegistrarCuentaPage } from '@/features/users'
 import { IncidentsPage } from '@/features/incidents'
 import { AlienAttemptsReportPage } from '@/features/reports/academic'
 
@@ -113,7 +114,7 @@ function DocenteRoutes() {
 
       <Route
         path="/examenes/:examId/auxiliares"
-        element={guarded('examenes.gestionar', <ExamAssistantsPage />)}
+        element={guarded('auxiliares.examen', <ExamAssistantsPage />)}
       />
 
       <Route
@@ -124,6 +125,11 @@ function DocenteRoutes() {
       <Route
         path="/examenes/:examId"
         element={guarded('examenes.gestionar', <ExamDetailPage />)}
+      />
+
+      <Route
+        path="/examenes/:examId/reporte-final"
+        element={guarded('examenes.gestionar', <FinalReportPage />)}
       />
 
       <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
@@ -143,7 +149,7 @@ function DocenteRoutes() {
         element={guarded('ingreso.operar', <ExamInProgressPage extensions={examInProgressExtensions} />)}
       />
 
-      <Route path="/incidencias" element={guarded('examenes.gestionar', <IncidentsPage />)} />
+      <Route path="/incidencias" element={guarded('incidencias.revisar', <IncidentsPage />)} />
 
       <Route
         path="/central-riesgo/:id?"
@@ -217,8 +223,16 @@ function AssignmentsRedirect() {
 function AdministradorRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/cuentas" replace />} />
-      <Route path="/cuentas" element={guarded('administracion.gestionar', <CuentasPage />)} />
+      <Route path="/" element={<Navigate to="/cuentas/nueva" replace />} />
+      <Route path="/cuentas" element={<Navigate to="/cuentas/nueva" replace />} />
+      <Route
+        path="/cuentas/nueva"
+        element={guarded('administracion.gestionar', <RegistrarCuentaPage />)}
+      />
+      <Route
+        path="/cuentas/roles"
+        element={guarded('administracion.gestionar', <ModificarRolPage />)}
+      />
       <Route
         path="/cuentas/:idUsuario"
         element={guarded('administracion.gestionar', <CuentaDetallePage />)}
@@ -243,7 +257,7 @@ function AdministradorRoutes() {
         element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
       />
 
-      <Route path="*" element={<Navigate to="/cuentas" replace />} />
+      <Route path="*" element={<Navigate to="/cuentas/nueva" replace />} />
     </Routes>
   )
 }

@@ -7,6 +7,7 @@ use App\Http\Requests\Academic\AddAssistantToGroupRequest;
 use App\Http\Requests\Academic\AddAssistantToGroupsRequest;
 use App\Http\Requests\Academic\EnableAssistantForExamRequest;
 use App\Http\Requests\Academic\ManageAssistantsRequest;
+use App\Http\Requests\Academic\ManageGroupAssistantsRequest;
 use App\Http\Requests\Academic\SearchAssistantRequest;
 use App\Http\Requests\Academic\ShowGroupAssistantsRequest;
 use App\Http\Resources\Academic\AssistantResource;
@@ -42,7 +43,7 @@ class AssistantController extends Controller
         $this->currentUser = $currentUser;
     }
 
-    public function index(ManageAssistantsRequest $request): JsonResponse
+    public function index(ManageGroupAssistantsRequest $request): JsonResponse
     {
         $assistants = $this->assistantService->listForTeacher($this->currentUser->teacherId());
 
@@ -115,7 +116,7 @@ class AssistantController extends Controller
         return ApiResponse::created(null, 'Auxiliar habilitado para el examen correctamente.');
     }
 
-    public function removeFromGroup(ManageAssistantsRequest $request, int $id_grupo, string $id_usuario): JsonResponse
+    public function removeFromGroup(ManageGroupAssistantsRequest $request, int $id_grupo, string $id_usuario): JsonResponse
     {
         $this->assistantService->removeFromGroup($id_grupo, $id_usuario, $this->currentUser->teacherId());
 

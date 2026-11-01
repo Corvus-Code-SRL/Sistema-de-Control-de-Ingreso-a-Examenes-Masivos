@@ -17,6 +17,9 @@ use Illuminate\Support\Facades\Route;
 Route::post('/usuarios', [UserController::class, 'store'])
      ->name('usuarios.store');
 
+Route::get('/usuarios/codigo-invitado', [UserController::class, 'guestCode'])
+     ->name('usuarios.codigo-invitado');
+
 Route::get('/sis/verificar/{cod_sis}', [UserController::class, 'verificarSis']);
 
 // HU-004 — {user} es un uuid: cualquier otro valor responde 404 sin llegar a la base.

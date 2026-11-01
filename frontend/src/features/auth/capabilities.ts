@@ -3,57 +3,90 @@ import type { Area, RoleName } from './types/auth.types'
 /**
  * Capacidades de la interfaz: lo que un rol permite hacer en pantalla.
  *
- * Las rutas piden una capacidad, nunca un nombre de rol. El Auxiliar es una versión liviana del
- * Docente, así que el Docente incluye las capacidades operativas del Auxiliar (ingreso e
- * incidencias) y las suyas: se define una vez aquí y ninguna ruta tiene que listar los dos roles.
- * Las capacidades propias de la auxiliatura (`asignaciones.consultar`) quedan fuera de esa
- * herencia: el Docente no consulta exámenes como auxiliar, y el menú lateral las usa para no
- * mostrarle las secciones del Auxiliar.
+ * Las rutas y el menú piden una capacidad, nunca un nombre de rol. Las capacidades del Docente, del
+ * Invitado y de la Central de Riesgo salen de `ACCESS_BY_FEATURE`, que es el espejo de
+ * `config('sciem.access')` del backend (backend/config/sciem.php). Ambos mapas DEBEN mantenerse
+ * iguales: capabilities.access.test.ts falla si difieren. Cambiar el acceso de un rol es editar su
+ * lista en los dos lugares.
  *
- * Por ahora este mapa vive en el cliente. A futuro estas capacidades deberían derivarse de los
- * permisos que informa el backend (`navegacion.permisos` de GET /auth/yo).
+ * El Auxiliar y el Administrador conservan además sus capacidades propias (`ROLE_OWN_CAPABILITIES`).
+ * El Auxiliar es una versión liviana del Docente: sus capacidades operativas (ingreso e incidencias)
+ * las comparten los roles que ejercen la docencia. Las propias de la auxiliatura
+ * (`asignaciones.consultar`) quedan fuera de esa herencia.
  *
  * Esto NO decide si un docente puede actuar sobre UN examen concreto (ser su dueño, estar
  * habilitado como auxiliar o haber aceptado una invitación): esa es una política del backend.
  */
 
-/** Lo que el Auxiliar y el Docente comparten: operar el ingreso y registrar incidencias. */
-const SHARED_OPERATION_CAPABILITIES = ['ingreso.operar', 'incidencias.registrar'] as const
+/** Funciones con acceso configurable por rol; los mismos nombres que `sciem.access` del backend. */
+export type AccessFeature =
+  | 'teaching'
+  | 'exam_assistants'
+  | 'incidents'
+  | 'risk_center'
+  | 'group_assistants'
+  | 'report_assistant'
+  | 'special_cases'
+  | 'invite_teachers'
 
-/** Consultar los grupos y exámenes donde se fue habilitado como auxiliar; solo del Auxiliar. */
-const AUXILIAR_ONLY_CAPABILITIES = ['asignaciones.consultar'] as const
+/**
+ * Qué roles ejercen cada función. El Invitado (docente sin código SIS) ejerce la docencia, habilita
+ * auxiliares por examen y revisa incidencias; no consulta la Central de Riesgo, no gestiona
+ * auxiliares de grupo, no reporta auxiliares, no acepta casos especiales y, hasta que producto lo
+ * decida, no invita a otros docentes.
+ */
+export const ACCESS_BY_FEATURE: Record<AccessFeature, readonly RoleName[]> = {
+  teaching: ['Docente', 'Invitado'],
+  exam_assistants: ['Docente', 'Invitado'],
+  incidents: ['Docente', 'Invitado'],
+  risk_center: ['Administrador', 'Docente'],
+  group_assistants: ['Docente'],
+  report_assistant: ['Docente'],
+  special_cases: ['Docente'],
+  invite_teachers: ['Docente'],
+}
 
-const AUXILIAR_CAPABILITIES = [
-  ...SHARED_OPERATION_CAPABILITIES,
-  ...AUXILIAR_ONLY_CAPABILITIES,
-] as const
+const CAPABILITIES_BY_FEATURE = {
+  teaching: ['grupos.gestionar', 'examenes.gestionar', 'ingreso.operar', 'incidencias.registrar'],
+  exam_assistants: ['auxiliares.examen'],
+  incidents: ['incidencias.revisar'],
+  risk_center: ['riesgo.consultar'],
+  group_assistants: ['auxiliares.gestionar'],
+  report_assistant: ['auxiliares.reportar'],
+  special_cases: ['casos-especiales.gestionar'],
+  invite_teachers: ['docentes.invitar'],
+} as const
 
-/** La Central de Riesgo es institucional y de solo lectura: la consultan el Docente y el Administrador, no el Auxiliar. */
-const RISK_CENTER_CAPABILITIES = ['riesgo.consultar'] as const
-
-const DOCENTE_CAPABILITIES = [
-  ...SHARED_OPERATION_CAPABILITIES,
-  'examenes.gestionar',
-  'grupos.gestionar',
-  'auxiliares.gestionar',
-  ...RISK_CENTER_CAPABILITIES,
-] as const
-
-const ADMINISTRADOR_CAPABILITIES = ['administracion.gestionar', ...RISK_CENTER_CAPABILITIES] as const
+const ROLE_OWN_CAPABILITIES = {
+  Auxiliar: ['ingreso.operar', 'incidencias.registrar', 'asignaciones.consultar'],
+  Administrador: ['administracion.gestionar'],
+  Docente: [],
+  Invitado: [],
+} as const
 
 export type Capability =
-  | (typeof AUXILIAR_CAPABILITIES)[number]
-  | (typeof DOCENTE_CAPABILITIES)[number]
-  | (typeof ADMINISTRADOR_CAPABILITIES)[number]
+  | (typeof CAPABILITIES_BY_FEATURE)[AccessFeature][number]
+  | (typeof ROLE_OWN_CAPABILITIES)[RoleName][number]
+
+const ROLE_NAMES = Object.keys(ROLE_OWN_CAPABILITIES) as RoleName[]
+
+function buildCapabilities(role: RoleName): readonly Capability[] {
+  const fromFeatures = (Object.keys(ACCESS_BY_FEATURE) as AccessFeature[])
+    .filter((feature) => ACCESS_BY_FEATURE[feature].includes(role))
+    .flatMap((feature) => CAPABILITIES_BY_FEATURE[feature])
+
+  return [...new Set<Capability>([...ROLE_OWN_CAPABILITIES[role], ...fromFeatures])]
+}
 
 const CAPABILITIES_BY_ROLE: Record<RoleName, readonly Capability[]> = {
-  Auxiliar: AUXILIAR_CAPABILITIES,
-  Docente: DOCENTE_CAPABILITIES,
-  Administrador: ADMINISTRADOR_CAPABILITIES,
+  Administrador: buildCapabilities('Administrador'),
+  Docente: buildCapabilities('Docente'),
+  Auxiliar: buildCapabilities('Auxiliar'),
+  Invitado: buildCapabilities('Invitado'),
 }
 
 function isRoleName(name: string): name is RoleName {
-  return name in CAPABILITIES_BY_ROLE
+  return ROLE_NAMES.includes(name as RoleName)
 }
 
 /** Un rol desconocido no concede nada. */

@@ -4,6 +4,11 @@ namespace App\Http\Requests\Academic;
 
 class AddAssistantToGroupRequest extends AssistantManagementRequest
 {
+    protected function feature(): string
+    {
+        return 'group_assistants';
+    }
+
     public function rules(): array
     {
         return [

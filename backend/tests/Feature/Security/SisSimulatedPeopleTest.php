@@ -71,10 +71,12 @@ class SisSimulatedPeopleTest extends TestCase
         }
     }
 
-    public function test_un_codigo_parecido_pero_no_reconocido_sigue_rechazandose(): void
+    public function test_un_codigo_parecido_pero_no_reconocido_no_precarga_datos(): void
     {
         foreach (['ADM0003', '10612', '010611', 'ADM002'] as $code) {
-            $this->getJson("/api/sis/verificar/{$code}")->assertStatus(422);
+            $this->getJson("/api/sis/verificar/{$code}")
+                ->assertOk()
+                ->assertJsonPath('data', null);
         }
     }
 
