@@ -20,8 +20,8 @@
     <table class="meta">
         <tr><td>Desde:</td><td>{{ \Carbon\Carbon::parse($report['cabecera']['desde'])->format('d/m/Y') }}</td></tr>
         <tr><td>Hasta:</td><td>{{ \Carbon\Carbon::parse($report['cabecera']['hasta'])->format('d/m/Y') }}</td></tr>
-        <tr><td>Facultad:</td><td>{{ $report['cabecera']['facultad'] ?? 'Todas' }}</td></tr>
-        <tr><td>Reporte generado:</td><td>{{ \Carbon\Carbon::parse($report['cabecera']['generado_en'])->format('d/m/Y H:i') }}</td></tr>
+        <tr><td>Facultad:</td><td>{{ $report['cabecera']['facultad'] }}</td></tr>
+        <tr><td>Reporte generado:</td><td>{{ \Carbon\Carbon::parse($report['cabecera']['generado_en'])->format('d/m/Y H:i') }} (La Paz)</td></tr>
     </table>
 
     <h2>Totales</h2>
