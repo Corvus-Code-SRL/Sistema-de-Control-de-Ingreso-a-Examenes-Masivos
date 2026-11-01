@@ -88,9 +88,9 @@ class ExamHistoryService
             ->leftJoin('ambiente as a', 'a.id_ambiente', '=', 'ee.id_ambiente')
             ->where('ee.id_examen', $exam->id_examen)
             ->whereIn('ee.estado_ingreso', ['INGRESO', 'CON_RETRASO'])
-            ->whereNotNull('ee.registrado_en')
-            ->select(['ee.registrado_en', 'ee.estado_ingreso', 's.nombre', 's.apellido_paterno', 'a.nro_aula'])
-            ->orderBy('ee.registrado_en')
+            ->whereNotNull('ee.hora_ingreso')
+            ->select(['ee.hora_ingreso', 'ee.estado_ingreso', 's.nombre', 's.apellido_paterno', 'a.nro_aula'])
+            ->orderBy('ee.hora_ingreso')
             ->get();
 
         $transitions = DB::table('log as l')
@@ -133,7 +133,11 @@ class ExamHistoryService
         }
         $timeline = $timeline->concat($entries->map(fn ($entry) => [
             'tipo' => $entry->estado_ingreso === 'CON_RETRASO' ? 'retraso' : 'ingreso',
-            'fecha_hora' => $entry->registrado_en,
+            'fecha_hora' => Carbon::createFromFormat(
+                'Y-m-d H:i:s',
+                $exam->fecha->format('Y-m-d') . ' ' . $entry->hora_ingreso,
+                config('sciem.zona_horaria')
+            )->toIso8601String(),
             'descripcion' => $entry->estado_ingreso === 'CON_RETRASO'
                 ? 'Ingreso con retraso' : 'Ingreso registrado',
             'detalle' => trim($entry->nombre . ' ' . $entry->apellido_paterno)
