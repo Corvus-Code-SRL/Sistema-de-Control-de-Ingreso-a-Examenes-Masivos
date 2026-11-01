@@ -17,6 +17,7 @@ import { useAlienAttempts } from '../hooks/useAlienAttempts'
 import { useAlienAttemptsFilters } from '../hooks/useAlienAttemptsFilters'
 import { useFaculties } from '../hooks/useFaculties'
 import { getAlienAttemptsPdf } from '../services/alienAttemptsService'
+import { Toast } from '@/components/ui/toast'
 
 const RANGE_ERROR = 'La fecha de inicio debe ser anterior a la fecha de fin.'
 
@@ -34,6 +35,7 @@ export function AlienAttemptsReportPage() {
   // Borrador local del rango: solo se aplica al pulsar «Generar».
   const [desdeDraft, setDesdeDraft] = useState(filters.desde)
   const [hastaDraft, setHastaDraft] = useState(filters.hasta)
+  const [pdfError, setPdfError] = useState<string | null>(null)
 
   useEffect(() => {
     setDesdeDraft(filters.desde)
@@ -64,10 +66,8 @@ export function AlienAttemptsReportPage() {
       anchor.click()
       anchor.remove()
       URL.revokeObjectURL(url)
-    } catch (cause) {
-      // La descarga falló (red, servidor o el navegador no la permite).
-      // No es un error de la vista: el usuario puede reintentar.
-      console.warn('No se pudo descargar el PDF del reporte.', cause)
+    } catch {
+      setPdfError('Intente de nuevo o revise su conexión.')
     }
   }
 
@@ -142,6 +142,15 @@ export function AlienAttemptsReportPage() {
           )}
         </Card>
       </div>
+      {pdfError !== null && (
+        <Toast
+          title="No se pudo descargar el PDF"
+          description={pdfError}
+          variant="error"
+          duration={6000}
+          onClose={() => setPdfError(null)}
+        />
+      )}
     </AppShell>
   )
 }

@@ -230,11 +230,6 @@ describe('AlienAttemptsReportPage — filtros', () => {
     setDateInput(screen.getByLabelText('Desde'), '2026-10-01')
     setDateInput(screen.getByLabelText('Hasta'), '2026-10-15')
 
-    console.log('[test] input values:', {
-      desde: (screen.getByLabelText('Desde') as HTMLInputElement).value,
-      hasta: (screen.getByLabelText('Hasta') as HTMLInputElement).value,
-    })
-
     await user.click(screen.getByRole('button', { name: 'Generar' }))
 
     await waitFor(() => expect(location()).toBe('/reportes/intentos?desde=2026-10-01&hasta=2026-10-15'))
