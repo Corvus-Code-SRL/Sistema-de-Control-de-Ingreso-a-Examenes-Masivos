@@ -55,6 +55,7 @@ export function ExamHistorySummaryPage() {
         {([['A tiempo', data.totales.a_tiempo], ['Con retraso', data.totales.con_retraso], ['Ausentes', data.totales.ausentes], ['Incidencias', data.totales.incidencias]] as const).map(([label, value]) =>
           <Card key={label} className="gap-1 p-4"><strong className="text-3xl tabular-nums">{value}</strong><span className="text-sm text-muted-foreground">{label}</span></Card>)}
       </div>
+      <p className="text-sm text-muted-foreground">Total de estudiantes: <strong className="tabular-nums text-foreground">{data.total_estudiantes}</strong></p>
       <div className="grid items-start gap-4 lg:grid-cols-2">
         <Card><CardHeader><CardTitle>Línea de tiempo</CardTitle></CardHeader><CardContent>
           {data.linea_tiempo.length === 0 ? <p className="text-sm text-muted-foreground">No hay actividades registradas.</p> :
