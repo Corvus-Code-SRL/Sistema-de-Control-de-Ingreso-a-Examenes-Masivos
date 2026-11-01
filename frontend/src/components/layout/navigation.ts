@@ -322,7 +322,9 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'teacher-late-student',
         label: 'Registrar estudiante con retraso',
         icon: Clock,
-        capability: 'ingreso.operar'
+        to: '/retrasos',
+        capability: 'ingreso.operar',
+        matches: ['/examenes/:examId/retrasos']
       },
       {
         id: 'teacher-exceptional-student',
@@ -424,7 +426,9 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'assistant-late-student',
         label: 'Registrar estudiante con retraso',
         icon: Clock,
-        capability: 'ingreso.operar'
+        to: '/retrasos',
+        capability: 'ingreso.operar',
+        matches: ['/examenes/:examId/retrasos']
       }
     ]
   }

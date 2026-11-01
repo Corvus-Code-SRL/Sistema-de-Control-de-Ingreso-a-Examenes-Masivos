@@ -25,6 +25,26 @@ class ActionSeeder extends Seeder
             ['operacion' => 'QUITAR_AUXILIAR_EXAMEN', 'tipo_operacion' => 'DELETE', 'descripcion' => 'Retiro de la habilitación de un auxiliar en un examen'],
             ['operacion' => 'APROBAR_REPORTE', 'tipo_operacion' => 'UPDATE', 'descripcion' => 'Aprobación de un reporte de falta'],
             ['operacion' => 'RECHAZAR_REPORTE', 'tipo_operacion' => 'UPDATE', 'descripcion' => 'Rechazo de un reporte de falta'],
+            [
+                'operacion' => 'SOLICITAR_INGRESO_RETRASO',
+                'tipo_operacion' => 'INSERT',
+                'descripcion' => 'Solicitud de ingreso con retraso de un estudiante',
+            ],
+            [
+                'operacion' => 'AUTORIZAR_INGRESO_RETRASO',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Autorización de una solicitud de ingreso con retraso',
+            ],
+            [
+                'operacion' => 'RECHAZAR_INGRESO_RETRASO',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Rechazo de una solicitud de ingreso con retraso',
+            ],
+            [
+                'operacion' => 'REGISTRAR_INGRESO_RETRASO',
+                'tipo_operacion' => 'INSERT',
+                'descripcion' => 'Registro directo de un ingreso con retraso por el docente',
+            ],
         ];
 
         foreach ($acciones as $accion) {

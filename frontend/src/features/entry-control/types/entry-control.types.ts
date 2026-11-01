@@ -61,6 +61,15 @@ export interface Verification {
   ingreso_previo: PreviousEntry | null
 }
 
+/** Textos de las acciones del resultado de verificación según el flujo que lo usa. */
+export interface VerificationActions {
+  confirmLabel: string
+  busyLabel: string
+  rejectLabel: string
+  /** El resultado negativo deja un intento registrado (solo el control normal de HU-032). */
+  recordsAttempt: boolean
+}
+
 export interface RecentEntry {
   id_estudiante: number
   cod_sis: string
@@ -157,4 +166,10 @@ export interface CurrentRejectedAttempt {
   roomId: number
   reason: string
   reported: boolean
+}
+
+/** De dónde salen las sugerencias de la identificación; cada flujo aporta la suya. */
+export interface StudentSearchSource {
+  byName: (examId: number, name: string, signal?: AbortSignal) => Promise<StudentMatch[]>
+  byIdentifier: (examId: number, field: 'sis' | 'ci', prefix: string, signal?: AbortSignal) => Promise<StudentMatch[]>
 }

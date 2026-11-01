@@ -7,6 +7,7 @@ use App\Exceptions\Academic\StudentRosterFileException;
 use App\Exceptions\Academic\StudentRosterGroupAccessException;
 use App\Exceptions\Academic\StudentRosterPreviewUnavailableException;
 use App\Exceptions\EntryControl\EntryOpeningException;
+use App\Exceptions\EntryControl\LateEntryException;
 use App\Exceptions\Exams\ExamAssistantNotFoundException;
 use App\Exceptions\Exams\ExamOwnershipException;
 use App\Exceptions\Exams\ExamStateException;
@@ -50,6 +51,7 @@ class Handler extends ExceptionHandler
         StudentRosterGroupAccessException::class,
         StudentRosterPreviewUnavailableException::class,
         EntryOpeningException::class,
+        LateEntryException::class,
         ExamAssistantNotFoundException::class,
         ExamOwnershipException::class,
         ExamStateException::class,

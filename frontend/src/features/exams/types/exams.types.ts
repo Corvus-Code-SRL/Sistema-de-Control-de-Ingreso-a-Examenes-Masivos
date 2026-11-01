@@ -4,6 +4,15 @@ export type ExamCategory = 'REGULAR' | 'MESA' | 'ADMISION';
 /** Valores de public.estado_examen. */
 export type ExamStatus = 'PROGRAMADO' | 'EN_INGRESO' | 'EN_CURSO' | 'FINALIZADO' | 'CANCELADO';
 
+/** Los mismos valores en tiempo de ejecución, para comparar sin literales sueltos. */
+export const EXAM_STATUS = {
+  PROGRAMADO: 'PROGRAMADO',
+  EN_INGRESO: 'EN_INGRESO',
+  EN_CURSO: 'EN_CURSO',
+  FINALIZADO: 'FINALIZADO',
+  CANCELADO: 'CANCELADO',
+} as const satisfies Record<ExamStatus, ExamStatus>;
+
 /**
  * Par materia-carrera seleccionable. La misma materia puede estar en varias
  * carreras, por eso la opción siempre lleva la carrera.
