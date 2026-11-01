@@ -182,8 +182,9 @@ class Sprint3QaSeeder extends Seeder
     {
         $rows = [];
 
+        // 202160 + 3 dígitos: con %02d, del estudiante 100 en adelante el código pasaba a 10 dígitos.
         for ($i = 0; $i < 118; $i++) {
-            $rows[] = $this->student(self::FIRST_STUDENT_120 + $i, sprintf('2021600%02d', $i + 1), 7200001 + $i, $i);
+            $rows[] = $this->student(self::FIRST_STUDENT_120 + $i, sprintf('202160%03d', $i + 1), 7200001 + $i, $i);
         }
 
         $rows[] = [

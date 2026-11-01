@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Security;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Security\GuestCodeRequest;
 use App\Http\Requests\Security\StoreUserRequest;
 use App\Http\Requests\Security\VerifySisRequest;
 use App\Http\Resources\Security\UserResource;
@@ -33,6 +34,12 @@ class UserController extends Controller
             new UserResource($usuario),
             'Cuenta creada correctamente.'
         );
+    }
+
+    /** GET /api/usuarios/codigo-invitado */
+    public function guestCode(GuestCodeRequest $request): JsonResponse
+    {
+        return ApiResponse::success(['cod_sis' => $this->service->suggestGuestCode()]);
     }
 
     /** GET /api/sis/verificar/{cod_sis} */

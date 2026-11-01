@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '@/lib/api-client'
+import { throttleNotice, throttleWaitSeconds } from '@/lib/throttle'
 import { entryControlService, isFullStatus, isPendingStatus } from '../services/entryControlService'
 import type { EntryContext, EntryOpeningFailure, EntryStatus } from '../types/entry-control.types'
 
@@ -65,6 +66,15 @@ export function useEntryStatus(examId: number) {
         endedRef.current = true
         setEnded(true)
         setStatusError(null)
+        return
+      }
+      if (cause instanceof ApiError && cause.isTooManyRequests) {
+        // El sondeo sigue vivo: solo espera lo que pide el servidor antes de volver a consultar.
+        const seconds = throttleWaitSeconds(cause)
+        networkFailures.current = 0
+        setPollDelay(seconds * 1000)
+        setStatusError(throttleNotice(seconds))
+        setLastUpdatedAt((previous) => previous ?? Date.now())
         return
       }
       if (cause instanceof ApiError && cause.isNetworkFailure) {

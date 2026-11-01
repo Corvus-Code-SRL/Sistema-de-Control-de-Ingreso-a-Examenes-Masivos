@@ -2,13 +2,16 @@
 
 namespace App\Services\Security;
 
+use App\Exceptions\Security\RoleNotAllowedForAccountException;
 use App\Exceptions\Security\SelfRoleAssignmentException;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Academic\SubjectCatalogService;
 use App\Support\RecordStatus;
+use App\Support\SisCode;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 /**
  * Asigna, modifica y consulta el rol de una cuenta.
@@ -30,13 +33,43 @@ class UserRoleService
         $this->subjectCatalog = $subjectCatalog;
     }
 
+    /**
+     * Cambia el rol de una cuenta. El de un docente invitado (código INV) no se cambia nunca: nace
+     * con el rol Invitado al registrarse y ese es el único que tiene.
+     */
     public function assignRole(User $user, int $roleId, string $actorId): Role
     {
         if ($actorId === $user->id_usuario) {
             throw new SelfRoleAssignmentException();
         }
 
-        return DB::transaction(function () use ($user, $roleId, $actorId) {
+        if (SisCode::isGuest(SisCode::normalize($user->cod_sis))) {
+            throw RoleNotAllowedForAccountException::guestRoleLocked();
+        }
+
+        $newRole = Role::findOrFail($roleId);
+
+        $this->assertRoleFitsAccount($user->cod_sis, $newRole->nombre_rol);
+
+        return $this->changeRole($user, $newRole, $actorId);
+    }
+
+    /**
+     * Rol con el que nace una cuenta recién registrada (HU-001). Es el único camino que asigna el rol
+     * a una cuenta INV, porque assignRole() no permite cambiarlo.
+     */
+    public function assignInitialRole(User $user, Role $role, string $actorId): Role
+    {
+        $this->assertRoleFitsAccount($user->cod_sis, $role->nombre_rol);
+
+        return $this->changeRole($user, $role, $actorId);
+    }
+
+    private function changeRole(User $user, Role $newRole, string $actorId): Role
+    {
+        $roleId = (int) $newRole->id_rol;
+
+        return DB::transaction(function () use ($user, $roleId, $actorId, $newRole) {
             /*
              * Se bloquea la fila de la cuenta, no solo la de usuario_rol: cuando la
              * cuenta aún no tiene rol no hay fila que bloquear, y dos peticiones
@@ -64,8 +97,6 @@ class UserRoleService
             $this->openRole($user, $roleId, $changedAt);
 
             // El estado de la cuenta no se toca: asignar rol no habilita una cuenta deshabilitada.
-
-            $newRole = Role::findOrFail($roleId);
 
             $this->auditLog->registrar(
                 $previousRole ? 'MODIFICAR' : 'ASIGNAR_ROL',
@@ -115,10 +146,53 @@ class UserRoleService
         return $this->hasActiveRole($userId, Role::ADMINISTRADOR);
     }
 
-    /** ¿La cuenta indicada está ACTIVA y tiene hoy el rol Docente? Sin cuenta, nunca. */
+    /**
+     * Una cuenta de docente invitado (código INV) solo puede tener el rol Invitado; una cuenta con
+     * código SIS, nunca. Sin rol (null) cualquiera de las dos es válida.
+     */
+    public function assertRoleFitsAccount(string $accountCode, ?string $roleName): void
+    {
+        if ($roleName === null) {
+            return;
+        }
+
+        $isGuestAccount = SisCode::isGuest(SisCode::normalize($accountCode));
+
+        if ($isGuestAccount && $roleName !== Role::INVITADO) {
+            throw RoleNotAllowedForAccountException::guestAccount();
+        }
+
+        if (! $isGuestAccount && $roleName === Role::INVITADO) {
+            throw RoleNotAllowedForAccountException::sisAccount();
+        }
+    }
+
+    /** ¿La cuenta indicada está ACTIVA y ejerce hoy la docencia (Docente o Invitado)? Sin cuenta, nunca. */
     public function isTeacher(?string $userId): bool
     {
-        return $this->hasActiveRole($userId, Role::DOCENTE);
+        return $this->canUse($userId, 'teaching');
+    }
+
+    /**
+     * ¿La cuenta indicada está ACTIVA y su rol vigente ejerce la función dada?
+     *
+     * Las funciones y sus roles viven en config('sciem.access'), el único lugar que decide el acceso.
+     */
+    public function canUse(?string $userId, string $feature): bool
+    {
+        return $this->hasActiveRole($userId, $this->rolesFor($feature));
+    }
+
+    /** @return array<int, string> Roles que ejercen la función, según config('sciem.access'). */
+    public function rolesFor(string $feature): array
+    {
+        $roles = config('sciem.access.' . $feature);
+
+        if (! is_array($roles)) {
+            throw new InvalidArgumentException("Función sin definir en sciem.access: {$feature}");
+        }
+
+        return $roles;
     }
 
     /** ¿La cuenta indicada está ACTIVA y tiene hoy alguno de los roles dados? Sin cuenta, nunca. */

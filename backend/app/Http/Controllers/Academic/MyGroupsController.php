@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Academic;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Academic\ManageAssistantsRequest;
+use App\Http\Requests\Academic\ManageGroupAssistantsRequest;
 use App\Http\Resources\Academic\GroupOptionResource;
 use App\Services\Academic\AssistantService;
 use App\Support\ApiResponse;
@@ -29,7 +29,7 @@ class MyGroupsController extends Controller
         $this->currentUser = $currentUser;
     }
 
-    public function index(ManageAssistantsRequest $request): JsonResponse
+    public function index(ManageGroupAssistantsRequest $request): JsonResponse
     {
         $groups = $this->assistantService->listTeacherGroups($this->currentUser->teacherId());
 

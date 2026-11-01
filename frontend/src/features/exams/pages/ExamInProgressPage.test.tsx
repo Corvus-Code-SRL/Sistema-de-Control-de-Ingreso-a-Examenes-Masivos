@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@/lib/api-client';
 import { renderWithRouter } from '@/test/render';
 import { examInProgressService } from '../services/examInProgressService';
 import type { ExamInProgress } from '../types/examInProgress.types';
@@ -62,9 +63,16 @@ const exam: ExamInProgress = {
   ],
 };
 
+const hidden = Object.getOwnPropertyDescriptor(document, 'hidden');
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(examInProgressService.get).mockResolvedValue(exam);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  if (hidden) Object.defineProperty(document, 'hidden', hidden);
 });
 
 describe('HU-038-A: puntos de extensión de En curso', () => {
@@ -244,5 +252,42 @@ describe('HU-038-A: navegación de En curso', () => {
       'href',
       '/examenes/en-curso'
     );
+  });
+});
+
+describe('RNF-03: En curso ante un 429', () => {
+  it('avisa, espera lo que pide Retry-After y sigue consultando', async () => {
+    vi.useFakeTimers();
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+    const advance = (ms: number) =>
+      act(async () => {
+        await vi.advanceTimersByTimeAsync(ms);
+      });
+    const get = vi.mocked(examInProgressService.get);
+    get
+      .mockResolvedValueOnce(exam)
+      .mockRejectedValueOnce(new ApiError(429, 'Too Many Attempts.', {}, undefined, { retryAfter: 5 }))
+      .mockResolvedValue(exam);
+
+    renderWithRouter(<ExamInProgressPage />, {
+      route: '/examenes/8/en-curso',
+      path: '/examenes/:examId/en-curso',
+    });
+    await advance(0);
+    expect(get).toHaveBeenCalledTimes(1);
+
+    await advance(2000);
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Datos sin actualizar: Muchas consultas seguidas, reintentando en 5 s.'
+    );
+    expect(screen.getByText('María Pérez')).toBeInTheDocument();
+
+    await advance(4000);
+    expect(get).toHaveBeenCalledTimes(2);
+
+    await advance(2000);
+    expect(get).toHaveBeenCalledTimes(3);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

@@ -1,12 +1,17 @@
 # SCIEM — Sistema de Control de Ingreso a Exámenes Masivos
 
+Plataforma web para el control de ingreso, validación de estudiantes y gestión de incidentes en exámenes universitarios.
+
+Proyecto desarrollado por **Corvus Code** para la materia TIS de la Universidad Mayor de San Simón.
+
 Plataforma web para el control de ingreso, la validación de estudiantes y la gestión de incidentes en exámenes universitarios.
 
 Proyecto desarrollado por **Corvus Code S.R.L.** para la Convocatoria Pública **CPTIS-452026-2026**, en el marco de la materia **Taller de Ingeniería de Software (TIS)** de la Universidad Mayor de San Simón (UMSS).
 
 ---
 
-## Contenido
+# Contenido
+El directorio `backend/` contiene la API, las reglas de negocio y el acceso a datos desarrollados con Laravel.
 
 - [Funcionalidades principales](#funcionalidades-principales)
 - [Arquitectura](#arquitectura)
@@ -22,7 +27,12 @@ Proyecto desarrollado por **Corvus Code S.R.L.** para la Convocatoria Pública *
 - [Documentación](#documentación)
 - [Empresa](#empresa)
 
----
+- PHP 8.0.30
+- Laravel Framework 8.83.29
+- Eloquent ORM
+- Composer 2.9.6
+- PostgreSQL 15.0
+- Redis 7.4.3
 
 ## Funcionalidades principales
 
@@ -37,6 +47,7 @@ Proyecto desarrollado por **Corvus Code S.R.L.** para la Convocatoria Pública *
 ---
 
 ## Arquitectura
+El directorio `frontend/` contiene la aplicación web desarrollada con React y TypeScript.
 
 SCIEM utiliza un **monolito modular desacoplado** con **MVC + capa de Services**:
 
@@ -56,6 +67,18 @@ flowchart LR
 ```
 
 ### Módulos
+- Node.js 22.23.2
+- npm 10.9.8
+- React 18.3.1
+- React DOM 18.3.1
+- TypeScript 5.7.3
+- Vite 6.4.3
+- Tailwind CSS 4.3.3
+- @tailwindcss/vite 4.3.3
+- shadcn CLI 4.21.0
+- Radix UI 1.6.7
+- Lucide React 1.45.0
+- tw-animate-css 1.4.0
 
 | Módulo backend | Feature(s) frontend | Responsabilidad |
 |---|---|---|
@@ -75,12 +98,15 @@ Las pantallas de control de ingreso, seguimiento del examen e incidencias se act
 Se evaluó WebSockets + Redis y **se descartó**: el servidor del laboratorio de la UMSS mantiene abiertos únicamente los puertos de PHP y PostgreSQL y unos pocos más, sin lugar para el puerto adicional ni para el proceso permanente que ese enfoque necesita. La justificación completa está en [`docs/architecture/decisions/0001-actualizacion-en-tiempo-real-por-consulta-periodica.md`](docs/architecture/decisions/0001-actualizacion-en-tiempo-real-por-consulta-periodica.md).
 
 **Regla de implementación:** el sondeo vive en exactamente dos lugares — `RedControlService` en el backend y el hook `useRedControl()` en el frontend. Ninguna otra feature llama al endpoint de estado ni monta su propio temporizador: todas consumen el hook. Si cada pantalla sondea por su cuenta, las peticiones se multiplican por pantalla abierta y el objetivo de rendimiento de RNF-14 se cae.
+El directorio `deployment/` contiene la configuración relacionada con el despliegue del sistema.
 
 El endpoint de estado se cachea 2 segundos y responde «sin cambios» cuando la versión del cliente coincide con la actual. Esa mitigación no es opcional: sin ella cada sondeo reejecuta la consulta agregada. El intervalo es de 3 segundos con la pestaña visible, 10 con la pestaña oculta, y **nunca por debajo de 2 segundos**.
 
 > La justificación completa de la arquitectura se documentará en `docs/architecture/justificacion-arquitectura.md` (pendiente de redactar).
 
 ---
+
+> Docker no es requerido para el desarrollo local. Los integrantes trabajan con las dependencias instaladas directamente en su entorno de desarrollo.
 
 ## Stack tecnológico
 
@@ -106,7 +132,37 @@ Las versiones están fijadas por compatibilidad con los servidores de despliegue
 
 Detalle en [`docs/architecture/stack.md`](docs/architecture/stack.md).
 
----
+- Node.js: 22.23.2
+- npm: 10.9.8
+- React: 18.3.1
+- React DOM: 18.3.1
+- TypeScript: 5.7.3
+- Vite: 6.4.3
+- Tailwind CSS: 4.3.3
+- @tailwindcss/vite: 4.3.3
+- shadcn CLI: 4.21.0
+- Radix UI: 1.6.7
+- Lucide React: 1.45.0
+- tw-animate-css: 1.4.0
+
+## Requisitos para desarrollo
+
+Antes de clonar el proyecto se recomienda disponer de:
+
+```text
+Git
+Node.js 22.23.2
+npm 10.9.8
+PHP 8.0.30
+Composer 2.9.6
+PostgreSQL 15
+```
+
+El proyecto utiliza `mise` para fijar la versión de Node.js mediante el archivo:
+
+```text
+mise.toml
+```
 
 ## Estructura del repositorio
 

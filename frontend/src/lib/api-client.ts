@@ -16,6 +16,8 @@ export type ApiErrorKind = 'network' | 'timeout' | 'server' | 'http'
 interface ApiErrorExtras {
   kind?: ApiErrorKind
   retryAfter?: number
+  codigoSugerido?: string
+  cuentaExistenteId?: string | null
 }
 
 /**
@@ -41,6 +43,12 @@ export class ApiError extends Error {
   /** Código estable de los rechazos de autenticación (`cuenta_inactiva`, `sin_rol_vigente`…). */
   readonly motivo?: string
 
+  /** Código INV libre que propone el servidor cuando el que se mostró ya lo tomó otra cuenta (409). */
+  readonly codigoSugerido?: string
+
+  /** Cuenta que ya usa el código consultado, cuando el servidor la informa (422 de la verificación). */
+  readonly cuentaExistenteId?: string | null
+
   constructor(
     status: number,
     message: string,
@@ -55,6 +63,8 @@ export class ApiError extends Error {
     this.motivo = motivo
     this.kind = extras.kind ?? defaultKind(status)
     this.retryAfter = extras.retryAfter
+    this.codigoSugerido = extras.codigoSugerido
+    this.cuentaExistenteId = extras.cuentaExistenteId
   }
 
   /** La petición nunca se completó: sin conexión o sin respuesta a tiempo. */
@@ -348,7 +358,11 @@ async function toApiError(response: Response): Promise<ApiError> {
     body?.message ?? UNEXPECTED_ERROR,
     body?.errors ?? {},
     body?.motivo,
-    { retryAfter: response.status === 429 ? parseRetryAfter(response.headers.get('Retry-After')) : undefined }
+    {
+      retryAfter: response.status === 429 ? parseRetryAfter(response.headers.get('Retry-After')) : undefined,
+      codigoSugerido: body?.codigo_sugerido,
+      cuentaExistenteId: body?.cuenta_existente?.id_usuario,
+    }
   )
 }
 
