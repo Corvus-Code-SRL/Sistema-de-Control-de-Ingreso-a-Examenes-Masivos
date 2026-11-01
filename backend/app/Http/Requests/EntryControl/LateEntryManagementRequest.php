@@ -22,7 +22,11 @@ abstract class LateEntryManagementRequest extends FormRequest
 
     public function authorize(CurrentUser $currentUser, UserRoleService $roles): bool
     {
-        return $roles->hasAnyActiveRole($currentUser->id(), [Role::DOCENTE, Role::AUXILIAR]);
+        // El Invitado ejerce la docencia (sciem.access.teaching): no se compara el rol por nombre.
+        return $roles->hasAnyActiveRole(
+            $currentUser->id(),
+            array_merge($roles->rolesFor('teaching'), [Role::AUXILIAR])
+        );
     }
 
     protected function failedAuthorization(): void
