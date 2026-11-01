@@ -41,6 +41,8 @@ Route::prefix('control-ingreso')->group(function () {
             Route::post('/verificar', [LateEntryController::class, 'verify'])
                 ->name('control-ingreso.examenes.retrasos.verificar');
             Route::get('/solicitudes', [LateEntryController::class, 'index'])
+                ->withoutMiddleware('throttle:api')
+                ->middleware('throttle:polling')
                 ->name('control-ingreso.examenes.retrasos.solicitudes.index');
             Route::post('/solicitudes', [LateEntryController::class, 'store'])
                 ->name('control-ingreso.examenes.retrasos.solicitudes.store');
