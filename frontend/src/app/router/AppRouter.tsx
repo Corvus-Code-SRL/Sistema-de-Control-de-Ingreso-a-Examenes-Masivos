@@ -50,6 +50,7 @@ import {
 } from '@/features/subjects'
 import { CuentaDetallePage, ModificarRolPage, RegistrarCuentaPage } from '@/features/users'
 import { IncidentsPage } from '@/features/incidents'
+import { AlienAttemptsReportPage } from '@/features/reports/academic'
 
 // Punto de composición de HU-037, HU-038-B, HU-042 y HU-057.
 // Cada feature puede aportar componentes aquí sin editar ExamInProgressPage.
@@ -164,6 +165,13 @@ function DocenteRoutes() {
         element={guarded('riesgo.consultar', <RiskCenterPage />)}
       />
 
+      <Route
+        path="/reportes/intentos"
+        element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
+      />
+
+      <Route path="*" element={<Navigate to="/materias" replace />} />
+
       <Route path="*" element={<Navigate to="/materias" replace />} />
 
     </Routes>
@@ -194,6 +202,10 @@ function AuxiliarRoutes() {
       />
       <Route path={LATE_ENTRY_EXAMS_PATH} element={guarded('ingreso.operar', <LateEntryExamsPage />)} />
       <Route path={LATE_ENTRY_PATH} element={guarded('ingreso.operar', <LateEntryPage />)} />
+      <Route
+        path="/reportes/intentos"
+        element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
+      />
       <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
     </Routes>
   )
@@ -261,6 +273,10 @@ function AdministradorRoutes() {
       <Route
         path="/central-riesgo/:id?"
         element={guarded('riesgo.consultar', <RiskCenterPage />)}
+      />
+      <Route
+        path="/reportes/intentos"
+        element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
       />
 
       <Route path="*" element={<Navigate to="/cuentas/nueva" replace />} />
