@@ -156,6 +156,13 @@ function DocenteRoutes() {
         element={guarded('riesgo.consultar', <RiskCenterPage />)}
       />
 
+      <Route
+        path="/reportes/intentos"
+        element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
+      />
+
+      <Route path="*" element={<Navigate to="/materias" replace />} />
+
       <Route path="*" element={<Navigate to="/materias" replace />} />
 
     </Routes>
@@ -183,6 +190,10 @@ function AuxiliarRoutes() {
       <Route
         path="/examenes/:examId/en-curso"
         element={guarded('ingreso.operar', <ExamInProgressPage extensions={examInProgressExtensions} />)}
+      />
+      <Route
+        path="/reportes/intentos"
+        element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
       />
       <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
     </Routes>
