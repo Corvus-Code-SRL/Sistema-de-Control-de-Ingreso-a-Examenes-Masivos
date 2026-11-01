@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '@/lib/api-client'
 import { throttleNotice, throttleWaitSeconds } from '@/lib/throttle'
-import { ENTRY_CONTROL_POLL_MS } from '../constants'
+import { LATE_ENTRY_POLL_MS } from '../constants'
 import { LATE_ENTRY_MESSAGES } from '../components/lateEntryMessages'
 import { lateEntryService } from '../services/lateEntryService'
 import {
@@ -34,8 +34,11 @@ function transitionOf(previous: Statuses, requests: LateEntryRequest[], role: Co
 }
 
 /**
- * Solicitudes de ingreso con retraso del examen, consultadas cada ENTRY_CONTROL_POLL_MS mientras la
- * pestaña está visible: el docente ve todas y el auxiliar solo las suyas (lo decide el servidor).
+ * Solicitudes de ingreso con retraso del examen: el docente ve todas y el auxiliar solo las suyas (lo
+ * decide el servidor). Se cargan una vez por examen y, mientras `enabled` (examen EN_CURSO antes de su
+ * fin programado), se consultan cada LATE_ENTRY_POLL_MS con la pestaña visible. Al cerrarse el examen
+ * deja de consultar y conserva la última lista; si la vista se abre con el examen ya cerrado, muestra
+ * la lista final.
  * `announcement` es el texto para la región aria-live cuando llega una solicitud o se resuelve una.
  * Ante un 429 (RNF-03) conserva la lista, avisa con `throttle` y se salta los ciclos dentro de la
  * espera que pide el servidor, igual que la vista En curso.
@@ -49,6 +52,7 @@ export function useLateEntryRequests(examId: number, role: ControllerRole, enabl
   const [throttle, setThrottle] = useState<string | null>(null)
   const previous = useRef<Statuses | null>(null)
   const pausedUntil = useRef(0)
+  const loadedExamId = useRef<number | null>(null)
 
   const apply = useCallback((next: LateEntryRequest[]) => {
     if (previous.current !== null) {
@@ -60,7 +64,6 @@ export function useLateEntryRequests(examId: number, role: ControllerRole, enabl
   }, [role])
 
   useEffect(() => {
-    if (!enabled) return
     const controller = new AbortController()
     let inFlight = false
 
@@ -71,6 +74,7 @@ export function useLateEntryRequests(examId: number, role: ControllerRole, enabl
         const next = await lateEntryService.list(examId, controller.signal)
         if (controller.signal.aborted) return
         apply(next)
+        loadedExamId.current = examId
         setError(null)
         setThrottle(null)
       } catch (cause) {
@@ -87,10 +91,12 @@ export function useLateEntryRequests(examId: number, role: ControllerRole, enabl
       }
     }
 
-    void load()
+    if (enabled || loadedExamId.current !== examId) void load()
+    if (!enabled) return () => controller.abort()
+
     const timer = window.setInterval(() => {
       if (!document.hidden && Date.now() >= pausedUntil.current) void load()
-    }, ENTRY_CONTROL_POLL_MS)
+    }, LATE_ENTRY_POLL_MS)
 
     return () => {
       controller.abort()

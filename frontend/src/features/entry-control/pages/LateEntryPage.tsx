@@ -96,7 +96,7 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
   const timeOver = useLateEntryDeadline(exam.fin_programado_en, exam.hora_servidor_en)
   const controlRoomId = isTeacher ? null : exam.id_ambiente_asignado
   const verification = useLateEntryVerification(exam.id_examen, controlRoomId, onConflict)
-  const requests = useLateEntryRequests(exam.id_examen, exam.rol_controlador, true)
+  const requests = useLateEntryRequests(exam.id_examen, exam.rol_controlador, open && !timeOver)
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null)
   const [confirmingOtherExam, setConfirmingOtherExam] = useState(false)
   const focusSisOnReset = useRef(false)

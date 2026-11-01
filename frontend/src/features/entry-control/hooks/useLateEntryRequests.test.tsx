@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api-client'
 import { makeLateEntryRequest } from '@/test/lateEntryFixtures'
-import { ENTRY_CONTROL_POLL_MS } from '../constants'
+import { ENTRY_CONTROL_POLL_MS, LATE_ENTRY_POLL_MS } from '../constants'
 import { LATE_ENTRY_MESSAGES } from '../components/lateEntryMessages'
 import { lateEntryService } from '../services/lateEntryService'
 import type { ControllerRole } from '../types/late-entry.types'
@@ -17,7 +17,7 @@ async function flush() {
   await act(async () => { await Promise.resolve() })
 }
 
-async function advance(ms = ENTRY_CONTROL_POLL_MS) {
+async function advance(ms = LATE_ENTRY_POLL_MS) {
   await act(async () => { await vi.advanceTimersByTimeAsync(ms) })
 }
 
@@ -39,12 +39,16 @@ afterEach(() => {
 })
 
 describe('useLateEntryRequests', () => {
-  it('consulta cada ENTRY_CONTROL_POLL_MS y no consulta con la pestaña oculta', async () => {
+  it('consulta cada 5 s, no al ritmo de 2 s del control de ingreso, y no con la pestaña oculta', async () => {
     const list = vi.spyOn(lateEntryService, 'list').mockResolvedValue([])
     await mount('DOCENTE')
+    expect(LATE_ENTRY_POLL_MS).toBe(5000)
     expect(list).toHaveBeenCalledTimes(1)
 
-    await advance()
+    await advance(ENTRY_CONTROL_POLL_MS)
+    expect(list).toHaveBeenCalledTimes(1)
+
+    await advance(LATE_ENTRY_POLL_MS - ENTRY_CONTROL_POLL_MS)
     expect(list).toHaveBeenCalledTimes(2)
 
     Object.defineProperty(document, 'hidden', { configurable: true, value: true })
@@ -52,11 +56,33 @@ describe('useLateEntryRequests', () => {
     expect(list).toHaveBeenCalledTimes(2)
   })
 
-  it('no consulta deshabilitado y cancela la petición al desmontar', async () => {
-    const list = vi.spyOn(lateEntryService, 'list').mockResolvedValue([])
-    await mount('DOCENTE', false)
-    expect(list).not.toHaveBeenCalled()
+  it('deshabilitado carga una sola vez la lista final y no sondea', async () => {
+    const list = vi.spyOn(lateEntryService, 'list').mockResolvedValue([approved])
+    const hook = await mount('DOCENTE', false)
+    expect(list).toHaveBeenCalledTimes(1)
+    expect(hook.result.current.requests).toEqual([approved])
 
+    await advance(LATE_ENTRY_POLL_MS * 3)
+    expect(list).toHaveBeenCalledTimes(1)
+  })
+
+  it('al deshabilitarse deja de sondear y conserva la lista', async () => {
+    const list = vi.spyOn(lateEntryService, 'list').mockResolvedValue([pending])
+    const hook = renderHook(({ enabled }) => useLateEntryRequests(7, 'DOCENTE', enabled), {
+      initialProps: { enabled: true },
+    })
+    await flush()
+    await advance()
+    expect(list).toHaveBeenCalledTimes(2)
+
+    hook.rerender({ enabled: false })
+    await advance(LATE_ENTRY_POLL_MS * 3)
+    expect(list).toHaveBeenCalledTimes(2)
+    expect(hook.result.current.requests).toEqual([pending])
+  })
+
+  it('cancela la petición al desmontar', async () => {
+    const list = vi.spyOn(lateEntryService, 'list').mockResolvedValue([])
     const hook = await mount('DOCENTE')
     const signal = list.mock.calls[0][1]
     hook.unmount()
@@ -138,16 +164,17 @@ describe('useLateEntryRequests', () => {
       .mockResolvedValue([pending])
     const hook = await mount('DOCENTE')
 
-    await act(async () => { await vi.advanceTimersByTimeAsync(ENTRY_CONTROL_POLL_MS) })
+    await advance()
     expect(list).toHaveBeenCalledTimes(2)
     expect(hook.result.current.throttle).toBe('Muchas consultas seguidas, reintentando en 7 s.')
     expect(hook.result.current.error).toBeNull()
     expect(hook.result.current.requests).toEqual([pending])
 
-    await act(async () => { await vi.advanceTimersByTimeAsync(6_000) })
+    // El ciclo de los 10 s cae dentro de la espera (hasta los 12 s) y se salta; el de los 15 s consulta.
+    await advance(6_000)
     expect(list).toHaveBeenCalledTimes(2)
 
-    await act(async () => { await vi.advanceTimersByTimeAsync(2_000) })
+    await advance(4_000)
     expect(list).toHaveBeenCalledTimes(3)
     expect(hook.result.current.throttle).toBeNull()
   })

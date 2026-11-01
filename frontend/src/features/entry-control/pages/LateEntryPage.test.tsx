@@ -8,7 +8,7 @@ import {
   makeExamInProgress, makeLateEntryRequest, makeLateEntryVerification, makeOtherExamWarning,
 } from '@/test/lateEntryFixtures'
 import { renderWithRouter } from '@/test/render'
-import { ENTRY_CONTROL_POLL_MS } from '../constants'
+import { LATE_ENTRY_POLL_MS } from '../constants'
 import { lateEntryService } from '../services/lateEntryService'
 import { LateEntryPage } from './LateEntryPage'
 
@@ -135,7 +135,7 @@ describe('HU-037: registrar estudiante con retraso', () => {
     expect(screen.getByRole('button', { name: 'Enviar solicitud' })).toBeDisabled()
 
     vi.mocked(lateEntryService.list).mockResolvedValue([{ ...sent, estado: 'AUTORIZADA' }])
-    await act(async () => { await vi.advanceTimersByTimeAsync(ENTRY_CONTROL_POLL_MS) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(LATE_ENTRY_POLL_MS) })
 
     expect(screen.getAllByText('Ingreso autorizado').length).toBeGreaterThan(0)
     expect(screen.queryByText('Esperando al docente')).not.toBeInTheDocument()
@@ -333,7 +333,7 @@ describe('HU-037: registrar estudiante con retraso', () => {
     await renderPage()
     await screen.findByLabelText('Código SIS')
 
-    await act(async () => { await vi.advanceTimersByTimeAsync(ENTRY_CONTROL_POLL_MS * 5) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(LATE_ENTRY_POLL_MS * 2) })
     expect(get).toHaveBeenCalledTimes(1)
     expect(vi.mocked(lateEntryService.list).mock.calls.length).toBeGreaterThan(1)
 
@@ -342,5 +342,42 @@ describe('HU-037: registrar estudiante con retraso', () => {
 
     expect(get).toHaveBeenCalledTimes(2)
     expect(await screen.findByText('El examen no está en curso')).toBeInTheDocument()
+  })
+
+  it('deja de consultar las solicitudes cuando el examen pasa a FINALIZADO', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const get = vi.spyOn(examInProgressService, 'get').mockResolvedValue(makeExamInProgress())
+    const list = vi.mocked(lateEntryService.list)
+    await renderPage()
+    await screen.findByLabelText('Código SIS')
+    await act(async () => { await vi.advanceTimersByTimeAsync(LATE_ENTRY_POLL_MS) })
+    expect(list.mock.calls.length).toBeGreaterThan(1)
+
+    get.mockResolvedValue(makeExamInProgress({ estado: 'FINALIZADO' }))
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')) })
+    expect(await screen.findByText('El examen no está en curso')).toBeInTheDocument()
+    const callsWhenClosed = list.mock.calls.length
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(LATE_ENTRY_POLL_MS * 3) })
+    expect(list).toHaveBeenCalledTimes(callsWhenClosed)
+  })
+
+  it('deja de consultar las solicitudes al llegar el fin programado', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.spyOn(examInProgressService, 'get').mockResolvedValue(makeExamInProgress({
+      hora_servidor_en: '2026-10-31T15:59:00+00:00',
+      fin_programado_en: '2026-10-31T16:00:00+00:00',
+    }))
+    const list = vi.mocked(lateEntryService.list)
+    await renderPage()
+    await screen.findByLabelText('Código SIS')
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+    expect(screen.getByText('Tiempo del examen cumplido')).toBeInTheDocument()
+    expect(list.mock.calls.length).toBeGreaterThan(1)
+    const callsAtDeadline = list.mock.calls.length
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(LATE_ENTRY_POLL_MS * 3) })
+    expect(list).toHaveBeenCalledTimes(callsAtDeadline)
   })
 })
