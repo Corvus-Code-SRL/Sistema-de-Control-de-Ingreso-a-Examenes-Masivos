@@ -57,10 +57,10 @@ export function ExamHistoryPage() {
 
   return <AppShell mobileTitle="Historial" breadcrumbs={[{ label: 'Exámenes' }, { label: 'Historial' }]}>
     <PageHeader title="Historial" subtitle="Sus exámenes finalizados. Solo lectura." />
-    <div className="flex flex-col gap-3 sm:flex-row">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
       <Select value={materia || 'todas'} onValueChange={(value) => updateParam('materia', value === 'todas' ? '' : value)}>
         <SelectTrigger aria-label="Filtrar por materia" className="w-full bg-card sm:w-[260px]"><SelectValue placeholder="Todas las materias" /></SelectTrigger>
-        <SelectContent><SelectItem value="todas">Todas las materias</SelectItem>
+        <SelectContent position="popper" align="start" sideOffset={4}><SelectItem value="todas">Todas las materias</SelectItem>
           {(data?.materias ?? []).map((subject) => <SelectItem key={subject.id_materia} value={String(subject.id_materia)}>{subject.nombre}</SelectItem>)}
         </SelectContent>
       </Select>
