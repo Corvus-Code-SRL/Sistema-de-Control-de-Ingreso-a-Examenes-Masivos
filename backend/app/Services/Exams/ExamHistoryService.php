@@ -6,6 +6,7 @@ use App\Models\Exam;
 use App\Support\ReportStatus;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /** Consultas de solo lectura del historial de exámenes de un docente. */
 class ExamHistoryService
@@ -28,8 +29,12 @@ class ExamHistoryService
             $base->where('id_materia', (int) $filters['materia']);
         }
         if (! empty($filters['buscar'])) {
-            $term = str_replace(['%', '_', '\\'], ['\\%', '\\_', '\\\\'], trim($filters['buscar']));
-            $base->where('nombre_examen', 'ilike', '%' . $term . '%');
+            $term = Str::ascii(mb_strtolower(trim($filters['buscar'])));
+            $term = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $term);
+            $base->whereRaw(
+                "translate(lower(nombre_examen), 'áéíóúüñ', 'aeiouun') LIKE ?",
+                ['%' . $term . '%']
+            );
         }
 
         $page = $base->with('subject:id_materia,nombre')
@@ -68,10 +73,8 @@ class ExamHistoryService
 
     public function show(Exam $exam, string $teacherId): array
     {
-        abort_unless(
-            $exam->id_usuario_docente === $teacherId && $exam->estado === Exam::FINALIZADO,
-            404
-        );
+        abort_unless($exam->id_usuario_docente === $teacherId, 403, 'No tiene acceso a este examen.');
+        abort_unless($exam->estado === Exam::FINALIZADO, 404);
 
         $exam->load('subject:id_materia,nombre');
         $counts = $this->attendanceFor([$exam->id_examen])[$exam->id_examen]
@@ -99,6 +102,7 @@ class ExamHistoryService
 
         $transitions = DB::table('log as l')
             ->join('accion as ac', 'ac.id_accion', '=', 'l.id_accion')
+            ->leftJoin('usuario as actor', 'actor.id_usuario', '=', 'l.id_usuario')
             ->where('l.tabla_afectada', 'examen')
             ->whereRaw("l.nuevo_valor->>'id_examen' = ?", [(string) $exam->id_examen])
             ->where(function ($query) {
@@ -109,6 +113,7 @@ class ExamHistoryService
                     });
             })
             ->select(['l.fecha_hora', 'ac.operacion', 'l.nuevo_valor'])
+            ->selectRaw("TRIM(CONCAT_WS(' ', actor.nombre, actor.apellido_paterno, actor.apellido_materno)) as actor")
             ->orderBy('l.fecha_hora')
             ->get();
 
@@ -124,7 +129,7 @@ class ExamHistoryService
                     ? $log->fecha_hora
                     : ($exam->fin_real_en?->toIso8601String() ?? $log->fecha_hora),
                 'descripcion' => $opening ? 'Se abrió el control de ingreso' : 'Examen terminado',
-                'detalle' => $opening || $automatic ? 'Automático' : 'Finalización manual',
+                'detalle' => $opening || $automatic ? 'Automático' : ($log->actor ?: 'Responsable no registrado'),
             ];
         });
         if ($exam->fin_real_en !== null && ! $transitions->contains('operacion', 'FINALIZAR')) {
@@ -132,7 +137,7 @@ class ExamHistoryService
                 'tipo' => 'fin',
                 'fecha_hora' => $exam->fin_real_en->toIso8601String(),
                 'descripcion' => 'Examen terminado',
-                'detalle' => $exam->fin_automatico ? 'Automático' : 'Finalización manual',
+                'detalle' => $exam->fin_automatico ? 'Automático' : 'Responsable no registrado',
             ]);
         }
         $timeline = $timeline->concat($entries->map(fn ($entry) => [
@@ -162,12 +167,25 @@ class ExamHistoryService
             config('sciem.zona_horaria')
         );
         $hasActualStart = $exam->inicio_real_en !== null;
+        $startActor = null;
+        if ($hasActualStart && ! $exam->inicio_automatico) {
+            $startActor = DB::table('log as l')
+                ->join('accion as ac', 'ac.id_accion', '=', 'l.id_accion')
+                ->leftJoin('usuario as actor', 'actor.id_usuario', '=', 'l.id_usuario')
+                ->where('l.tabla_afectada', 'examen')
+                ->where('ac.operacion', 'INICIAR')
+                ->whereRaw("l.nuevo_valor->>'id_examen' = ?", [(string) $exam->id_examen])
+                ->whereRaw("l.nuevo_valor->>'tipo_inicio' = ?", ['MANUAL'])
+                ->orderByDesc('l.fecha_hora')
+                ->selectRaw("TRIM(CONCAT_WS(' ', actor.nombre, actor.apellido_paterno, actor.apellido_materno)) as actor")
+                ->value('actor');
+        }
         $timeline->push([
             'tipo' => 'inicio',
             'fecha_hora' => $startedAt->toIso8601String(),
             'descripcion' => $hasActualStart ? 'Examen iniciado' : 'Inicio programado del examen',
             'detalle' => $hasActualStart
-                ? ($exam->inicio_automatico ? 'Inicio automático' : 'Inicio manual')
+                ? ($exam->inicio_automatico ? 'Automático' : ($startActor ?: 'Responsable no registrado'))
                 : 'Horario previsto',
         ]);
         $timeline = $timeline
@@ -192,11 +210,13 @@ class ExamHistoryService
             ->orderBy('a.nro_aula')
             ->get();
 
-        $assistants = DB::table('examen_auxiliar as exa')
-            ->join('usuario as u', 'u.id_usuario', '=', 'exa.id_usuario')
-            ->where('exa.id_examen', $exam->id_examen)
-            ->whereNotNull('exa.id_ambiente')
-            ->get(['exa.id_ambiente', 'u.nombre', 'u.apellido_paterno'])
+        $controllers = DB::table('examen_estudiante as ee')
+            ->join('usuario as u', 'u.id_usuario', '=', 'ee.id_usuario_controlador')
+            ->where('ee.id_examen', $exam->id_examen)
+            ->whereIn('ee.estado_ingreso', ['INGRESO', 'CON_RETRASO'])
+            ->whereNotNull('ee.id_ambiente')
+            ->distinct()
+            ->get(['ee.id_ambiente', 'u.nombre', 'u.apellido_paterno'])
             ->groupBy('id_ambiente');
 
         return [
@@ -219,7 +239,7 @@ class ExamHistoryService
                 'id_ambiente' => $room->id_ambiente,
                 'nro_aula' => $room->nro_aula,
                 'presentes' => (int) $room->presentes,
-                'auxiliares' => ($assistants[$room->id_ambiente] ?? collect())
+                'auxiliares' => ($controllers[$room->id_ambiente] ?? collect())
                     ->map(fn ($assistant) => trim($assistant->nombre . ' ' . $assistant->apellido_paterno))
                     ->values()->all(),
             ])->all(),
