@@ -205,9 +205,13 @@ class AlienAttemptsReportTest extends TestCase
             'nombre_examen' => 'Examen FCE',
             'fecha' => '2026-10-15',
             'hora_inicio' => '10:00',
-            'id_tipo_examen' => DB::table('examen')->where('id_examen', $this->context['id_examen'])->value('id_tipo_examen'),
+            'id_tipo_examen' => DB::table('examen')
+                ->where('id_examen', $this->context['id_examen'])
+                ->value('id_tipo_examen'),
             'id_carrera' => $this->careerB,
-            'id_materia' => DB::table('materia_carrera')->where('id_carrera', $this->careerB)->value('id_materia'),
+            'id_materia' => DB::table('materia_carrera')
+                ->where('id_carrera', $this->careerB)
+                ->value('id_materia'),
             'id_usuario_docente' => $this->context['id_usuario'],
         ], 'id_examen');
         DB::table('examen_ambiente')->insert([
@@ -304,5 +308,25 @@ class AlienAttemptsReportTest extends TestCase
             'motivo' => $motivo,
             'registrado_en' => $registeredAt ?? '2026-10-15 10:00:00+00',
         ]));
+    }
+
+    public function test_interpreta_el_rango_en_hora_de_la_paz(): void
+    {
+        $estudiante = $this->insertStudent('Tz', 'La Paz', null, '202300777');
+
+        // 20:00 La Paz del 15/10 = 00:00 UTC del 16/10 (dentro del rango 15/10).
+        $this->insertAttempt('NO_PERTENECE', $estudiante, '2026-10-16 00:00:00+00');
+        // 01:00 La Paz del 16/10 = 05:00 UTC del 16/10 (fuera del rango 15/10).
+        $this->insertAttempt('NO_PERTENECE', $estudiante, '2026-10-16 05:00:00+00');
+
+        $this->actAs($this->createAccount(Role::ADMINISTRADOR));
+
+        $this->getJson($this->url(['desde' => '2026-10-15', 'hasta' => '2026-10-15']))
+            ->assertOk()
+            ->assertJsonPath('meta.total_intentos', 1);
+
+        $this->getJson($this->url(['desde' => '2026-10-16', 'hasta' => '2026-10-16']))
+            ->assertOk()
+            ->assertJsonPath('meta.total_intentos', 1);
     }
 }
