@@ -231,12 +231,46 @@ class ExamHistoryService
             ->groupBy('id_examen')
             ->get();
 
-        return $rows->mapWithKeys(fn ($row) => [$row->id_examen => [
+        $attendance = $rows->mapWithKeys(fn ($row) => [$row->id_examen => [
             'esperados' => (int) $row->esperados,
             'a_tiempo' => (int) $row->a_tiempo,
             'con_retraso' => (int) $row->con_retraso,
             'ausentes' => (int) $row->ausentes,
         ]])->all();
+
+        // Un cierre normal congela la nómina y deja una auditoría. Si solo se cambió
+        // el estado, las filas de los alumnos que no ingresaron pueden faltar.
+        $closedIds = DB::table('log as l')
+            ->join('accion as ac', 'ac.id_accion', '=', 'l.id_accion')
+            ->where('l.tabla_afectada', 'examen')
+            ->where('ac.operacion', 'FINALIZAR')
+            ->whereRaw("l.nuevo_valor->>'estado' = ?", [Exam::FINALIZADO])
+            ->whereIn(DB::raw("l.nuevo_valor->>'id_examen'"), array_map('strval', $examIds))
+            ->selectRaw("l.nuevo_valor->>'id_examen' as id_examen")
+            ->get()
+            ->pluck('id_examen')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $fallbackIds = array_diff($examIds, $closedIds);
+
+        if ($fallbackIds !== []) {
+            $rosterCounts = DB::table('grupo_examen as gx')
+                ->join('grupo_estudiante as gs', 'gs.id_grupo', '=', 'gx.id_grupo')
+                ->whereIn('gx.id_examen', $fallbackIds)
+                ->selectRaw('gx.id_examen, COUNT(DISTINCT gs.id_estudiante) as esperados')
+                ->groupBy('gx.id_examen')
+                ->pluck('esperados', 'id_examen');
+
+            foreach ($fallbackIds as $examId) {
+                $counts = $attendance[$examId] ?? $this->emptyAttendance();
+                $missing = max(0, (int) ($rosterCounts[$examId] ?? 0) - $counts['esperados']);
+                $counts['esperados'] += $missing;
+                $counts['ausentes'] += $missing;
+                $attendance[$examId] = $counts;
+            }
+        }
+
+        return $attendance;
     }
 
     private function emptyAttendance(): array
