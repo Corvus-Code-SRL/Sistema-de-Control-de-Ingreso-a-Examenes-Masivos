@@ -136,4 +136,32 @@ describe('useLateEntryVerification', () => {
     act(() => hook.result.current.choose(student, 'ci'))
     expect(hook.result.current.ci).toBe('9342145')
   })
+
+  it('un 429 al verificar muestra la espera, no el texto del servidor', async () => {
+    vi.spyOn(lateEntryService, 'verify').mockRejectedValue(
+      new ApiError(429, 'Too Many Attempts.', {}, undefined, { retryAfter: 6 })
+    )
+    const onConflict = vi.fn()
+    const hook = mount(null, onConflict)
+
+    await verifyStudent(hook)
+
+    expect(hook.result.current.error).toBe(LATE_ENTRY_MESSAGES.throttled(6))
+    expect(onConflict).not.toHaveBeenCalled()
+  })
+
+  it('un 429 al registrar muestra la espera y conserva el resultado', async () => {
+    const verify = vi.spyOn(lateEntryService, 'verify').mockResolvedValue(makeLateEntryVerification())
+    vi.spyOn(lateEntryService, 'register').mockRejectedValue(
+      new ApiError(429, 'Too Many Attempts.', {}, undefined, { retryAfter: 3 })
+    )
+    const hook = mount()
+
+    await verifyStudent(hook)
+    await act(async () => { await hook.result.current.register(5) })
+
+    expect(hook.result.current.error).toBe(LATE_ENTRY_MESSAGES.throttled(3))
+    expect(hook.result.current.result?.autorizado).toBe(true)
+    expect(verify).toHaveBeenCalledTimes(1)
+  })
 })

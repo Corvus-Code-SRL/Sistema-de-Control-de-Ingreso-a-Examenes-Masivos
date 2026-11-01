@@ -40,6 +40,8 @@ export const LATE_ENTRY_MESSAGES = {
   ciInvalid: 'El CI solo puede contener hasta 10 dígitos.',
   verifyFailed: 'No se pudo verificar al estudiante.',
   actionFailed: 'No se pudo completar la operación. Intente de nuevo.',
+  /** 429 en una acción del usuario: nada se reintenta solo. */
+  throttled: (seconds: number) => `Muchas consultas seguidas. Intente de nuevo en ${seconds} s.`,
   roomField: 'Ambiente de ingreso',
   roomPlaceholder: 'Seleccione un ambiente',
   closeNotice: 'Cerrar aviso',

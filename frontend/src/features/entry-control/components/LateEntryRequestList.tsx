@@ -20,6 +20,8 @@ interface LateEntryRequestListProps {
   title: string
   requests: LateEntryRequest[] | null
   error: ApiError | null
+  /** Aviso de espera ante un 429: la lista sigue visible y se reintenta sola. */
+  throttle?: string | null
   /** El docente ve quién pidió cada solicitud; el auxiliar solo ve las suyas. */
   showRequester: boolean
   /** Solo el docente con el examen en curso puede resolver las pendientes. */
@@ -30,7 +32,9 @@ interface LateEntryRequestListProps {
  * Solicitudes del examen. Tabla o tarjetas según el ancho de la tarjeta (container query), no
  * de la pantalla: en la columna derecha de un escritorio con menú la tabla no entra.
  */
-export function LateEntryRequestList({ title, requests, error, showRequester, actions }: LateEntryRequestListProps) {
+export function LateEntryRequestList({
+  title, requests, error, throttle = null, showRequester, actions,
+}: LateEntryRequestListProps) {
   const columns = LATE_ENTRY_MESSAGES.columns
   const canResolve = (request: LateEntryRequest) =>
     actions !== undefined && request.estado === LATE_ENTRY_REQUEST_STATUS.PENDIENTE
@@ -45,7 +49,12 @@ export function LateEntryRequestList({ title, requests, error, showRequester, ac
 
       {requests === null && error === null && <LoadingState rows={2} label={LATE_ENTRY_MESSAGES.listLoading} />}
       {requests === null && error !== null && <ErrorState error={error} />}
-      {requests !== null && error !== null && (
+      {throttle !== null && (
+        <p role="status" className="border-b border-warn-border bg-warn-soft px-4 py-2 text-xs text-warn-fg">
+          {throttle}
+        </p>
+      )}
+      {throttle === null && requests !== null && error !== null && (
         <p role="status" className="border-b border-warn-border bg-warn-soft px-4 py-2 text-xs text-warn-fg">
           {LATE_ENTRY_MESSAGES.listStale}
         </p>

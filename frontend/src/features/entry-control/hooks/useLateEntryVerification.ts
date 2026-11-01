@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ApiError } from '@/lib/api-client'
+import { throttleWaitSeconds } from '@/lib/throttle'
 import { LATE_ENTRY_MESSAGES } from '../components/lateEntryMessages'
 import { lateEntryService } from '../services/lateEntryService'
 import type { StudentMatch } from '../types/entry-control.types'
@@ -10,7 +11,11 @@ import { CI_MAX_LENGTH, digitsOnly, isValidCi, isValidSis, SIS_LENGTH } from '..
 
 type Busy = 'verify' | 'request' | 'register'
 
+/** Ante un 429 (RNF-03) pide esperar, en español, en lugar del texto del servidor. */
 function messageOf(cause: unknown, fallback: string): string {
+  if (cause instanceof ApiError && cause.isTooManyRequests) {
+    return LATE_ENTRY_MESSAGES.throttled(throttleWaitSeconds(cause))
+  }
   return cause instanceof Error && cause.message !== '' ? cause.message : fallback
 }
 

@@ -67,4 +67,20 @@ describe('lateEntryService', () => {
       '/control-ingreso/examenes/7/retrasos/buscar?ci=9342',
     ])
   })
+
+  it('un 429 en las sugerencias llega como aviso de espera', async () => {
+    mockApiWith(() => ({ status: 429, headers: { 'Retry-After': '4' }, body: { message: 'Too Many Attempts.' } }))
+
+    await expect(LATE_ENTRY_SEARCH.byName(7, 'lucia'))
+      .rejects.toMatchObject({ status: 429, message: 'Muchas consultas seguidas. Intente de nuevo en 4 s.' })
+    await expect(LATE_ENTRY_SEARCH.byIdentifier(7, 'sis', '2023'))
+      .rejects.toMatchObject({ status: 429, message: 'Muchas consultas seguidas. Intente de nuevo en 4 s.' })
+  })
+
+  it('los demás errores de las sugerencias llegan sin cambios', async () => {
+    mockApiWith(() => ({ status: 409, body: { message: 'El examen no está en curso.' } }))
+
+    await expect(LATE_ENTRY_SEARCH.byName(7, 'lucia'))
+      .rejects.toMatchObject({ status: 409, message: 'El examen no está en curso.' })
+  })
 })

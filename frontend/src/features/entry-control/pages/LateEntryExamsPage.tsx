@@ -8,6 +8,7 @@ import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { AppShell } from '@/components/layout/AppShell'
 import { Button } from '@/components/ui/button'
+import { throttleNotice, throttleWaitSeconds } from '@/lib/throttle'
 import { useInProgressExams } from '@/features/exams'
 import { LATE_ENTRY_MESSAGES } from '../components/lateEntryMessages'
 import { MAX_TIMEOUT_MS } from '../constants'
@@ -48,6 +49,18 @@ export function LateEntryExamsPage() {
     reload()
   }
 
+  // Ante un 429 (RNF-03) no muestra el error: avisa y reintenta solo tras la espera del servidor.
+  const throttleSeconds = status === 'error' && error?.isTooManyRequests ? throttleWaitSeconds(error) : null
+
+  useEffect(() => {
+    if (throttleSeconds === null) return undefined
+    const timer = window.setTimeout(() => {
+      setNow(Date.now())
+      reload()
+    }, throttleSeconds * 1000)
+    return () => window.clearTimeout(timer)
+  }, [throttleSeconds, error, reload])
+
   return (
     <AppShell mobileTitle={LATE_ENTRY_MESSAGES.examsTitle} breadcrumbs={[{ label: LATE_ENTRY_MESSAGES.examsTitle }]}>
       <PageHeader
@@ -63,7 +76,12 @@ export function LateEntryExamsPage() {
 
       {status === 'loading' && <LoadingState rows={3} label={LATE_ENTRY_MESSAGES.loadingExams} />}
 
-      {status === 'error' && error && <ErrorState error={error} onRetry={refresh} />}
+      {throttleSeconds !== null && (
+        <p role="status" className="rounded-lg border border-warn-border bg-warn-soft p-3 text-sm text-warn-fg">
+          {throttleNotice(throttleSeconds)}
+        </p>
+      )}
+      {throttleSeconds === null && status === 'error' && error && <ErrorState error={error} onRetry={refresh} />}
 
       {status === 'success' && exams.length === 0 && (
         <EmptyState

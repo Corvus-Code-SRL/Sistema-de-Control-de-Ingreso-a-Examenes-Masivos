@@ -222,6 +222,7 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
       title={isTeacher ? LATE_ENTRY_MESSAGES.listTitle : LATE_ENTRY_MESSAGES.listTitleOwn}
       requests={requests.requests}
       error={requests.error}
+      throttle={requests.throttle}
       showRequester={isTeacher}
       actions={isTeacher && open && !timeOver ? {
         busyId: requests.busyId,

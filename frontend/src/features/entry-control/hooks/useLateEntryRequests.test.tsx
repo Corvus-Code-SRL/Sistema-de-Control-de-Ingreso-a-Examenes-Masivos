@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/lib/api-client'
 import { makeLateEntryRequest } from '@/test/lateEntryFixtures'
 import { ENTRY_CONTROL_POLL_MS } from '../constants'
 import { LATE_ENTRY_MESSAGES } from '../components/lateEntryMessages'
@@ -128,5 +129,40 @@ describe('useLateEntryRequests', () => {
     expect(done).toBe(false)
     expect(hook.result.current.actionError).toBe('La solicitud ya fue resuelta.')
     expect(hook.result.current.pending).toEqual([pending])
+  })
+
+  it('ante un 429 conserva la lista, avisa y no consulta hasta que pase Retry-After', async () => {
+    const list = vi.spyOn(lateEntryService, 'list')
+      .mockResolvedValueOnce([pending])
+      .mockRejectedValueOnce(new ApiError(429, 'Too Many Attempts.', {}, undefined, { retryAfter: 7 }))
+      .mockResolvedValue([pending])
+    const hook = await mount('DOCENTE')
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(ENTRY_CONTROL_POLL_MS) })
+    expect(list).toHaveBeenCalledTimes(2)
+    expect(hook.result.current.throttle).toBe('Muchas consultas seguidas, reintentando en 7 s.')
+    expect(hook.result.current.error).toBeNull()
+    expect(hook.result.current.requests).toEqual([pending])
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(6_000) })
+    expect(list).toHaveBeenCalledTimes(2)
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_000) })
+    expect(list).toHaveBeenCalledTimes(3)
+    expect(hook.result.current.throttle).toBeNull()
+  })
+
+  it('un 429 al autorizar avisa la espera en lugar del error genérico', async () => {
+    vi.spyOn(lateEntryService, 'list').mockResolvedValue([pending])
+    vi.spyOn(lateEntryService, 'approve').mockRejectedValue(
+      new ApiError(429, 'Too Many Attempts.', {}, undefined, { retryAfter: 3 })
+    )
+    const hook = await mount('DOCENTE')
+
+    let done = true
+    await act(async () => { done = await hook.result.current.approve(31) })
+
+    expect(done).toBe(false)
+    expect(hook.result.current.actionError).toBe('Muchas consultas seguidas. Intente de nuevo en 3 s.')
   })
 })

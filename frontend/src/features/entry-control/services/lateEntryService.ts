@@ -1,4 +1,6 @@
-import { apiClient, apiPost } from '@/lib/api-client'
+import { ApiError, apiClient, apiPost } from '@/lib/api-client'
+import { throttleWaitSeconds } from '@/lib/throttle'
+import { LATE_ENTRY_MESSAGES } from '../components/lateEntryMessages'
 import type { StudentMatch, StudentSearchSource } from '../types/entry-control.types'
 import type {
   LateEntryActionInput, LateEntryRegistration, LateEntryRequest, LateEntryVerification, LateEntryVerificationInput,
@@ -64,8 +66,22 @@ export const lateEntryService = {
   },
 }
 
+/**
+ * Las sugerencias muestran el mensaje del error tal cual; ante un 429 (RNF-03) se cambia por el
+ * pedido de esperar, sin tocar los componentes de búsqueda de HU-032.
+ */
+function withThrottleNotice(cause: unknown): never {
+  if (cause instanceof ApiError && cause.isTooManyRequests) {
+    throw new ApiError(cause.status, LATE_ENTRY_MESSAGES.throttled(throttleWaitSeconds(cause)), {}, undefined, {
+      retryAfter: cause.retryAfter,
+    })
+  }
+  throw cause
+}
+
 /** Sugerencias de la identificación durante EN_CURSO, cuando la búsqueda de HU-032 ya no está disponible. */
 export const LATE_ENTRY_SEARCH: StudentSearchSource = {
-  byName: (examId, name, signal) => lateEntryService.search(examId, name, signal),
-  byIdentifier: (examId, field, prefix, signal) => lateEntryService.searchByIdentifier(examId, field, prefix, signal),
+  byName: (examId, name, signal) => lateEntryService.search(examId, name, signal).catch(withThrottleNotice),
+  byIdentifier: (examId, field, prefix, signal) =>
+    lateEntryService.searchByIdentifier(examId, field, prefix, signal).catch(withThrottleNotice),
 }

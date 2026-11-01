@@ -104,4 +104,16 @@ describe('HU-037: exámenes para registrar con retraso', () => {
 
     expect(reload).toHaveBeenCalledTimes(2)
   })
+
+  it('ante un 429 avisa la espera y reintenta solo, sin mostrar el error', async () => {
+    withExams(null, 'error', new ApiError(429, 'Too Many Attempts.', {}, undefined, { retryAfter: 4 }))
+    renderPage()
+
+    expect(screen.getByText('Muchas consultas seguidas, reintentando en 4 s.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Reintentar/ })).not.toBeInTheDocument()
+    expect(reload).not.toHaveBeenCalled()
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(4_000) })
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
 })

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '@/lib/api-client'
+import { throttleNotice, throttleWaitSeconds } from '@/lib/throttle'
 import { ENTRY_CONTROL_POLL_MS } from '../constants'
 import { LATE_ENTRY_MESSAGES } from '../components/lateEntryMessages'
 import { lateEntryService } from '../services/lateEntryService'
@@ -36,6 +37,8 @@ function transitionOf(previous: Statuses, requests: LateEntryRequest[], role: Co
  * Solicitudes de ingreso con retraso del examen, consultadas cada ENTRY_CONTROL_POLL_MS mientras la
  * pestaña está visible: el docente ve todas y el auxiliar solo las suyas (lo decide el servidor).
  * `announcement` es el texto para la región aria-live cuando llega una solicitud o se resuelve una.
+ * Ante un 429 (RNF-03) conserva la lista, avisa con `throttle` y se salta los ciclos dentro de la
+ * espera que pide el servidor, igual que la vista En curso.
  */
 export function useLateEntryRequests(examId: number, role: ControllerRole, enabled: boolean) {
   const [requests, setRequests] = useState<LateEntryRequest[] | null>(null)
@@ -43,7 +46,9 @@ export function useLateEntryRequests(examId: number, role: ControllerRole, enabl
   const [announcement, setAnnouncement] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<number | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [throttle, setThrottle] = useState<string | null>(null)
   const previous = useRef<Statuses | null>(null)
+  const pausedUntil = useRef(0)
 
   const apply = useCallback((next: LateEntryRequest[]) => {
     if (previous.current !== null) {
@@ -67,8 +72,15 @@ export function useLateEntryRequests(examId: number, role: ControllerRole, enabl
         if (controller.signal.aborted) return
         apply(next)
         setError(null)
+        setThrottle(null)
       } catch (cause) {
         if (controller.signal.aborted) return
+        if (cause instanceof ApiError && cause.isTooManyRequests) {
+          const seconds = throttleWaitSeconds(cause)
+          pausedUntil.current = Date.now() + seconds * 1000
+          setThrottle(throttleNotice(seconds))
+          return
+        }
         setError(cause instanceof ApiError ? cause : new ApiError(0, LATE_ENTRY_MESSAGES.actionFailed))
       } finally {
         inFlight = false
@@ -77,7 +89,7 @@ export function useLateEntryRequests(examId: number, role: ControllerRole, enabl
 
     void load()
     const timer = window.setInterval(() => {
-      if (!document.hidden) void load()
+      if (!document.hidden && Date.now() >= pausedUntil.current) void load()
     }, ENTRY_CONTROL_POLL_MS)
 
     return () => {
@@ -98,6 +110,10 @@ export function useLateEntryRequests(examId: number, role: ControllerRole, enabl
       setAnnouncement(approve ? LATE_ENTRY_MESSAGES.approved : LATE_ENTRY_MESSAGES.rejected)
       return true
     } catch (cause) {
+      if (cause instanceof ApiError && cause.isTooManyRequests) {
+        setActionError(LATE_ENTRY_MESSAGES.throttled(throttleWaitSeconds(cause)))
+        return false
+      }
       setActionError(cause instanceof Error && cause.message !== '' ? cause.message : LATE_ENTRY_MESSAGES.actionFailed)
       return false
     } finally {
@@ -119,6 +135,7 @@ export function useLateEntryRequests(examId: number, role: ControllerRole, enabl
     requests,
     pending: (requests ?? []).filter((request) => request.estado === LATE_ENTRY_REQUEST_STATUS.PENDIENTE),
     error,
+    throttle,
     announcement,
     busyId,
     actionError,
