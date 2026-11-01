@@ -34,6 +34,8 @@ Route::prefix('control-ingreso')->group(function () {
 
         // HU-037 — ingreso con retraso mientras el examen está EN_CURSO.
         Route::prefix('retrasos')->group(function () {
+            Route::get('/buscar', [LateEntryController::class, 'search'])
+                ->name('control-ingreso.examenes.retrasos.buscar');
             Route::post('/verificar', [LateEntryController::class, 'verify'])
                 ->name('control-ingreso.examenes.retrasos.verificar');
             Route::get('/solicitudes', [LateEntryController::class, 'index'])

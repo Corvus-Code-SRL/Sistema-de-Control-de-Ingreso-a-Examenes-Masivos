@@ -517,7 +517,7 @@ class LateEntryServiceTest extends TestCase
         $this->assertSame(1, $this->auditCount(LateEntryService::AUTHORIZE_ACTION));
     }
 
-    public function test_bloquea_examen_solicitud_e_ingreso_en_ese_orden(): void
+    public function test_bloquea_examen_solicitud_estudiante_e_ingreso_en_ese_orden(): void
     {
         $request = $this->requestSecondStudent();
         $locked = [];
@@ -529,7 +529,7 @@ class LateEntryServiceTest extends TestCase
 
         $this->service->authorize($this->exam, $request->id_solicitud, $this->teacher);
 
-        $this->assertSame(['examen', 'solicitud_ingreso_retraso', 'examen_estudiante'], $locked);
+        $this->assertSame(['examen', 'solicitud_ingreso_retraso', 'estudiante', 'examen_estudiante'], $locked);
     }
 
     public function test_la_solicitud_tambien_bloquea_en_el_mismo_orden(): void
@@ -543,7 +543,7 @@ class LateEntryServiceTest extends TestCase
 
         $this->requestSecondStudent();
 
-        $this->assertSame(['examen', 'solicitud_ingreso_retraso', 'examen_estudiante'], $locked);
+        $this->assertSame(['examen', 'solicitud_ingreso_retraso', 'estudiante', 'examen_estudiante'], $locked);
     }
 
     public function test_cada_operacion_deja_una_fila_en_la_bitacora(): void
@@ -658,13 +658,13 @@ class LateEntryServiceTest extends TestCase
 
         $this->assertSame(
             [$pending->id_solicitud, $resolved->id_solicitud],
-            $queries->list($this->exam, $this->teacher)->pluck('id_solicitud')->all()
+            $queries->list($this->exam, $this->teacher)['solicitudes']->pluck('id_solicitud')->all()
         );
-        $this->assertSame([$resolved->id_solicitud], $queries->list($this->exam, $this->assistantB)->pluck('id_solicitud')->all());
-        $this->assertTrue($queries->list($this->exam, $this->teacher)->first()->relationLoaded('requester'));
+        $this->assertSame([$resolved->id_solicitud], $queries->list($this->exam, $this->assistantB)['solicitudes']->pluck('id_solicitud')->all());
+        $this->assertTrue($queries->list($this->exam, $this->teacher)['solicitudes']->first()->relationLoaded('requester'));
 
         $this->setExamState(Exam::FINALIZADO);
-        $this->assertCount(2, $queries->list($this->exam, $this->teacher));
+        $this->assertCount(2, $queries->list($this->exam, $this->teacher)['solicitudes']);
 
         $this->setExamState(Exam::EN_INGRESO);
         $this->expectException(ExamStateException::class);

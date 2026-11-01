@@ -6,7 +6,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Verificación del ingreso con retraso: el mismo resultado de HU-032 (StudentVerificationResource)
- * más la solicitud pendiente del estudiante, si la hay.
+ * más la solicitud pendiente del estudiante, si la hay, y la advertencia de otro examen.
  */
 class LateEntryVerificationResource extends JsonResource
 {
@@ -17,6 +17,7 @@ class LateEntryVerificationResource extends JsonResource
 
         return (new StudentVerificationResource($this->resource['verificacion']))->toArray($request) + [
             'solicitud_pendiente' => $pendingRequest,
+            'otro_examen' => $this->resource['otro_examen'],
         ];
     }
 }

@@ -8,6 +8,7 @@ use App\Models\LateEntryRequest;
 use App\Models\Student;
 use App\Models\StudentExam;
 use App\Models\User;
+use App\Services\Exams\ExamTimingService;
 use App\Services\Security\AuditLogService;
 use App\Support\SisCode;
 use Carbon\Carbon;
@@ -22,8 +23,13 @@ use LogicException;
  * directamente. La verificación es la misma de HU-032 (VerificationService::evaluate) sobre
  * el registro armado desde PostgreSQL, porque el snapshot de Redis ya no está activo.
  *
- * Todas las escrituras bloquean en el mismo orden —examen, solicitud, examen_estudiante—,
- * el mismo que usan el inicio, la finalización y la confirmación de ingreso.
+ * Todas las escrituras bloquean en el mismo orden —examen, solicitud, estudiante,
+ * examen_estudiante—, el mismo que usan el inicio, la finalización y la confirmación de ingreso.
+ * El bloqueo del estudiante hace que dos ingresos con retraso simultáneos en exámenes distintos
+ * se esperen: así la advertencia de «otro examen» no se salta por concurrencia.
+ *
+ * El ingreso con retraso termina a la hora de fin programada, aunque el examen siga EN_CURSO
+ * hasta su cierre automático.
  */
 class LateEntryService
 {
@@ -43,24 +49,31 @@ class LateEntryService
     private IdentificationService $identification;
     private VerificationService $verification;
     private AuditLogService $auditLog;
+    private LateEntryOtherExamService $otherExams;
+    private ExamTimingService $timing;
 
     public function __construct(
         LateEntryAccessService $access,
         EntryControlSnapshotService $snapshots,
         IdentificationService $identification,
         VerificationService $verification,
-        AuditLogService $auditLog
+        AuditLogService $auditLog,
+        LateEntryOtherExamService $otherExams,
+        ExamTimingService $timing
     ) {
         $this->access = $access;
         $this->snapshots = $snapshots;
         $this->identification = $identification;
         $this->verification = $verification;
         $this->auditLog = $auditLog;
+        $this->otherExams = $otherExams;
+        $this->timing = $timing;
     }
 
     /**
-     * Verifica por código SIS y CI sin escribir nada. Devuelve el resultado de HU-032 y la
-     * solicitud pendiente del estudiante, si la hay, para que la vista la resuelva ahí mismo.
+     * Verifica por código SIS y CI sin escribir nada. Devuelve el resultado de HU-032, la
+     * solicitud pendiente del estudiante, si la hay, para que la vista la resuelva ahí mismo, y
+     * la advertencia de otro examen si el resultado autoriza.
      *
      * @param array{cod_sis: string, ci?: string|null, id_ambiente?: int|null} $input
      * @return array{
@@ -75,13 +88,16 @@ class LateEntryService
      *         ingreso_previo: array{registrado_en: string|null, hora_ingreso: string|null,
      *             id_ambiente: int|null, nro_aula: string|null, controlador: string}|null
      *     },
-     *     solicitud_pendiente: LateEntryRequest|null
+     *     solicitud_pendiente: LateEntryRequest|null,
+     *     otro_examen: array{id_examen: int, nombre_examen: string, materia: string|null,
+     *         docente: string|null, hora_ingreso: string|null, nro_aula: string|null}|null
      * }
      */
     public function verify(Exam $exam, array $input, User $actor): array
     {
         $access = $this->access->resolve($exam, $actor);
         $this->assertInProgress($exam);
+        $this->assertBeforeEnd($exam);
         $roomId = $this->access->controlRoom(
             $exam,
             $access,
@@ -92,16 +108,19 @@ class LateEntryService
         $record = $studentId === null ? null : $this->recordFor($exam, (int) $studentId);
 
         if ($record === null) {
-            return ['verificacion' => $this->verification->notFoundResult(), 'solicitud_pendiente' => null];
+            return [
+                'verificacion' => $this->verification->notFoundResult(),
+                'solicitud_pendiente' => null,
+                'otro_examen' => null,
+            ];
         }
 
+        $verdict = $this->verification->evaluate($this->verification->withBackground($record), $input, $roomId);
+
         return [
-            'verificacion' => $this->verification->evaluate(
-                $this->verification->withBackground($record),
-                $input,
-                $roomId
-            ),
+            'verificacion' => $verdict,
             'solicitud_pendiente' => $this->pendingQuery($exam, (int) $studentId)->with(self::RELATIONS)->first(),
+            'otro_examen' => $verdict['autorizado'] ? $this->otherExams->forStudent($exam, (int) $studentId) : null,
         ];
     }
 
@@ -109,7 +128,7 @@ class LateEntryService
      * El auxiliar pide registrar al estudiante en su ambiente. La hora de la solicitud es
      * la que quedará como hora de ingreso si el docente la autoriza.
      *
-     * @param array{id_estudiante: int, ci?: string|null, id_ambiente: int} $input
+     * @param array{id_estudiante: int, ci?: string|null, id_ambiente: int, confirmar_otro_examen?: bool} $input
      */
     public function request(Exam $exam, array $input, User $actor): LateEntryRequest
     {
@@ -119,11 +138,13 @@ class LateEntryService
                 $access = $this->access->resolve($locked, $actor);
                 $this->access->assertAssistant($access);
                 $this->assertInProgress($locked);
+                $this->assertBeforeEnd($locked);
 
                 $roomId = $this->access->controlRoom($locked, $access, (int) $input['id_ambiente']);
                 $studentId = (int) $input['id_estudiante'];
                 $this->allowedRecord($this->recordFor($locked, $studentId), $input, $roomId);
                 $this->assertNoPendingRequest($locked, $studentId);
+                $otherExam = $this->otherExamConflict($locked, $studentId, $this->confirmed($input));
                 $this->lockEntry($locked, $studentId);
 
                 $request = LateEntryRequest::create([
@@ -141,7 +162,7 @@ class LateEntryService
                     'id_estudiante' => $studentId,
                     'id_ambiente' => $roomId,
                     'estado' => LateEntryRequest::PENDIENTE,
-                ], $actor->id_usuario);
+                ] + $this->otherExamAudit($otherExam), $actor->id_usuario);
 
                 return $request;
             });
@@ -157,17 +178,31 @@ class LateEntryService
         return $request->load(self::RELATIONS);
     }
 
-    /** El docente autoriza: el estudiante queda CON_RETRASO a la hora de la solicitud. */
-    public function authorize(Exam $exam, int $requestId, User $actor): LateEntryRequest
-    {
-        $request = $this->writeEntryOrConflict(function () use ($exam, $requestId, $actor): LateEntryRequest {
+    /**
+     * El docente autoriza: el estudiante queda CON_RETRASO a la hora de la solicitud. Si ingresó
+     * a otro examen abierto, el docente decide con la advertencia a la vista y debe confirmarla.
+     */
+    public function authorize(
+        Exam $exam,
+        int $requestId,
+        User $actor,
+        bool $confirmOtherExam = false
+    ): LateEntryRequest {
+        $request = $this->writeEntryOrConflict(function () use (
+            $exam,
+            $requestId,
+            $actor,
+            $confirmOtherExam
+        ): LateEntryRequest {
             $locked = $this->lockExam($exam);
             $this->access->assertTeacher($this->access->resolve($locked, $actor));
             $this->assertInProgress($locked);
+            $this->assertBeforeEnd($locked);
             $request = $this->lockPendingRequest($locked, $requestId);
 
             $studentId = (int) $request->id_estudiante;
             $record = $this->allowedRecord($this->recordFor($locked, $studentId), [], null);
+            $otherExam = $this->otherExamConflict($locked, $studentId, $confirmOtherExam);
             $existing = $this->lockEntry($locked, $studentId);
             $resolvedAt = Carbon::now('UTC');
             $entryTime = $this->writeEntry(
@@ -191,7 +226,7 @@ class LateEntryService
                     'id_estudiante' => $studentId,
                     'estado_ingreso' => StudentExam::CON_RETRASO,
                     'hora_ingreso' => $entryTime,
-                ],
+                ] + $this->otherExamAudit($otherExam),
                 $actor->id_usuario
             );
 
@@ -228,7 +263,7 @@ class LateEntryService
     /**
      * El docente registra directamente, sin solicitud, en el ambiente que elige.
      *
-     * @param array{id_estudiante: int, ci?: string|null, id_ambiente: int} $input
+     * @param array{id_estudiante: int, ci?: string|null, id_ambiente: int, confirmar_otro_examen?: bool} $input
      * @return array{id_estudiante: int, estado_ingreso: string, hora_ingreso: string, id_ambiente: int}
      */
     public function register(Exam $exam, array $input, User $actor): array
@@ -237,12 +272,14 @@ class LateEntryService
             $locked = $this->lockExam($exam);
             $this->access->assertTeacher($this->access->resolve($locked, $actor));
             $this->assertInProgress($locked);
+            $this->assertBeforeEnd($locked);
 
             $roomId = (int) $input['id_ambiente'];
             $this->access->assertRoomInExam($locked, $roomId);
             $studentId = (int) $input['id_estudiante'];
             $record = $this->allowedRecord($this->recordFor($locked, $studentId), $input, null);
             $this->assertNoPendingRequest($locked, $studentId);
+            $otherExam = $this->otherExamConflict($locked, $studentId, $this->confirmed($input));
             $existing = $this->lockEntry($locked, $studentId);
 
             $now = Carbon::now('UTC');
@@ -254,7 +291,7 @@ class LateEntryService
                 'estado_ingreso' => StudentExam::CON_RETRASO,
                 'hora_ingreso' => $entryTime,
                 'id_ambiente' => $roomId,
-            ], $actor->id_usuario);
+            ] + $this->otherExamAudit($otherExam), $actor->id_usuario);
 
             return [
                 'id_estudiante' => $studentId,
@@ -298,6 +335,13 @@ class LateEntryService
         }
     }
 
+    private function assertBeforeEnd(Exam $exam): void
+    {
+        if ($this->timing->hasEnded($exam)) {
+            throw LateEntryException::timeOver();
+        }
+    }
+
     private function lockPendingRequest(Exam $exam, int $requestId): LateEntryRequest
     {
         $request = LateEntryRequest::query()
@@ -326,6 +370,56 @@ class LateEntryService
             ->where('id_examen', $exam->id_examen)
             ->where('id_estudiante', $studentId)
             ->where('estado', LateEntryRequest::PENDIENTE);
+    }
+
+    /**
+     * Regla propia de HU-037 (no de evaluate(), que comparte HU-032): si el estudiante ya ingresó
+     * a otro examen abierto, solo se continúa con la confirmación de quien controla. Bloquea antes
+     * al estudiante para que la comprobación y la escritura no se crucen con otra igual.
+     *
+     * @return array{id_examen: int, nombre_examen: string, materia: string|null, docente: string|null,
+     *     hora_ingreso: string|null, nro_aula: string|null}|null
+     */
+    private function otherExamConflict(Exam $exam, int $studentId, bool $confirmed): ?array
+    {
+        Student::query()->whereKey($studentId)->lockForUpdate()->first(['id_estudiante']);
+        $warning = $this->otherExams->forStudent($exam, $studentId);
+
+        if ($warning !== null && ! $confirmed) {
+            throw LateEntryException::otherExam($warning);
+        }
+
+        return $warning;
+    }
+
+    /** @param array{confirmar_otro_examen?: bool} $input */
+    private function confirmed(array $input): bool
+    {
+        return (bool) ($input['confirmar_otro_examen'] ?? false);
+    }
+
+    /**
+     * Lo que la bitácora guarda cuando se continuó pese a la advertencia.
+     *
+     * @param array{id_examen: int, nombre_examen: string, hora_ingreso: string|null,
+     *     nro_aula: string|null}|null $warning
+     * @return array<string, mixed>
+     */
+    private function otherExamAudit(?array $warning): array
+    {
+        if ($warning === null) {
+            return [];
+        }
+
+        return [
+            'otro_examen' => [
+                'id_examen' => $warning['id_examen'],
+                'nombre_examen' => $warning['nombre_examen'],
+                'hora_ingreso' => $warning['hora_ingreso'],
+                'nro_aula' => $warning['nro_aula'],
+            ],
+            'confirmado_pese_a_otro_examen' => true,
+        ];
     }
 
     /** Fila de ingreso del estudiante, bloqueada; null si todavía no tiene. */

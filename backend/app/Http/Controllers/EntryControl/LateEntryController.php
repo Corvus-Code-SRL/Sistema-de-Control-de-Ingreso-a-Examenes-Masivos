@@ -3,13 +3,16 @@
 namespace App\Http\Controllers\EntryControl;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\EntryControl\AuthorizeLateEntryRequest;
 use App\Http\Requests\EntryControl\IndexLateEntryRequest;
 use App\Http\Requests\EntryControl\RegisterLateEntryRequest;
 use App\Http\Requests\EntryControl\ResolveLateEntryRequest;
+use App\Http\Requests\EntryControl\SearchLateEntryStudentRequest;
 use App\Http\Requests\EntryControl\StoreLateEntryRequestRequest;
 use App\Http\Requests\EntryControl\VerifyLateEntryRequest;
 use App\Http\Resources\EntryControl\LateEntryRegistrationResource;
 use App\Http\Resources\EntryControl\LateEntryRequestResource;
+use App\Http\Resources\EntryControl\LateEntryStudentMatchResource;
 use App\Http\Resources\EntryControl\LateEntryVerificationResource;
 use App\Models\Exam;
 use App\Services\EntryControl\LateEntryQueryService;
@@ -39,9 +42,19 @@ class LateEntryController extends Controller
 
     public function index(IndexLateEntryRequest $request, Exam $examen): JsonResponse
     {
-        return ApiResponse::success(
-            LateEntryRequestResource::collection($this->queries->list($examen, $request->user()))
-        );
+        $list = $this->queries->list($examen, $request->user());
+
+        return ApiResponse::success($list['solicitudes']->map(fn ($item) => new LateEntryRequestResource(
+            $item,
+            $list['otros_examenes'][(int) $item->id_estudiante] ?? null
+        ))->values());
+    }
+
+    public function search(SearchLateEntryStudentRequest $request, Exam $examen): JsonResponse
+    {
+        return ApiResponse::success(LateEntryStudentMatchResource::collection(
+            $this->queries->search($examen, $request->user(), $request->validated())
+        ));
     }
 
     public function verify(VerifyLateEntryRequest $request, Exam $examen): JsonResponse
@@ -61,11 +74,16 @@ class LateEntryController extends Controller
         );
     }
 
-    public function approve(ResolveLateEntryRequest $request, Exam $examen, string $solicitud): JsonResponse
+    public function approve(AuthorizeLateEntryRequest $request, Exam $examen, string $solicitud): JsonResponse
     {
         return ApiResponse::success(
             new LateEntryRequestResource(
-                $this->lateEntries->authorize($examen, (int) $solicitud, $request->user())
+                $this->lateEntries->authorize(
+                    $examen,
+                    (int) $solicitud,
+                    $request->user(),
+                    $request->boolean('confirmar_otro_examen')
+                )
             ),
             self::APPROVED_MESSAGE
         );

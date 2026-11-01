@@ -7,6 +7,6 @@ class StoreLateEntryRequestRequest extends LateEntryManagementRequest
 {
     public function rules(): array
     {
-        return (new ConfirmEntryRequest())->rules();
+        return (new ConfirmEntryRequest())->rules() + self::otherExamRules();
     }
 }

@@ -18,6 +18,7 @@ use Illuminate\Foundation\Http\FormRequest;
 abstract class LateEntryManagementRequest extends FormRequest
 {
     public const FORBIDDEN_MESSAGE = 'Solo un docente o un auxiliar puede registrar ingresos con retraso.';
+    public const CONFIRM_OTHER_EXAM_MESSAGE = 'La confirmación del otro examen debe ser verdadera o falsa.';
 
     public function authorize(CurrentUser $currentUser, UserRoleService $roles): bool
     {
@@ -37,6 +38,14 @@ abstract class LateEntryManagementRequest extends FormRequest
     /** Los mismos textos de validación del control de ingreso (HU-032). */
     public function messages(): array
     {
-        return (new VerifyStudentRequest())->messages();
+        return (new VerifyStudentRequest())->messages() + [
+            'confirmar_otro_examen.boolean' => self::CONFIRM_OTHER_EXAM_MESSAGE,
+        ];
+    }
+
+    /** Continuar pese a que el estudiante ya ingresó a otro examen abierto. */
+    protected static function otherExamRules(): array
+    {
+        return ['confirmar_otro_examen' => ['sometimes', 'boolean']];
     }
 }
