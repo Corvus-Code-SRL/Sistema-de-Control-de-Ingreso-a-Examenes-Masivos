@@ -92,6 +92,31 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Límites de peticiones por minuto (RNF-03)
+    |--------------------------------------------------------------------------
+    |
+    | Los lee App\Providers\RouteServiceProvider. Con sesión se limita por usuario, no por IP: detrás
+    | del NAT del campus todos los controladores comparten IP.
+    |
+    | - api:       acciones y consultas de un usuario autenticado.
+    | - polling:   las consultas periódicas (/estado del control de ingreso y /en-curso), aparte
+    |              para que no consuman la cuota de las acciones.
+    | - guest:     peticiones sin sesión que pasan por el limiter `api`, por IP.
+    | - login_account: intentos de inicio de sesión sobre un mismo código SIS desde una misma IP.
+    | - login_ip:  intentos de inicio de sesión desde una IP, sea cual sea el código.
+    |
+    */
+
+    'rate_limits' => [
+        'api' => (int) env('SCIEM_RATE_API', 180),
+        'polling' => (int) env('SCIEM_RATE_POLLING', 90),
+        'guest' => (int) env('SCIEM_RATE_GUEST', 60),
+        'login_account' => (int) env('SCIEM_RATE_LOGIN_ACCOUNT', 10),
+        'login_ip' => (int) env('SCIEM_RATE_LOGIN_IP', 300),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Acceso por función y rol
     |--------------------------------------------------------------------------
     |

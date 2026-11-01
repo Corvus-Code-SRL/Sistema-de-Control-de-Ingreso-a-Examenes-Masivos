@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Support\SisCode;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -57,7 +59,39 @@ class RouteServiceProvider extends ServiceProvider
     protected function configureRateLimiting()
     {
         RateLimiter::for('api', function (Request $request) {
-            return Limit::perMinute(60)->by(optional($request->user())->id ?: $request->ip());
+            $user = $this->sanctumUser($request);
+
+            return $user === null
+                ? Limit::perMinute(config('sciem.rate_limits.guest'))->by('ip:' . $request->ip())
+                : Limit::perMinute(config('sciem.rate_limits.api'))->by('user:' . $user->getKey());
         });
+
+        RateLimiter::for('polling', function (Request $request) {
+            $user = $this->sanctumUser($request);
+
+            return Limit::perMinute(config('sciem.rate_limits.polling'))
+                ->by($user === null ? 'ip:' . $request->ip() : 'user:' . $user->getKey());
+        });
+
+        // El login es público: sin usuario, la clave es el código SIS (ya normalizado) más la IP.
+        RateLimiter::for('login', function (Request $request) {
+            $codSis = $request->input('cod_sis');
+            $account = is_string($codSis) ? SisCode::normalize($codSis) : '';
+
+            return [
+                Limit::perMinute(config('sciem.rate_limits.login_account'))
+                    ->by('login:' . sha1($account . '|' . $request->ip())),
+                Limit::perMinute(config('sciem.rate_limits.login_ip'))->by('login-ip:' . $request->ip()),
+            ];
+        });
+    }
+
+    /**
+     * Se resuelve con el guard de Sanctum para no depender del orden de los middleware: el guard
+     * guarda el usuario de la petición, así que si `auth:sanctum` ya corrió no repite la consulta.
+     */
+    private function sanctumUser(Request $request): ?Authenticatable
+    {
+        return $request->user('sanctum');
     }
 }

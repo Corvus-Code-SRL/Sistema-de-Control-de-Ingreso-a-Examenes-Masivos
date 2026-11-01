@@ -36,6 +36,8 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
         ->name('show');
 
     Route::get('/{exam}/en-curso', [ExamInProgressController::class, 'show'])
+        ->withoutMiddleware('throttle:api')
+        ->middleware('throttle:polling')
         ->where('exam', '[0-9]{1,9}')
         ->name('en-curso');
 

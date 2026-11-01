@@ -29,6 +29,8 @@ Route::prefix('control-ingreso')->group(function () {
         Route::post('/rechazar-ingreso', [StudentEntryController::class, 'reject'])
             ->name('control-ingreso.examenes.rechazar');
         Route::get('/estado', [EntryControlStatusController::class, 'currentStatus'])
+            ->withoutMiddleware('throttle:api')
+            ->middleware('throttle:polling')
             ->name('control-ingreso.examenes.estado');
     });
 });
