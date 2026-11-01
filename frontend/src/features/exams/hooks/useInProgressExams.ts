@@ -9,8 +9,7 @@ import type { InProgressExamRow } from '../types/examInProgress.types'
 /**
  * Exámenes EN_CURSO que controla el usuario: los suyos si es docente y en los que está
  * habilitado con ambiente si es auxiliar. Cada API ya limita los resultados a la cuenta;
- * aquí solo se elige el estado. Fuente única de «En curso» (HU-038-A) y de «Registrar
- * estudiante con retraso» (HU-037).
+ * aquí solo se elige el estado. Alimenta la lista «Registrar estudiante con retraso» (HU-037).
  */
 export function useInProgressExams(): AsyncResource<InProgressExamRow[]> {
   const { area } = useCurrentUser()

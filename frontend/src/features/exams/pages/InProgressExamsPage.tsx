@@ -3,24 +3,69 @@ import { Link } from 'react-router-dom';
 
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
-import { ExamSummaryCard } from '@/components/common/ExamSummaryCard';
 import { LoadingState } from '@/components/common/LoadingState';
 import { PageHeader } from '@/components/common/PageHeader';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/button';
 import { useCurrentUser } from '@/features/auth';
+import { assistantsService } from '@/features/assistants';
+import { useAsyncResource } from '@/hooks/useAsyncResource';
 
-import { useInProgressExams } from '../hooks/useInProgressExams';
+import { examsService } from '../services/examsService';
+
+interface ActiveExamRow {
+  id: number;
+  title: string;
+  subject: string | null;
+  date: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  rooms: string;
+}
 
 /**
  * Lista de acceso a los exámenes EN_CURSO, exclusiva de docente y auxiliar.
- * Los datos salen de useInProgressExams.
+ * Cada API limita los resultados al usuario autenticado; el cliente solo
+ * selecciona EN_CURSO para esta pantalla.
  */
 export function InProgressExamsPage() {
   const { area } = useCurrentUser();
   const isAssistant = area === 'auxiliar';
 
-  const { status, data, error, reload } = useInProgressExams();
+  const { status, data, error, reload } = useAsyncResource<ActiveExamRow[]>(
+    async (signal) => {
+      if (isAssistant) {
+        const exams = await assistantsService.listMyExams(signal);
+
+        return exams
+          .filter((exam) => exam.estado === 'EN_CURSO' && exam.ambiente !== null)
+          .map((exam) => ({
+            id: exam.id_examen,
+            title: exam.nombre_examen,
+            subject: exam.materia,
+            date: exam.fecha,
+            startsAt: exam.hora_inicio,
+            endsAt: exam.hora_fin,
+            rooms: exam.ambiente?.nro_aula ?? 'Sin ambiente asignado',
+          }));
+      }
+
+      const exams = await examsService.listExams(signal);
+
+      return exams
+        .filter((exam) => exam.estado === 'EN_CURSO')
+        .map((exam) => ({
+          id: exam.id_examen,
+          title: exam.nombre_examen,
+          subject: exam.materia?.nombre ?? null,
+          date: exam.fecha,
+          startsAt: exam.hora_inicio,
+          endsAt: exam.hora_fin,
+          rooms: exam.ambientes?.map((room) => room.nro_aula).join(', ') || 'Sin ambiente',
+        }));
+    },
+    [isAssistant]
+  );
 
   const exams = data ?? [];
 
@@ -64,22 +109,30 @@ export function InProgressExamsPage() {
         <ul className="space-y-3" aria-label="Exámenes en curso">
           {exams.map((exam) => (
             <li key={exam.id}>
-              <ExamSummaryCard
-                title={exam.title}
-                subject={exam.subject}
-                dateLabel={exam.date ?? 'Fecha no disponible'}
-                startsAt={exam.startsAt}
-                endsAt={exam.endsAt}
-                roomsLabel={isAssistant ? 'Su ambiente' : 'Ambientes'}
-                rooms={exam.rooms}
-                action={
+              <article className="rounded-xl border bg-card p-4 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <h2 className="sciem-h3">{exam.title}</h2>
+                    {exam.subject && (
+                      <p className="text-sm text-muted-foreground">{exam.subject}</p>
+                    )}
+                    <p className="text-sm text-muted-foreground">
+                      {exam.date ?? 'Fecha no disponible'}
+                      {exam.startsAt && exam.endsAt
+                        ? ` · ${exam.startsAt}–${exam.endsAt}`
+                        : ''}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {isAssistant ? 'Su ambiente' : 'Ambientes'}: {exam.rooms}
+                    </p>
+                  </div>
                   <Button asChild size="sm">
                     <Link to={`/examenes/${exam.id}/en-curso`}>
                       Ver examen
                     </Link>
                   </Button>
-                }
-              />
+                </div>
+              </article>
             </li>
           ))}
         </ul>
