@@ -21,7 +21,6 @@ import {
   LateEntryExamsPage,
   LateEntryPage,
   OpenEntryControlsPage,
-  lateEntryExtensions,
 } from '@/features/entry-control'
 import {
   CreateExamPage,
@@ -53,10 +52,7 @@ import { IncidentsPage } from '@/features/incidents'
 
 // Punto de composición de HU-037, HU-038-B, HU-042 y HU-057.
 // Cada feature puede aportar componentes aquí sin editar ExamInProgressPage.
-const examInProgressExtensions: ExamInProgressExtensions = {
-  headerActions: lateEntryExtensions.headerActions,
-  panels: lateEntryExtensions.panels,
-}
+const examInProgressExtensions: ExamInProgressExtensions = {}
 
 /** Envuelve una pantalla con la capacidad que exige. Sin sesión redirige al login (ver ProtectedRoute). */
 function guarded(capability: Capability, element: ReactElement) {
