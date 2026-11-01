@@ -78,18 +78,22 @@ class ExamHistoryService
             ?? $this->emptyAttendance();
         $reports = DB::table('reporte_estudiante as r')
             ->join('tipo_falta as f', 'f.id_falta', '=', 'r.id_tipo_falta')
+            ->leftJoin('usuario as reportante', 'reportante.id_usuario', '=', 'r.id_usuario_reportante')
             ->where('r.id_examen', $exam->id_examen)
             ->select(['r.fecha_reporte', 'r.estado', 'f.nombre as falta'])
+            ->selectRaw("TRIM(CONCAT_WS(' ', reportante.nombre, reportante.apellido_paterno, reportante.apellido_materno)) as reportante")
             ->orderBy('r.fecha_reporte')
             ->get();
 
         $entries = DB::table('examen_estudiante as ee')
             ->join('estudiante as s', 's.id_estudiante', '=', 'ee.id_estudiante')
             ->leftJoin('ambiente as a', 'a.id_ambiente', '=', 'ee.id_ambiente')
+            ->leftJoin('usuario as controlador', 'controlador.id_usuario', '=', 'ee.id_usuario_controlador')
             ->where('ee.id_examen', $exam->id_examen)
             ->whereIn('ee.estado_ingreso', ['INGRESO', 'CON_RETRASO'])
             ->whereNotNull('ee.hora_ingreso')
             ->select(['ee.hora_ingreso', 'ee.estado_ingreso', 's.nombre', 's.apellido_paterno', 'a.nro_aula'])
+            ->selectRaw("TRIM(CONCAT_WS(' ', controlador.nombre, controlador.apellido_paterno, controlador.apellido_materno)) as controlador")
             ->orderBy('ee.hora_ingreso')
             ->get();
 
@@ -141,13 +145,15 @@ class ExamHistoryService
             'descripcion' => $entry->estado_ingreso === 'CON_RETRASO'
                 ? 'Ingreso con retraso' : 'Ingreso registrado',
             'detalle' => trim($entry->nombre . ' ' . $entry->apellido_paterno)
-                . ($entry->nro_aula ? ' · ' . $entry->nro_aula : ''),
+                . ($entry->nro_aula ? ' · ' . $entry->nro_aula : '')
+                . ($entry->controlador ? ' · Controló: ' . $entry->controlador : ' · Controlador no registrado'),
         ]))->concat($reports->map(fn ($report) => [
             'tipo' => 'incidencia',
             'fecha_hora' => $report->fecha_reporte,
             'descripcion' => 'Incidencia: ' . $report->falta,
-            'detalle' => $report->estado === ReportStatus::APPROVED
-                ? 'Aprobada · en Central de Riesgo' : ucfirst(strtolower($report->estado)),
+            'detalle' => ($report->estado === ReportStatus::APPROVED
+                ? 'Aprobada · en Central de Riesgo' : ucfirst(strtolower($report->estado)))
+                . ($report->reportante ? ' · Reportó: ' . $report->reportante : ' · Reportante no registrado'),
         ]));
 
         $startedAt = $exam->inicio_real_en ?? Carbon::createFromFormat(
