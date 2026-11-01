@@ -60,7 +60,7 @@ class ExamHistoryService
                     'fecha' => $exam->fecha->format('Y-m-d'),
                     'materia' => $exam->subject?->nombre,
                     'esperados' => $counts['esperados'],
-                    'presentes' => $counts['a_tiempo'] + $counts['con_retraso'],
+                    'presentes' => $counts['presentes'],
                     'incidencias' => (int) ($incidents[$exam->id_examen] ?? 0),
                 ];
             })->values()->all(),
@@ -224,6 +224,7 @@ class ExamHistoryService
             'nombre_examen' => $exam->nombre_examen,
             'fecha' => $exam->fecha->format('Y-m-d'),
             'materia' => $exam->subject?->nombre,
+            'total_estudiantes' => $counts['esperados'],
             'inicio_real_en' => $exam->inicio_real_en?->toIso8601String(),
             'inicio_automatico' => (bool) $exam->inicio_automatico,
             'fin_real_en' => $exam->fin_real_en?->toIso8601String(),
@@ -232,7 +233,7 @@ class ExamHistoryService
                 'a_tiempo' => $counts['a_tiempo'],
                 'con_retraso' => $counts['con_retraso'],
                 'ausentes' => $counts['ausentes'],
-                'incidencias' => $reports->count(),
+                'incidencias' => $counts['incidencias'],
             ],
             'linea_tiempo' => $timeline,
             'ambientes' => $rooms->map(fn ($room) => [
@@ -266,6 +267,8 @@ class ExamHistoryService
             'a_tiempo' => (int) $row->a_tiempo,
             'con_retraso' => (int) $row->con_retraso,
             'ausentes' => (int) $row->ausentes,
+            'presentes' => (int) $row->a_tiempo + (int) $row->con_retraso,
+            'incidencias' => 0,
         ]])->all();
 
         // Un cierre normal congela la nómina y deja una auditoría. Si solo se cambió
@@ -300,11 +303,52 @@ class ExamHistoryService
             }
         }
 
+        // Los cuatro totales del resumen clasifican estudiantes, no reportes.
+        // Un estudiante reportado ocupa una sola categoría aunque tenga varios reportes.
+        $reported = DB::table('reporte_estudiante as r')
+            ->leftJoin('examen_estudiante as ee', function ($join) {
+                $join->on('ee.id_examen', '=', 'r.id_examen')
+                    ->on('ee.id_estudiante', '=', 'r.id_estudiante');
+            })
+            ->whereIn('r.id_examen', $examIds)
+            ->where(function ($query) {
+                $query->whereNotNull('ee.id_estudiante')
+                    ->orWhereExists(function ($roster) {
+                        $roster->selectRaw('1')
+                            ->from('grupo_examen as gx')
+                            ->join('grupo_estudiante as gs', 'gs.id_grupo', '=', 'gx.id_grupo')
+                            ->whereColumn('gx.id_examen', 'r.id_examen')
+                            ->whereColumn('gs.id_estudiante', 'r.id_estudiante');
+                    });
+            })
+            ->distinct()
+            ->get(['r.id_examen', 'r.id_estudiante', 'ee.estado_ingreso']);
+
+        foreach ($reported as $student) {
+            $examId = (int) $student->id_examen;
+            $counts = $attendance[$examId] ?? $this->emptyAttendance();
+            $category = match ($student->estado_ingreso) {
+                'INGRESO' => 'a_tiempo',
+                'CON_RETRASO' => 'con_retraso',
+                default => 'ausentes',
+            };
+            $counts[$category] = max(0, $counts[$category] - 1);
+            $counts['incidencias']++;
+            $attendance[$examId] = $counts;
+        }
+
         return $attendance;
     }
 
     private function emptyAttendance(): array
     {
-        return ['esperados' => 0, 'a_tiempo' => 0, 'con_retraso' => 0, 'ausentes' => 0];
+        return [
+            'esperados' => 0,
+            'a_tiempo' => 0,
+            'con_retraso' => 0,
+            'ausentes' => 0,
+            'presentes' => 0,
+            'incidencias' => 0,
+        ];
     }
 }
