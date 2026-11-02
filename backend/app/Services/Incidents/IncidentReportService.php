@@ -102,9 +102,11 @@ class IncidentReportService
                 $this->evidence->delete($evidencePath);
             }
 
-            if ($exception instanceof QueryException
+            if (
+                $exception instanceof QueryException
                 && ($exception->errorInfo[0] ?? null) === '23505'
-                && strpos($exception->getMessage(), 'unq_reporte_estudiante_id_intento') !== false) {
+                && strpos($exception->getMessage(), 'unq_reporte_estudiante_id_intento') !== false
+            ) {
                 $this->rejectDuplicate();
             }
 

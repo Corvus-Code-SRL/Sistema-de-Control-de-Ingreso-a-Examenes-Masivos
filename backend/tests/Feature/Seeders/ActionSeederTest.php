@@ -104,5 +104,4 @@ class ActionSeederTest extends TestCase
             'descripcion' => 'Retiro de un estudiante durante el examen',
         ]);
     }
-
 }

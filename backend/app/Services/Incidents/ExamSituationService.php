@@ -23,8 +23,7 @@ class ExamSituationService
         ExamSituationAccessService $access,
         AuditLogService $audit,
         ExamExpulsionService $expulsions
-    )
-    {
+    ) {
         $this->access = $access;
         $this->audit = $audit;
         $this->expulsions = $expulsions;

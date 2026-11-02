@@ -88,7 +88,8 @@ class InProgressIncidentTest extends TestCase
         $response = $this->getJson("/api/examenes/{$this->situationExam->id_examen}/en-curso")
             ->assertOk()->assertJsonPath('data.totales.incidencias_pendientes', 2);
         $student = collect($response->json('data.estudiantes'))->firstWhere(
-            'id_estudiante', $this->situationStudent->id_estudiante
+            'id_estudiante',
+            $this->situationStudent->id_estudiante
         );
         $this->assertSame(2, $student['total_incidencias']);
     }
@@ -110,7 +111,8 @@ class InProgressIncidentTest extends TestCase
         $this->postJson($this->url(), $this->payload([
             'evidencia' => UploadedFile::fake()->create('archivo.txt', 1, 'text/plain'),
         ]))->assertStatus(422)->assertJsonPath(
-            'errors.evidencia.0', 'Formato o tamaño no permitido. Use jpg, png o pdf de hasta 5 MB.'
+            'errors.evidencia.0',
+            'Formato o tamaño no permitido. Use jpg, png o pdf de hasta 5 MB.'
         );
         $this->assertSame(0, DB::table('reporte_estudiante')->count());
     }
@@ -229,7 +231,8 @@ class InProgressIncidentTest extends TestCase
         $this->expectException(ExamStateException::class);
         $this->expectExceptionMessage('El estudiante fue expulsado de este examen a las 10:40');
         app(ExamExpulsionService::class)->assertCanEnter(
-            $this->situationExam->id_examen, $this->situationStudent->id_estudiante
+            $this->situationExam->id_examen,
+            $this->situationStudent->id_estudiante
         );
     }
 
@@ -304,5 +307,4 @@ class InProgressIncidentTest extends TestCase
             [['outside_room' => true], '23503'],
         ];
     }
-
 }

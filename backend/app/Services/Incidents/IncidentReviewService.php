@@ -44,7 +44,10 @@ class IncidentReviewService
         $reports = $this->baseQuery($teacherId)
             ->when($examId !== null, fn (Builder $q) => $q->where('id_examen', $examId))
             ->when($estado === 'pendiente', fn (Builder $q) => $q->where('estado', ReportStatus::PENDING))
-            ->when($estado === 'revisada', fn (Builder $q) => $q->whereIn('estado', [ReportStatus::APPROVED, ReportStatus::REJECTED]))
+            ->when(
+                $estado === 'revisada',
+                fn (Builder $q) => $q->whereIn('estado', [ReportStatus::APPROVED, ReportStatus::REJECTED])
+            )
             ->orderBy(
                 $estado === 'revisada' ? 'fecha_revision' : 'fecha_reporte',
                 $orden ?? ($estado === 'pendiente' ? 'asc' : 'desc')
