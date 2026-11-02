@@ -73,7 +73,7 @@ async function poll() {
   await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
 }
 async function open(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole('button', { name: 'Reportar incidencia' }))
+  await user.click(await screen.findByRole('button', { name: 'Reportar' }))
   return screen.findByRole('dialog', { name: 'Reportar incidencia' })
 }
 async function fill(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement) {
@@ -86,7 +86,7 @@ async function fill(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElemen
 describe('HU-042 durante el examen en la página de HU-038-A', () => {
   it('carga contexto reciente, catálogo real y envía sin inventar intento ni datos protegidos', async () => {
     const { user, calls } = setup()
-    await screen.findByRole('button', { name: 'Reportar incidencia' })
+    await screen.findByRole('button', { name: 'Reportar' })
     exam.hora_servidor_en = '2026-10-30T12:31:00Z'
     const dialog = await open(user)
     expect(within(dialog).getByText(/08:31/)).toBeInTheDocument()
@@ -156,7 +156,7 @@ describe('HU-042 durante el examen en la página de HU-038-A', () => {
     exam.id_ambiente_asignado = 6
     setup()
     await screen.findByRole('row', { name: /Carlos Rocha/ })
-    expect(screen.queryByRole('button', { name: 'Reportar incidencia' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reportar' })).not.toBeInTheDocument()
   })
 
   it('bloquea el modal si el polling informa cierre y permite cancelarlo', async () => {
@@ -166,7 +166,7 @@ describe('HU-042 durante el examen en la página de HU-038-A', () => {
     await poll()
     expect(within(dialog).getByRole('button', { name: 'Enviar a revisión' })).toBeDisabled()
     await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
-    expect(screen.queryByRole('button', { name: 'Reportar incidencia' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reportar' })).not.toBeInTheDocument()
     expect(calls.filter((call) => call.method === 'POST')).toHaveLength(0)
   })
 

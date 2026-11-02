@@ -66,7 +66,7 @@ export function InProgressIncidentAction({ exam, student }: Props) {
       {count === 1 ? 'Incidencia reportada' : `${count} incidencias`}
     </p>}
     {available && <Button type="button" variant="outline" disabled={loading} onClick={() => void open()}>
-      {loading ? 'Cargando reporte…' : 'Reportar incidencia'}
+      {loading ? 'Cargando reporte…' : 'Reportar'}
     </Button>}
     {error && <p role="alert" className="text-sm text-danger-fg">{error}</p>}
     {message && <p role="status" className="text-sm text-muted-foreground">{message}</p>}
