@@ -151,7 +151,7 @@ class RoutesRequireAuthenticationTest extends TestCase
         $this->assertSame([], $failures, "Rutas que no exigen token:\n" . implode("\n", $failures));
     }
 
-    public function test_el_login_es_la_unica_ruta_publica_y_esta_limitada_a_10_intentos_por_minuto(): void
+    public function test_el_login_es_la_unica_ruta_publica_y_tiene_su_propio_limitador(): void
     {
         $public = [];
 
@@ -163,7 +163,8 @@ class RoutesRequireAuthenticationTest extends TestCase
 
         $this->assertCount(1, $public);
         $this->assertSame(self::PUBLIC_ROUTE, $this->signature($public[0]));
-        $this->assertContains('throttle:10,1', $public[0]->gatherMiddleware());
+        $this->assertContains('throttle:login', $public[0]->gatherMiddleware());
+        $this->assertContains('throttle:api', $public[0]->excludedMiddleware());
     }
 
     /** @return array<int, LaravelRoute> */

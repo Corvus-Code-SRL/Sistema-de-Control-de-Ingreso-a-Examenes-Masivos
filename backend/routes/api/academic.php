@@ -9,6 +9,7 @@ use App\Http\Controllers\Academic\StudentRosterController;
 use App\Http\Controllers\Academic\SubjectController;
 use App\Http\Controllers\Academic\SubjectGroupController;
 use App\Http\Controllers\Academic\SubjectCareerAssignmentController;
+use App\Http\Controllers\Academic\FacultyController;
 use Illuminate\Support\Facades\Route;
 
 // Rutas del módulo: academic
@@ -18,6 +19,8 @@ Route::get('materias', [SubjectController::class, 'index']);
 Route::get('materias/administracion', [SubjectController::class, 'adminIndex']);
 
 Route::get('periodos', [PeriodController::class, 'index']);
+
+Route::get('facultades', [FacultyController::class, 'index']);
 
 Route::get(
     'carreras/{id_carrera}/materias/{id_materia}/grupos',

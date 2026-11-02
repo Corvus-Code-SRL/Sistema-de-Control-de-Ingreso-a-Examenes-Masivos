@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/button';
+import { ApiError } from '@/lib/api-client';
 import { normalizeSearch } from '@/lib/text';
+import { throttleNotice, throttleWaitSeconds } from '@/lib/throttle';
 import { examInProgressService } from '../services/examInProgressService';
 import type { ExamInProgressExtensions } from '../components/ExamInProgressExtensions';
 import type {
@@ -60,6 +62,7 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
   const [clockSync, setClockSync] = useState<ExamClockSync | null>(null);
   const [filter, setFilter] = useState<Filter>('presentes');
   const [search, setSearch] = useState('');
+  const pausedUntil = useRef(0);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -100,7 +103,12 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
           setError(null);
         }
       } catch (cause) {
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted && cause instanceof ApiError && cause.isTooManyRequests) {
+          // La consulta sigue viva: solo se salta los ciclos que caen dentro de la espera del servidor.
+          const seconds = throttleWaitSeconds(cause);
+          pausedUntil.current = Date.now() + seconds * 1000;
+          setError(throttleNotice(seconds));
+        } else if (!controller.signal.aborted) {
           setError(
             cause instanceof Error
               ? cause.message
@@ -116,7 +124,7 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
     void load();
 
     const timer = window.setInterval(() => {
-      if (!document.hidden) void load();
+      if (!document.hidden && Date.now() >= pausedUntil.current) void load();
     }, 2000);
 
     return () => {

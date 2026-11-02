@@ -39,8 +39,9 @@ describe('findActiveItem', () => {
   })
 
   it.each([
-    ['/cuentas', 'admin-register-account'],
-    ['/cuentas/00000000-0000-4000-8000-000000000011', 'admin-register-account'],
+    ['/cuentas/nueva', 'admin-register-account'],
+    ['/cuentas/roles', 'admin-change-role'],
+    ['/cuentas/00000000-0000-4000-8000-000000000011', 'admin-change-role'],
     ['/materias/catalogo', 'admin-academic-catalog'],
     ['/materias/asignaciones', 'admin-assign-subject'],
     ['/ambientes', 'admin-register-classroom'],

@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Role;
+
 return [
 
     /*
@@ -86,6 +88,78 @@ return [
     'evidencia_discos' => array_values(array_filter(array_map(
         'trim',
         explode(',', (string) env('SCIEM_EVIDENCIA_DISCOS', 'local,public'))
+    ))),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Límites de peticiones por minuto (RNF-03)
+    |--------------------------------------------------------------------------
+    |
+    | Los lee App\Providers\RouteServiceProvider. Con sesión se limita por usuario, no por IP: detrás
+    | del NAT del campus todos los controladores comparten IP.
+    |
+    | - api:       acciones y consultas de un usuario autenticado.
+    | - polling:   las consultas periódicas (/estado del control de ingreso y /en-curso), aparte
+    |              para que no consuman la cuota de las acciones.
+    | - guest:     peticiones sin sesión que pasan por el limiter `api`, por IP.
+    | - login_account: intentos de inicio de sesión sobre un mismo código SIS desde una misma IP.
+    | - login_ip:  intentos de inicio de sesión desde una IP, sea cual sea el código.
+    |
+    */
+
+    'rate_limits' => [
+        'api' => (int) env('SCIEM_RATE_API', 180),
+        'polling' => (int) env('SCIEM_RATE_POLLING', 90),
+        'guest' => (int) env('SCIEM_RATE_GUEST', 60),
+        'login_account' => (int) env('SCIEM_RATE_LOGIN_ACCOUNT', 10),
+        'login_ip' => (int) env('SCIEM_RATE_LOGIN_IP', 300),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Acceso por función y rol
+    |--------------------------------------------------------------------------
+    |
+    | ÚNICO lugar del backend que decide qué roles ejercen cada función
+    | (UserRoleService::canUse). Cambiar el acceso de un rol es editar su lista aquí.
+    |
+    | DEBE mantenerse igual que ACCESS_BY_FEATURE en
+    | frontend/src/features/auth/capabilities.ts: el menú y las rutas del cliente salen de ese
+    | espejo, y capabilities.access.test.ts falla si los dos mapas difieren.
+    |
+    | El Auxiliar no figura: su acceso (control de ingreso, reportes de falta) es del rol, no de
+    | estas funciones. El Invitado (docente sin código SIS) ejerce la docencia, habilita auxiliares
+    | por examen, toma incidencias y opera el ingreso; no consulta la Central de Riesgo, no gestiona
+    | auxiliares de grupo, no reporta auxiliares, no acepta casos especiales y, mientras no haya una
+    | decisión de producto, no invita a otros docentes.
+    |
+    */
+
+    'access' => [
+        'teaching'         => [Role::DOCENTE, Role::INVITADO],
+        'exam_assistants'  => [Role::DOCENTE, Role::INVITADO],
+        'incidents'        => [Role::DOCENTE, Role::INVITADO],
+        'risk_center'      => [Role::ADMINISTRADOR, Role::DOCENTE],
+        'group_assistants' => [Role::DOCENTE],
+        'report_assistant' => [Role::DOCENTE],
+        'special_cases'    => [Role::DOCENTE],
+        'invite_teachers'  => [Role::DOCENTE],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cuentas de sistema que nunca pueden iniciar sesión
+    |--------------------------------------------------------------------------
+    |
+    | Códigos (separados por comas) de las cuentas que firman la bitácora de las automatizaciones.
+    | AuthService las rechaza con el mismo mensaje genérico que una contraseña incorrecta,
+    | aunque la contraseña sea la correcta y sea cual sea su rol. Ver App\Support\SystemAccounts.
+    |
+    */
+
+    'cuentas_sistema' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('SCIEM_CUENTAS_SISTEMA', '000000000'))
     ))),
 
 ];

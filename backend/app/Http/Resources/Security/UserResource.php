@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Security;
 
+use App\Support\SisCode;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class UserResource extends JsonResource
@@ -13,6 +14,7 @@ class UserResource extends JsonResource
         return [
             'id_usuario'       => $this->id_usuario,
             'cod_sis'          => $this->cod_sis,
+            'es_invitado'      => SisCode::isGuest($this->cod_sis),
             'nombre'           => $this->nombre,
             'apellido_paterno' => $this->apellido_paterno,
             'apellido_materno' => $this->apellido_materno,

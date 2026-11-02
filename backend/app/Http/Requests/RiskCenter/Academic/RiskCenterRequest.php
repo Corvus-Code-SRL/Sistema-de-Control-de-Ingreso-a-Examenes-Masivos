@@ -9,9 +9,9 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Consulta de la Central de Riesgo de estudiantes: solo Docente y Administrador activos.
+ * Consulta de la Central de Riesgo de estudiantes: los roles de la función risk_center (config sciem.access): Docente y Administrador.
  *
- * El registro es institucional y de solo lectura; el Auxiliar no tiene acceso.
+ * El registro es institucional y de solo lectura; el Auxiliar y el Invitado no tienen acceso.
  */
 abstract class RiskCenterRequest extends FormRequest
 {
@@ -19,7 +19,7 @@ abstract class RiskCenterRequest extends FormRequest
 
     public function authorize(CurrentUser $currentUser, UserRoleService $roles): bool
     {
-        return $roles->hasAnyActiveRole($currentUser->id(), [Role::ADMINISTRADOR, Role::DOCENTE]);
+        return $roles->canUse($currentUser->id(), 'risk_center');
     }
 
     protected function failedAuthorization(): void

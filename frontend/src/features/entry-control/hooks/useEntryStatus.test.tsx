@@ -103,4 +103,47 @@ describe('useEntryStatus', () => {
     await advance(2000)
     expect(request).toHaveBeenCalledTimes(3)
   })
+
+  it('ante un 429 avisa, espera lo que pide Retry-After y sigue consultando', async () => {
+    vi.useFakeTimers()
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false })
+    vi.spyOn(entryControlService, 'context').mockResolvedValue(context)
+    const request = vi.spyOn(entryControlService, 'status')
+      .mockResolvedValueOnce(status)
+      .mockRejectedValueOnce(new ApiError(429, 'Too Many Attempts.', {}, undefined, { retryAfter: 7 }))
+      .mockResolvedValue(status)
+
+    const { result } = await mount()
+    await advance(2000)
+    expect(request).toHaveBeenCalledTimes(2)
+    expect(result.current.statusError).toBe('Muchas consultas seguidas, reintentando en 7 s.')
+    expect(result.current.status).toEqual(status)
+
+    await advance(6999)
+    expect(request).toHaveBeenCalledTimes(2)
+    await advance(1)
+    expect(request).toHaveBeenCalledTimes(3)
+    expect(result.current.statusError).toBeNull()
+
+    await advance(2000)
+    expect(request).toHaveBeenCalledTimes(4)
+  })
+
+  it('limita la espera de un 429 a 30 segundos', async () => {
+    vi.useFakeTimers()
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false })
+    vi.spyOn(entryControlService, 'context').mockResolvedValue(context)
+    const request = vi.spyOn(entryControlService, 'status')
+      .mockResolvedValueOnce(status)
+      .mockRejectedValueOnce(new ApiError(429, 'Too Many Attempts.', {}, undefined, { retryAfter: 60 }))
+      .mockResolvedValue(status)
+
+    await mount()
+    await advance(2000)
+    expect(request).toHaveBeenCalledTimes(2)
+    await advance(29999)
+    expect(request).toHaveBeenCalledTimes(2)
+    await advance(1)
+    expect(request).toHaveBeenCalledTimes(3)
+  })
 })

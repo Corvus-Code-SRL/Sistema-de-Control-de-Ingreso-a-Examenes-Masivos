@@ -11,13 +11,16 @@ use App\Exceptions\Exams\ExamAssistantNotFoundException;
 use App\Exceptions\Exams\ExamOwnershipException;
 use App\Exceptions\Exams\ExamStateException;
 use App\Exceptions\Exams\ExamWarningsException;
+use App\Exceptions\Exams\FinalReportUnavailableException;
 use App\Exceptions\Security\DuplicateAccountException;
 use App\Exceptions\Security\InactiveAccountException;
 use App\Exceptions\Security\InvalidCredentialsException;
 use App\Exceptions\Security\NoCurrentRoleException;
 use App\Exceptions\Security\PasswordChangeRequiredException;
 use App\Exceptions\Security\SelfRoleAssignmentException;
-use App\Exceptions\Security\SisNoValidoException;
+use App\Exceptions\Security\GuestCodeTakenException;
+use App\Exceptions\Security\GuestCodesExhaustedException;
+use App\Exceptions\Security\RoleNotAllowedForAccountException;
 use App\Support\ApiResponse;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
@@ -51,13 +54,16 @@ class Handler extends ExceptionHandler
         ExamOwnershipException::class,
         ExamStateException::class,
         ExamWarningsException::class,
+        FinalReportUnavailableException::class,
         DuplicateAccountException::class,
         InactiveAccountException::class,
         InvalidCredentialsException::class,
         NoCurrentRoleException::class,
         PasswordChangeRequiredException::class,
         SelfRoleAssignmentException::class,
-        SisNoValidoException::class,
+        GuestCodeTakenException::class,
+        GuestCodesExhaustedException::class,
+        RoleNotAllowedForAccountException::class,
         IncidentAlreadyReviewedException::class,
         IncidentOwnershipException::class,
         IncidentReportNotFoundException::class,

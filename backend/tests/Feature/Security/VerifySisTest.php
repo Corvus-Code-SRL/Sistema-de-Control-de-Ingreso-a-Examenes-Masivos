@@ -50,14 +50,31 @@ class VerifySisTest extends TestCase
     }
 
     /** @test */
-    public function rechaza_un_codigo_no_reconocido_por_el_sis()                 // CA 3
+    public function el_duplicado_se_detecta_aunque_el_sis_no_responda_y_trae_el_id_de_la_cuenta()
+    {
+        $existing = User::factory()->create([
+            'cod_sis' => '202312345',
+            'nombre' => 'Juan',
+            'apellido_paterno' => 'Perez',
+            'apellido_materno' => null,
+        ]);
+
+        $mock = Mockery::mock(SisGateway::class);
+        $mock->shouldReceive('estaDisponible')->andReturn(false);
+        $this->app->instance(SisGateway::class, $mock);
+
+        $this->getJson('/api/sis/verificar/202312345')
+             ->assertStatus(422)
+             ->assertJsonPath('errors.cod_sis.0', 'Ya existe una cuenta con este código SIS: Juan Perez.')
+             ->assertJsonPath('cuenta_existente.id_usuario', $existing->id_usuario);
+    }
+
+    /** @test */
+    public function un_codigo_no_reconocido_por_el_sis_responde_sin_datos()      // el SIS es solo una ayuda
     {
         $this->getJson('/api/sis/verificar/999999999')
-             ->assertStatus(422)
-             ->assertJsonPath(
-                 'errors.cod_sis.0',
-                 'El código SIS no corresponde a una persona reconocida por la institución.'
-             );
+             ->assertOk()
+             ->assertJsonPath('data', null);
     }
 
     /** @test */

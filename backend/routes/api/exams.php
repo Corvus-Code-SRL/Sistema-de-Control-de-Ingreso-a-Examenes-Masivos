@@ -7,6 +7,7 @@ use App\Http\Controllers\Exams\ExamGroupController;
 use App\Http\Controllers\Exams\GroupExamController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Exams\ClassroomController;
+use App\Http\Controllers\Exams\FinalReportController;
 
 // ...
 
@@ -35,6 +36,8 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
         ->name('show');
 
     Route::get('/{exam}/en-curso', [ExamInProgressController::class, 'show'])
+        ->withoutMiddleware('throttle:api')
+        ->middleware('throttle:polling')
         ->where('exam', '[0-9]{1,9}')
         ->name('en-curso');
 
@@ -53,6 +56,14 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
     Route::post('/{exam}/finalizar', [ExamController::class, 'finish'])
         ->where('exam', '[0-9]{1,9}')
         ->name('finalizar');
+
+    Route::get('/{exam}/reporte-final', [FinalReportController::class, 'show'])
+        ->where('exam', '[0-9]{1,9}')
+        ->name('reporte-final');
+
+    Route::get('/{exam}/reporte-final/pdf', [FinalReportController::class, 'pdf'])
+        ->where('exam', '[0-9]{1,9}')
+        ->name('reporte-final.pdf');
 
     Route::post('/{exam}/grupos', [ExamGroupController::class, 'store'])
         ->where('exam', '[0-9]{1,9}')

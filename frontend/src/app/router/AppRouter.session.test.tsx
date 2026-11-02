@@ -237,7 +237,7 @@ describe('acceso por capacidad', () => {
 
     const app = renderApp('/examenes/nuevo')
 
-    await waitFor(() => expect(app.pathname).toBe('/cuentas'))
+    await waitFor(() => expect(app.pathname).toBe('/cuentas/nueva'))
   })
 })
 
@@ -309,7 +309,7 @@ describe('redirección después de iniciar sesión', () => {
 
   it.each<[string, AccountKey, string]>([
     ['10452', 'docente', '/materias'],
-    ['ADM0001', 'administrador', '/cuentas'],
+    ['ADM0001', 'administrador', '/cuentas/nueva'],
     ['201800451', 'auxiliar', '/mis-examenes'],
   ])('%s (%s) llega a %s', async (sis, account, destination) => {
     stubLoginServer(account)
@@ -339,7 +339,7 @@ describe('redirección después de iniciar sesión', () => {
 
     await loginAs('10452')
 
-    await waitFor(() => expect(app.pathname).toBe('/cuentas'))
+    await waitFor(() => expect(app.pathname).toBe('/cuentas/nueva'))
   })
 
   it('quien ya tiene sesión y abre /login vuelve a la entrada de su rol', async () => {
@@ -348,6 +348,6 @@ describe('redirección después de iniciar sesión', () => {
 
     const app = renderApp('/login')
 
-    await waitFor(() => expect(app.pathname).toBe('/cuentas'))
+    await waitFor(() => expect(app.pathname).toBe('/cuentas/nueva'))
   })
 })
