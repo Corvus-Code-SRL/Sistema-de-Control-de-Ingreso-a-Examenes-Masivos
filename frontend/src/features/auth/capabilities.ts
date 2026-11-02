@@ -47,7 +47,13 @@ export const ACCESS_BY_FEATURE: Record<AccessFeature, readonly RoleName[]> = {
 }
 
 const CAPABILITIES_BY_FEATURE = {
-  teaching: ['grupos.gestionar', 'examenes.gestionar', 'ingreso.operar', 'incidencias.registrar'],
+  teaching: [
+    'grupos.gestionar',
+    'examenes.gestionar',
+    'ingreso.operar',
+    'incidencias.registrar',
+    'situaciones.registrar',
+  ],
   exam_assistants: ['auxiliares.examen'],
   incidents: ['incidencias.revisar'],
   risk_center: ['riesgo.consultar'],
@@ -58,7 +64,7 @@ const CAPABILITIES_BY_FEATURE = {
 } as const
 
 const ROLE_OWN_CAPABILITIES = {
-  Auxiliar: ['ingreso.operar', 'incidencias.registrar', 'asignaciones.consultar'],
+  Auxiliar: ['ingreso.operar', 'incidencias.registrar', 'situaciones.registrar', 'asignaciones.consultar'],
   Administrador: ['administracion.gestionar'],
   Docente: [],
   Invitado: [],

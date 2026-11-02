@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\Security\UserRoleService;
+use App\Services\Incidents\ExamInProgressSituationService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 
@@ -16,7 +17,8 @@ class ExamInProgressQueryService
     public function __construct(
         private ExamParticipantService $participants,
         private ExamTimingService $timing,
-        private UserRoleService $roles
+        private UserRoleService $roles,
+        private ExamInProgressSituationService $situations
     ) {}
 
     public function show(Exam $exam, User $actor): array
@@ -177,6 +179,15 @@ class ExamInProgressQueryService
         }
 
         $studentIds = array_column($students, 'id_estudiante');
+        $situationData = $this->situations->forExam($exam, $studentIds, $actor);
+
+        foreach ($students as &$student) {
+            $student['situaciones'] = $situationData['students'][$student['id_estudiante']] ?? [
+                'identidad_observada' => false,
+                'ultimo_cambio_ambiente' => null,
+            ];
+        }
+        unset($student);
 
         $incidents = DB::table('reporte_estudiante')
             ->where('id_examen', $examId)
@@ -212,6 +223,8 @@ class ExamInProgressQueryService
             'hora_servidor_en' => now('UTC')->toIso8601String(),
             'totales' => $counts,
             'estudiantes' => $students,
+            'situaciones_habilitadas' => $situationData['enabled'],
+            'total_situaciones' => $situationData['revision'],
         ];
     }
 }
