@@ -31,6 +31,7 @@ import {
   FinalReportPage,
   InProgressExamsPage,
   ExamHistoryPage,
+  ExamReportsPage,
   ExamHistorySummaryPage,
   type ExamInProgressExtensions,
 } from '@/features/exams'
@@ -128,6 +129,11 @@ function DocenteRoutes() {
       <Route
         path="/examenes/programados"
         element={guarded('examenes.gestionar', <ExamsPage />)}
+      />
+
+      <Route
+        path="/examenes/reportes"
+        element={guarded('examenes.gestionar', <ExamReportsPage />)}
       />
 
       <Route
