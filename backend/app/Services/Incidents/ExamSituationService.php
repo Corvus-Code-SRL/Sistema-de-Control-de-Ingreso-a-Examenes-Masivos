@@ -6,9 +6,11 @@ use App\Exceptions\Exams\ExamStateException;
 use App\Models\Exam;
 use App\Models\ExamSituation;
 use App\Models\User;
+use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\Security\AuditLogService;
 use App\Support\ExamSituationType;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 /** Guarda situación, cambio de ambiente y bitácora dentro de la misma transacción. */
@@ -16,23 +18,29 @@ class ExamSituationService
 {
     private ExamSituationAccessService $access;
     private AuditLogService $audit;
+    private EntryControlSnapshotService $snapshots;
 
-    public function __construct(ExamSituationAccessService $access, AuditLogService $audit)
-    {
+    public function __construct(
+        ExamSituationAccessService $access,
+        AuditLogService $audit,
+        EntryControlSnapshotService $snapshots
+    ) {
         $this->access = $access;
         $this->audit = $audit;
+        $this->snapshots = $snapshots;
     }
 
     /** $input contiene exclusivamente los datos validados por StoreExamSituationRequest. */
     public function register(int $examId, int $studentId, array $input, User $actor): ExamSituation
     {
-        return DB::transaction(function () use ($examId, $studentId, $input, $actor): ExamSituation {
+        $syncedRoomId = null;
+
+        $situation = DB::transaction(function () use (
+            $examId, $studentId, $input, $actor, &$syncedRoomId
+        ): ExamSituation {
             $exam = Exam::query()->whereKey($examId)->lockForUpdate()->firstOrFail();
             $roomScope = $this->access->roomScope($exam, $actor);
-
-            if ($exam->estado !== Exam::EN_CURSO) {
-                throw new ExamStateException('Solo puede registrar situaciones durante el examen en curso.');
-            }
+            $this->access->assertRegistrable($exam);
 
             $attendance = DB::table('examen_estudiante')
                 ->where('id_examen', $examId)
@@ -79,6 +87,10 @@ class ExamSituationService
                     ->update(['id_ambiente' => $destinationRoomId]);
 
                 $action = 'CAMBIAR_AMBIENTE';
+
+                if ($exam->estado === Exam::EN_INGRESO) {
+                    $syncedRoomId = $destinationRoomId;
+                }
             }
 
             $attributes = [
@@ -107,5 +119,34 @@ class ExamSituationService
                 ->with(['student', 'originRoom', 'destinationRoom', 'reporter'])
                 ->findOrFail($situationId);
         });
+
+        if ($syncedRoomId !== null) {
+            $this->syncEntrySnapshot($examId, $studentId, $syncedRoomId);
+        }
+
+        return $situation;
+    }
+
+    /** Después del commit: PostgreSQL ya tiene el cambio; Redis solo es la copia operativa del ingreso. */
+    private function syncEntrySnapshot(int $examId, int $studentId, int $roomId): void
+    {
+        try {
+            $this->snapshots->markRoomChanged($examId, $studentId, $roomId);
+        } catch (\Throwable $exception) {
+            Log::error('Cambio de ambiente persistido, pero no se pudo actualizar Redis', [
+                'id_examen' => $examId,
+                'id_estudiante' => $studentId,
+                'motivo' => $exception->getMessage(),
+            ]);
+
+            try {
+                $this->snapshots->deactivate($examId);
+            } catch (\Throwable $deactivationError) {
+                Log::error('Tampoco se pudo invalidar el snapshot Redis', [
+                    'id_examen' => $examId,
+                    'motivo' => $deactivationError->getMessage(),
+                ]);
+            }
+        }
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Services\Incidents;
 
+use App\Exceptions\Exams\ExamStateException;
 use App\Models\Exam;
 use App\Models\Role;
 use App\Models\User;
@@ -13,6 +14,9 @@ use Illuminate\Support\Facades\DB;
 /** Autoriza por examen y ambiente sin aplicar los horarios del control de ingreso. */
 class ExamSituationAccessService
 {
+    /** Estados en los que se puede registrar una situación: desde que abre el ingreso hasta que termina el examen. */
+    public const REGISTRABLE_STATES = [Exam::EN_INGRESO, Exam::EN_CURSO];
+
     private UserRoleService $roles;
 
     public function __construct(UserRoleService $roles)
@@ -104,6 +108,15 @@ class ExamSituationAccessService
                         });
                 });
             });
+    }
+
+    public function assertRegistrable(Exam $exam): void
+    {
+        if (! in_array($exam->estado, self::REGISTRABLE_STATES, true)) {
+            throw new ExamStateException(
+                'Solo se pueden registrar situaciones con el ingreso abierto o con el examen en curso.'
+            );
+        }
     }
 
     public function assertRoomAllowed(Exam $exam, int $roomId, ?int $roomScope): void
