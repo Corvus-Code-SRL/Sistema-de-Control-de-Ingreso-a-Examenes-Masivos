@@ -324,14 +324,36 @@ describe('AppSidebar — entradas y estado activo', () => {
       ['Programados', '/examenes/programados'],
       ['Registrar examen', '/examenes/nuevo'],
       ['Control de ingreso', '/control-ingreso'],
-      ['Registrar situación excepcional', '/situacion-excepcional'],
       ['En curso', '/examenes/en-curso'],
       ['Registrar estudiante con retraso', '/retrasos'],
+      ['Registrar situación excepcional', '/situacion-excepcional'],
       ['Revisar reportes de incidencias', '/incidencias'],
       ['Central de riesgo', '/central-riesgo'],
       ['Historial de mis exámenes', '/historial'],
       ['Generar reporte de examen', '/examenes/reportes'],
     ])
+  })
+
+  it.each(['Docente', 'Invitado', 'Auxiliar'] as const)(
+    '%s ve siempre «Registrar situación excepcional», sin depender de un examen activo',
+    async (role) => {
+      const user = userEvent.setup()
+      renderSidebar(role, '/materias')
+      await openAllSections(user)
+
+      expect(screen.getByRole('link', { name: 'Registrar situación excepcional' }))
+        .toHaveAttribute('href', '/situacion-excepcional')
+      expect(screen.queryByText('Registrar estudiante excepcional')).not.toBeInTheDocument()
+    }
+  )
+
+  it('el Administrador no ve «Registrar situación excepcional»', async () => {
+    const user = userEvent.setup()
+    renderSidebar('Administrador', '/cuentas/roles')
+    await openAllSections(user)
+
+    expect(screen.queryByText('Registrar situación excepcional')).not.toBeInTheDocument()
+    expect(screen.queryByText('Registrar estudiante excepcional')).not.toBeInTheDocument()
   })
 
   it('una subruta resalta su entrada y abre su sección: /grupos/:id/editar → Mis grupos', () => {
