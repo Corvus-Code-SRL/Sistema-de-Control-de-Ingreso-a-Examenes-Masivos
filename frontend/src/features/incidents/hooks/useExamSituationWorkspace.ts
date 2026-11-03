@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '@/lib/api-client'
+import { throttleWaitSeconds } from '@/lib/throttle'
 import { examSituationService } from '../services/examSituationService'
 import type { SituationWorkspace } from '../types/exam-situation.types'
 
@@ -38,8 +39,14 @@ export function useExamSituationWorkspace(examId: number, roomId: number | undef
           setData(null)
           return
         }
-        failures += 1
-        delay = Math.min(5000 * 2 ** Math.min(failures, 3), 30000)
+        if (failure.isTooManyRequests) {
+          // Tras un 429 espera lo que pide el servidor (Retry-After) sin escalar el retroceso de red.
+          failures = 0
+          delay = throttleWaitSeconds(failure) * 1000
+        } else {
+          failures += 1
+          delay = Math.min(5000 * 2 ** Math.min(failures, 3), 30000)
+        }
       }
       if (!controller.signal.aborted) timer = setTimeout(() => { void refresh() }, delay)
     }
