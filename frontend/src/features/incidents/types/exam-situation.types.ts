@@ -66,7 +66,7 @@ export interface SituationExam {
   id_examen: number
   nombre_examen: string
   fecha: string
-  estado: 'EN_CURSO' | 'FINALIZADO'
+  estado: 'EN_INGRESO' | 'EN_CURSO'
 }
 
 export interface SituationExamsPage {

@@ -1,13 +1,14 @@
 import { apiClient, apiPost } from '@/lib/api-client'
 import type {
-  SituationCreated, SituationInput, SituationPage, SituationExam, SituationExamsPage,
+  SituationCreated, SituationInput, SituationPage, SituationExamsPage,
   SituationWorkspace, SituationWorkspaceFilters,
 } from '../types/exam-situation.types'
 
 /** Registro, historial y contexto de la HU-057 mediante el cliente autenticado compartido. */
 export const examSituationService = {
-  exams(state: SituationExam['estado'], page: number, signal?: AbortSignal): Promise<SituationExamsPage> {
-    return apiClient('/situaciones/examenes', { query: { estado: state, page }, signal })
+  /** Exámenes con el ingreso abierto o en curso; el servidor excluye los demás estados. */
+  exams(page: number, signal?: AbortSignal): Promise<SituationExamsPage> {
+    return apiClient('/situaciones/examenes', { query: { page }, signal })
   },
 
   context(examId: number, filters: SituationWorkspaceFilters, signal?: AbortSignal) {

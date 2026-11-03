@@ -4,7 +4,7 @@ import { throttleWaitSeconds } from '@/lib/throttle'
 import { examSituationService } from '../services/examSituationService'
 import type { SituationWorkspace } from '../types/exam-situation.types'
 
-/** Un único ciclo por pantalla: no superpone peticiones y se detiene al finalizar el examen. */
+/** Un único ciclo por pantalla: no superpone peticiones y se detiene si el servidor rechaza el examen (409). */
 export function useExamSituationWorkspace(examId: number, roomId: number | undefined, search: string, page: number) {
   const [data, setData] = useState<SituationWorkspace | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
@@ -30,7 +30,6 @@ export function useExamSituationWorkspace(examId: number, roomId: number | undef
         setError(null)
         setRevision((value) => value + 1)
         failures = 0
-        if (result.data.examen.estado === 'FINALIZADO') return
       } catch (cause) {
         if (controller.signal.aborted) return
         const failure = cause instanceof ApiError ? cause : new ApiError(0, 'No se pudo actualizar la vista.')
