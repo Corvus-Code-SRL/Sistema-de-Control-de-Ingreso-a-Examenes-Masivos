@@ -17,16 +17,16 @@ class ActionSeederTest extends TestCase
         return DB::table('accion')->orderBy('id_accion')->get()->map(fn ($row) => (array) $row)->all();
     }
 
-    public function test_dos_ejecuciones_dejan_quince_acciones_sin_duplicados(): void
+    public function test_dos_ejecuciones_dejan_diecinueve_acciones_sin_duplicados(): void
     {
         $this->seed(ActionSeeder::class);
         $afterFirst = $this->catalog();
 
         $this->seed(ActionSeeder::class);
 
-        $this->assertCount(15, $afterFirst);
+        $this->assertCount(19, $afterFirst);
         $this->assertSame($afterFirst, $this->catalog());
-        $this->assertSame(15, DB::table('accion')->distinct()->count('operacion'));
+        $this->assertSame(19, DB::table('accion')->distinct()->count('operacion'));
     }
 
     public function test_incluye_las_acciones_de_aprobacion_y_rechazo_de_reportes(): void
@@ -43,6 +43,25 @@ class ActionSeederTest extends TestCase
                 ->orderBy('operacion')
                 ->get()
                 ->mapWithKeys(fn ($row) => [$row->operacion => [$row->tipo_operacion, $row->descripcion]])
+                ->all()
+        );
+    }
+
+    public function test_incluye_las_acciones_del_ingreso_con_retraso(): void
+    {
+        $this->seed(ActionSeeder::class);
+
+        $this->assertSame(
+            [
+                'AUTORIZAR_INGRESO_RETRASO' => 'UPDATE',
+                'RECHAZAR_INGRESO_RETRASO' => 'UPDATE',
+                'REGISTRAR_INGRESO_RETRASO' => 'INSERT',
+                'SOLICITAR_INGRESO_RETRASO' => 'INSERT',
+            ],
+            DB::table('accion')
+                ->where('operacion', 'like', '%_INGRESO_RETRASO')
+                ->orderBy('operacion')
+                ->pluck('tipo_operacion', 'operacion')
                 ->all()
         );
     }
@@ -71,6 +90,6 @@ class ActionSeederTest extends TestCase
                 ->value('descripcion')
         );
 
-        $this->assertSame(15, DB::table('accion')->count());
+        $this->assertSame(19, DB::table('accion')->count());
     }
 }
