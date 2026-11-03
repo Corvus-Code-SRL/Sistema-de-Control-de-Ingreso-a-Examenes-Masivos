@@ -108,6 +108,7 @@ class FinalReportService
                 'g.num_grupo',
                 'ee.estado_ingreso',
                 'ee.hora_ingreso',
+                'ee.expulsado_en',
                 'e.cod_sis',
                 'e.nombre',
                 'e.apellido_paterno',
@@ -147,13 +148,15 @@ class FinalReportService
 
     private function studentList(Collection $rows): array
     {
-        // «Expulsado» se agregará cuando exista su estado en el sistema (HU-042 y HU-057).
         return $rows->map(fn ($row) => [
             'cod_sis' => $row->cod_sis,
             'nombre' => trim("{$row->nombre} {$row->apellido_paterno} {$row->apellido_materno}"),
             'ambiente' => $row->nro_aula,
             'hora_ingreso' => $this->shortTime($row->hora_ingreso),
-            'estado' => self::ENTRY_LABELS[$row->estado_ingreso] ?? self::UNCLASSIFIED_LABEL,
+            'estado' => ($row->expulsado_en ?? null) !== null
+                ? 'Expulsado · ' . Carbon::parse($row->expulsado_en)
+                    ->setTimezone(config('sciem.zona_horaria'))->format('H:i')
+                : (self::ENTRY_LABELS[$row->estado_ingreso] ?? self::UNCLASSIFIED_LABEL),
         ])->all();
     }
 
