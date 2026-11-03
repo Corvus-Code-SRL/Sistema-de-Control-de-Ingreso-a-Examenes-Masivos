@@ -18,17 +18,29 @@ async function flush() { await act(async () => { await Promise.resolve() }) }
 async function advance(ms: number) { await act(async () => { await vi.advanceTimersByTimeAsync(ms) }) }
 
 describe('Actualización compartida de situaciones', () => {
-  it('recarga cada cinco segundos y detiene el ciclo cuando el servidor finaliza el examen', async () => {
+  it('recarga cada cinco segundos y detiene el ciclo cuando el servidor rechaza el examen con 409', async () => {
     const request = vi.spyOn(examSituationService, 'context').mockResolvedValue({ data: workspace })
     const { result } = renderHook(() => useExamSituationWorkspace(10, undefined, '', 1))
     await flush()
     expect(result.current.revision).toBe(1)
     await advance(5000)
     expect(request).toHaveBeenCalledTimes(2)
-    request.mockResolvedValue({ data: { ...workspace, examen: { ...workspace.examen, estado: 'FINALIZADO' } } })
+    request.mockRejectedValue(new ApiError(409, 'Solo se pueden registrar situaciones con el ingreso abierto o con el examen en curso.'))
     await advance(5000)
-    expect(result.current.data?.examen.estado).toBe('FINALIZADO')
+    expect(result.current.data).toBeNull()
+    expect(result.current.error?.status).toBe(409)
     await advance(60000)
+    expect(request).toHaveBeenCalledTimes(3)
+  })
+
+  it('sigue consultando mientras el examen está en ingreso', async () => {
+    const request = vi.spyOn(examSituationService, 'context').mockResolvedValue({
+      data: { ...workspace, examen: { ...workspace.examen, estado: 'EN_INGRESO' } },
+    })
+    const { result } = renderHook(() => useExamSituationWorkspace(10, undefined, '', 1))
+    await flush()
+    await advance(10000)
+    expect(result.current.data?.examen.estado).toBe('EN_INGRESO')
     expect(request).toHaveBeenCalledTimes(3)
   })
 

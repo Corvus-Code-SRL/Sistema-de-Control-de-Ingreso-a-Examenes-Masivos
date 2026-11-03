@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderWithRouter } from '@/test/render'
 import { mockApiWith } from '@/test/http'
 import { ExamSituationsPage } from './ExamSituationsPage'
-import type { SituationWorkspace } from '../types/exam-situation.types'
+import type { SituationExam, SituationWorkspace } from '../types/exam-situation.types'
 
 const base: SituationWorkspace = {
   examen: { id_examen: 10, nombre_examen: 'Primer parcial', fecha: '2026-10-29', estado: 'EN_CURSO' },
@@ -18,26 +18,32 @@ const base: SituationWorkspace = {
   }],
   paginacion: { current_page: 1, last_page: 1, total: 1 },
 }
+const CLOSED_MESSAGE = 'Solo se pueden registrar situaciones con el ingreso abierto o con el examen en curso.'
 const emptyHistory = { data: [], meta: { current_page: 1, last_page: 1, total: 0 } }
 
-function setup(options: { state?: 'EN_CURSO' | 'FINALIZADO'; assistant?: boolean; denied?: boolean } = {}) {
+type ExamState = 'EN_INGRESO' | 'EN_CURSO'
+
+function setup(options: {
+  state?: ExamState; assistant?: boolean; denied?: boolean; noExams?: boolean; extraExams?: SituationExam[]
+} = {}) {
   let context = structuredClone(base)
   if (options.state) context.examen.estado = options.state
   if (options.assistant) context.ambiente_control = 1
-  let freshState: 'EN_CURSO' | 'FINALIZADO' = context.examen.estado
+  let closedByServer = false
   let historyCalls = 0
   const api = mockApiWith((request) => {
     const url = new URL(request.url)
-    if (url.pathname.endsWith('/situaciones/examenes')) return { body: {
-      data: [context.examen], meta: { current_page: 1, last_page: 1, total: 1 },
-    } }
+    if (url.pathname.endsWith('/situaciones/examenes')) {
+      const data = options.noExams ? [] : [context.examen, ...(options.extraExams ?? [])]
+      return { body: { data, meta: { current_page: 1, last_page: 1, total: data.length } } }
+    }
     if (url.pathname.endsWith('/contexto')) {
       if (options.denied) return { status: 403, body: { message: 'No está habilitado para este examen.' } }
-      const result = structuredClone(context)
-      if (url.searchParams.has('id_estudiante')) {
-        result.hora_servidor = '2026-10-29T15:05:00Z'
-        result.examen.estado = freshState
+      if (closedByServer && url.searchParams.has('id_estudiante')) {
+        return { status: 409, body: { message: CLOSED_MESSAGE } }
       }
+      const result = structuredClone(context)
+      if (url.searchParams.has('id_estudiante')) result.hora_servidor = '2026-10-29T15:05:00Z'
       return { body: { data: result } }
     }
     if (url.pathname.endsWith('/estudiantes/20/situaciones') && request.method === 'POST') {
@@ -64,7 +70,7 @@ function setup(options: { state?: 'EN_CURSO' | 'FINALIZADO'; assistant?: boolean
     if (url.pathname.includes('/incidencias')) return { body: { data: [], meta: { total_pendientes: 0 } } }
   })
   renderWithRouter(<ExamSituationsPage />)
-  return { ...api, setFreshState: (state: typeof freshState) => { freshState = state },
+  return { ...api, closeExam: () => { closedByServer = true },
     getHistoryCalls: () => historyCalls, setContext: (value: SituationWorkspace) => { context = value } }
 }
 
@@ -161,23 +167,48 @@ describe('Acceso independiente HU-057', () => {
     expect(screen.queryByRole('button', { name: 'Registrar situación' })).not.toBeInTheDocument()
   })
 
-  it('un examen finalizado permite consultar sin ofrecer registro', async () => {
-    setup({ state: 'FINALIZADO' })
-    const user = userEvent.setup()
-    await selectExam(user)
-    expect(await screen.findByText(/Examen finalizado\. Puede consultar/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Registrar situación' })).not.toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Historial de situaciones' })).toBeInTheDocument()
+  it('sin exámenes con ingreso abierto ni en curso muestra el estado vacío de HU-057', async () => {
+    setup({ noExams: true })
+    expect(await screen.findByText('No tiene exámenes con ingreso abierto ni en curso')).toBeInTheDocument()
+    expect(screen.getByText(
+      'Las situaciones excepcionales se registran desde que se abre el control de ingreso hasta que termina el examen.'
+    )).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Examen' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Estado del examen' })).not.toBeInTheDocument()
   })
 
-  it('comprueba el cierre antes de abrir, sin enviar un POST', async () => {
+  it('el selector lista exámenes en ingreso y en curso con su estado, sin opción de finalizados', async () => {
+    setup({
+      state: 'EN_INGRESO',
+      extraExams: [{ id_examen: 11, nombre_examen: 'Segundo parcial', fecha: '2026-10-30', estado: 'EN_CURSO' }],
+    })
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('combobox', { name: 'Examen' }))
+    expect(await screen.findByRole('option', { name: /Primer parcial · 2026-10-29 · En ingreso/ })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Segundo parcial · 2026-10-30 · En curso/ })).toBeInTheDocument()
+    expect(screen.queryByText(/Finalizados/)).not.toBeInTheDocument()
+  })
+
+  it('durante el ingreso permite buscar y registrar un cambio de ambiente', async () => {
+    const api = setup({ state: 'EN_INGRESO' })
+    const user = userEvent.setup()
+    await selectExam(user)
+    expect(await screen.findByText('José Pérez')).toBeInTheDocument()
+    await submitMove(user)
+    expect(await screen.findByText('202100001 · Ambiente 692B')).toBeInTheDocument()
+    expect(api.calls.find((call) => call.method === 'POST')?.body).toEqual({
+      tipo: 'CAMBIO_AMBIENTE', motivo: 'Ruido', id_ambiente_destino: 2,
+    })
+  })
+
+  it('comprueba el estado antes de abrir: si el servidor lo rechaza no abre ni envía un POST', async () => {
     const api = setup()
     const user = userEvent.setup()
     await selectExam(user)
     await screen.findByText('José Pérez')
-    api.setFreshState('FINALIZADO')
+    api.closeExam()
     await user.click(screen.getByRole('button', { name: 'Registrar situación' }))
-    expect(await screen.findByText(/El examen o la asistencia cambió/)).toBeInTheDocument()
+    expect(await screen.findByText(CLOSED_MESSAGE)).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(api.calls.filter((call) => call.method === 'POST')).toHaveLength(0)
   })
