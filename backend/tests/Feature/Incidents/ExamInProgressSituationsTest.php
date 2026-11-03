@@ -50,6 +50,49 @@ class ExamInProgressSituationsTest extends TestCase
         );
     }
 
+    public function test_situations_registered_during_entry_open_appear_once_the_exam_starts(): void
+    {
+        $this->situationExam->update(['estado' => Exam::EN_INGRESO]);
+        $this->postJson($this->situationUrl(), $this->situationPayload())->assertCreated();
+        $this->postJson($this->situationUrl(), [
+            'tipo' => 'IDENTIFICACION',
+            'motivo' => 'Documento deteriorado.',
+        ])->assertCreated();
+
+        $this->situationExam->update(['estado' => Exam::EN_CURSO]);
+
+        $this->getJson($this->situationListUrl())->assertOk()->assertJsonPath('meta.total', 2);
+        $response = $this->getJson($this->inProgressUrl())->assertOk()
+            ->assertJsonPath('data.estado', Exam::EN_CURSO)
+            ->assertJsonPath('data.total_situaciones', 2);
+        $student = collect($response->json('data.estudiantes'))
+            ->firstWhere('id_estudiante', (int) $this->situationStudent->id_estudiante);
+
+        $this->assertSame($this->otraAulaId, $student['id_ambiente']);
+        $this->assertTrue($student['situaciones']['identidad_observada']);
+        $this->assertSame(
+            $this->aulaId,
+            $student['situaciones']['ultimo_cambio_ambiente']['ambiente_origen']['id_ambiente']
+        );
+    }
+
+    public function test_assistant_of_the_destination_room_sees_a_room_change_made_during_entry_open(): void
+    {
+        $this->situationExam->update(['estado' => Exam::EN_INGRESO]);
+        $this->postJson($this->situationUrl(), $this->situationPayload())->assertCreated();
+        $this->situationExam->update(['estado' => Exam::EN_CURSO]);
+
+        $this->actAsSituationAssistant($this->otraAulaId);
+        $this->getJson($this->situationListUrl())->assertOk()->assertJsonPath('meta.total', 1);
+        $response = $this->getJson($this->inProgressUrl())->assertOk()
+            ->assertJsonPath('data.total_situaciones', 1);
+
+        $this->assertContains(
+            (int) $this->situationStudent->id_estudiante,
+            array_column($response->json('data.estudiantes'), 'id_estudiante')
+        );
+    }
+
     public function test_history_revision_changes_for_repeated_identity_observations(): void
     {
         $this->createSituationFixture();
