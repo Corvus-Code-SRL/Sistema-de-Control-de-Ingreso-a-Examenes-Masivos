@@ -9,9 +9,11 @@ use App\Models\Exam;
 use App\Models\Role;
 use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\EntryControl\RoomAssignmentService;
+use App\Services\Exams\ExamHistoryService;
 use App\Services\Exams\ExamLifecycleService;
 use App\Services\Exams\ExamParticipantService;
 use App\Services\Exams\ExamTimingService;
+use App\Services\Exams\FinalReportService;
 use App\Services\Security\AuditLogService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -339,6 +341,105 @@ class FinalizeExamTest extends TestCase
         $this->assertSame('FINALIZAR', $log->accion->operacion);
         $this->assertSame('AUTOMATICA', $log->nuevo_valor['tipo_finalizacion']);
         $this->assertArrayNotHasKey('estudiantes_esperados', $log->nuevo_valor);
+    }
+
+    public function test_cierre_automatico_tardio_conserva_fin_programado_mas_diez_minutos(): void
+    {
+        $zone = config('sciem.zona_horaria');
+        $exam = $this->createExam([
+            'fecha' => '2026-10-01',
+            'hora_inicio' => '10:04',
+            'hora_fin' => '11:34',
+            'duracion' => 90,
+            'estado' => Exam::EN_CURSO,
+        ]);
+        DB::table('examen')->where('id_examen', $exam->id_examen)
+            ->update(['inicio_real_en' => '2026-10-01 14:05:00+00']);
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
+
+        // El planificador corre más de tres horas tarde.
+        $late = Carbon::parse('2026-10-01 14:50:00', $zone);
+        $this->assertSame(1, app(ExamLifecycleService::class)->finishExpired($late));
+
+        $closed = $exam->fresh();
+        $this->assertSame('2026-10-01T15:44:00+00:00', $closed->fin_real_en->utc()->toIso8601String());
+        $this->assertTrue($closed->fin_automatico);
+
+        $history = app(ExamHistoryService::class)->show($closed, $this->docenteId);
+        $end = collect($history['linea_tiempo'])->firstWhere('tipo', 'fin');
+        $this->assertSame('2026-10-01 11:44:00', $end['fecha_hora']);
+        $this->assertSame('Automático', $end['detalle']);
+        $this->assertTrue($history['fin_automatico']);
+        $this->assertSame('2026-10-01T15:44:00+00:00', Carbon::parse($history['fin_real_en'])->utc()->toIso8601String());
+
+        $header = app(FinalReportService::class)->build($closed, $this->docenteId)['cabecera'];
+        $this->assertSame('10:05', $header['hora_inicio']);
+        $this->assertSame('11:44', $header['hora_fin']);
+    }
+
+    public function test_cierre_de_recuperacion_tardio_usa_el_plazo_y_no_falla_sin_inicio_real(): void
+    {
+        $zone = config('sciem.zona_horaria');
+        $exam = $this->createExam([
+            'fecha' => '2026-10-01',
+            'hora_inicio' => '10:04',
+            'hora_fin' => '11:34',
+            'duracion' => 90,
+            'estado' => Exam::EN_INGRESO,
+        ]);
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
+
+        $this->assertSame(1, app(ExamLifecycleService::class)->finishExpired(
+            Carbon::parse('2026-10-01 18:00:00', $zone)
+        ));
+
+        $closed = $exam->fresh();
+        $this->assertNull($closed->inicio_real_en);
+        $this->assertSame('2026-10-01T17:34:00+00:00', $closed->fin_real_en->utc()->toIso8601String());
+        $this->assertTrue($closed->fin_automatico);
+
+        $history = app(ExamHistoryService::class)->show($closed, $this->docenteId);
+        $timeline = collect($history['linea_tiempo']);
+        $start = $timeline->firstWhere('tipo', 'inicio');
+        $end = $timeline->firstWhere('tipo', 'fin');
+        $this->assertSame('Inicio programado del examen', $start['descripcion']);
+        $this->assertSame('Horario previsto', $start['detalle']);
+        $this->assertSame('2026-10-01 13:34:00', $end['fecha_hora']);
+        $this->assertSame('Automático', $end['detalle']);
+        $this->assertTrue($history['fin_automatico']);
+
+        $header = app(FinalReportService::class)->build($closed, $this->docenteId)['cabecera'];
+        $this->assertSame('10:04 (programada)', $header['hora_inicio']);
+        $this->assertSame('13:34', $header['hora_fin']);
+    }
+
+    public function test_fin_manual_conserva_el_instante_real_aunque_el_plazo_sea_posterior(): void
+    {
+        $exam = $this->createExam([
+            'fecha' => '2026-10-01',
+            'hora_inicio' => '10:04',
+            'hora_fin' => '11:34',
+            'duracion' => 90,
+            'estado' => Exam::EN_CURSO,
+        ]);
+
+        $manualAt = Carbon::parse('2026-10-01T15:10:30Z');
+        Carbon::setTestNow($manualAt);
+        try {
+            $this->postJson($this->url($exam))->assertOk();
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        $closed = $exam->fresh();
+        $this->assertTrue($closed->fin_real_en->equalTo($manualAt));
+        $this->assertFalse($closed->fin_automatico);
     }
 
     public function test_finalizacion_conserva_ingresos_existentes(): void

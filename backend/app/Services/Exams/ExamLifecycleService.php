@@ -227,12 +227,18 @@ class ExamLifecycleService
                         $changed = DB::transaction(function () use ($exam, $now): bool {
                             $locked = Exam::query()->whereKey($exam->id_examen)->lockForUpdate()->firstOrFail();
                             if (! in_array($locked->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::EN_CURSO], true)
-                                || $locked->duracion === null
-                                || $now->lessThan($this->timing->finishesAutomaticallyAt($locked))) {
+                                || $locked->duracion === null) {
                                 return false;
                             }
 
-                            $this->finishLockedExam($locked, $now->copy()->utc(), true);
+                            $deadline = $this->timing->finishesAutomaticallyAt($locked);
+
+                            if ($now->lessThan($deadline)) {
+                                return false;
+                            }
+
+                            // El fin real del cierre automático es su plazo, no el momento en que corrió el planificador.
+                            $this->finishLockedExam($locked, $deadline->copy()->utc(), true);
 
                             return true;
                         });
