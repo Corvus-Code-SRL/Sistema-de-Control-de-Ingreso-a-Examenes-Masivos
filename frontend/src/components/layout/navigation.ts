@@ -10,6 +10,7 @@ import {
   FilePenLine,
   FileSearch,
   FileText,
+  FileWarning,
   FileUp,
   GraduationCap,
   History,
@@ -331,6 +332,13 @@ export const NAVIGATION: readonly NavSection[] = [
         icon: AlertTriangle,
         capability: 'situaciones.registrar',
         to: '/situacion-excepcional'
+      },
+      {
+        id: 'teacher-report-incident',
+        label: 'Reportar incidencia',
+        icon: FileWarning,
+        capability: 'incidencias.registrar',
+        to: '/reportar-incidencia'
       }
     ]
   },
@@ -423,6 +431,13 @@ export const NAVIGATION: readonly NavSection[] = [
         icon: AlertTriangle,
         capability: 'situaciones.registrar',
         to: '/situacion-excepcional'
+      },
+      {
+        id: 'assistant-report-incident',
+        label: 'Reportar incidencia',
+        icon: FileWarning,
+        capability: 'incidencias.registrar',
+        to: '/reportar-incidencia'
       },
       {
         id: 'assistant-exam-in-progress',

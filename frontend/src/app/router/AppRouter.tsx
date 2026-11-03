@@ -29,12 +29,10 @@ import {
   ExamInProgressPage,
   ExamsPage,
   FinalReportPage,
-  FinishExamAction,
   InProgressExamsPage,
   ExamHistoryPage,
   ExamReportsPage,
   ExamHistorySummaryPage,
-  type ExamInProgressExtensions,
 } from '@/features/exams'
 
 import {
@@ -57,18 +55,10 @@ import { CuentaDetallePage, ModificarRolPage, RegistrarCuentaPage } from '@/feat
 import {
   ExamSituationsPage,
   IncidentsPage,
-  InProgressSituationAction,
-  InProgressSituationsPanel,
+  ReportIncidentPage,
 } from '@/features/incidents'
+import { examInProgressExtensions } from './examInProgressExtensions'
 import { AlienAttemptsReportPage } from '@/features/reports/academic'
-
-// Punto de composición de HU-037, HU-038-B, HU-042 y HU-057.
-// Cada feature puede aportar componentes aquí sin editar ExamInProgressPage.
-const examInProgressExtensions: ExamInProgressExtensions = {
-  headerActions: (exam) => <FinishExamAction key={exam.id_examen} exam={exam} />,
-  studentActions: (student, exam) => <InProgressSituationAction student={student} exam={exam} />,
-  panels: (exam) => <InProgressSituationsPanel exam={exam} />,
-}
 
 /** Envuelve una pantalla con la capacidad que exige. Sin sesión redirige al login (ver ProtectedRoute). */
 function guarded(capability: Capability, element: ReactElement) {
@@ -159,6 +149,7 @@ function DocenteRoutes() {
       />
 
       <Route path="/situacion-excepcional" element={guarded('situaciones.registrar', <ExamSituationsPage />)} />
+      <Route path="/reportar-incidencia" element={guarded('incidencias.registrar', <ReportIncidentPage />)} />
       <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
 
       <Route
@@ -210,6 +201,7 @@ function AuxiliarRoutes() {
       <Route path="/" element={<Navigate to="/mis-examenes" replace />} />
       <Route path="/mis-examenes" element={guarded('ingreso.operar', <MyAssignmentsPage />)} />
       <Route path="/situacion-excepcional" element={guarded('situaciones.registrar', <ExamSituationsPage />)} />
+      <Route path="/reportar-incidencia" element={guarded('incidencias.registrar', <ReportIncidentPage />)} />
       <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
       <Route
         path="/examenes/:examId/control-ingreso"

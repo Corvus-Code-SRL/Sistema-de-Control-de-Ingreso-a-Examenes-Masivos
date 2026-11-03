@@ -111,7 +111,8 @@ describe('menú por capacidades', () => {
           ['Control de ingreso', '/control-ingreso'],
           ['En curso', '/examenes/en-curso'],
           ['Registrar estudiante con retraso', '/retrasos'],
-          ['Registrar situación excepcional', '/situacion-excepcional']
+          ['Registrar situación excepcional', '/situacion-excepcional'],
+          ['Reportar incidencia', '/reportar-incidencia']
         ]
       },
       {
@@ -145,6 +146,7 @@ describe('menú por capacidades', () => {
         items: [
           ['Control de ingreso', '/control-ingreso'],
           ['Registrar situación excepcional', '/situacion-excepcional'],
+          ['Reportar incidencia', '/reportar-incidencia'],
           ['En curso', '/examenes/en-curso'],
           ['Registrar estudiante con retraso', '/retrasos']
         ]
@@ -173,6 +175,7 @@ describe('menú por capacidades', () => {
         'Control de ingreso',
         'En curso',
         'Registrar situación excepcional',
+        'Reportar incidencia',
         'Registrar estudiante con retraso',
         'Revisar reportes de incidencias'
       ])
@@ -244,6 +247,36 @@ describe('menú por capacidades', () => {
 
     expect(items.map((item) => item.capability)).toEqual(['situaciones.registrar', 'situaciones.registrar'])
   })
+
+  it('«Reportar incidencia» es visible para Docente, Invitado y Auxiliar, no para el Administrador', () => {
+    for (const role of ['Docente', 'Invitado', 'Auxiliar'] as const) {
+      const items = menuOf(role).flatMap((section) => section.items)
+
+      expect(items).toContainEqual(['Reportar incidencia', '/reportar-incidencia'])
+    }
+
+    const adminEntries = menuOf('Administrador').flatMap((section) => section.items.map(([label]) => label))
+
+    expect(adminEntries).not.toContain('Reportar incidencia')
+  })
+
+  it('«Reportar incidencia» no depende de un examen: solo de incidencias.registrar', () => {
+    const items = NAVIGATION.flatMap((section) => section.items).filter((item) => item.to === '/reportar-incidencia')
+
+    expect(items.map((item) => item.capability)).toEqual(['incidencias.registrar', 'incidencias.registrar'])
+  })
+
+  it.each(['Docente', 'Invitado', 'Auxiliar'] as const)(
+    '%s con incidencias.registrar pero sin situaciones.registrar sigue viendo «Reportar incidencia»',
+    (role) => {
+      const capabilities = capabilitiesOf(role).filter((capability) => capability !== 'situaciones.registrar')
+      const items = visibleSections(capabilities).flatMap((section) => section.items.map((item) => item.label))
+
+      expect(capabilities).toContain('incidencias.registrar')
+      expect(items).toContain('Reportar incidencia')
+      expect(items).not.toContain('Registrar situación excepcional')
+    }
+  )
 
   it('docente y auxiliar pueden abrir En curso', () => {
     for (const role of ['Docente', 'Auxiliar'] as const) {
