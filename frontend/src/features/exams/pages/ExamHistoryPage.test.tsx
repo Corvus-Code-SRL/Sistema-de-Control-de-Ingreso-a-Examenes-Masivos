@@ -25,9 +25,9 @@ const summary: HistorySummary = {
   id_examen: 7, nombre_examen: 'Examen diagnóstico', fecha: '2026-10-28',
   materia: 'Cálculo II', total_estudiantes: 55, inicio_real_en: null, inicio_automatico: false,
   fin_real_en: null, fin_automatico: false,
-  totales: { a_tiempo: 51, con_retraso: 1, ausentes: 1, incidencias: 2 },
+  totales: { a_tiempo: 52, con_retraso: 1, ausentes: 2, sin_clasificar: 0, incidencias: 2 },
   linea_tiempo: [{ tipo: 'retraso', fecha_hora: '2026-10-28 08:20:00',
-    descripcion: 'Ingreso con retraso', detalle: 'Luis · Controló: Ana Rojas' }],
+    descripcion: 'Ingreso con retraso: Luis Pérez', detalle: 'Autorizó: Ana Rojas' }],
   ambientes: [{ id_ambiente: 1, nro_aula: '691A', presentes: 54, auxiliares: ['Ana Rojas'] }],
 }
 
@@ -84,9 +84,36 @@ describe('HU-052: historial de exámenes', () => {
     expect(screen.getByText('Finalizado')).toBeInTheDocument()
     expect(screen.getByText('Total de estudiantes:', { exact: false })).toHaveTextContent('55')
     expect(screen.getByText(/Ingreso con retraso/)).toBeInTheDocument()
-    expect(screen.getByText('Luis · Controló: Ana Rojas')).toBeInTheDocument()
+    expect(screen.getByText('Autorizó: Ana Rojas')).toBeInTheDocument()
     expect(screen.getByText('691A')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /editar|modificar|eliminar|registrar ingreso/i })).not.toBeInTheDocument()
+  })
+
+  it('muestra «Sin clasificar» solo cuando hay estudiantes sin clasificar', async () => {
+    vi.mocked(examHistoryService.show).mockResolvedValue(summary)
+    const first = renderWithRouter(<ExamHistorySummaryPage />, { route: '/historial/7', path: '/historial/:id' })
+    await screen.findByText('Examen diagnóstico · Cálculo II')
+    expect(screen.queryByText('Sin clasificar')).not.toBeInTheDocument()
+    first.unmount()
+
+    vi.mocked(examHistoryService.show).mockResolvedValue({
+      ...summary, totales: { ...summary.totales, ausentes: 1, sin_clasificar: 1 },
+    })
+    renderWithRouter(<ExamHistorySummaryPage />, { route: '/historial/7', path: '/historial/:id' })
+    expect(await screen.findByText('Sin clasificar')).toBeInTheDocument()
+  })
+
+  it('ofrece «Generar reporte» hacia el reporte final de HU-051', async () => {
+    vi.mocked(examHistoryService.show).mockResolvedValue(summary)
+    renderWithRouter(<ExamHistorySummaryPage />, { route: '/historial/7', path: '/historial/:id' })
+    expect(await screen.findByRole('link', { name: /generar reporte/i }))
+      .toHaveAttribute('href', '/examenes/7/reporte-final')
+  })
+
+  it('no falla si la respuesta de la lista no trae exámenes', async () => {
+    vi.mocked(examHistoryService.list).mockResolvedValue([] as unknown as HistoryList)
+    renderWithRouter(<ExamHistoryPage />, { route: '/historial', path: '/historial' })
+    expect(await screen.findByText('Aún no tiene exámenes finalizados')).toBeInTheDocument()
   })
 
   it('muestra el rechazo de un examen ajeno abierto por URL', async () => {

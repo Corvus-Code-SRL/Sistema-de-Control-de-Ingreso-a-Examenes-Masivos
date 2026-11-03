@@ -1,15 +1,17 @@
 import { useCallback } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Check, Clock3, DoorOpen, Flag, History, Play, UserRoundCheck } from 'lucide-react'
+import { ArrowLeft, Check, Clock3, DoorOpen, FileText, Flag, History, Play } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAsyncResource } from '@/hooks/useAsyncResource'
 import { examHistoryService } from '../services/examHistoryService'
 import type { HistorySummary } from '../types/examHistory.types'
+import { examFinalReportPath } from '../utils/paths'
 
 function formatDate(value: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
@@ -19,7 +21,6 @@ function formatDate(value: string): string {
 const eventStyles = {
   apertura: { Icon: DoorOpen, color: 'bg-accent-brand text-brand-deep' },
   inicio: { Icon: Play, color: 'bg-brand text-white' },
-  ingreso: { Icon: UserRoundCheck, color: 'bg-ok text-white' },
   retraso: { Icon: Clock3, color: 'bg-accent-brand text-brand-deep' },
   incidencia: { Icon: Flag, color: 'bg-danger text-white' },
   fin: { Icon: Check, color: 'bg-neutral-fg text-white' },
@@ -35,13 +36,21 @@ export function ExamHistorySummaryPage() {
     [id, validId]
   )
 
+  const totals: [string, number][] = data ? [
+    ['A tiempo', data.totales.a_tiempo],
+    ['Con retraso', data.totales.con_retraso],
+    ['Ausentes', data.totales.ausentes],
+    ...(data.totales.sin_clasificar > 0 ? [['Sin clasificar', data.totales.sin_clasificar] as [string, number]] : []),
+    ['Incidencias', data.totales.incidencias],
+  ] : []
+
   return <AppShell mobileTitle="Resumen del examen" breadcrumbs={[{ label: 'Exámenes' }, { label: 'Historial', to: backTo }, { label: data?.nombre_examen ?? 'Resumen' }]}>
     
     {!validId && <EmptyState icon={History} title="Examen no encontrado" description="Revise el enlace del historial." />}
     {validId && status === 'loading' && <LoadingState rows={4} label="Cargando resumen" />}
     {validId && status === 'error' && error && <ErrorState error={error} onRetry={reload} />}
     {validId && status === 'success' && data && <>
-      <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <Link to={backTo} className="mb-2 inline-flex items-center gap-1.5 text-sm font-semibold text-brand"><ArrowLeft className="size-4" />Historial</Link>
           <h1 className="sciem-h1 break-words">{data.nombre_examen} · {data.materia ?? 'Examen'}</h1>
@@ -50,9 +59,10 @@ export function ExamHistorySummaryPage() {
             <span>{formatDate(data.fecha)}</span>
           </div>
         </div>
+        <Button variant="outline" asChild><Link to={examFinalReportPath(data.id_examen)}><FileText className="size-4" aria-hidden="true" />Generar reporte</Link></Button>
       </div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {([['A tiempo', data.totales.a_tiempo], ['Con retraso', data.totales.con_retraso], ['Ausentes', data.totales.ausentes], ['Incidencias', data.totales.incidencias]] as const).map(([label, value]) =>
+      <div className={`grid grid-cols-2 gap-3 ${totals.length > 4 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+        {totals.map(([label, value]) =>
           <Card key={label} className="gap-1 p-4"><strong className="text-3xl tabular-nums">{value}</strong><span className="text-sm text-muted-foreground">{label}</span></Card>)}
       </div>
       <p className="text-sm text-muted-foreground">Total de estudiantes: <strong className="tabular-nums text-foreground">{data.total_estudiantes}</strong></p>
