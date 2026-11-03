@@ -37,13 +37,13 @@ class InvitedTeacherAccessTest extends TestCase
         $this->assignRole($userId, Role::INVITADO);
     }
 
-    public function test_el_mapa_de_acceso_define_las_ocho_funciones_con_la_decision_del_invitado(): void
+    public function test_el_mapa_de_acceso_define_las_nueve_funciones_con_la_decision_del_invitado(): void
     {
         $access = config('sciem.access');
 
         $this->assertSame([
             'teaching', 'exam_assistants', 'incidents', 'risk_center',
-            'group_assistants', 'report_assistant', 'special_cases', 'invite_teachers',
+            'group_assistants', 'report_assistant', 'special_cases', 'invite_teachers', 'audit_log',
         ], array_keys($access));
 
         $allowed = [
@@ -56,6 +56,9 @@ class InvitedTeacherAccessTest extends TestCase
             $this->assertSame($invitedCan, in_array(Role::INVITADO, $access[$feature], true), $feature);
             $this->assertContains(Role::DOCENTE, $access[$feature], "El Docente conserva {$feature}");
         }
+
+        // La bitácora es solo del Administrador: ni el Docente ni el Invitado la ejercen.
+        $this->assertSame([Role::ADMINISTRADOR], $access['audit_log']);
     }
 
     public function test_invitado_registra_un_examen_propio(): void

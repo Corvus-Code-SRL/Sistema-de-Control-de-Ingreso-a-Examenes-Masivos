@@ -131,7 +131,8 @@ return [
     | estas funciones. El Invitado (docente sin código SIS) ejerce la docencia, habilita auxiliares
     | por examen, toma incidencias y opera el ingreso; no consulta la Central de Riesgo, no gestiona
     | auxiliares de grupo, no reporta auxiliares, no acepta casos especiales y, mientras no haya una
-    | decisión de producto, no invita a otros docentes.
+    | decisión de producto, no invita a otros docentes. La bitácora (audit_log) la consulta solo el
+    | Administrador.
     |
     */
 
@@ -144,6 +145,7 @@ return [
         'report_assistant' => [Role::DOCENTE],
         'special_cases'    => [Role::DOCENTE],
         'invite_teachers'  => [Role::DOCENTE],
+        'audit_log'        => [Role::ADMINISTRADOR],
     ],
 
     /*
@@ -161,5 +163,136 @@ return [
         'trim',
         explode(',', (string) env('SCIEM_CUENTAS_SISTEMA', '000000000'))
     ))),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Consulta de la bitácora (HU-015)
+    |--------------------------------------------------------------------------
+    |
+    | Solo lectura sobre la tabla log. Nada de esto cambia cómo se escribe:
+    |
+    | - por_pagina: filas por página (fijo, no lo elige el cliente).
+    | - modulos: módulos del filtro, en el orden en que se ofrecen. «otros» no se declara: es todo lo
+    |   que no esté en `tablas`. La Central de Riesgo no figura porque nadie escribe en ella.
+    | - tablas: cada tabla_afectada que hoy se registra, con su módulo, cómo se nombra el registro y
+    |   las claves que lo identifican (la primera es la principal). `persona` resuelve esa clave a
+    |   «Nombre (SIS)».
+    | - etiquetas_accion: texto del filtro y de la lista; un código ausente se muestra tal cual.
+    | - etiquetas_campo: nombre legible de los campos del detalle; si falta se deduce del nombre.
+    | - campos_ocultos: nunca se devuelven (ver App\Support\Audit\AuditLogSanitizer). Se comparan sin
+    |   distinguir mayúsculas ni separadores (rememberToken = remember_token). `fragmentos` oculta
+    |   cualquier campo que los contenga; `exactos` solo ese nombre; `excepciones` son indicadores
+    |   booleanos que contienen un fragmento pero no guardan ningún secreto.
+    |
+    */
+
+    'bitacora' => [
+        'por_pagina' => 50,
+
+        'modulos' => [
+            'cuentas' => 'Cuentas',
+            'roles' => 'Roles',
+            'grupos' => 'Grupos',
+            'catalogo' => 'Catálogo académico',
+            'ambientes' => 'Ambientes',
+            'examenes' => 'Exámenes',
+            'auxiliares' => 'Auxiliares',
+            'ingreso' => 'Control de ingreso',
+            'incidencias' => 'Incidencias',
+            'situaciones' => 'Situaciones',
+        ],
+
+        'tablas' => [
+            'usuario' => [
+                'modulo' => 'cuentas', 'etiqueta' => 'Cuenta', 'claves' => ['id_usuario'], 'persona' => true,
+            ],
+            'usuario_rol' => [
+                'modulo' => 'roles', 'etiqueta' => 'Rol de cuenta', 'claves' => ['id_usuario'], 'persona' => true,
+            ],
+            'grupo' => ['modulo' => 'grupos', 'etiqueta' => 'Grupo', 'claves' => ['id_grupo']],
+            'grupo_estudiante' => ['modulo' => 'grupos', 'etiqueta' => 'Nómina de grupo', 'claves' => ['id_grupo']],
+            'materia_carrera' => [
+                'modulo' => 'catalogo', 'etiqueta' => 'Materia de carrera', 'claves' => ['id_materia', 'id_carrera'],
+            ],
+            'oferta_academica' => [
+                'modulo' => 'catalogo', 'etiqueta' => 'Oferta académica', 'claves' => ['id_materia', 'id_carrera'],
+            ],
+            'ambiente' => ['modulo' => 'ambientes', 'etiqueta' => 'Ambiente', 'claves' => ['id_ambiente']],
+            'examen' => ['modulo' => 'examenes', 'etiqueta' => 'Examen', 'claves' => ['id_examen']],
+            'grupo_auxiliar' => [
+                'modulo' => 'auxiliares', 'etiqueta' => 'Auxiliar de grupo', 'claves' => ['id_grupo'],
+            ],
+            'examen_auxiliar' => [
+                'modulo' => 'auxiliares', 'etiqueta' => 'Auxiliar de examen', 'claves' => ['id_examen'],
+            ],
+            'examen_estudiante' => [
+                'modulo' => 'ingreso',
+                'etiqueta' => 'Ingreso de estudiante',
+                'claves' => ['id_examen', 'id_estudiante'],
+            ],
+            'intento_ingreso' => [
+                'modulo' => 'ingreso', 'etiqueta' => 'Intento de ingreso', 'claves' => ['id_intento'],
+            ],
+            'solicitud_ingreso_retraso' => [
+                'modulo' => 'ingreso', 'etiqueta' => 'Solicitud de ingreso con retraso', 'claves' => ['id_solicitud'],
+            ],
+            'reporte_estudiante' => [
+                'modulo' => 'incidencias', 'etiqueta' => 'Reporte de falta', 'claves' => ['id_reporte_est'],
+            ],
+            'situacion_examen' => [
+                'modulo' => 'situaciones', 'etiqueta' => 'Situación de examen', 'claves' => ['id_situacion'],
+            ],
+        ],
+
+        'etiquetas_accion' => [
+            'CREAR' => 'Crear',
+            'MODIFICAR' => 'Modificar',
+            'DESHABILITAR' => 'Deshabilitar',
+            'HABILITAR' => 'Habilitar',
+            'ASIGNAR_ROL' => 'Asignar rol',
+            'CANCELAR' => 'Cancelar',
+            'INICIAR' => 'Iniciar',
+            'FINALIZAR' => 'Finalizar',
+            'INICIO_SESION_FALLIDO' => 'Inicio de sesión fallido',
+            'ANADIR_AUXILIAR_GRUPO' => 'Añadir auxiliar a grupo',
+            'HABILITAR_AUXILIAR_EXAMEN' => 'Habilitar auxiliar en examen',
+            'QUITAR_AUXILIAR_GRUPO' => 'Quitar auxiliar de grupo',
+            'QUITAR_AUXILIAR_EXAMEN' => 'Quitar auxiliar de examen',
+            'APROBAR_REPORTE' => 'Aprobar reporte',
+            'RECHAZAR_REPORTE' => 'Rechazar reporte',
+            'SOLICITAR_INGRESO_RETRASO' => 'Solicitar ingreso con retraso',
+            'AUTORIZAR_INGRESO_RETRASO' => 'Autorizar ingreso con retraso',
+            'RECHAZAR_INGRESO_RETRASO' => 'Rechazar ingreso con retraso',
+            'REGISTRAR_INGRESO_RETRASO' => 'Registrar ingreso con retraso',
+            'EXPULSAR_ESTUDIANTE' => 'Retirar estudiante',
+            'CAMBIAR_AMBIENTE' => 'Cambiar ambiente',
+            'OBSERVAR_IDENTIDAD' => 'Observar identidad',
+        ],
+
+        'etiquetas_campo' => [
+            'num_grupo' => 'Número de grupo',
+            'id_gestion_periodo' => 'Gestión y período',
+            'estado' => 'Estado',
+            'estado_ingreso' => 'Estado de ingreso',
+            'nro_aula' => 'Número de aula',
+            'cod_sis' => 'Código SIS',
+            'correo' => 'Correo',
+            'debe_cambiar_contrasenia' => 'Debe cambiar la contraseña',
+            'contrasenia_cambiada' => 'Contraseña cambiada',
+            'tipo_inicio' => 'Tipo de inicio',
+            'tipo_finalizacion' => 'Tipo de finalización',
+            'inicio_real_en' => 'Inicio real',
+            'ip' => 'Dirección IP',
+            'motivo' => 'Motivo',
+        ],
+
+        'campos_ocultos' => [
+            'fragmentos' => [
+                'contrasenia', 'contrasena', 'password', 'passwd', 'token', 'secret', 'apikey', 'remember',
+            ],
+            'exactos' => ['evidencia_url', 'evidencia_public_id'],
+            'excepciones' => ['debe_cambiar_contrasenia', 'contrasenia_cambiada'],
+        ],
+    ],
 
 ];
