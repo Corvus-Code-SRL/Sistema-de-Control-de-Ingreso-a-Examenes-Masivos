@@ -9,7 +9,10 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-/** Cierra controles vencidos y finaliza exámenes dos horas después de su fin. */
+/**
+ * Cierra controles vencidos y finaliza exámenes diez minutos después de su fin programado
+ * (dos horas si nunca se iniciaron).
+ */
 class FinalizeExpiredExamsJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;

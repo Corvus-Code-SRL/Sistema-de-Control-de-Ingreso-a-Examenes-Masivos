@@ -40,9 +40,11 @@ class EntryConfirmationService
                     return [
                         'creado' => false,
                         'veredicto' => $started ? 'EXAMEN_INICIADO' : 'INGRESO_CERRADO',
-                        'motivo' => $started
-                            ? 'El examen ya inició.'
-                            : 'El control de ingreso no está disponible.',
+                        'motivo' => match (true) {
+                            $currentExam->estado === Exam::FINALIZADO => 'El examen ya finalizó.',
+                            $started => 'El examen ya inició.',
+                            default => 'El control de ingreso no está disponible.',
+                        },
                     ];
                 }
 

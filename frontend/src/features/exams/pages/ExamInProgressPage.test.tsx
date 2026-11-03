@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react';
-import { act, screen } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api-client';
+import { mockApiOnce } from '@/test/http';
 import { renderWithRouter } from '@/test/render';
+import { FinishExamAction } from '../components/FinishExamAction';
 import { examInProgressService } from '../services/examInProgressService';
+import { examsService } from '../services/examsService';
 import type { ExamInProgress } from '../types/examInProgress.types';
 import { ExamInProgressPage } from './ExamInProgressPage';
 
@@ -289,5 +292,134 @@ describe('RNF-03: En curso ante un 429', () => {
     await advance(2000);
     expect(get).toHaveBeenCalledTimes(3);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('HU-038-B: terminar examen desde En curso', () => {
+  const finishLabel = 'Terminar examen';
+  const modalTitle = '¿Terminar el examen?';
+
+  function renderExam() {
+    return renderWithRouter(
+      <ExamInProgressPage extensions={{ headerActions: (value) => <FinishExamAction exam={value} /> }} />,
+      { route: '/examenes/8/en-curso', path: '/examenes/:examId/en-curso' },
+    );
+  }
+
+  async function advance(ms: number) {
+    await act(async () => vi.advanceTimersByTimeAsync(ms));
+  }
+
+  it('muestra los totales del examen y cierra el modal sin finalizar al cancelar', async () => {
+    const user = userEvent.setup();
+    const finish = vi.spyOn(examsService, 'finishExam');
+    vi.mocked(examInProgressService.get).mockResolvedValue({
+      ...exam,
+      totales: { a_tiempo: 12, con_retraso: 3, ausentes: 5, incidencias_pendientes: 2, presentes: 15, total: 20 },
+    });
+    renderExam();
+    await user.click(await screen.findByRole('button', { name: finishLabel }));
+
+    const dialog = within(screen.getByRole('dialog', { name: modalTitle }));
+    for (const [label, value] of [
+      ['A tiempo', '12'], ['Con retraso', '3'], ['Ausentes', '5'], ['Incidencias pendientes', '2'],
+    ]) {
+      expect(dialog.getByText(label).parentElement).toHaveTextContent(value);
+    }
+
+    await user.click(dialog.getByRole('button', { name: 'Seguir en curso' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(finish).not.toHaveBeenCalled();
+  });
+
+  it('oculta la acción a los auxiliares', async () => {
+    vi.mocked(examInProgressService.get).mockResolvedValue({ ...exam, rol_controlador: 'AUXILIAR' });
+    renderExam();
+
+    expect(await screen.findByText(exam.nombre_examen)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: finishLabel })).not.toBeInTheDocument();
+  });
+
+  it('bloquea el doble envío y muestra el resultado de la confirmación', async () => {
+    const user = userEvent.setup();
+    let respond!: (value: Response) => void;
+    const response = new Promise<Response>((resolve) => { respond = resolve; });
+    const fetch = vi.spyOn(globalThis, 'fetch').mockReturnValue(response);
+    renderExam();
+    await user.click(await screen.findByRole('button', { name: finishLabel }));
+    const dialog = within(screen.getByRole('dialog', { name: modalTitle }));
+    await user.dblClick(dialog.getByRole('button', { name: finishLabel }));
+
+    expect(dialog.getByRole('button', { name: 'Terminando examen…' })).toBeDisabled();
+    expect(dialog.getByRole('button', { name: 'Seguir en curso' })).toBeDisabled();
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    respond(new Response(JSON.stringify({ data: { estado: 'FINALIZADO' } })));
+    expect(await screen.findByText('Examen finalizado correctamente.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: finishLabel })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    [403, 'Solo un docente puede finalizar un examen.'],
+    [409, 'El examen ya está finalizado.'],
+  ])('muestra el error HTTP %s y permite cerrar el modal', async (status, message) => {
+    const user = userEvent.setup();
+    mockApiOnce({ status, body: { message } });
+    renderExam();
+    await user.click(await screen.findByRole('button', { name: finishLabel }));
+    const dialog = within(screen.getByRole('dialog', { name: modalTitle }));
+    await user.click(dialog.getByRole('button', { name: finishLabel }));
+
+    expect(await dialog.findByRole('alert')).toHaveTextContent(message);
+    await user.click(dialog.getByRole('button', { name: 'Seguir en curso' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('cierra el modal si el sondeo confirma el cierre automático y muestra el resultado', async () => {
+    vi.useFakeTimers();
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+    const finish = vi.spyOn(examsService, 'finishExam');
+    vi.mocked(examInProgressService.get).mockResolvedValueOnce(exam).mockResolvedValue({
+      ...exam,
+      estado: 'FINALIZADO',
+      fin_automatico: true,
+      fin_real_en: '2026-10-29T15:10:00Z',
+    });
+    renderExam();
+    await advance(0);
+    fireEvent.click(screen.getByRole('button', { name: finishLabel }));
+    expect(screen.getByRole('dialog', { name: modalTitle })).toBeInTheDocument();
+
+    await advance(2000);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: finishLabel })).not.toBeInTheDocument();
+    expect(screen.getByText('Finalizado')).toBeInTheDocument();
+    expect(screen.getByText('Cierre automático')).toBeInTheDocument();
+    expect(screen.getByText('11:10')).toHaveAttribute('datetime', '2026-10-29T15:10:00Z');
+    expect(finish).not.toHaveBeenCalled();
+  });
+
+  it.each(['DOCENTE', 'AUXILIAR'] as const)('avisa a %s cuando vence el tiempo sin cerrar el examen', async (role) => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'performance'] });
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    vi.mocked(examInProgressService.get).mockResolvedValue({
+      ...exam,
+      rol_controlador: role,
+      hora_servidor_en: '2026-10-29T14:59:59Z',
+    });
+    renderExam();
+    await advance(0);
+    const clock = screen.getByLabelText('Tiempo restante del examen');
+    expect(clock).toHaveTextContent('00:00:01');
+    expect(screen.queryByText('Tiempo cumplido')).not.toBeInTheDocument();
+
+    await advance(1000);
+    expect(clock).toHaveTextContent('00:00:00');
+    expect(screen.getByText('Tiempo cumplido')).toBeInTheDocument();
+    await advance(3000);
+    expect(clock).toHaveTextContent('00:00:00');
+    expect(screen.getByText('En curso', { exact: true })).toBeInTheDocument();
+    expect(examInProgressService.get).toHaveBeenCalledTimes(1);
   });
 });

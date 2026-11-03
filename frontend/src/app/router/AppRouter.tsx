@@ -29,6 +29,7 @@ import {
   ExamInProgressPage,
   ExamsPage,
   FinalReportPage,
+  FinishExamAction,
   InProgressExamsPage,
   ExamHistoryPage,
   ExamReportsPage,
@@ -64,6 +65,7 @@ import { AlienAttemptsReportPage } from '@/features/reports/academic'
 // Punto de composición de HU-037, HU-038-B, HU-042 y HU-057.
 // Cada feature puede aportar componentes aquí sin editar ExamInProgressPage.
 const examInProgressExtensions: ExamInProgressExtensions = {
+  headerActions: (exam) => <FinishExamAction key={exam.id_examen} exam={exam} />,
   studentActions: (student, exam) => <InProgressSituationAction student={student} exam={exam} />,
   panels: (exam) => <InProgressSituationsPanel exam={exam} />,
 }

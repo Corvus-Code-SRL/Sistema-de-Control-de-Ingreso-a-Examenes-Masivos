@@ -62,6 +62,11 @@ export const examsService = {
     return response.data;
   },
 
+  async finishExam(examId: number): Promise<Exam> {
+    const response = await apiPost<DataResponse<Exam>>(`/examenes/${examId}/finalizar`, {});
+    return response.data;
+  },
+
   async assignGroups(examId: number, payload: AssignGroupsPayload): Promise<Exam> {
     const response = await apiPost<DataResponse<Exam>>(
       `/examenes/${examId}/grupos`,
