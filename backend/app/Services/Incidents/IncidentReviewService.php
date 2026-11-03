@@ -44,7 +44,10 @@ class IncidentReviewService
         $reports = $this->baseQuery($teacherId)
             ->when($examId !== null, fn (Builder $q) => $q->where('id_examen', $examId))
             ->when($estado === 'pendiente', fn (Builder $q) => $q->where('estado', ReportStatus::PENDING))
-            ->when($estado === 'revisada', fn (Builder $q) => $q->whereIn('estado', [ReportStatus::APPROVED, ReportStatus::REJECTED]))
+            ->when(
+                $estado === 'revisada',
+                fn (Builder $q) => $q->whereIn('estado', [ReportStatus::APPROVED, ReportStatus::REJECTED])
+            )
             ->orderBy(
                 $estado === 'revisada' ? 'fecha_revision' : 'fecha_reporte',
                 $orden ?? ($estado === 'pendiente' ? 'asc' : 'desc')
@@ -271,6 +274,7 @@ class IncidentReviewService
             'userReporter',
             'userReviewer',
             'entryAttempt.classroom',
+            'incidentRoom',
             'riskCenter',
         ];
     }
@@ -283,11 +287,14 @@ class IncidentReviewService
     {
         $exam = $r->exam;
         $evidencia = $this->evidenciaDto($r);
+        $room = $r->origen === 'EN_CURSO' ? $r->incidentRoom : $r->entryAttempt?->classroom;
 
         return [
             'id'     => 'estudiante-' . $r->id_reporte_est,
             'tipo'   => 'estudiante',
             'estado' => $r->estado,
+            'origen' => $r->origen,
+            'retiro_examen' => (bool) $r->retiro_examen,
 
             'persona' => [
                 'nombre_completo' => $r->student
@@ -326,10 +333,10 @@ class IncidentReviewService
             'fecha_reporte' => $r->fecha_reporte?->utc()->toIso8601String(),
             'hora_reporte'  => $r->fecha_reporte?->utc()->format('H:i'),
 
-            'ambiente' => $r->entryAttempt?->classroom
+            'ambiente' => $room
                 ? [
-                    'id_ambiente' => $r->entryAttempt->classroom->id_ambiente,
-                    'nro_aula'    => $r->entryAttempt->classroom->nro_aula,
+                    'id_ambiente' => $room->id_ambiente,
+                    'nro_aula'    => $room->nro_aula,
                 ]
                 : null,
 

@@ -19,9 +19,21 @@ class ExamSituationAccessService
 
     private UserRoleService $roles;
 
+    /** Función de sciem.access cuyos roles controlan el examen (HU-057: teaching; HU-042: incidents). */
+    private string $feature = 'teaching';
+
     public function __construct(UserRoleService $roles)
     {
         $this->roles = $roles;
+    }
+
+    /** Copia que autoriza con los roles de otra función, sin depender de las capacidades de HU-057. */
+    public function forFeature(string $feature): self
+    {
+        $copy = clone $this;
+        $copy->feature = $feature;
+
+        return $copy;
     }
 
     /** Devuelve null para el docente responsable, o el ambiente permitido al auxiliar. */
@@ -33,7 +45,7 @@ class ExamSituationAccessService
 
         if (
             (string) $exam->id_usuario_docente === (string) $actor->id_usuario
-            && $this->roles->isTeacher($actor->id_usuario)
+            && $this->roles->canUse($actor->id_usuario, $this->feature)
         ) {
             return null;
         }
@@ -81,7 +93,7 @@ class ExamSituationAccessService
             throw new AuthorizationException('No tiene permiso para consultar situaciones.');
         }
 
-        $isTeacher = $this->roles->isTeacher($actor->id_usuario);
+        $isTeacher = $this->roles->canUse($actor->id_usuario, $this->feature);
 
         return Exam::query()->whereNotNull('examen.id_carrera')
             ->where(function ($query) use ($actor, $isTeacher) {
@@ -112,10 +124,18 @@ class ExamSituationAccessService
 
     public function assertRegistrable(Exam $exam): void
     {
-        if (! in_array($exam->estado, self::REGISTRABLE_STATES, true)) {
-            throw new ExamStateException(
-                'Solo se pueden registrar situaciones con el ingreso abierto o con el examen en curso.'
-            );
+        $this->assertInStates(
+            $exam,
+            self::REGISTRABLE_STATES,
+            'Solo se pueden registrar situaciones con el ingreso abierto o con el examen en curso.'
+        );
+    }
+
+    /** @param array<int, string> $states */
+    public function assertInStates(Exam $exam, array $states, string $message): void
+    {
+        if (! in_array($exam->estado, $states, true)) {
+            throw new ExamStateException($message);
         }
     }
 
@@ -139,6 +159,6 @@ class ExamSituationAccessService
      */
     private function controllerRoles(): array
     {
-        return array_merge($this->roles->rolesFor('teaching'), [Role::AUXILIAR]);
+        return array_merge($this->roles->rolesFor($this->feature), [Role::AUXILIAR]);
     }
 }

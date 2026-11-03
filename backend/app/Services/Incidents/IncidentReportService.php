@@ -82,6 +82,7 @@ class IncidentReportService
                     'id_estudiante' => $attempt->id_estudiante,
                     'id_examen' => $attempt->id_examen,
                     'id_intento' => $attempt->id_intento,
+                    'origen' => 'CONTROL_INGRESO',
                     'id_tipo_falta' => $input['id_tipo_falta'],
                     'id_usuario_reportante' => $actor->id_usuario,
                     'descripcion' => trim($input['descripcion']),
@@ -101,9 +102,11 @@ class IncidentReportService
                 $this->evidence->delete($evidencePath);
             }
 
-            if ($exception instanceof QueryException
+            if (
+                $exception instanceof QueryException
                 && ($exception->errorInfo[0] ?? null) === '23505'
-                && strpos($exception->getMessage(), 'unq_reporte_estudiante_id_intento') !== false) {
+                && strpos($exception->getMessage(), 'unq_reporte_estudiante_id_intento') !== false
+            ) {
                 $this->rejectDuplicate();
             }
 
