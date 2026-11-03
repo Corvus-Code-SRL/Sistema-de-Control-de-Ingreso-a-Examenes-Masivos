@@ -163,7 +163,7 @@ function SituationWorkspace({ examId, roomId, search, page, onRoom, onSearch, on
                 ...data.ambientes.map((room) => ({ value: String(room.id_ambiente), label: room.nro_aula }))]} />
           </div>
           <form className="space-y-2" onSubmit={(event) => { event.preventDefault(); onSearch(draft.trim()) }}>
-            <Label htmlFor="situation-student-search">Nombre o código SIS</Label>
+            <Label htmlFor="situation-student-search">Nombre, código SIS o CI</Label>
             <div className="flex gap-2">
               <Input id="situation-student-search" value={draft} maxLength={50}
                 onChange={(event) => setDraft(event.target.value)} />

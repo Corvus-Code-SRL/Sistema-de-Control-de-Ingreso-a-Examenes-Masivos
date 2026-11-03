@@ -85,6 +85,18 @@ class ExamSituationWorkspaceTest extends TestCase
         $this->getJson($this->contextUrl() . '?q=%25')->assertOk()->assertJsonCount(0, 'data.estudiantes');
     }
 
+    public function testSearchFindsThePresentStudentByCiWithoutExposingIt(): void
+    {
+        $this->situationStudent->update(['ci' => '7654321']);
+
+        $response = $this->getJson($this->contextUrl() . '?q=7654321')->assertOk()
+            ->assertJsonCount(1, 'data.estudiantes')
+            ->assertJsonPath('data.estudiantes.0.id_estudiante', (int) $this->situationStudent->id_estudiante);
+
+        $this->assertArrayNotHasKey('ci', $response->json('data.estudiantes.0'));
+        $this->getJson($this->contextUrl() . '?q=7654322')->assertOk()->assertJsonCount(0, 'data.estudiantes');
+    }
+
     public function testAssistantOnlySeesAssignedRoomButCanChooseOtherExamRoomsAsDestination(): void
     {
         $this->actAsSituationAssistant($this->aulaId);

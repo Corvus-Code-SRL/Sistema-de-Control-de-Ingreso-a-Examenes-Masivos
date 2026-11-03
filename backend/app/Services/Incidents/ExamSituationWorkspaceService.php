@@ -68,7 +68,8 @@ class ExamSituationWorkspaceService
             $query->where(function ($search) use ($pattern) {
                 $name = "concat_ws(' ', estudiante.nombre, estudiante.apellido_paterno, estudiante.apellido_materno)";
                 $search->whereRaw(AccentInsensitiveSearch::condition($name), [$pattern])
-                    ->orWhereRaw(AccentInsensitiveSearch::condition('estudiante.cod_sis'), [$pattern]);
+                    ->orWhereRaw(AccentInsensitiveSearch::condition('estudiante.cod_sis'), [$pattern])
+                    ->orWhereRaw(AccentInsensitiveSearch::condition('estudiante.ci'), [$pattern]);
             });
         }
 

@@ -98,6 +98,18 @@ describe('Acceso independiente HU-057', () => {
     expect(api.calls.filter((call) => call.method === 'POST')).toHaveLength(0)
   })
 
+  it('anuncia la búsqueda por nombre, código SIS o CI y envía la CI como criterio', async () => {
+    const api = setup()
+    const user = userEvent.setup()
+    await selectExam(user)
+    const search = await screen.findByLabelText('Nombre, código SIS o CI')
+    await user.type(search, '7654321')
+    await user.click(screen.getByRole('button', { name: 'Buscar' }))
+    await waitFor(() => {
+      expect(api.calls.some((call) => call.url.includes('/contexto') && call.url.includes('q=7654321'))).toBe(true)
+    })
+  })
+
   it('traslada y recarga ambiente, marca e historial sin perder el retraso', async () => {
     const api = setup()
     const user = userEvent.setup()
