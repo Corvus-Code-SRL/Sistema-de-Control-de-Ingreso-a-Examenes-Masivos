@@ -47,6 +47,10 @@ function stubBackend(session: AccountKey) {
       return { body: { data: { materias: [], ambientes: [], grupos: [] } } }
     }
 
+    if (url.includes('/historial/examenes')) {
+      return { body: { data: { examenes: [], materias: [], pagina: 1, paginas: 1, total: 0 } } }
+    }
+
     return { body: { data: [], meta: { id_periodo_activo: 1, total: 0, total_mios: 0 } } }
   })
 }

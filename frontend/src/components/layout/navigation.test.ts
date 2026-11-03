@@ -124,7 +124,7 @@ describe('menú por capacidades', () => {
       {
         label: 'Historial de exámenes y reportes',
         items: [
-          ['Historial de mis exámenes', undefined],
+          ['Historial de mis exámenes', '/historial'],
           ['Generar reporte de examen', undefined]
         ]
       }

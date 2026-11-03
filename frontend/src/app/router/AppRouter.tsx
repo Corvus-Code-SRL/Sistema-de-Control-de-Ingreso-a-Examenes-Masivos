@@ -30,8 +30,11 @@ import {
   ExamsPage,
   FinalReportPage,
   InProgressExamsPage,
+  ExamHistoryPage,
+  ExamHistorySummaryPage,
   type ExamInProgressExtensions,
 } from '@/features/exams'
+
 import {
   GroupAssistantsPage,
   GroupDetailPage,
@@ -158,6 +161,8 @@ function DocenteRoutes() {
       <Route path={LATE_ENTRY_EXAMS_PATH} element={guarded('ingreso.operar', <LateEntryExamsPage />)} />
       <Route path={LATE_ENTRY_PATH} element={guarded('ingreso.operar', <LateEntryPage />)} />
 
+      <Route path="/historial" element={guarded('examenes.gestionar', <ExamHistoryPage />)} />
+      <Route path="/historial/:id" element={guarded('examenes.gestionar', <ExamHistorySummaryPage />)} />
       <Route path="/incidencias" element={guarded('incidencias.revisar', <IncidentsPage />)} />
 
       <Route

@@ -327,7 +327,8 @@ describe('AppSidebar — entradas y estado activo', () => {
       ['En curso', '/examenes/en-curso'],
       ['Registrar estudiante con retraso', '/retrasos'],
       ['Revisar reportes de incidencias', '/incidencias'],
-      ['Central de riesgo', '/central-riesgo']
+      ['Central de riesgo', '/central-riesgo'],
+      ['Historial de mis exámenes', '/historial']
     ])
   })
 

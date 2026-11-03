@@ -11,6 +11,9 @@ export * from './hooks/useExams';
 export * from './hooks/useExamDetail';
 export * from './types/exams.types';
 export * from './services/examsService';
+
+export { ExamHistoryPage } from './pages/ExamHistoryPage';
+export { ExamHistorySummaryPage } from './pages/ExamHistorySummaryPage';
 export { examDetailPath, examFinalReportPath } from './utils/paths';
 export { ExamInProgressPage } from './pages/ExamInProgressPage';
 export { InProgressExamsPage } from './pages/InProgressExamsPage';
