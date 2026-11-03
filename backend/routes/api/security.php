@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Security\AuditLogController;
 use App\Http\Controllers\Security\AuthController;
 use App\Http\Controllers\Security\RoleController;
 use App\Http\Controllers\Security\UserController;
@@ -44,6 +45,19 @@ Route::post('/usuarios/{user}/rol', [UserRoleController::class, 'store'])
 Route::get('/usuarios/{user}/asignaciones', [UserRoleController::class, 'assignments'])
      ->whereUuid('user')
      ->name('usuarios.asignaciones');
+
+// HU-015 — bitácora: solo lectura. No se declara ningún verbo de escritura (PUT/PATCH/DELETE responden 405).
+Route::prefix('bitacora')->name('bitacora.')->group(function () {
+    Route::get('/', [AuditLogController::class, 'index'])
+        ->name('index');
+
+    Route::get('opciones', [AuditLogController::class, 'options'])
+        ->name('opciones');
+
+    Route::get('{id}', [AuditLogController::class, 'show'])
+        ->where('id', '[0-9]{1,9}')
+        ->name('show');
+});
 
 // RNF-02 — el login es la única ruta pública y se declara en routes/api.php.
 Route::prefix('auth')->name('auth.')->group(function () {
