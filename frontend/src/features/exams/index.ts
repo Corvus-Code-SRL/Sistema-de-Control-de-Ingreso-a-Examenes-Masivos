@@ -15,4 +15,7 @@ export { examDetailPath, examFinalReportPath } from './utils/paths';
 export { ExamInProgressPage } from './pages/ExamInProgressPage';
 export { InProgressExamsPage } from './pages/InProgressExamsPage';
 export type { ExamInProgressExtensions } from './components/ExamInProgressExtensions';
-export type { ExamInProgress, InProgressStudent } from './types/examInProgress.types';
+export type { ExamInProgress, InProgressExamRow, InProgressStudent } from './types/examInProgress.types';
+export { EXAM_STATUS } from './types/exams.types';
+export { useInProgressExams } from './hooks/useInProgressExams';
+export { examInProgressService } from './services/examInProgressService';

@@ -1,0 +1,195 @@
+import { act, renderHook } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/lib/api-client'
+import { makeLateEntryRequest } from '@/test/lateEntryFixtures'
+import { ENTRY_CONTROL_POLL_MS, LATE_ENTRY_POLL_MS } from '../constants'
+import { LATE_ENTRY_MESSAGES } from '../components/lateEntryMessages'
+import { lateEntryService } from '../services/lateEntryService'
+import type { ControllerRole } from '../types/late-entry.types'
+import { useLateEntryRequests } from './useLateEntryRequests'
+
+const hidden = Object.getOwnPropertyDescriptor(document, 'hidden')
+const pending = makeLateEntryRequest()
+const approved = makeLateEntryRequest({ estado: 'AUTORIZADA', resolutor: { nombre_completo: 'Ana Rojas' } })
+const rejected = makeLateEntryRequest({ estado: 'RECHAZADA', resolutor: { nombre_completo: 'Ana Rojas' } })
+
+async function flush() {
+  await act(async () => { await Promise.resolve() })
+}
+
+async function advance(ms = LATE_ENTRY_POLL_MS) {
+  await act(async () => { await vi.advanceTimersByTimeAsync(ms) })
+}
+
+async function mount(role: ControllerRole, enabled = true) {
+  const hook = renderHook(() => useLateEntryRequests(7, role, enabled))
+  await flush()
+  return hook
+}
+
+beforeEach(() => {
+  vi.useFakeTimers()
+  Object.defineProperty(document, 'hidden', { configurable: true, value: false })
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+  if (hidden) Object.defineProperty(document, 'hidden', hidden)
+})
+
+describe('useLateEntryRequests', () => {
+  it('consulta cada 5 s, no al ritmo de 2 s del control de ingreso, y no con la pestaña oculta', async () => {
+    const list = vi.spyOn(lateEntryService, 'list').mockResolvedValue([])
+    await mount('DOCENTE')
+    expect(LATE_ENTRY_POLL_MS).toBe(5000)
+    expect(list).toHaveBeenCalledTimes(1)
+
+    await advance(ENTRY_CONTROL_POLL_MS)
+    expect(list).toHaveBeenCalledTimes(1)
+
+    await advance(LATE_ENTRY_POLL_MS - ENTRY_CONTROL_POLL_MS)
+    expect(list).toHaveBeenCalledTimes(2)
+
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true })
+    await advance()
+    expect(list).toHaveBeenCalledTimes(2)
+  })
+
+  it('deshabilitado carga una sola vez la lista final y no sondea', async () => {
+    const list = vi.spyOn(lateEntryService, 'list').mockResolvedValue([approved])
+    const hook = await mount('DOCENTE', false)
+    expect(list).toHaveBeenCalledTimes(1)
+    expect(hook.result.current.requests).toEqual([approved])
+
+    await advance(LATE_ENTRY_POLL_MS * 3)
+    expect(list).toHaveBeenCalledTimes(1)
+  })
+
+  it('al deshabilitarse deja de sondear y conserva la lista', async () => {
+    const list = vi.spyOn(lateEntryService, 'list').mockResolvedValue([pending])
+    const hook = renderHook(({ enabled }) => useLateEntryRequests(7, 'DOCENTE', enabled), {
+      initialProps: { enabled: true },
+    })
+    await flush()
+    await advance()
+    expect(list).toHaveBeenCalledTimes(2)
+
+    hook.rerender({ enabled: false })
+    await advance(LATE_ENTRY_POLL_MS * 3)
+    expect(list).toHaveBeenCalledTimes(2)
+    expect(hook.result.current.requests).toEqual([pending])
+  })
+
+  it('cancela la petición al desmontar', async () => {
+    const list = vi.spyOn(lateEntryService, 'list').mockResolvedValue([])
+    const hook = await mount('DOCENTE')
+    const signal = list.mock.calls[0][1]
+    hook.unmount()
+    expect(signal?.aborted).toBe(true)
+  })
+
+  it('anuncia al docente una solicitud nueva, no las que ya estaban', async () => {
+    const list = vi.spyOn(lateEntryService, 'list').mockResolvedValue([])
+    const hook = await mount('DOCENTE')
+    expect(hook.result.current.announcement).toBeNull()
+
+    list.mockResolvedValue([pending])
+    await advance()
+
+    expect(hook.result.current.pending).toEqual([pending])
+    expect(hook.result.current.announcement).toBe(LATE_ENTRY_MESSAGES.newRequest('Lucía Fernández Rojas', '692B'))
+  })
+
+  it('anuncia al auxiliar que su solicitud fue autorizada o rechazada', async () => {
+    const list = vi.spyOn(lateEntryService, 'list').mockResolvedValue([pending])
+    const hook = await mount('AUXILIAR')
+
+    list.mockResolvedValue([approved])
+    await advance()
+    expect(hook.result.current.announcement).toBe(LATE_ENTRY_MESSAGES.waitingApproved)
+
+    act(() => hook.result.current.clearAnnouncement())
+    list.mockResolvedValue([pending])
+    await advance()
+    list.mockResolvedValue([rejected])
+    await advance()
+    expect(hook.result.current.announcement).toBe(LATE_ENTRY_MESSAGES.waitingRejected)
+  })
+
+  it('una solicitud recién enviada se anuncia aunque se resuelva antes de la siguiente consulta', async () => {
+    const list = vi.spyOn(lateEntryService, 'list').mockResolvedValue([])
+    const hook = await mount('AUXILIAR')
+
+    act(() => hook.result.current.track(pending))
+    expect(hook.result.current.requests).toEqual([pending])
+
+    list.mockResolvedValue([approved])
+    await advance()
+    expect(hook.result.current.announcement).toBe(LATE_ENTRY_MESSAGES.waitingApproved)
+  })
+
+  it('autoriza y rechaza actualizando la lista al instante', async () => {
+    vi.spyOn(lateEntryService, 'list').mockResolvedValue([pending])
+    vi.spyOn(lateEntryService, 'approve').mockResolvedValue(approved)
+    vi.spyOn(lateEntryService, 'reject').mockResolvedValue(rejected)
+    const hook = await mount('DOCENTE')
+
+    await act(async () => { await hook.result.current.approve(31) })
+    expect(hook.result.current.pending).toEqual([])
+    expect(hook.result.current.announcement).toBe(LATE_ENTRY_MESSAGES.approved)
+
+    await act(async () => { await hook.result.current.reject(31) })
+    expect(hook.result.current.requests).toEqual([rejected])
+    expect(hook.result.current.announcement).toBe(LATE_ENTRY_MESSAGES.rejected)
+  })
+
+  it('muestra el mensaje del servidor si la acción falla y conserva la solicitud', async () => {
+    vi.spyOn(lateEntryService, 'list').mockResolvedValue([pending])
+    vi.spyOn(lateEntryService, 'approve').mockRejectedValue(new Error('La solicitud ya fue resuelta.'))
+    const hook = await mount('DOCENTE')
+
+    let done = true
+    await act(async () => { done = await hook.result.current.approve(31) })
+
+    expect(done).toBe(false)
+    expect(hook.result.current.actionError).toBe('La solicitud ya fue resuelta.')
+    expect(hook.result.current.pending).toEqual([pending])
+  })
+
+  it('ante un 429 conserva la lista, avisa y no consulta hasta que pase Retry-After', async () => {
+    const list = vi.spyOn(lateEntryService, 'list')
+      .mockResolvedValueOnce([pending])
+      .mockRejectedValueOnce(new ApiError(429, 'Too Many Attempts.', {}, undefined, { retryAfter: 7 }))
+      .mockResolvedValue([pending])
+    const hook = await mount('DOCENTE')
+
+    await advance()
+    expect(list).toHaveBeenCalledTimes(2)
+    expect(hook.result.current.throttle).toBe('Muchas consultas seguidas, reintentando en 7 s.')
+    expect(hook.result.current.error).toBeNull()
+    expect(hook.result.current.requests).toEqual([pending])
+
+    // El ciclo de los 10 s cae dentro de la espera (hasta los 12 s) y se salta; el de los 15 s consulta.
+    await advance(6_000)
+    expect(list).toHaveBeenCalledTimes(2)
+
+    await advance(4_000)
+    expect(list).toHaveBeenCalledTimes(3)
+    expect(hook.result.current.throttle).toBeNull()
+  })
+
+  it('un 429 al autorizar avisa la espera en lugar del error genérico', async () => {
+    vi.spyOn(lateEntryService, 'list').mockResolvedValue([pending])
+    vi.spyOn(lateEntryService, 'approve').mockRejectedValue(
+      new ApiError(429, 'Too Many Attempts.', {}, undefined, { retryAfter: 3 })
+    )
+    const hook = await mount('DOCENTE')
+
+    let done = true
+    await act(async () => { done = await hook.result.current.approve(31) })
+
+    expect(done).toBe(false)
+    expect(hook.result.current.actionError).toBe('Muchas consultas seguidas. Intente de nuevo en 3 s.')
+  })
+})

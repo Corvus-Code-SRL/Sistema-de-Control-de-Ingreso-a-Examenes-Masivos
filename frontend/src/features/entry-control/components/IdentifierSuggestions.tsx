@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { entryControlService } from '../services/entryControlService'
-import type { StudentMatch } from '../types/entry-control.types'
+import type { StudentMatch, StudentSearchSource } from '../types/entry-control.types'
+import { ENTRY_CONTROL_SEARCH } from './studentSearchSource'
 
 interface Props {
   examId: number
@@ -8,9 +8,12 @@ interface Props {
   query: string
   disabled: boolean
   onSelect: (student: StudentMatch, field: 'sis' | 'ci') => void
+  searchSource?: StudentSearchSource
 }
 
-export function IdentifierSuggestions({ examId, field, query, disabled, onSelect }: Props) {
+export function IdentifierSuggestions({
+  examId, field, query, disabled, onSelect, searchSource = ENTRY_CONTROL_SEARCH,
+}: Props) {
   const [matches, setMatches] = useState<StudentMatch[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -40,7 +43,7 @@ export function IdentifierSuggestions({ examId, field, query, disabled, onSelect
     const timer = window.setTimeout(async () => {
       setLoading(true)
       try {
-        const found = await entryControlService.searchByIdentifier(examId, field, query, controller.signal)
+        const found = await searchSource.byIdentifier(examId, field, query, controller.signal)
         if (!controller.signal.aborted) {
           setMatches(found)
           setSearchedQuery(query)
@@ -55,7 +58,7 @@ export function IdentifierSuggestions({ examId, field, query, disabled, onSelect
     }, 300)
 
     return () => { window.clearTimeout(timer); controller.abort() }
-  }, [disabled, examId, field, minLength, query, selectedQuery])
+  }, [disabled, examId, field, minLength, query, selectedQuery, searchSource])
 
   if (disabled || query.length < minLength || query === selectedQuery) return null
 
@@ -67,7 +70,7 @@ export function IdentifierSuggestions({ examId, field, query, disabled, onSelect
         <p role="status" className="text-xs text-muted-foreground">No hay coincidencias por {label}.</p>
       )}
       {searchedQuery === query && matches.length > 0 && (
-        <ul aria-label={`Sugerencias por ${label}`} className="max-h-52 divide-y overflow-y-auto rounded-md border border-border bg-card shadow-sm">
+        <ul aria-label={`Sugerencias por ${label}`} className="divide-y rounded-md border border-border bg-card shadow-sm">
           {matches.slice(0, 5).map((student) => (
             <li key={student.id_estudiante}>
               <button
