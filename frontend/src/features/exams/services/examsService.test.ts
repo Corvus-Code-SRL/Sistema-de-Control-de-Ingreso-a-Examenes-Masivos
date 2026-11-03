@@ -19,6 +19,22 @@ const exam: Exam = {
 }
 
 describe('examsService', () => {
+  it('termina el examen por el endpoint de finalización y devuelve el estado persistido', async () => {
+    const closed: Exam = {
+      ...exam,
+      estado: 'FINALIZADO',
+      fin_real_en: '2026-10-20T14:00:00Z',
+      fin_automatico: false,
+    };
+    mockApiOnce({ body: { data: closed } });
+
+    await expect(examsService.finishExam(7)).resolves.toEqual(closed);
+
+    const [url, options] = vi.mocked(fetch).mock.calls[0];
+    expect(String(url)).toMatch(/\/examenes\/7\/finalizar$/);
+    expect(options).toMatchObject({ method: 'POST', body: '{}' });
+  });
+
   it('crea el examen con el par académico y los grupos seleccionados', async () => {
     const payload: CreateExamPayload = {
       nombre_examen: 'Primer parcial',

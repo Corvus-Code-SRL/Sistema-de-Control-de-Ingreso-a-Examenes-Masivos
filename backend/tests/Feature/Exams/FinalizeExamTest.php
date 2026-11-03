@@ -11,6 +11,7 @@ use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\EntryControl\RoomAssignmentService;
 use App\Services\Exams\ExamLifecycleService;
 use App\Services\Exams\ExamParticipantService;
+use App\Services\Exams\ExamTimingService;
 use App\Services\Security\AuditLogService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -36,7 +37,7 @@ class FinalizeExamTest extends TestCase
 
     public function test_finalizacion_conserva_estudiantes_esperados_aunque_cambie_la_nomina(): void
     {
-        $exam = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId]);
+        $exam = $this->createExam(['estado' => Exam::EN_CURSO], [$this->aulaId]);
         DB::table('grupo_examen')->insert([
             'id_examen' => $exam->id_examen,
             'id_grupo' => $this->grupoPropioId,
@@ -68,7 +69,7 @@ class FinalizeExamTest extends TestCase
             ->assertJsonPath('data.grupos.0.cantidad_estudiantes', 2);
     }
 
-    public function test_docente_creador_finaliza_examen_abierto_desactiva_redis_y_audita(): void
+    public function test_docente_creador_finaliza_en_curso_desactiva_snapshot_y_audita(): void
     {
         $exam = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId]);
         DB::table('grupo_examen')->insert([
@@ -77,13 +78,27 @@ class FinalizeExamTest extends TestCase
         ]);
         app(RoomAssignmentService::class)->prepare((int) $exam->id_examen);
         $this->assertTrue(app(EntryControlSnapshotService::class)->ready((int) $exam->id_examen));
+        $exam->update(['estado' => Exam::EN_CURSO]);
 
-        $this->postJson($this->url($exam))
-            ->assertOk()
-            ->assertJsonPath('mensaje', 'Examen finalizado correctamente.')
-            ->assertJsonPath('data.estado', Exam::FINALIZADO);
+        $finishedAt = Carbon::parse('2026-10-01T15:32:45Z');
+        Carbon::setTestNow($finishedAt);
+        try {
+            $this->postJson($this->url($exam))
+                ->assertOk()
+                ->assertJsonPath('mensaje', 'Examen finalizado correctamente.')
+                ->assertJsonPath('data.estado', Exam::FINALIZADO)
+                ->assertJsonPath('data.fin_real_en', $finishedAt->toIso8601String())
+                ->assertJsonPath('data.fin_automatico', false);
 
-        $this->assertSame(Exam::FINALIZADO, $exam->fresh()->estado);
+            $this->postJson($this->url($exam))->assertStatus(409);
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        $closed = $exam->fresh();
+        $this->assertSame(Exam::FINALIZADO, $closed->estado);
+        $this->assertTrue($closed->fin_real_en->equalTo($finishedAt));
+        $this->assertFalse($closed->fin_automatico);
         $this->assertFalse(app(EntryControlSnapshotService::class)->ready((int) $exam->id_examen));
 
         $log = AuditLog::query()->where('tabla_afectada', 'examen')->sole();
@@ -93,7 +108,7 @@ class FinalizeExamTest extends TestCase
         );
         $this->assertSame($this->docenteId, $log->id_usuario);
         $this->assertEquals(
-            ['id_examen' => $exam->id_examen, 'estado' => Exam::EN_INGRESO],
+            ['id_examen' => $exam->id_examen, 'estado' => Exam::EN_CURSO],
             $log->antiguo_valor
         );
         $this->assertEquals(
@@ -109,19 +124,19 @@ class FinalizeExamTest extends TestCase
     public function test_solo_docente_creador_puede_finalizar(): void
     {
         $exam = $this->createExam([
-            'estado' => Exam::EN_INGRESO,
+            'estado' => Exam::EN_CURSO,
             'id_usuario_docente' => $this->otroDocenteId,
         ]);
 
         $this->postJson($this->url($exam))->assertForbidden();
 
-        $this->assertSame(Exam::EN_INGRESO, $exam->fresh()->estado);
+        $this->assertSame(Exam::EN_CURSO, $exam->fresh()->estado);
         $this->assertSame(0, AuditLog::query()->where('tabla_afectada', 'examen')->count());
     }
 
     public function test_un_auxiliar_no_puede_finalizar_ni_estando_habilitado_en_el_examen(): void
     {
-        $exam = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId]);
+        $exam = $this->createExam(['estado' => Exam::EN_CURSO], [$this->aulaId]);
         $auxiliaryId = '33333333-3333-4333-8333-000000000099';
         DB::table('usuario')->insert([
             'id_usuario' => $auxiliaryId,
@@ -153,13 +168,42 @@ class FinalizeExamTest extends TestCase
             ->assertForbidden()
             ->assertJsonPath('message', 'Solo un docente puede finalizar un examen.');
 
-        $this->assertSame(Exam::EN_INGRESO, $exam->fresh()->estado);
+        $this->assertSame(Exam::EN_CURSO, $exam->fresh()->estado);
         $this->assertSame(0, AuditLog::query()->where('tabla_afectada', 'examen')->count());
     }
 
-    public function test_finalizacion_manual_rechaza_estados_no_activos(): void
+    public function test_finalizacion_requiere_autenticacion(): void
     {
-        foreach ([Exam::PROGRAMADO, Exam::CANCELADO, Exam::FINALIZADO] as $state) {
+        $exam = $this->createExam(['estado' => Exam::EN_CURSO]);
+        $this->actAsGuest();
+
+        $this->postJson($this->url($exam))->assertUnauthorized();
+        $this->assertSame(Exam::EN_CURSO, $exam->fresh()->estado);
+    }
+
+    public function test_docente_invitado_vigente_puede_finalizar_su_examen(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::EN_CURSO]);
+        $guestRoleId = Role::firstOrCreate(
+            ['nombre_rol' => Role::INVITADO],
+            ['descripcion' => 'Docente invitado', 'estado' => 'ACTIVO']
+        )->id_rol;
+        DB::table('usuario_rol')->where('id_usuario', $this->docenteId)->whereNull('fecha_fin')
+            ->update(['fecha_fin' => now()]);
+        DB::table('usuario')->where('id_usuario', $this->docenteId)->update(['cod_sis' => 'INV4821']);
+        DB::table('usuario_rol')->insert([
+            'id_usuario' => $this->docenteId,
+            'id_rol' => $guestRoleId,
+            'fecha_inicio' => now(),
+        ]);
+        $this->actAsUserId($this->docenteId);
+
+        $this->postJson($this->url($exam))->assertOk()->assertJsonPath('data.estado', Exam::FINALIZADO);
+    }
+
+    public function test_finalizacion_manual_rechaza_estados_distintos_de_en_curso(): void
+    {
+        foreach ([Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::CANCELADO, Exam::FINALIZADO] as $state) {
             $exam = $this->createExam([
                 'nombre_examen' => "Examen {$state}",
                 'estado' => $state,
@@ -170,31 +214,63 @@ class FinalizeExamTest extends TestCase
         }
     }
 
-    public function test_job_espera_dos_horas_despues_del_fin_y_luego_finaliza(): void
+    public function test_job_finaliza_en_curso_exactamente_diez_minutos_despues_del_fin(): void
     {
         $timezone = config('sciem.zona_horaria');
-        $before = Carbon::parse('2026-10-01 14:59:00', $timezone);
+        $deadline = Carbon::parse('2026-10-01 11:44:00', $timezone);
         $exam = $this->createExam([
             'fecha' => '2026-10-01',
-            'hora_inicio' => '12:00',
-            'hora_fin' => '13:00',
-            'duracion' => 60,
-            'estado' => Exam::EN_INGRESO,
+            'hora_inicio' => '10:04',
+            'hora_fin' => '11:34',
+            'duracion' => 90,
+            'estado' => Exam::EN_CURSO,
         ]);
 
         $service = app(ExamLifecycleService::class);
-        $this->assertSame(0, $service->finishExpired($before));
-        $this->assertSame(Exam::EN_INGRESO, $exam->fresh()->estado);
+        $this->assertSame(0, $service->finishExpired($deadline->copy()->subMinutes(10)));
+        $this->assertSame(0, $service->finishExpired($deadline->copy()->subSecond()));
+        $this->assertSame(Exam::EN_CURSO, $exam->fresh()->estado);
+        $this->assertNull($exam->fresh()->fin_real_en);
 
-        Carbon::setTestNow(Carbon::parse('2026-10-01 15:00:00', $timezone));
+        Carbon::setTestNow($deadline);
         try {
             app(FinalizeExpiredExamsJob::class)->handle($service);
         } finally {
             Carbon::setTestNow();
         }
 
+        $this->postJson($this->url($exam))->assertStatus(409);
+        $this->assertSame(0, $service->finishExpired($deadline->copy()->addMinute()));
+        $closed = $exam->fresh();
+        $this->assertSame(Exam::FINALIZADO, $closed->estado);
+        $this->assertTrue($closed->fin_real_en->equalTo($deadline));
+        $this->assertTrue($closed->fin_automatico);
+        $this->assertSame(1, AuditLog::query()->where('tabla_afectada', 'examen')->count());
+    }
+
+    public function test_job_no_sobrescribe_un_cierre_manual_entre_la_seleccion_y_el_bloqueo(): void
+    {
+        $exam = $this->createExam([
+            'fecha' => '2026-10-01',
+            'hora_inicio' => '10:04',
+            'duracion' => 90,
+            'estado' => Exam::EN_CURSO,
+        ]);
+        $deadline = Carbon::parse('2026-10-01 11:44:00', config('sciem.zona_horaria'));
+        $this->partialMock(ExamTimingService::class, function ($mock) use ($exam, $deadline): void {
+            $mock->shouldReceive('finishesAutomaticallyAt')->once()->andReturnUsing(
+                function () use ($exam, $deadline): Carbon {
+                    $this->postJson($this->url($exam))->assertOk();
+
+                    return $deadline;
+                }
+            );
+        });
+
+        $this->assertSame(0, app(ExamLifecycleService::class)->finishExpired($deadline));
         $this->assertSame(Exam::FINALIZADO, $exam->fresh()->estado);
-        $this->assertSame(0, $service->finishExpired(Carbon::parse('2026-10-01 15:01:00', $timezone)));
+        $this->assertFalse($exam->fresh()->fin_automatico);
+        $this->assertSame(1, AuditLog::query()->where('tabla_afectada', 'examen')->count());
     }
 
     public function test_job_corrige_programados_antiguos_y_finaliza_en_curso(): void
@@ -213,14 +289,21 @@ class FinalizeExamTest extends TestCase
             'nombre_examen' => 'En curso antiguo',
             'estado' => Exam::EN_CURSO,
         ]);
+        $entry = $this->createExam($attributes + [
+            'nombre_examen' => 'En ingreso antiguo',
+            'estado' => Exam::EN_INGRESO,
+        ]);
 
-        $finished = app(ExamLifecycleService::class)->finishExpired(
-            Carbon::parse('2026-10-01 12:00:00', config('sciem.zona_horaria'))
-        );
+        $service = app(ExamLifecycleService::class);
+        $timezone = config('sciem.zona_horaria');
+        $this->assertSame(1, $service->finishExpired(Carbon::parse('2026-09-30 10:59:59', $timezone)));
+        $this->assertSame(Exam::PROGRAMADO, $programmed->fresh()->estado);
+        $this->assertSame(Exam::EN_INGRESO, $entry->fresh()->estado);
 
-        $this->assertSame(2, $finished);
+        $this->assertSame(2, $service->finishExpired(Carbon::parse('2026-10-01 12:00:00', $timezone)));
         $this->assertSame(Exam::FINALIZADO, $programmed->fresh()->estado);
         $this->assertSame(Exam::FINALIZADO, $running->fresh()->estado);
+        $this->assertSame(Exam::FINALIZADO, $entry->fresh()->estado);
     }
 
     public function test_finalizacion_automatica_congela_esperados_y_audita(): void

@@ -157,7 +157,7 @@ class ExamLifecycleService
         return $started;
     }
 
-    /** Finaliza inmediatamente un examen activo, únicamente por su docente creador. */
+    /** Finaliza un examen en curso por decisión de su docente propietario. */
     public function finishManually(Exam $exam, string $teacherId): Exam
     {
         $exam = DB::transaction(function () use ($exam, $teacherId): Exam {
@@ -167,28 +167,11 @@ class ExamLifecycleService
                 throw new ExamOwnershipException();
             }
 
-            if (! in_array($locked->estado, [Exam::EN_INGRESO, Exam::EN_CURSO], true)) {
+            if ($locked->estado !== Exam::EN_CURSO) {
                 throw new ExamStateException($this->manualFinishMessage($locked->estado));
             }
 
-            $previousState = $locked->estado;
-
-            $this->registerMissingStudents((int) $locked->id_examen);
-            $locked->update(['estado' => Exam::FINALIZADO]);
-
-            $this->auditLog->registrar(
-                'FINALIZAR',
-                'examen',
-                [
-                    'id_examen' => $locked->id_examen,
-                    'estado' => $previousState,
-                ],
-                [
-                    'id_examen' => $locked->id_examen,
-                    'estado' => Exam::FINALIZADO,
-                ],
-                $teacherId
-            );
+            $this->finishLockedExam($locked, Carbon::now('UTC'), false);
 
             return $locked;
         });
@@ -206,8 +189,8 @@ class ExamLifecycleService
     }
 
     /**
-     * Cierra snapshots al terminar la duración y, dos horas después, persiste
-     * FINALIZADO. Devuelve la cantidad de estados modificados.
+     * Cierra snapshots al terminar la duración y finaliza al cumplirse el margen.
+     * Devuelve la cantidad de estados modificados.
      */
     public function finishExpired(?Carbon $now = null): int
     {
@@ -249,25 +232,7 @@ class ExamLifecycleService
                                 return false;
                             }
 
-                            $previousState = $locked->estado;
-
-                            $this->registerMissingStudents((int) $locked->id_examen);
-                            $locked->update(['estado' => Exam::FINALIZADO]);
-
-                            $this->auditLog->registrar(
-                                'FINALIZAR',
-                                'examen',
-                                [
-                                    'id_examen' => $locked->id_examen,
-                                    'estado' => $previousState,
-                                ],
-                                [
-                                    'id_examen' => $locked->id_examen,
-                                    'estado' => Exam::FINALIZADO,
-                                    'tipo_finalizacion' => 'AUTOMATICA',
-                                ],
-                                (string) $locked->id_usuario_docente
-                            );
+                            $this->finishLockedExam($locked, $now->copy()->utc(), true);
 
                             return true;
                         });
@@ -285,6 +250,30 @@ class ExamLifecycleService
             }, 'id_examen');
 
         return $finished;
+    }
+
+    private function finishLockedExam(Exam $exam, Carbon $finishedAt, bool $automatic): void
+    {
+        $previousState = $exam->estado;
+
+        $this->registerMissingStudents((int) $exam->id_examen);
+        $exam->estado = Exam::FINALIZADO;
+        $exam->fin_real_en = $finishedAt;
+        $exam->fin_automatico = $automatic;
+        $exam->save();
+
+        $newValues = ['id_examen' => $exam->id_examen, 'estado' => Exam::FINALIZADO];
+        if ($automatic) {
+            $newValues['tipo_finalizacion'] = 'AUTOMATICA';
+        }
+
+        $this->auditLog->registrar(
+            'FINALIZAR',
+            'examen',
+            ['id_examen' => $exam->id_examen, 'estado' => $previousState],
+            $newValues,
+            (string) $exam->id_usuario_docente
+        );
     }
 
     private function registerMissingStudents(int $examId): void

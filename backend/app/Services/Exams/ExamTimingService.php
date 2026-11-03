@@ -30,7 +30,8 @@ class ExamTimingService
 
     public function finishesAutomaticallyAt(Exam $exam): Carbon
     {
-        return $this->endsAt($exam)->addHours(2);
+        // Los exámenes que quedaron sin iniciar conservan el plazo de recuperación.
+        return $this->endsAt($exam)->addMinutes($exam->estado === Exam::EN_CURSO ? 10 : 120);
     }
 
     public function hasEnded(Exam $exam, ?Carbon $now = null): bool

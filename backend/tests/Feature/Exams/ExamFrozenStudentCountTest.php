@@ -64,7 +64,7 @@ class ExamFrozenStudentCountTest extends TestCase
 
     public function test_finalizado_conserva_su_conteo_en_listado_y_detalle_y_programado_muestra_el_vivo(): void
     {
-        $finalized = $this->examInGroup(Exam::EN_INGRESO);
+        $finalized = $this->examInGroup(Exam::EN_CURSO);
         $scheduled = $this->examInGroup(Exam::PROGRAMADO, '14:00');
 
         $this->postJson("/api/examenes/{$finalized->id_examen}/finalizar")->assertOk();
@@ -84,7 +84,7 @@ class ExamFrozenStudentCountTest extends TestCase
 
     public function test_respuesta_de_finalizar_coincide_con_el_conteo_congelado_del_detalle(): void
     {
-        $exam = $this->examInGroup(Exam::EN_INGRESO);
+        $exam = $this->examInGroup(Exam::EN_CURSO);
 
         // Un estudiante inscrito en dos grupos del examen se congela una sola vez.
         $sharedStudentId = DB::table('grupo_estudiante')
@@ -113,7 +113,7 @@ class ExamFrozenStudentCountTest extends TestCase
     public function test_el_conteo_congelado_usa_una_sola_consulta_sobre_examen_estudiante(): void
     {
         for ($i = 0; $i < 3; $i++) {
-            $exam = $this->examInGroup(Exam::EN_INGRESO, sprintf('%02d:00', 8 + $i));
+            $exam = $this->examInGroup(Exam::EN_CURSO, sprintf('%02d:00', 8 + $i));
             $this->postJson("/api/examenes/{$exam->id_examen}/finalizar")->assertOk();
         }
 
