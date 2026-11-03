@@ -168,8 +168,50 @@ class RegisterExamSituationTest extends TestCase
         ];
     }
 
-     /** @dataProvider closedStates */
-    public function testOnlyInProgressExamsAcceptSituations(string $state): void
+    /** @dataProvider registrableStates */
+    public function testEntryOpenAndInProgressExamsAcceptBothSituationTypes(string $state): void
+    {
+        $this->situationExam->update(['estado' => $state]);
+
+        $this->postJson($this->situationUrl(), [
+            'tipo' => 'IDENTIFICACION', 'motivo' => 'Documento deteriorado.',
+        ])->assertCreated()->assertJsonPath('data.tipo', 'IDENTIFICACION');
+        $this->postJson($this->situationUrl(), $this->situationPayload())->assertCreated()
+            ->assertJsonPath('data.ambiente_destino.id_ambiente', $this->otraAulaId);
+
+        $this->assertSame(2, DB::table('situacion_examen')->count());
+        $this->assertSame($this->otraAulaId, (int) $this->attendance()->id_ambiente);
+    }
+
+    public static function registrableStates(): array
+    {
+        return [[Exam::EN_INGRESO], [Exam::EN_CURSO]];
+    }
+
+    public function testAssistantCanRegisterDuringEntryOpen(): void
+    {
+        $this->situationExam->update(['estado' => Exam::EN_INGRESO]);
+        $this->actAsSituationAssistant($this->aulaId);
+
+        $this->postJson($this->situationUrl(), $this->situationPayload())->assertCreated()
+            ->assertJsonPath('data.registrante.id_usuario', $this->otroDocenteId);
+    }
+
+    public function testPresentStudentIsRequiredDuringEntryOpen(): void
+    {
+        $this->situationExam->update(['estado' => Exam::EN_INGRESO]);
+        DB::table('examen_estudiante')->where('id_examen', $this->situationExam->id_examen)->update([
+            'estado_ingreso' => 'NO_INGRESO', 'hora_ingreso' => null,
+            'id_usuario_controlador' => null, 'registrado_en' => null,
+        ]);
+
+        $this->postJson($this->situationUrl(), $this->situationPayload())->assertStatus(409)
+            ->assertJsonPath('message', 'Solo puede registrar situaciones de estudiantes presentes.');
+        $this->assertSame(0, DB::table('situacion_examen')->count());
+    }
+
+    /** @dataProvider closedStates */
+    public function testExamsOutsideEntryAndProgressRejectSituations(string $state): void
     {
         if ($state === Exam::CANCELADO) {
             // La base solo permite cancelar un examen que todavía está programado.
@@ -180,13 +222,17 @@ class RegisterExamSituationTest extends TestCase
         }
 
         $this->situationExam->update(['estado' => $state]);
-        $this->postJson($this->situationUrl(), $this->situationPayload())->assertStatus(409);
+        $this->postJson($this->situationUrl(), $this->situationPayload())->assertStatus(409)
+            ->assertJsonPath(
+                'message',
+                'Solo se pueden registrar situaciones con el ingreso abierto o con el examen en curso.'
+            );
         $this->assertSame(0, DB::table('situacion_examen')->count());
     }
 
     public static function closedStates(): array
     {
-        return [[Exam::PROGRAMADO], [Exam::EN_INGRESO], [Exam::FINALIZADO], [Exam::CANCELADO]];
+        return [[Exam::PROGRAMADO], [Exam::FINALIZADO], [Exam::CANCELADO]];
     }
 
     public function testAbsentStudentCannotReceiveASituation(): void

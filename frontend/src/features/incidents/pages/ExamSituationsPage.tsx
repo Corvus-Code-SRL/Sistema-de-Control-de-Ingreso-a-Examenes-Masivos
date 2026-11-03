@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Clock } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
+import { EmptyState } from '@/components/common/EmptyState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { FormSelect } from '@/components/common/FormSelect'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -11,60 +13,57 @@ import { Label } from '@/components/ui/label'
 import { useAsyncResource } from '@/hooks/useAsyncResource'
 import { ApiError } from '@/lib/api-client'
 import { ExamSituationDialog } from '../components/ExamSituationDialog'
+import { EXAM_SITUATION_MESSAGES, SITUATION_EXAM_STATE_LABELS } from '../components/examSituationMessages'
 import { ExamSituationsPanel } from '../components/ExamSituationsPanel'
 import { useExamSituationWorkspace } from '../hooks/useExamSituationWorkspace'
 import { examSituationService } from '../services/examSituationService'
 import {
-  formatSituationTime, type ExamSituationContext, type SituationExam, type SituationCreated,
+  formatSituationTime, type ExamSituationContext, type SituationCreated,
 } from '../types/exam-situation.types'
 
-/** Acceso independiente para los controladores autorizados; no abre ni inicia exámenes. */
+/**
+ * Acceso independiente para los controladores autorizados; no abre ni inicia exámenes.
+ * Lista los exámenes con el ingreso abierto o en curso; sin ninguno, explica el estado vacío.
+ */
 export function ExamSituationsPage() {
-  const [state, setState] = useState<SituationExam['estado']>('EN_CURSO')
+  const [page, setPage] = useState(1)
+  const [examId, setExamId] = useState('')
   return (
     <AppShell mobileTitle="Situaciones excepcionales" breadcrumbs={[{ label: 'Situaciones excepcionales' }]}>
       <PageHeader title="Registrar situación excepcional"
         subtitle="Cambios de ambiente y observaciones de identidad de estudiantes presentes." />
-      <div className="max-w-sm space-y-2">
-        <Label htmlFor="situation-exam-state">Estado del examen</Label>
-        <FormSelect id="situation-exam-state" value={state} placeholder="Seleccione un estado"
-          onValueChange={(value) => setState(value as SituationExam['estado'])}
-          options={[{ value: 'EN_CURSO', label: 'En curso' }, { value: 'FINALIZADO', label: 'Finalizados · consulta' }]} />
-      </div>
-      <ExamSelector key={state} state={state} />
+      <ExamSelectionPage key={page} page={page} examId={examId}
+        onSelect={setExamId} onPage={(value) => { setExamId(''); setPage(value) }} />
     </AppShell>
   )
 }
 
-function ExamSelector({ state }: { state: SituationExam['estado'] }) {
-  const [page, setPage] = useState(1)
-  const [examId, setExamId] = useState('')
-  return <ExamSelectionPage key={`${state}-${page}`} state={state} page={page} examId={examId}
-    onSelect={setExamId} onPage={(value) => { setExamId(''); setPage(value) }} />
-}
-
 interface SelectionProps {
-  state: SituationExam['estado']
   page: number
   examId: string
   onSelect: (value: string) => void
   onPage: (value: number) => void
 }
 
-function ExamSelectionPage({ state, page, examId, onSelect, onPage }: SelectionProps) {
+function ExamSelectionPage({ page, examId, onSelect, onPage }: SelectionProps) {
   const resource = useAsyncResource(useCallback(
-    (signal) => examSituationService.exams(state, page, signal), [state, page]
-  ), [state, page])
+    (signal) => examSituationService.exams(page, signal), [page]
+  ), [page])
   if (resource.status === 'error' && resource.error) return <ErrorState error={resource.error} onRetry={resource.reload} />
   if (!resource.data) return <LoadingState rows={2} label="Cargando exámenes" />
   const catalog = resource.data
+  if (!catalog.data.length && page <= 1) {
+    return <EmptyState icon={Clock} title={EXAM_SITUATION_MESSAGES.emptyTitle}
+      description={EXAM_SITUATION_MESSAGES.emptyDescription} />
+  }
   return <>
     <Card className="space-y-3 p-4">
       <Label htmlFor="situation-exam">Examen</Label>
       {catalog.data.length ? <FormSelect id="situation-exam" value={examId} placeholder="Seleccione un examen"
         onValueChange={onSelect} options={catalog.data.map((exam) => ({
-          value: String(exam.id_examen), label: `${exam.nombre_examen} · ${exam.fecha} · #${exam.id_examen}`,
-        }))} /> : <p role="status">No hay exámenes disponibles con ese estado para su cuenta.</p>}
+          value: String(exam.id_examen),
+          label: `${exam.nombre_examen} · ${exam.fecha} · ${SITUATION_EXAM_STATE_LABELS[exam.estado]} · #${exam.id_examen}`,
+        }))} /> : <p role="status">No hay más exámenes en esta página.</p>}
       <Pagination page={catalog.meta.current_page} lastPage={catalog.meta.last_page} onChange={onPage} label="exámenes" />
     </Card>
     {examId && <SituationWorkspaceFilters key={examId} examId={Number(examId)} />}
@@ -113,7 +112,7 @@ function SituationWorkspace({ examId, roomId, search, page, onRoom, onSearch, on
       }, controller.signal)
       if (controller.signal.aborted) return
       const student = data.estudiantes.find((item) => item.id_estudiante === studentId)
-      if (data.examen.estado !== 'EN_CURSO' || !student) {
+      if (!student) {
         setMessage('El examen o la asistencia cambió. Se actualizó la vista; seleccione nuevamente al estudiante.')
         resource.reload()
         return
@@ -141,17 +140,13 @@ function SituationWorkspace({ examId, roomId, search, page, onRoom, onSearch, on
   }
 
   const data = resource.data
-  const closed = data?.examen.estado === 'FINALIZADO'
-  const canRegister = !!data && !closed && !resource.error
+  const canRegister = !!data && !resource.error
   const effectiveRoom = data?.ambiente_control ?? roomId
   return <>
     {message && <p role="status" className="text-sm">{message}</p>}
     {resource.error && <ErrorState error={resource.error} onRetry={resource.reload} />}
     {!data && !resource.error && <LoadingState rows={3} label="Cargando estudiantes presentes" />}
     {data && <>
-      {closed && <p role="status" className="rounded-lg border bg-muted p-3 text-sm">
-        Examen finalizado. Puede consultar las situaciones; no registrar nuevas.
-      </p>}
       <Card className="space-y-4 p-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
@@ -190,8 +185,8 @@ function SituationWorkspace({ examId, roomId, search, page, onRoom, onSearch, on
                 {change && <p className="text-sm text-brand">Cambio desde {change.ambiente_origen.nro_aula} · {formatSituationTime(change.registrado_en)}</p>}
                 {student.situaciones.identidad_observada && <p className="text-sm text-warn-fg">Identidad observada</p>}
               </div>
-              {!closed && <Button type="button" variant="outline" disabled={!canRegister || opening}
-                onClick={() => { void openSituation(student.id_estudiante) }}>Registrar situación</Button>}
+              <Button type="button" variant="outline" disabled={!canRegister || opening}
+                onClick={() => { void openSituation(student.id_estudiante) }}>Registrar situación</Button>
             </li>
           })}
         </ul>

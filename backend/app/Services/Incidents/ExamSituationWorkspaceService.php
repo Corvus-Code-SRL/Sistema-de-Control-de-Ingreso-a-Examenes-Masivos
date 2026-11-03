@@ -7,7 +7,6 @@ use App\Models\Student;
 use App\Models\User;
 use App\Support\Database\AccentInsensitiveSearch;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /** Consultas de la pantalla independiente; no registra asistencia ni cambia el estado del examen. */
 class ExamSituationWorkspaceService
@@ -23,8 +22,10 @@ class ExamSituationWorkspaceService
 
     public function exams(array $filters, User $actor): LengthAwarePaginator
     {
+        $states = isset($filters['estado']) ? [$filters['estado']] : ExamSituationAccessService::REGISTRABLE_STATES;
+
         return $this->access->visibleExams($actor)
-            ->where('estado', $filters['estado'] ?? Exam::EN_CURSO)
+            ->whereIn('estado', $states)
             ->orderByDesc('fecha')->orderByDesc('id_examen')
             ->paginate(20, ['examen.*'], 'page', (int) ($filters['page'] ?? 1));
     }
@@ -34,9 +35,7 @@ class ExamSituationWorkspaceService
         $exam = Exam::query()->with('classrooms')->findOrFail($examId);
         $scope = $this->access->roomScope($exam, $actor);
 
-        if (! in_array($exam->estado, [Exam::EN_CURSO, Exam::FINALIZADO], true)) {
-            throw new HttpException(409, 'El examen no está en curso ni finalizado.');
-        }
+        $this->access->assertRegistrable($exam);
 
         $roomId = isset($filters['id_ambiente']) ? (int) $filters['id_ambiente'] : $scope;
 

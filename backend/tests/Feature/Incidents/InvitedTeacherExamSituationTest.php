@@ -63,6 +63,18 @@ class InvitedTeacherExamSituationTest extends TestCase
             ->assertJsonPath('data.ambiente_control', null);
     }
 
+    public function testInvitedOwnerRegistersDuringEntryOpen(): void
+    {
+        $this->situationExam->update(['estado' => Exam::EN_INGRESO]);
+        $examId = (int) $this->situationExam->id_examen;
+
+        $this->getJson('/api/situaciones/examenes')->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.estado', Exam::EN_INGRESO);
+        $this->getJson("/api/situaciones/examenes/{$examId}/contexto")->assertOk()
+            ->assertJsonPath('data.examen.estado', Exam::EN_INGRESO);
+        $this->postJson($this->situationUrl(), $this->situationPayload())->assertCreated();
+    }
+
     public function testInvitedTeacherCannotRegisterInAnotherTeachersExam(): void
     {
         $this->situationExam->forceFill(['id_usuario_docente' => $this->otroDocenteId])->save();
