@@ -111,7 +111,7 @@ describe('menú por capacidades', () => {
           ['Control de ingreso', '/control-ingreso'],
           ['Registrar situación excepcional', '/situacion-excepcional'],
           ['En curso', '/examenes/en-curso'],
-          ['Registrar estudiante con retraso', undefined],
+          ['Registrar estudiante con retraso', '/retrasos'],
           ['Registrar estudiante excepcional', undefined]
         ]
       },
@@ -125,7 +125,7 @@ describe('menú por capacidades', () => {
       {
         label: 'Historial de exámenes y reportes',
         items: [
-          ['Historial de mis exámenes', undefined],
+          ['Historial de mis exámenes', '/historial'],
           ['Generar reporte de examen', undefined]
         ]
       }
@@ -147,7 +147,7 @@ describe('menú por capacidades', () => {
           ['Control de ingreso', '/control-ingreso'],
           ['Registrar situación excepcional', '/situacion-excepcional'],
           ['En curso', '/examenes/en-curso'],
-          ['Registrar estudiante con retraso', undefined]
+          ['Registrar estudiante con retraso', '/retrasos']
         ]
       }
     ])
@@ -175,6 +175,7 @@ describe('menú por capacidades', () => {
         'Control de ingreso',
         'En curso',
         'Registrar situación excepcional',
+        'Registrar estudiante con retraso',
         'Revisar reportes de incidencias'
       ])
     )

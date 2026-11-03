@@ -14,7 +14,14 @@ import {
   useCurrentUser,
   type Capability,
 } from '@/features/auth'
-import { EntryControlPage, OpenEntryControlsPage } from '@/features/entry-control'
+import {
+  EntryControlPage,
+  LATE_ENTRY_EXAMS_PATH,
+  LATE_ENTRY_PATH,
+  LateEntryExamsPage,
+  LateEntryPage,
+  OpenEntryControlsPage,
+} from '@/features/entry-control'
 import {
   CreateExamPage,
   EditExamPage,
@@ -23,8 +30,11 @@ import {
   ExamsPage,
   FinalReportPage,
   InProgressExamsPage,
+  ExamHistoryPage,
+  ExamHistorySummaryPage,
   type ExamInProgressExtensions,
 } from '@/features/exams'
+
 import {
   GroupAssistantsPage,
   GroupDetailPage,
@@ -157,7 +167,11 @@ function DocenteRoutes() {
         path="/examenes/:examId/en-curso"
         element={guarded('ingreso.operar', <ExamInProgressPage extensions={examInProgressExtensions} />)}
       />
+      <Route path={LATE_ENTRY_EXAMS_PATH} element={guarded('ingreso.operar', <LateEntryExamsPage />)} />
+      <Route path={LATE_ENTRY_PATH} element={guarded('ingreso.operar', <LateEntryPage />)} />
 
+      <Route path="/historial" element={guarded('examenes.gestionar', <ExamHistoryPage />)} />
+      <Route path="/historial/:id" element={guarded('examenes.gestionar', <ExamHistorySummaryPage />)} />
       <Route path="/incidencias" element={guarded('incidencias.revisar', <IncidentsPage />)} />
 
       <Route
@@ -201,6 +215,8 @@ function AuxiliarRoutes() {
         path="/examenes/:examId/en-curso"
         element={guarded('ingreso.operar', <ExamInProgressPage extensions={examInProgressExtensions} />)}
       />
+      <Route path={LATE_ENTRY_EXAMS_PATH} element={guarded('ingreso.operar', <LateEntryExamsPage />)} />
+      <Route path={LATE_ENTRY_PATH} element={guarded('ingreso.operar', <LateEntryPage />)} />
       <Route
         path="/reportes/intentos"
         element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}

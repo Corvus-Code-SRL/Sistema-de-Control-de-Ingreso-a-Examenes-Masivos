@@ -1,5 +1,16 @@
 export type EntryState = 'INGRESO' | 'CON_RETRASO' | 'NO_INGRESO';
 
+/** Fila de los listados de exámenes EN_CURSO del docente o del auxiliar. */
+export interface InProgressExamRow {
+    id: number;
+    title: string;
+    subject: string | null;
+    date: string | null;
+    startsAt: string | null;
+    endsAt: string | null;
+    rooms: string;
+}
+
 export interface InProgressStudent {
     id_estudiante: number;
     cod_sis: string;

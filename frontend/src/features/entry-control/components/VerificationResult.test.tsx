@@ -158,3 +158,80 @@ describe('VerificationResult inscripción y riesgo', () => {
     expect(screen.getByText('Adriana Arnez Céspedes')).toBeInTheDocument()
   })
 })
+
+describe('VerificationResult acciones configurables', () => {
+  const lateActions = {
+    confirmLabel: 'Enviar solicitud', busyLabel: 'Enviando…', rejectLabel: 'Cancelar', recordsAttempt: false,
+  }
+
+  it('por omisión conserva las acciones del control de ingreso', () => {
+    const denied = { ...result, veredicto: 'CI_NO_COINCIDE', autorizado: false }
+    const { rerender } = render(<VerificationResult
+      result={result} busy={false} onConfirm={() => {}} onReject={() => {}} onNext={() => {}}
+    />)
+
+    expect(screen.getByRole('button', { name: 'Rechazar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Aceptar ingreso' })).toBeInTheDocument()
+
+    rerender(<VerificationResult
+      result={denied} busy={false} onConfirm={() => {}} onReject={() => {}} onNext={() => {}}
+    />)
+    expect(screen.getByText('Intento registrado con hora, ambiente y controlador.')).toBeInTheDocument()
+  })
+
+  it('usa los textos del flujo y llama a sus acciones', () => {
+    const onConfirm = vi.fn()
+    const onReject = vi.fn()
+    render(<VerificationResult
+      result={result} busy={false} onConfirm={onConfirm} onReject={onReject} onNext={() => {}}
+      actions={lateActions}
+    />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solicitud' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(onConfirm).toHaveBeenCalledTimes(1)
+    expect(onReject).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: 'Aceptar ingreso' })).not.toBeInTheDocument()
+  })
+
+  it('muestra el texto de espera del flujo mientras está ocupado', () => {
+    render(<VerificationResult
+      result={result} busy onConfirm={() => {}} onReject={() => {}} onNext={() => {}}
+      actions={lateActions}
+    />)
+
+    expect(screen.getByRole('button', { name: 'Enviando…' })).toBeDisabled()
+  })
+
+  it('sin intento registrado omite la nota del rechazo', () => {
+    render(<VerificationResult
+      result={{ ...result, veredicto: 'CI_NO_COINCIDE', autorizado: false }}
+      busy={false} onConfirm={() => {}} onReject={() => {}} onNext={() => {}}
+      actions={lateActions}
+    />)
+
+    expect(screen.queryByText('Intento registrado con hora, ambiente y controlador.')).not.toBeInTheDocument()
+  })
+
+  it('agrega contenido propio antes de los botones', () => {
+    render(<VerificationResult
+      result={result} busy={false} onConfirm={() => {}} onReject={() => {}} onNext={() => {}}
+      extra={<p>Selector de ambiente</p>}
+    />)
+
+    expect(screen.getByText('Selector de ambiente')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Aceptar ingreso' })).toBeInTheDocument()
+  })
+
+  it('el pie propio reemplaza los botones', () => {
+    render(<VerificationResult
+      result={result} busy={false} onConfirm={() => {}} onReject={() => {}} onNext={() => {}}
+      footer={<button type="button">Autorizar</button>}
+    />)
+
+    expect(screen.getByRole('button', { name: 'Autorizar' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Aceptar ingreso' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument()
+  })
+})
