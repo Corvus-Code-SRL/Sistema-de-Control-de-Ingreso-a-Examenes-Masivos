@@ -111,6 +111,29 @@ class StartExamTest extends TestCase
 
         $this->assertFalse($result['creado']);
         $this->assertSame('EXAMEN_INICIADO', $result['veredicto']);
+        $this->assertSame('El examen ya inició.', $result['motivo']);
+        $this->assertSame(0, DB::table('examen_estudiante')
+            ->where('id_examen', $exam->id_examen)->count());
+    }
+
+    public function test_confirmacion_rechaza_un_examen_finalizado_con_su_propio_mensaje(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::EN_INGRESO]);
+        $studentId = DB::table('grupo_estudiante')
+            ->where('id_grupo', $this->grupoPropioId)
+            ->value('id_estudiante');
+        $actor = $this->actAsTeacher($this->docenteId);
+        $stale = clone $exam;
+        $exam->update(['estado' => Exam::FINALIZADO]);
+
+        $result = app(EntryConfirmationService::class)->confirm($stale, [
+            'id_estudiante' => (int) $studentId,
+            'id_ambiente' => $this->aulaId,
+        ], $actor);
+
+        $this->assertFalse($result['creado']);
+        $this->assertSame('EXAMEN_INICIADO', $result['veredicto']);
+        $this->assertSame('El examen ya finalizó.', $result['motivo']);
         $this->assertSame(0, DB::table('examen_estudiante')
             ->where('id_examen', $exam->id_examen)->count());
     }
