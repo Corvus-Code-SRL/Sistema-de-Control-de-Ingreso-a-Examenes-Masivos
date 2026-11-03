@@ -38,6 +38,8 @@ class StudentReport extends Model
         'id_examen' => 'int',
         'id_tipo_falta' => 'int',
         'id_intento' => 'int',
+        'id_ambiente_hecho' => 'int',
+        'retiro_examen' => 'boolean',
         'id_usuario_reportante' => 'string',
         'fecha_reporte' => 'datetime',
         'fecha_revision' => 'datetime',
@@ -49,6 +51,9 @@ class StudentReport extends Model
         'id_examen',
         'id_tipo_falta',
         'id_intento',
+        'origen',
+        'id_ambiente_hecho',
+        'retiro_examen',
         'id_usuario_reportante',
         'descripcion',
         'evidencia_url',
@@ -78,6 +83,11 @@ class StudentReport extends Model
     public function entryAttempt(): BelongsTo
     {
         return $this->belongsTo(EntryAttempt::class, 'id_intento', 'id_intento');
+    }
+
+    public function incidentRoom(): BelongsTo
+    {
+        return $this->belongsTo(Classroom::class, 'id_ambiente_hecho', 'id_ambiente');
     }
 
     public function userReviewer(): BelongsTo
