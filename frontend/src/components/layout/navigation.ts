@@ -185,9 +185,10 @@ export const NAVIGATION: readonly NavSection[] = [
     items: [
       {
         id: 'admin-audit-log',
-        label: 'Bitácora de operaciones',
+        label: 'Bitácora',
         icon: ScrollText,
-        capability: 'administracion.gestionar'
+        capability: 'bitacora.consultar',
+        to: '/bitacora'
       },
       {
         id: 'admin-audit-report',

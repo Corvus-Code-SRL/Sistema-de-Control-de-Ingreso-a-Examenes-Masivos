@@ -57,6 +57,25 @@ describe('mapa de acceso: backend e interfaz', () => {
   })
 })
 
+describe('Bitácora (HU-015)', () => {
+  it('solo el Administrador tiene bitacora.consultar', () => {
+    expect(hasCapability('Administrador', 'bitacora.consultar')).toBe(true)
+
+    for (const role of ['Docente', 'Invitado', 'Auxiliar']) {
+      expect(hasCapability(role, 'bitacora.consultar')).toBe(false)
+    }
+  })
+
+  it('un rol desconocido o ausente no la tiene', () => {
+    expect(hasCapability('Rol inexistente', 'bitacora.consultar')).toBe(false)
+    expect(hasCapability(null, 'bitacora.consultar')).toBe(false)
+  })
+
+  it('el acceso del backend a audit_log es solo del Administrador', () => {
+    expect(backendAccess().audit_log).toEqual(['Administrador'])
+  })
+})
+
 describe('capacidades del Invitado y del Docente', () => {
   it('el Invitado ejerce la docencia, habilita auxiliares por examen y revisa incidencias', () => {
     for (const capability of [
