@@ -111,7 +111,7 @@ describe('menú por capacidades', () => {
           ['Control de ingreso', '/control-ingreso'],
           ['En curso', '/examenes/en-curso'],
           ['Registrar estudiante con retraso', '/retrasos'],
-          ['Registrar estudiante excepcional', undefined]
+          ['Registrar situación excepcional', '/situacion-excepcional']
         ]
       },
       {
@@ -125,7 +125,7 @@ describe('menú por capacidades', () => {
         label: 'Historial de exámenes y reportes',
         items: [
           ['Historial de mis exámenes', '/historial'],
-          ['Generar reporte de examen', undefined]
+          ['Generar reporte de examen', '/examenes/reportes']
         ]
       }
     ])
@@ -144,6 +144,7 @@ describe('menú por capacidades', () => {
         label: 'Control de ingreso y reportes',
         items: [
           ['Control de ingreso', '/control-ingreso'],
+          ['Registrar situación excepcional', '/situacion-excepcional'],
           ['En curso', '/examenes/en-curso'],
           ['Registrar estudiante con retraso', '/retrasos']
         ]
@@ -164,7 +165,6 @@ describe('menú por capacidades', () => {
     expect(entries).not.toContain('Mis auxiliares')
     expect(entries).not.toContain('Central de riesgo')
     expect(entries).not.toContain('Invitar docentes colaboradores')
-    expect(entries).not.toContain('Registrar estudiante excepcional')
     expect(entries).toEqual(
       expect.arrayContaining([
         'Materias',
@@ -172,6 +172,7 @@ describe('menú por capacidades', () => {
         'Habilitar auxiliar para el examen',
         'Control de ingreso',
         'En curso',
+        'Registrar situación excepcional',
         'Registrar estudiante con retraso',
         'Revisar reportes de incidencias'
       ])
@@ -216,6 +217,32 @@ describe('menú por capacidades', () => {
       'Consultar central',
       'Rectificar registro de la central'
     ])
+  })
+
+  it('«Registrar situación excepcional» es visible para Docente, Invitado y Auxiliar, no para el Administrador', () => {
+    for (const role of ['Docente', 'Invitado', 'Auxiliar'] as const) {
+      const items = menuOf(role).flatMap((section) => section.items)
+
+      expect(items).toContainEqual(['Registrar situación excepcional', '/situacion-excepcional'])
+    }
+
+    const adminEntries = menuOf('Administrador').flatMap((section) => section.items.map(([label]) => label))
+
+    expect(adminEntries).not.toContain('Registrar situación excepcional')
+  })
+
+  it('«Registrar estudiante excepcional» ya no existe en ningún menú', () => {
+    const labels = NAVIGATION.flatMap((section) => section.items.map((item) => item.label))
+
+    expect(labels).not.toContain('Registrar estudiante excepcional')
+  })
+
+  it('la entrada de situaciones no depende de un examen: solo de la capacidad', () => {
+    const items = NAVIGATION.flatMap((section) => section.items).filter(
+      (item) => item.to === '/situacion-excepcional'
+    )
+
+    expect(items.map((item) => item.capability)).toEqual(['situaciones.registrar', 'situaciones.registrar'])
   })
 
   it('docente y auxiliar pueden abrir En curso', () => {

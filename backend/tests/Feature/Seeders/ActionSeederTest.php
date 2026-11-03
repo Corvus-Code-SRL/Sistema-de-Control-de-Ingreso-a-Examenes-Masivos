@@ -17,16 +17,16 @@ class ActionSeederTest extends TestCase
         return DB::table('accion')->orderBy('id_accion')->get()->map(fn ($row) => (array) $row)->all();
     }
 
-    public function test_dos_ejecuciones_dejan_diecinueve_acciones_sin_duplicados(): void
+    public function test_dos_ejecuciones_dejan_veintiuna_acciones_sin_duplicados(): void
     {
         $this->seed(ActionSeeder::class);
         $afterFirst = $this->catalog();
 
         $this->seed(ActionSeeder::class);
 
-        $this->assertCount(19, $afterFirst);
+        $this->assertCount(21, $afterFirst);
         $this->assertSame($afterFirst, $this->catalog());
-        $this->assertSame(19, DB::table('accion')->distinct()->count('operacion'));
+        $this->assertSame(21, DB::table('accion')->distinct()->count('operacion'));
     }
 
     public function test_incluye_las_acciones_de_aprobacion_y_rechazo_de_reportes(): void
@@ -66,7 +66,7 @@ class ActionSeederTest extends TestCase
         );
     }
 
-       public function test_corrige_la_descripcion_de_una_accion_existente_sin_duplicarla(): void
+    public function test_corrige_la_descripcion_de_una_accion_existente_sin_duplicarla(): void
     {
         DB::table('accion')
             ->where('operacion', 'APROBAR_REPORTE')
@@ -90,6 +90,26 @@ class ActionSeederTest extends TestCase
                 ->value('descripcion')
         );
 
-        $this->assertSame(19, DB::table('accion')->count());
+        $this->assertSame(21, DB::table('accion')->count());
+    }
+
+    public function test_conserva_inicio_y_las_dos_acciones_de_situaciones(): void
+    {
+        $this->seed(ActionSeeder::class);
+        $this->seed(ActionSeeder::class);
+
+        $this->assertSame(
+            [
+                'CAMBIAR_AMBIENTE' => 'UPDATE',
+                'INICIAR' => 'UPDATE',
+                'OBSERVAR_IDENTIDAD' => 'INSERT',
+            ],
+            DB::table('accion')
+                ->whereIn('operacion', ['INICIAR', 'CAMBIAR_AMBIENTE', 'OBSERVAR_IDENTIDAD'])
+                ->orderBy('operacion')
+                ->pluck('tipo_operacion', 'operacion')
+                ->all()
+        );
+        $this->assertSame(21, DB::table('accion')->count());
     }
 }

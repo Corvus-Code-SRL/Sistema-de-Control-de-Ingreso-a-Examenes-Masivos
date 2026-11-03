@@ -3,6 +3,7 @@ export * from './pages/CreateExamPage';
 export * from './pages/ExamDetailPage';
 export * from './pages/EditExamPage';
 export * from './pages/FinalReportPage';
+export * from './pages/ExamReportsPage';
 export * from './components/CreateExamContainer';
 export * from './components/ExamForm';
 export * from './components/ExamStatusBadge';

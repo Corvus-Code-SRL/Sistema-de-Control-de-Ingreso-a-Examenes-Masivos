@@ -408,6 +408,48 @@ class EntryControlSnapshotService
         });
     }
 
+    /**
+     * Refleja un cambio de aula de un estudiante que ya ingresó, para que ambos controladores
+     * vean el aula nueva. No altera los contadores: el estudiante sigue contando una sola vez.
+     * Sin snapshot activo no hace nada; el siguiente se reconstruye desde PostgreSQL.
+     */
+    public function markRoomChanged(int $examId, int $studentId, int $roomId): void
+    {
+        $token = $this->activeToken($examId);
+        if ($token === null) {
+            return;
+        }
+
+        $this->cache()->lock($this->key($examId, $token, 'update-lock'), 5)->block(3, function () use (
+            $examId, $token, $studentId, $roomId
+        ): void {
+            $meta = $this->cache()->get($this->key($examId, $token, 'meta'));
+            $student = $this->studentById($examId, $studentId, $token);
+            $status = $this->cache()->get($this->key($examId, $token, 'status'));
+            $room = is_array($meta) ? collect($meta['ambientes'])->firstWhere('id_ambiente', $roomId) : null;
+            if ($room === null || $student === null || ! is_array($status) || $student['ingreso_previo'] === null) {
+                throw new \RuntimeException('El estado operativo del examen está incompleto.');
+            }
+
+            $student['ingreso_previo']['id_ambiente'] = $roomId;
+            $student['ingreso_previo']['nro_aula'] = $room['nro_aula'];
+            $status['ultimos_ingresos'] = array_map(
+                fn (array $recent): array => (int) $recent['id_estudiante'] === $studentId
+                    ? array_merge($recent, ['nro_aula' => $room['nro_aula']])
+                    : $recent,
+                $status['ultimos_ingresos']
+            );
+            $status['version'] = (string) Str::uuid();
+
+            if (! $this->cache()->putMany([
+                $this->key($examId, $token, 'student', $studentId) => $student,
+                $this->key($examId, $token, 'status') => $status,
+            ], Carbon::parse($meta['expira_en']))) {
+                throw new \RuntimeException('No se pudo actualizar el estado del ingreso en Redis.');
+            }
+        });
+    }
+
     private function meta(int $examId): array
     {
         $token = $this->activeTokenOrFail($examId);

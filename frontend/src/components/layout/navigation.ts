@@ -27,7 +27,6 @@ import {
   UserCheck,
   UserCog,
   UserPlus,
-  UserRoundCheck,
   UserRoundPlus,
   Users
 } from 'lucide-react'
@@ -327,10 +326,11 @@ export const NAVIGATION: readonly NavSection[] = [
         matches: ['/examenes/:examId/retrasos']
       },
       {
-        id: 'teacher-exceptional-student',
-        label: 'Registrar estudiante excepcional',
-        icon: UserRoundCheck,
-        capability: 'casos-especiales.gestionar'
+        id: 'teacher-exam-situations',
+        label: 'Registrar situación excepcional',
+        icon: AlertTriangle,
+        capability: 'situaciones.registrar',
+        to: '/situacion-excepcional'
       }
     ]
   },
@@ -374,7 +374,9 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'teacher-exam-report',
         label: 'Generar reporte de examen',
         icon: FileText,
-        capability: 'examenes.gestionar'
+        capability: 'examenes.gestionar',
+        to: '/examenes/reportes'
+
       }
     ]
   },
@@ -414,6 +416,13 @@ export const NAVIGATION: readonly NavSection[] = [
         capability: 'ingreso.operar',
         to: '/control-ingreso',
         matches: ['/examenes/:examId/control-ingreso']
+      },
+      {
+        id: 'assistant-exam-situations',
+        label: 'Registrar situación excepcional',
+        icon: AlertTriangle,
+        capability: 'situaciones.registrar',
+        to: '/situacion-excepcional'
       },
       {
         id: 'assistant-exam-in-progress',
