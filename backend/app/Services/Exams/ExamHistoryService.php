@@ -3,6 +3,8 @@
 namespace App\Services\Exams;
 
 use App\Models\Exam;
+use App\Models\LateEntryRequest;
+use App\Models\StudentExam;
 use App\Support\ReportStatus;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -45,14 +47,9 @@ class ExamHistoryService
 
         $ids = $page->getCollection()->pluck('id_examen')->all();
         $attendance = $this->attendanceFor($ids);
-        $incidents = DB::table('reporte_estudiante')
-            ->whereIn('id_examen', $ids)
-            ->selectRaw('id_examen, count(*) as total')
-            ->groupBy('id_examen')
-            ->pluck('total', 'id_examen');
 
         return [
-            'examenes' => $page->getCollection()->map(function (Exam $exam) use ($attendance, $incidents) {
+            'examenes' => $page->getCollection()->map(function (Exam $exam) use ($attendance) {
                 $counts = $attendance[$exam->id_examen] ?? $this->emptyAttendance();
                 return [
                     'id_examen' => $exam->id_examen,
@@ -61,7 +58,7 @@ class ExamHistoryService
                     'materia' => $exam->subject?->nombre,
                     'esperados' => $counts['esperados'],
                     'presentes' => $counts['presentes'],
-                    'incidencias' => (int) ($incidents[$exam->id_examen] ?? 0),
+                    'incidencias' => $counts['incidencias'],
                 ];
             })->values()->all(),
             'materias' => $subjects->all(),
@@ -88,14 +85,23 @@ class ExamHistoryService
             ->orderBy('r.fecha_reporte')
             ->get();
 
-        $entries = DB::table('examen_estudiante as ee')
+        // Solo los ingresos con retraso (HU-037) entran a la línea de tiempo; los puntuales no se listan.
+        $lateEntries = DB::table('examen_estudiante as ee')
             ->join('estudiante as s', 's.id_estudiante', '=', 'ee.id_estudiante')
             ->leftJoin('ambiente as a', 'a.id_ambiente', '=', 'ee.id_ambiente')
+            ->leftJoin('solicitud_ingreso_retraso as sr', function ($join) {
+                $join->on('sr.id_examen', '=', 'ee.id_examen')
+                    ->on('sr.id_estudiante', '=', 'ee.id_estudiante')
+                    ->where('sr.estado', '=', LateEntryRequest::AUTORIZADA);
+            })
+            ->leftJoin('usuario as resolutor', 'resolutor.id_usuario', '=', 'sr.id_usuario_resolutor')
             ->leftJoin('usuario as controlador', 'controlador.id_usuario', '=', 'ee.id_usuario_controlador')
             ->where('ee.id_examen', $exam->id_examen)
-            ->whereIn('ee.estado_ingreso', ['INGRESO', 'CON_RETRASO'])
+            ->where('ee.estado_ingreso', StudentExam::CON_RETRASO)
             ->whereNotNull('ee.hora_ingreso')
-            ->select(['ee.hora_ingreso', 'ee.estado_ingreso', 's.nombre', 's.apellido_paterno', 'a.nro_aula'])
+            ->select(['ee.hora_ingreso', 's.nombre', 's.apellido_paterno', 'a.nro_aula'])
+            ->selectRaw('sr.id_solicitud is not null as por_solicitud')
+            ->selectRaw("TRIM(CONCAT_WS(' ', resolutor.nombre, resolutor.apellido_paterno, resolutor.apellido_materno)) as resolutor")
             ->selectRaw("TRIM(CONCAT_WS(' ', controlador.nombre, controlador.apellido_paterno, controlador.apellido_materno)) as controlador")
             ->orderBy('ee.hora_ingreso')
             ->get();
@@ -140,18 +146,18 @@ class ExamHistoryService
                 'detalle' => $exam->fin_automatico ? 'Automático' : 'Responsable no registrado',
             ]);
         }
-        $timeline = $timeline->concat($entries->map(fn ($entry) => [
-            'tipo' => $entry->estado_ingreso === 'CON_RETRASO' ? 'retraso' : 'ingreso',
+        $timeline = $timeline->concat($lateEntries->map(fn ($entry) => [
+            'tipo' => 'retraso',
             'fecha_hora' => Carbon::createFromFormat(
                 'Y-m-d H:i:s',
                 $exam->fecha->format('Y-m-d') . ' ' . $entry->hora_ingreso,
                 config('sciem.zona_horaria')
             )->toIso8601String(),
-            'descripcion' => $entry->estado_ingreso === 'CON_RETRASO'
-                ? 'Ingreso con retraso' : 'Ingreso registrado',
-            'detalle' => trim($entry->nombre . ' ' . $entry->apellido_paterno)
-                . ($entry->nro_aula ? ' · ' . $entry->nro_aula : '')
-                . ($entry->controlador ? ' · Controló: ' . $entry->controlador : ' · Controlador no registrado'),
+            'descripcion' => 'Ingreso con retraso: ' . trim($entry->nombre . ' ' . $entry->apellido_paterno)
+                . ($entry->nro_aula ? ' (' . $entry->nro_aula . ')' : ''),
+            'detalle' => $entry->por_solicitud
+                ? 'Autorizó: ' . ($entry->resolutor ?: 'Responsable no registrado')
+                : 'Registró: ' . ($entry->controlador ?: 'Responsable no registrado'),
         ]))->concat($reports->map(fn ($report) => [
             'tipo' => 'incidencia',
             'fecha_hora' => $report->fecha_reporte,
@@ -233,6 +239,7 @@ class ExamHistoryService
                 'a_tiempo' => $counts['a_tiempo'],
                 'con_retraso' => $counts['con_retraso'],
                 'ausentes' => $counts['ausentes'],
+                'sin_clasificar' => $counts['sin_clasificar'],
                 'incidencias' => $counts['incidencias'],
             ],
             'linea_tiempo' => $timeline,
@@ -253,88 +260,60 @@ class ExamHistoryService
             return [];
         }
 
+        $known = [StudentExam::INGRESO, StudentExam::CON_RETRASO, StudentExam::NO_INGRESO];
         $rows = DB::table('examen_estudiante')
             ->whereIn('id_examen', $examIds)
             ->selectRaw("id_examen, count(*) as esperados,
-                count(*) filter (where estado_ingreso = 'INGRESO') as a_tiempo,
-                count(*) filter (where estado_ingreso = 'CON_RETRASO') as con_retraso,
-                count(*) filter (where estado_ingreso is null or estado_ingreso not in ('INGRESO', 'CON_RETRASO')) as ausentes")
+                count(*) filter (where estado_ingreso = ?) as a_tiempo,
+                count(*) filter (where estado_ingreso = ?) as con_retraso,
+                count(*) filter (where estado_ingreso = ?) as ausentes,
+                count(*) filter (where estado_ingreso is null or estado_ingreso not in (?, ?, ?)) as sin_clasificar", [
+                StudentExam::INGRESO,
+                StudentExam::CON_RETRASO,
+                StudentExam::NO_INGRESO,
+                ...$known,
+            ])
             ->groupBy('id_examen')
             ->get();
 
-        $attendance = $rows->mapWithKeys(fn ($row) => [$row->id_examen => [
+        $attendance = $rows->mapWithKeys(fn ($row) => [(int) $row->id_examen => [
             'esperados' => (int) $row->esperados,
             'a_tiempo' => (int) $row->a_tiempo,
             'con_retraso' => (int) $row->con_retraso,
             'ausentes' => (int) $row->ausentes,
+            'sin_clasificar' => (int) $row->sin_clasificar,
             'presentes' => (int) $row->a_tiempo + (int) $row->con_retraso,
             'incidencias' => 0,
         ]])->all();
 
-        // Un cierre normal congela la nómina y deja una auditoría. Si solo se cambió
-        // el estado, las filas de los alumnos que no ingresaron pueden faltar.
-        $closedIds = DB::table('log as l')
-            ->join('accion as ac', 'ac.id_accion', '=', 'l.id_accion')
-            ->where('l.tabla_afectada', 'examen')
-            ->where('ac.operacion', 'FINALIZAR')
-            ->whereRaw("l.nuevo_valor->>'estado' = ?", [Exam::FINALIZADO])
-            ->whereIn(DB::raw("l.nuevo_valor->>'id_examen'"), array_map('strval', $examIds))
-            ->selectRaw("l.nuevo_valor->>'id_examen' as id_examen")
-            ->get()
-            ->pluck('id_examen')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-        $fallbackIds = array_diff($examIds, $closedIds);
-
-        if ($fallbackIds !== []) {
-            $rosterCounts = DB::table('grupo_examen as gx')
+        // Solo para exámenes sin nómina congelada (datos anteriores a HU-021): se toman las inscripciones
+        // actuales de sus grupos y nadie cuenta como presente. Con una sola fila en examen_estudiante no aplica.
+        $withoutRoster = array_values(array_diff($examIds, array_keys($attendance)));
+        if ($withoutRoster !== []) {
+            $enrolled = DB::table('grupo_examen as gx')
                 ->join('grupo_estudiante as gs', 'gs.id_grupo', '=', 'gx.id_grupo')
-                ->whereIn('gx.id_examen', $fallbackIds)
+                ->whereIn('gx.id_examen', $withoutRoster)
                 ->selectRaw('gx.id_examen, COUNT(DISTINCT gs.id_estudiante) as esperados')
                 ->groupBy('gx.id_examen')
                 ->pluck('esperados', 'id_examen');
 
-            foreach ($fallbackIds as $examId) {
-                $counts = $attendance[$examId] ?? $this->emptyAttendance();
-                $missing = max(0, (int) ($rosterCounts[$examId] ?? 0) - $counts['esperados']);
-                $counts['esperados'] += $missing;
-                $counts['ausentes'] += $missing;
-                $attendance[$examId] = $counts;
+            foreach ($enrolled as $examId => $count) {
+                $attendance[(int) $examId] = ['esperados' => (int) $count, 'ausentes' => (int) $count]
+                    + $this->emptyAttendance();
             }
         }
 
-        // Los cuatro totales del resumen clasifican estudiantes, no reportes.
-        // Un estudiante reportado ocupa una sola categoría aunque tenga varios reportes.
-        $reported = DB::table('reporte_estudiante as r')
-            ->leftJoin('examen_estudiante as ee', function ($join) {
-                $join->on('ee.id_examen', '=', 'r.id_examen')
-                    ->on('ee.id_estudiante', '=', 'r.id_estudiante');
-            })
-            ->whereIn('r.id_examen', $examIds)
-            ->where(function ($query) {
-                $query->whereNotNull('ee.id_estudiante')
-                    ->orWhereExists(function ($roster) {
-                        $roster->selectRaw('1')
-                            ->from('grupo_examen as gx')
-                            ->join('grupo_estudiante as gs', 'gs.id_grupo', '=', 'gx.id_grupo')
-                            ->whereColumn('gx.id_examen', 'r.id_examen')
-                            ->whereColumn('gs.id_estudiante', 'r.id_estudiante');
-                    });
-            })
-            ->distinct()
-            ->get(['r.id_examen', 'r.id_estudiante', 'ee.estado_ingreso']);
+        // Las incidencias son un total aparte: no sacan al estudiante de su categoría de asistencia.
+        $incidents = DB::table('reporte_estudiante')
+            ->whereIn('id_examen', $examIds)
+            ->selectRaw('id_examen, count(*) as total')
+            ->groupBy('id_examen')
+            ->pluck('total', 'id_examen');
 
-        foreach ($reported as $student) {
-            $examId = (int) $student->id_examen;
-            $counts = $attendance[$examId] ?? $this->emptyAttendance();
-            $category = match ($student->estado_ingreso) {
-                'INGRESO' => 'a_tiempo',
-                'CON_RETRASO' => 'con_retraso',
-                default => 'ausentes',
-            };
-            $counts[$category] = max(0, $counts[$category] - 1);
-            $counts['incidencias']++;
-            $attendance[$examId] = $counts;
+        foreach ($incidents as $examId => $total) {
+            $counts = $attendance[(int) $examId] ?? $this->emptyAttendance();
+            $counts['incidencias'] = (int) $total;
+            $attendance[(int) $examId] = $counts;
         }
 
         return $attendance;
@@ -347,6 +326,7 @@ class ExamHistoryService
             'a_tiempo' => 0,
             'con_retraso' => 0,
             'ausentes' => 0,
+            'sin_clasificar' => 0,
             'presentes' => 0,
             'incidencias' => 0,
         ];
