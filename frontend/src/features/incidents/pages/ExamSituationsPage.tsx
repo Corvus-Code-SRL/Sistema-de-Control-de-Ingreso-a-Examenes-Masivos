@@ -1,73 +1,43 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Clock } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
-import { EmptyState } from '@/components/common/EmptyState'
 import { PageHeader } from '@/components/common/PageHeader'
-import { FormSelect } from '@/components/common/FormSelect'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { useAsyncResource } from '@/hooks/useAsyncResource'
 import { ApiError } from '@/lib/api-client'
+import { ExamPagination } from '../components/ExamPagination'
+import { ExamSelection } from '../components/ExamSelection'
 import { ExamSituationDialog } from '../components/ExamSituationDialog'
 import { EXAM_SITUATION_MESSAGES, SITUATION_EXAM_STATE_LABELS } from '../components/examSituationMessages'
 import { ExamSituationsPanel } from '../components/ExamSituationsPanel'
+import { ExamStudentFilters } from '../components/ExamStudentFilters'
 import { useExamSituationWorkspace } from '../hooks/useExamSituationWorkspace'
 import { examSituationService } from '../services/examSituationService'
 import {
   formatSituationTime, type ExamSituationContext, type SituationCreated,
 } from '../types/exam-situation.types'
 
+const fetchSituationExams = (page: number, signal?: AbortSignal) => examSituationService.exams(page, signal)
+
 /**
  * Acceso independiente para los controladores autorizados; no abre ni inicia exámenes.
  * Lista los exámenes con el ingreso abierto o en curso; sin ninguno, explica el estado vacío.
  */
 export function ExamSituationsPage() {
-  const [page, setPage] = useState(1)
-  const [examId, setExamId] = useState('')
   return (
     <AppShell mobileTitle="Situaciones excepcionales" breadcrumbs={[{ label: 'Situaciones excepcionales' }]}>
       <PageHeader title="Registrar situación excepcional"
         subtitle="Cambios de ambiente y observaciones de identidad de estudiantes presentes." />
-      <ExamSelectionPage key={page} page={page} examId={examId}
-        onSelect={setExamId} onPage={(value) => { setExamId(''); setPage(value) }} />
+      <ExamSelection fetchExams={fetchSituationExams} selectId="situation-exam" icon={Clock}
+        emptyTitle={EXAM_SITUATION_MESSAGES.emptyTitle}
+        emptyDescription={EXAM_SITUATION_MESSAGES.emptyDescription}
+        stateLabels={SITUATION_EXAM_STATE_LABELS}>
+        {(examId) => <SituationWorkspaceFilters key={examId} examId={examId} />}
+      </ExamSelection>
     </AppShell>
   )
-}
-
-interface SelectionProps {
-  page: number
-  examId: string
-  onSelect: (value: string) => void
-  onPage: (value: number) => void
-}
-
-function ExamSelectionPage({ page, examId, onSelect, onPage }: SelectionProps) {
-  const resource = useAsyncResource(useCallback(
-    (signal) => examSituationService.exams(page, signal), [page]
-  ), [page])
-  if (resource.status === 'error' && resource.error) return <ErrorState error={resource.error} onRetry={resource.reload} />
-  if (!resource.data) return <LoadingState rows={2} label="Cargando exámenes" />
-  const catalog = resource.data
-  if (!catalog.data.length && page <= 1) {
-    return <EmptyState icon={Clock} title={EXAM_SITUATION_MESSAGES.emptyTitle}
-      description={EXAM_SITUATION_MESSAGES.emptyDescription} />
-  }
-  return <>
-    <Card className="space-y-3 p-4">
-      <Label htmlFor="situation-exam">Examen</Label>
-      {catalog.data.length ? <FormSelect id="situation-exam" value={examId} placeholder="Seleccione un examen"
-        onValueChange={onSelect} options={catalog.data.map((exam) => ({
-          value: String(exam.id_examen),
-          label: `${exam.nombre_examen} · ${exam.fecha} · ${SITUATION_EXAM_STATE_LABELS[exam.estado]} · #${exam.id_examen}`,
-        }))} /> : <p role="status">No hay más exámenes en esta página.</p>}
-      <Pagination page={catalog.meta.current_page} lastPage={catalog.meta.last_page} onChange={onPage} label="exámenes" />
-    </Card>
-    {examId && <SituationWorkspaceFilters key={examId} examId={Number(examId)} />}
-  </>
 }
 
 function SituationWorkspaceFilters({ examId }: { examId: number }) {
@@ -148,24 +118,8 @@ function SituationWorkspace({ examId, roomId, search, page, onRoom, onSearch, on
     {!data && !resource.error && <LoadingState rows={3} label="Cargando estudiantes presentes" />}
     {data && <>
       <Card className="space-y-4 p-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="situation-room-filter">Ambiente</Label>
-            <FormSelect id="situation-room-filter" value={String(effectiveRoom ?? 'all')}
-              placeholder="Todos los ambientes" disabled={data.ambiente_control !== null}
-              onValueChange={(value) => onRoom(value === 'all' ? undefined : Number(value))}
-              options={[...(data.ambiente_control === null ? [{ value: 'all', label: 'Todos los ambientes' }] : []),
-                ...data.ambientes.map((room) => ({ value: String(room.id_ambiente), label: room.nro_aula }))]} />
-          </div>
-          <form className="space-y-2" onSubmit={(event) => { event.preventDefault(); onSearch(draft.trim()) }}>
-            <Label htmlFor="situation-student-search">Nombre, código SIS o CI</Label>
-            <div className="flex gap-2">
-              <Input id="situation-student-search" value={draft} maxLength={50}
-                onChange={(event) => setDraft(event.target.value)} />
-              <Button type="submit" variant="outline">Buscar</Button>
-            </div>
-          </form>
-        </div>
+        <ExamStudentFilters idPrefix="situation" rooms={data.ambientes} controlRoom={data.ambiente_control}
+          effectiveRoom={effectiveRoom} draft={draft} onDraft={setDraft} onRoom={onRoom} onSearch={onSearch} />
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-semibold">Estudiantes presentes ({data.paginacion.total})</h2>
           <Button type="button" variant="outline" size="sm" onClick={resource.reload}>Actualizar</Button>
@@ -190,7 +144,7 @@ function SituationWorkspace({ examId, roomId, search, page, onRoom, onSearch, on
             </li>
           })}
         </ul>
-        <Pagination page={data.paginacion.current_page} lastPage={data.paginacion.last_page} onChange={onPage} label="estudiantes" />
+        <ExamPagination page={data.paginacion.current_page} lastPage={data.paginacion.last_page} onChange={onPage} label="estudiantes" />
       </Card>
       <section className="space-y-3" aria-label="Historial de situaciones">
         <h2 className="text-base font-semibold">Situaciones</h2>
@@ -201,15 +155,4 @@ function SituationWorkspace({ examId, roomId, search, page, onRoom, onSearch, on
     {context && <ExamSituationDialog context={context} readOnly={!canRegister}
       onClose={() => { setContext(null); resource.reload() }} onRegistered={handleRegistered} />}
   </>
-}
-
-function Pagination({ page, lastPage, onChange, label }: {
-  page: number; lastPage: number; onChange: (value: number) => void; label: string
-}) {
-  if (lastPage <= 1 && page <= 1) return null
-  return <nav aria-label={`Paginación de ${label}`} className="flex flex-wrap items-center gap-3 text-sm">
-    <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>Anterior</Button>
-    <span>Página {page} de {lastPage}</span>
-    <Button type="button" variant="outline" size="sm" disabled={page >= lastPage} onClick={() => onChange(page + 1)}>Siguiente</Button>
-  </nav>
 }
