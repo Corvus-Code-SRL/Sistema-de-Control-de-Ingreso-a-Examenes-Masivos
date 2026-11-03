@@ -80,6 +80,8 @@ export interface SituationStudent {
   nombre_completo: string
   estado_ingreso: 'INGRESO' | 'CON_RETRASO'
   ambiente: SituationRoom
+  /** Solo en el contexto de HU-042: incidencias reportadas durante el examen. */
+  total_incidencias?: number
   situaciones: {
     identidad_observada: boolean
     ultimo_cambio_ambiente: null | {

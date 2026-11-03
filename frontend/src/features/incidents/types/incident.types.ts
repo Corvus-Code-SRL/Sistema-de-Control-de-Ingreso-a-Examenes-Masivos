@@ -63,6 +63,8 @@ export interface IncidentEvidence {
 /** DTO completo de una incidencia en la vista de revisión (HU-045). */
 export interface IncidentReview {
   id: string
+  origen?: 'LEGADO' | 'CONTROL_INGRESO' | 'EN_CURSO'
+  retiro_examen?: boolean
   tipo: IncidentSource
   estado: IncidentState
   persona: IncidentPerson
@@ -109,15 +111,22 @@ export interface ReportIncidentContext {
   timeLabel?: string
 }
 
+export interface ExamIncidentContext extends Omit<ReportIncidentContext, 'attemptId' | 'reason'> {
+  origin: 'EN_CURSO'
+}
+
+export type IncidentDialogContext = ReportIncidentContext | ExamIncidentContext
+
 export interface IncidentReportInput {
   incidentTypeId: string
   description: string
   evidence: File | null
+  retire?: boolean
 }
 
 export interface IncidentReport {
   id_reporte_est: number
-  id_intento: number
+  id_intento: number | null
   estado: 'PENDIENTE'
 }
 
