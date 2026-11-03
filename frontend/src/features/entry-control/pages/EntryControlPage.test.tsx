@@ -110,7 +110,11 @@ describe('EntryControlPage', () => {
     const user = userEvent.setup()
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
 
-    await user.type(await screen.findByLabelText('Código SIS'), '199912543')
+    const sisInput = await screen.findByLabelText('Código SIS')
+    await waitFor(() => expect(sisInput).toBeEnabled())
+    await user.type(sisInput, '199912543')
+    expect(sisInput).toHaveValue('199912543')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Verificar estudiante' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: 'Verificar estudiante' }))
     expect(await screen.findByText('No pertenece a los grupos de este examen')).toBeInTheDocument()
     expect(screen.getByText('María Fuera Nómina')).toBeInTheDocument()
