@@ -74,7 +74,7 @@ describe('menú por capacidades', () => {
       {
         label: 'Historial, auditoría y reportes',
         items: [
-          ['Bitácora de operaciones', undefined],
+          ['Bitácora', '/bitacora'],
           ['Generar reporte de bitácora', undefined],
           ['Reporte intentos a exámenes ajenos', '/reportes/intentos']
         ]
@@ -277,6 +277,22 @@ describe('menú por capacidades', () => {
       expect(items).not.toContain('Registrar situación excepcional')
     }
   )
+
+  it('«Bitácora» es visible solo para el Administrador (CA-11)', () => {
+    expect(menuOf('Administrador').flatMap((section) => section.items)).toContainEqual(['Bitácora', '/bitacora'])
+
+    for (const role of ['Docente', 'Invitado', 'Auxiliar'] as const) {
+      const labels = menuOf(role).flatMap((section) => section.items.map(([label]) => label))
+
+      expect(labels).not.toContain('Bitácora')
+    }
+  })
+
+  it('«Bitácora» exige bitacora.consultar y no la capacidad genérica de administración', () => {
+    const items = NAVIGATION.flatMap((section) => section.items).filter((item) => item.to === '/bitacora')
+
+    expect(items.map((item) => item.capability)).toEqual(['bitacora.consultar'])
+  })
 
   it('docente y auxiliar pueden abrir En curso', () => {
     for (const role of ['Docente', 'Auxiliar'] as const) {

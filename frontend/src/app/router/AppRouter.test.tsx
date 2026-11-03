@@ -1,6 +1,11 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
+import {
+  detailOf as auditLogDetailOf,
+  entries as auditLogEntries,
+  options as auditLogOptions,
+} from '@/test/auditLogFixtures'
 import { mockApiWith } from '@/test/http'
 import { detailOf, faultTypes, records } from '@/test/riskCenterFixtures'
 import { TOKEN_STORAGE_KEY, meBody, type AccountKey } from '@/test/authFixtures'
@@ -194,6 +199,103 @@ describe('AppRouter — control de ingreso por área', () => {
     expect(
       screen.queryByRole('heading', { name: 'Control de ingreso' })
     ).not.toBeInTheDocument()
+  })
+})
+
+describe('AppRouter — Bitácora por área (HU-015)', () => {
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  function stubAuditLog(session: AccountKey | null) {
+    if (session) {
+      window.localStorage.setItem(TOKEN_STORAGE_KEY, 'tok')
+    }
+
+    return mockApiWith(({ url }) => {
+      if (url.endsWith('/auth/yo')) {
+        return session ? { body: meBody(session) } : { status: 401, body: { message: 'Unauthenticated.' } }
+      }
+
+      if (url.includes('/bitacora/opciones')) {
+        return { body: { data: auditLogOptions } }
+      }
+
+      if (/\/bitacora\/\d+$/.test(url)) {
+        return { body: { data: auditLogDetailOf(130) } }
+      }
+
+      if (url.includes('/bitacora')) {
+        return {
+          body: {
+            data: auditLogEntries,
+            meta: { current_page: 1, last_page: 1, per_page: 50, total: auditLogEntries.length },
+          },
+        }
+      }
+
+      return { body: { data: [] } }
+    })
+  }
+
+  it('el Administrador entra a la Bitácora y ve el listado', async () => {
+    stubAuditLog('administrador')
+
+    const app = renderApp('/bitacora')
+
+    expect(await screen.findByRole('heading', { name: 'Bitácora' })).toBeInTheDocument()
+    expect(app.pathname).toBe('/bitacora')
+    expect(await screen.findByRole('table')).toBeInTheDocument()
+  })
+
+  it('un enlace directo al detalle abre el listado con el panel', async () => {
+    stubAuditLog('administrador')
+
+    const app = renderApp('/bitacora?detalle=130')
+
+    expect(await screen.findByRole('dialog', { name: 'Detalle de la operación' })).toBeInTheDocument()
+    expect(app.pathname).toBe('/bitacora')
+  })
+
+  it.each([
+    ['un Docente', 'docente'],
+    ['un Auxiliar', 'auxiliar'],
+  ] as const)('%s que navega a /bitacora ve «No tiene permiso para ver esta sección.»', async (_label, account) => {
+    const api = stubAuditLog(account)
+
+    renderApp('/bitacora')
+
+    expect(await screen.findByText('No tiene permiso para ver esta sección.')).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(api.calls.some((call) => call.url.includes('/bitacora'))).toBe(false)
+  })
+
+  it('sin sesión la Bitácora lleva al login', async () => {
+    stubAuditLog(null)
+
+    const app = renderApp('/bitacora')
+
+    await waitFor(() => expect(app.pathname).toBe('/login'))
+  })
+
+  it('el Administrador llega desde «Bitácora» del menú', async () => {
+    const user = userEvent.setup()
+    stubAuditLog('administrador')
+    renderApp('/cuentas')
+
+    await openAllSections(user, await screen.findByRole('navigation', { name: 'Navegación principal' }))
+
+    expect(screen.getByRole('link', { name: 'Bitácora' })).toHaveAttribute('href', '/bitacora')
+  })
+
+  it('el Docente no tiene «Bitácora» en el menú', async () => {
+    const user = userEvent.setup()
+    stubAuditLog('docente')
+    renderApp('/materias')
+
+    await openAllSections(user, await screen.findByRole('navigation', { name: 'Navegación principal' }))
+
+    expect(screen.queryByRole('link', { name: 'Bitácora' })).not.toBeInTheDocument()
   })
 })
 

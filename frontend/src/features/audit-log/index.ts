@@ -1,2 +1,1 @@
-// API pública del feature audit-log
-export {};
+export { AuditLogPage } from './pages/AuditLogPage'

@@ -59,6 +59,7 @@ import {
 } from '@/features/incidents'
 import { examInProgressExtensions } from './examInProgressExtensions'
 import { AlienAttemptsReportPage } from '@/features/reports/academic'
+import { AuditLogPage } from '@/features/audit-log'
 
 /** Envuelve una pantalla con la capacidad que exige. Sin sesión redirige al login (ver ProtectedRoute). */
 function guarded(capability: Capability, element: ReactElement) {
@@ -182,6 +183,7 @@ function DocenteRoutes() {
         path="/reportes/intentos"
         element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
       />
+      <Route path="/bitacora" element={guarded('bitacora.consultar', <AuditLogPage />)} />
 
       <Route path="*" element={<Navigate to="/materias" replace />} />
 
@@ -221,6 +223,7 @@ function AuxiliarRoutes() {
         path="/reportes/intentos"
         element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
       />
+      <Route path="/bitacora" element={guarded('bitacora.consultar', <AuditLogPage />)} />
       <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
     </Routes>
   )
@@ -293,6 +296,7 @@ function AdministradorRoutes() {
         path="/reportes/intentos"
         element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
       />
+      <Route path="/bitacora" element={guarded('bitacora.consultar', <AuditLogPage />)} />
 
       <Route path="*" element={<Navigate to="/cuentas/nueva" replace />} />
     </Routes>
