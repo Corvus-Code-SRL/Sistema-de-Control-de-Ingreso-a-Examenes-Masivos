@@ -8,6 +8,8 @@ use App\Models\LateEntryRequest;
 use App\Models\Student;
 use App\Models\StudentExam;
 use App\Models\User;
+use App\Exceptions\Exams\ExamStateException;
+use App\Services\Exams\ExamExpulsionService;
 use App\Services\Exams\ExamTimingService;
 use App\Services\Security\AuditLogService;
 use App\Support\SisCode;
@@ -51,6 +53,7 @@ class LateEntryService
     private AuditLogService $auditLog;
     private LateEntryOtherExamService $otherExams;
     private ExamTimingService $timing;
+    private ExamExpulsionService $expulsions;
 
     public function __construct(
         LateEntryAccessService $access,
@@ -59,7 +62,8 @@ class LateEntryService
         VerificationService $verification,
         AuditLogService $auditLog,
         LateEntryOtherExamService $otherExams,
-        ExamTimingService $timing
+        ExamTimingService $timing,
+        ExamExpulsionService $expulsions
     ) {
         $this->access = $access;
         $this->snapshots = $snapshots;
@@ -68,6 +72,7 @@ class LateEntryService
         $this->auditLog = $auditLog;
         $this->otherExams = $otherExams;
         $this->timing = $timing;
+        $this->expulsions = $expulsions;
     }
 
     /**
@@ -116,6 +121,14 @@ class LateEntryService
         }
 
         $verdict = $this->verification->evaluate($this->verification->withBackground($record), $input, $roomId);
+        $expelled = $this->expulsionMessage($exam, (int) $studentId);
+        if ($expelled !== null) {
+            $verdict = array_merge($verdict, [
+                'veredicto' => VerificationService::DUPLICATE,
+                'motivo' => $expelled,
+                'autorizado' => false,
+            ]);
+        }
 
         return [
             'verificacion' => $verdict,
@@ -142,6 +155,7 @@ class LateEntryService
 
                 $roomId = $this->access->controlRoom($locked, $access, (int) $input['id_ambiente']);
                 $studentId = (int) $input['id_estudiante'];
+                $this->assertNotExpelled($locked, $studentId);
                 $this->allowedRecord($this->recordFor($locked, $studentId), $input, $roomId);
                 $this->assertNoPendingRequest($locked, $studentId);
                 $otherExam = $this->otherExamConflict($locked, $studentId, $this->confirmed($input));
@@ -201,6 +215,7 @@ class LateEntryService
             $request = $this->lockPendingRequest($locked, $requestId);
 
             $studentId = (int) $request->id_estudiante;
+            $this->assertNotExpelled($locked, $studentId);
             $record = $this->allowedRecord($this->recordFor($locked, $studentId), [], null);
             $otherExam = $this->otherExamConflict($locked, $studentId, $confirmOtherExam);
             $existing = $this->lockEntry($locked, $studentId);
@@ -277,6 +292,7 @@ class LateEntryService
             $roomId = (int) $input['id_ambiente'];
             $this->access->assertRoomInExam($locked, $roomId);
             $studentId = (int) $input['id_estudiante'];
+            $this->assertNotExpelled($locked, $studentId);
             $record = $this->allowedRecord($this->recordFor($locked, $studentId), $input, null);
             $this->assertNoPendingRequest($locked, $studentId);
             $otherExam = $this->otherExamConflict($locked, $studentId, $this->confirmed($input));
@@ -420,6 +436,27 @@ class LateEntryService
             ],
             'confirmado_pese_a_otro_examen' => true,
         ];
+    }
+
+    /** Un estudiante retirado en HU-042 no puede ingresar: reutiliza la regla de ExamExpulsionService. */
+    private function assertNotExpelled(Exam $exam, int $studentId): void
+    {
+        $message = $this->expulsionMessage($exam, $studentId);
+
+        if ($message !== null) {
+            throw LateEntryException::denied(VerificationService::DUPLICATE, $message);
+        }
+    }
+
+    private function expulsionMessage(Exam $exam, int $studentId): ?string
+    {
+        try {
+            $this->expulsions->assertCanEnter((int) $exam->id_examen, $studentId);
+        } catch (ExamStateException $exception) {
+            return $exception->getMessage();
+        }
+
+        return null;
     }
 
     /** Fila de ingreso del estudiante, bloqueada; null si todavía no tiene. */

@@ -2,10 +2,23 @@ import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '@/lib/api-client'
 import { throttleWaitSeconds } from '@/lib/throttle'
 import { examSituationService } from '../services/examSituationService'
-import type { SituationWorkspace } from '../types/exam-situation.types'
+import type { SituationWorkspace, SituationWorkspaceFilters } from '../types/exam-situation.types'
 
-/** Un único ciclo por pantalla: no superpone peticiones y se detiene si el servidor rechaza el examen (409). */
-export function useExamSituationWorkspace(examId: number, roomId: number | undefined, search: string, page: number) {
+export type WorkspaceFetcher = (
+  examId: number, filters: SituationWorkspaceFilters, signal?: AbortSignal,
+) => Promise<{ data: SituationWorkspace }>
+
+const fetchSituationWorkspace: WorkspaceFetcher = (examId, filters, signal) =>
+  examSituationService.context(examId, filters, signal)
+
+/**
+ * Un único ciclo por pantalla: no superpone peticiones y se detiene si el servidor rechaza el examen (409).
+ * HU-042 reutiliza el ciclo con su propio endpoint de contexto.
+ */
+export function useExamSituationWorkspace(
+  examId: number, roomId: number | undefined, search: string, page: number,
+  fetchContext: WorkspaceFetcher = fetchSituationWorkspace,
+) {
   const [data, setData] = useState<SituationWorkspace | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
   const [revision, setRevision] = useState(0)
@@ -22,7 +35,7 @@ export function useExamSituationWorkspace(examId: number, roomId: number | undef
     async function refresh() {
       let delay = 5000
       try {
-        const result = await examSituationService.context(examId, {
+        const result = await fetchContext(examId, {
           id_ambiente: roomId, q: search || undefined, page,
         }, controller.signal)
         if (controller.signal.aborted) return
@@ -55,7 +68,7 @@ export function useExamSituationWorkspace(examId: number, roomId: number | undef
       controller.abort()
       clearTimeout(timer)
     }
-  }, [examId, roomId, search, page, attempt])
+  }, [examId, roomId, search, page, attempt, fetchContext])
 
   return { data, error, revision, reload }
 }

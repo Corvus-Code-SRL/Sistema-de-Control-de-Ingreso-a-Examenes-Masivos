@@ -327,6 +327,7 @@ describe('AppSidebar — entradas y estado activo', () => {
       ['En curso', '/examenes/en-curso'],
       ['Registrar estudiante con retraso', '/retrasos'],
       ['Registrar situación excepcional', '/situacion-excepcional'],
+      ['Reportar incidencia', '/reportar-incidencia'],
       ['Revisar reportes de incidencias', '/incidencias'],
       ['Central de riesgo', '/central-riesgo'],
       ['Historial de mis exámenes', '/historial'],
@@ -525,5 +526,26 @@ describe('AppSidebar — cuenta', () => {
     renderSidebar('Auxiliar', '/mis-examenes')
 
     expect(within(screen.getByRole('region', { name: 'Cuenta' })).getByText('Auxiliar')).toBeInTheDocument()
+  })
+})
+describe('AppSidebar — Reportar incidencia (HU-042)', () => {
+  it.each(['Docente', 'Invitado', 'Auxiliar'] as const)(
+    '%s ve siempre «Reportar incidencia», sin depender de un examen activo',
+    async (role) => {
+      const user = userEvent.setup()
+      renderSidebar(role, '/materias')
+      await openAllSections(user)
+
+      expect(screen.getByRole('link', { name: 'Reportar incidencia' }))
+        .toHaveAttribute('href', '/reportar-incidencia')
+    }
+  )
+
+  it('el Administrador no ve «Reportar incidencia»', async () => {
+    const user = userEvent.setup()
+    renderSidebar('Administrador', '/cuentas/roles')
+    await openAllSections(user)
+
+    expect(screen.queryByText('Reportar incidencia')).not.toBeInTheDocument()
   })
 })

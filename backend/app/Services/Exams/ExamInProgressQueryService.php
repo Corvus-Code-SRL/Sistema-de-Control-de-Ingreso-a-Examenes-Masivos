@@ -111,7 +111,8 @@ class ExamInProgressQueryService
                 'nomina.apellido_materno',
                 'ee.estado_ingreso',
                 'ee.hora_ingreso',
-                'ee.id_ambiente'
+                'ee.id_ambiente',
+                'ee.expulsado_en'
             )
             ->orderBy('nomina.id_estudiante')
             ->get();
@@ -155,6 +156,8 @@ class ExamInProgressQueryService
                 'hora_ingreso' => $student->hora_ingreso === null
                     ? null
                     : substr($student->hora_ingreso, 0, 5),
+                'expulsado_en' => $student->expulsado_en === null
+                    ? null : \Carbon\Carbon::parse($student->expulsado_en)->utc()->toIso8601String(),
                 'id_ambiente' => $roomId,
                 'ambiente' => $roomId === null
                     ? null
@@ -166,10 +169,13 @@ class ExamInProgressQueryService
             'a_tiempo' => 0,
             'con_retraso' => 0,
             'ausentes' => 0,
+            'expulsados' => 0,
         ];
 
         foreach ($students as $student) {
-            if ($student['estado_ingreso'] === 'INGRESO') {
+            if ($student['expulsado_en'] !== null) {
+                $counts['expulsados']++;
+            } elseif ($student['estado_ingreso'] === 'INGRESO') {
                 $counts['a_tiempo']++;
             } elseif ($student['estado_ingreso'] === 'CON_RETRASO') {
                 $counts['con_retraso']++;
@@ -179,9 +185,13 @@ class ExamInProgressQueryService
         }
 
         $studentIds = array_column($students, 'id_estudiante');
+        $incidentCounts = DB::table('reporte_estudiante')->where('id_examen', $examId)
+            ->where('origen', 'EN_CURSO')->whereIn('id_estudiante', $studentIds)
+            ->selectRaw('id_estudiante, count(*) as total')->groupBy('id_estudiante')->pluck('total', 'id_estudiante');
         $situationData = $this->situations->forExam($exam, $studentIds, $actor);
 
         foreach ($students as &$student) {
+            $student['total_incidencias'] = (int) ($incidentCounts[$student['id_estudiante']] ?? 0);
             $student['situaciones'] = $situationData['students'][$student['id_estudiante']] ?? [
                 'identidad_observada' => false,
                 'ultimo_cambio_ambiente' => null,
@@ -223,6 +233,7 @@ class ExamInProgressQueryService
             'hora_servidor_en' => now('UTC')->toIso8601String(),
             'totales' => $counts,
             'estudiantes' => $students,
+            'incidencias_habilitadas' => $exam->id_carrera !== null,
             'situaciones_habilitadas' => $situationData['enabled'],
             'total_situaciones' => $situationData['revision'],
         ];

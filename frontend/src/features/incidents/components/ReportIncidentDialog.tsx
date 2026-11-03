@@ -8,10 +8,11 @@ import {
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useReportIncident } from '../hooks/useReportIncident'
-import type { ReportIncidentContext } from '../types/incident.types'
+import type { IncidentDialogContext } from '../types/incident.types'
 
 interface Props {
-  context: ReportIncidentContext
+  context: IncidentDialogContext
+  readOnly?: boolean
   onClose: () => void
   onReported: (alreadyReported: boolean) => void
 }
@@ -23,13 +24,17 @@ const dialogContentClass = [
 ].join(' ')
 
 /** Modal de escritorio y hoja inferior móvil para reportar un intento de ingreso. */
-export function ReportIncidentDialog({ context, onClose, onReported }: Props) {
+export function ReportIncidentDialog({ context, onClose, onReported, readOnly = false }: Props) {
+  const duringExam = 'origin' in context
+  const [retire, setRetire] = useState(false)
   const fieldId = useId()
   const fileInput = useRef<HTMLInputElement>(null)
   const [incidentTypeId, setIncidentTypeId] = useState('')
   const [description, setDescription] = useState('')
   const [evidence, setEvidence] = useState<File | null>(null)
   const report = useReportIncident(context, onReported)
+
+  const disabled = report.busy || report.blocked || readOnly
 
   function clearEvidence() {
     setEvidence(null)
@@ -39,7 +44,9 @@ export function ReportIncidentDialog({ context, onClose, onReported }: Props) {
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !report.busy) onClose() }}>
       <DialogContent
-        className={dialogContentClass}
+        className={duringExam
+          ? 'flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-xl sm:max-w-xl flex-col gap-0 overflow-hidden rounded-xl p-0'
+          : dialogContentClass}
         showCloseButton={false}
       >
         <DialogHeader className="shrink-0 border-b p-4 text-left">
@@ -48,11 +55,11 @@ export function ReportIncidentDialog({ context, onClose, onReported }: Props) {
         </DialogHeader>
         <form className="flex min-h-0 flex-col" noValidate onSubmit={(event) => {
           event.preventDefault()
-          void report.submit({ incidentTypeId, description, evidence })
+          if (!disabled) void report.submit({ incidentTypeId, description, evidence, retire })
         }}>
           <div className="min-h-0 space-y-4 overflow-y-auto p-4">
-            <section className="space-y-3 rounded-lg border bg-muted/50 p-3" aria-label="Datos del intento">
-              <p className="text-xs font-medium text-muted-foreground">Datos del intento · no se editan</p>
+            <section className="space-y-3 rounded-lg border bg-muted/50 p-3" aria-label={duringExam ? 'Datos del examen' : 'Datos del intento'}>
+              <p className="text-xs font-medium text-muted-foreground">{duringExam ? 'Datos del examen' : 'Datos del intento'} · no se editan</p>
               <dl className="grid grid-cols-[6rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
                 <dt className="text-muted-foreground">Estudiante</dt>
                 <dd className="font-medium">
@@ -63,7 +70,7 @@ export function ReportIncidentDialog({ context, onClose, onReported }: Props) {
                 <dt className="text-muted-foreground">Examen</dt><dd>{context.examName}</dd>
                 <dt className="text-muted-foreground">Ambiente</dt>
                 <dd><span>{context.roomName}</span>{context.timeLabel && context.timeLabel !== '—' ? ` · ${context.timeLabel}` : ''}</dd>
-                <dt className="text-muted-foreground">Motivo del rechazo</dt><dd>{context.reason}</dd>
+                {'reason' in context && <><dt className="text-muted-foreground">Motivo del rechazo</dt><dd>{context.reason}</dd></>}
               </dl>
             </section>
             <div className="space-y-1.5">
@@ -74,9 +81,14 @@ export function ReportIncidentDialog({ context, onClose, onReported }: Props) {
                 onValueChange={setIncidentTypeId}
                 placeholder={report.loadingTypes ? 'Cargando tipos de falta…' : 'Elija el tipo de falta'}
                 options={report.types.map((type) => ({ value: String(type.id_falta), label: type.nombre }))}
-                disabled={report.busy || report.loadingTypes || !!report.catalogError}
+                disabled={disabled || report.loadingTypes || !!report.catalogError}
                 invalid={!!report.errors.id_tipo_falta}
               />
+              {duringExam && report.types.find((type) => String(type.id_falta) === incidentTypeId)?.descripcion && (
+                <p className="text-xs text-muted-foreground">
+                  {report.types.find((type) => String(type.id_falta) === incidentTypeId)?.descripcion}
+                </p>
+              )}
               {report.errors.id_tipo_falta && <p role="alert" className="text-sm text-danger-fg">{report.errors.id_tipo_falta}</p>}
               {report.catalogError && <div role="alert" className="space-y-2 text-sm text-danger-fg">
                 <p>{report.catalogError}</p>
@@ -92,10 +104,10 @@ export function ReportIncidentDialog({ context, onClose, onReported }: Props) {
                 id={`${fieldId}-description`}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
-                disabled={report.busy}
+                disabled={disabled}
                 maxLength={500}
                 rows={3}
-                placeholder="Describa lo ocurrido durante el intento de ingreso"
+                placeholder={duringExam ? 'Describa lo ocurrido durante el examen' : 'Describa lo ocurrido durante el intento de ingreso'}
                 aria-required="true"
                 aria-invalid={!!report.errors.descripcion}
                 aria-describedby={`${fieldId}-description-help`}
@@ -113,7 +125,7 @@ export function ReportIncidentDialog({ context, onClose, onReported }: Props) {
                 type="file"
                 className="sr-only"
                 accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
-                disabled={report.busy}
+                disabled={disabled}
                 onChange={(event) => setEvidence(event.target.files?.[0] ?? null)}
                 aria-invalid={!!report.errors.evidencia}
                 aria-describedby={`${fieldId}-evidence-help`}
@@ -130,7 +142,7 @@ export function ReportIncidentDialog({ context, onClose, onReported }: Props) {
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  disabled={report.busy}
+                  disabled={disabled}
                   onClick={clearEvidence}
                   aria-label="Quitar evidencia"
                 >
@@ -141,7 +153,7 @@ export function ReportIncidentDialog({ context, onClose, onReported }: Props) {
                   type="button"
                   variant="outline"
                   className="h-auto w-full justify-start border-dashed p-4 text-left"
-                  disabled={report.busy}
+                  disabled={disabled}
                   onClick={() => fileInput.current?.click()}
                 >
                   <Upload className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -151,11 +163,24 @@ export function ReportIncidentDialog({ context, onClose, onReported }: Props) {
               <p id={`${fieldId}-evidence-help`} className="text-xs text-muted-foreground">JPG, PNG o PDF, hasta 5 MB.</p>
               {report.errors.evidencia && <p role="alert" className="text-sm text-danger-fg">{report.errors.evidencia}</p>}
             </div>
+            {duringExam && <div className="space-y-2 rounded-lg border p-3">
+              <label className="flex items-start gap-2 text-sm" htmlFor={`${fieldId}-retire`}>
+                <input id={`${fieldId}-retire`} type="checkbox" checked={retire} disabled={disabled}
+                  onChange={(event) => setRetire(event.target.checked)} className="mt-1" />
+                Retirar al estudiante del examen
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Al enviar se registrará su retiro inmediato. El reporte quedará pendiente de revisión.
+              </p>
+            </div>}
+            {readOnly && <p role="alert" className="text-sm text-danger-fg">
+              El examen o el estudiante cambió. Cierre el formulario y actualice la vista.
+            </p>}
             {report.error && <p role="alert" className="text-sm text-danger-fg">{report.error}</p>}
           </div>
           <DialogFooter className="m-0 shrink-0 rounded-none p-4 sm:rounded-b-xl">
             <Button type="button" variant="outline" disabled={report.busy} onClick={onClose}>Cancelar</Button>
-            <Button type="submit" disabled={report.busy || report.loadingTypes || !!report.catalogError || !report.types.length}>
+            <Button type="submit" disabled={disabled || report.loadingTypes || !!report.catalogError || !report.types.length}>
               {report.busy ? 'Enviando…' : 'Enviar a revisión'}
             </Button>
           </DialogFooter>

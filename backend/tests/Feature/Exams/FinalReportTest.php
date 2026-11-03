@@ -98,6 +98,23 @@ class FinalReportTest extends TestCase
         );
     }
 
+    public function test_un_estudiante_expulsado_figura_como_expulsado_con_su_hora(): void
+    {
+        $exam = $this->finishedExam();
+        $expelledId = $this->groupStudentIds()[0];
+
+        DB::table('examen_estudiante')->where('id_examen', $exam->id_examen)
+            ->where('id_estudiante', $expelledId)
+            ->update(['expulsado_en' => '2026-10-28 12:41:00+00']);
+
+        $response = $this->getJson($this->url($exam))->assertOk();
+
+        $this->assertEqualsCanonicalizing(
+            ['Expulsado · 08:41', 'Ausente'],
+            array_column($response->json('data.estudiantes'), 'estado')
+        );
+    }
+
     public function test_encabezado_usa_las_horas_reales_en_hora_de_la_paz(): void
     {
         $exam = $this->finishedExam();

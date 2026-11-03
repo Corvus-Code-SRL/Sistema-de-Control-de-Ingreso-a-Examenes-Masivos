@@ -2,13 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { ApiError } from '@/lib/api-client'
 import { incidentService } from '../services/incidentService'
 import type {
-  IncidentFormErrors, IncidentReportInput, IncidentType, ReportIncidentContext,
+  IncidentFormErrors, IncidentReportInput, IncidentType, IncidentDialogContext,
 } from '../types/incident.types'
 
 const MAX_EVIDENCE_BYTES = 5 * 1024 * 1024
 const EVIDENCE_TYPES = ['image/jpeg', 'image/png', 'application/pdf']
 
-export function useReportIncident(context: ReportIncidentContext, onReported: (alreadyReported: boolean) => void) {
+export function useReportIncident(context: IncidentDialogContext, onReported: (alreadyReported: boolean) => void) {
+  const duringExam = 'origin' in context && context.origin === 'EN_CURSO'
+  const [blocked, setBlocked] = useState(false)
   const [types, setTypes] = useState<IncidentType[]>([])
   const [loadingTypes, setLoadingTypes] = useState(true)
   const [catalogError, setCatalogError] = useState<string | null>(null)
@@ -38,7 +40,7 @@ export function useReportIncident(context: ReportIncidentContext, onReported: (a
   }, [catalogVersion])
 
   async function submit(input: IncidentReportInput) {
-    if (sending.current || loadingTypes || catalogError || types.length === 0) return
+    if (blocked || sending.current || loadingTypes || catalogError || types.length === 0) return
     const nextErrors: IncidentFormErrors = {}
     const description = input.description.trim()
     if (!types.some((type) => String(type.id_falta) === input.incidentTypeId)) {
@@ -52,7 +54,9 @@ export function useReportIncident(context: ReportIncidentContext, onReported: (a
       || input.evidence.size > MAX_EVIDENCE_BYTES
       || input.evidence.size === 0
     )) {
-      nextErrors.evidencia = 'Formato o tamaño no permitido'
+      nextErrors.evidencia = duringExam
+        ? 'Formato o tamaño no permitido. Use jpg, png o pdf de hasta 5 MB.'
+        : 'Formato o tamaño no permitido'
     }
     setErrors(nextErrors)
     setError(null)
@@ -61,11 +65,15 @@ export function useReportIncident(context: ReportIncidentContext, onReported: (a
     sending.current = true
     setBusy(true)
     try {
-      await incidentService.report(context.examId, context.attemptId, input)
+      if ('origin' in context) {
+        await incidentService.reportDuringExam(context.examId, context.student.id_estudiante, context.roomId, input)
+      } else {
+        await incidentService.report(context.examId, context.attemptId, input)
+      }
       if (mounted.current) onReported(false)
     } catch (cause) {
       if (!mounted.current) return
-      if (cause instanceof ApiError && cause.status === 422 && cause.errors.id_intento?.length) {
+      if (cause instanceof ApiError && !duringExam && cause.status === 422 && cause.errors.id_intento?.length) {
         onReported(true)
         return
       }
@@ -77,13 +85,21 @@ export function useReportIncident(context: ReportIncidentContext, onReported: (a
         })
         setError('Revise los datos del reporte.')
       } else if (cause instanceof ApiError && cause.isNetworkFailure) {
-        setError('No se pudo confirmar el envío. Revise los últimos rechazos antes de reintentar.')
+        setBlocked(duringExam)
+        setError(duringExam
+          ? 'No se pudo confirmar el envío. Cierre y consulte las incidencias antes de volver a reportar.'
+          : 'No se pudo confirmar el envío. Revise los últimos rechazos antes de reintentar.')
       } else if (cause instanceof ApiError && cause.status === 403) {
-        setError('No tiene permiso para reportar este intento.')
+        setBlocked(duringExam)
+        setError(duringExam ? 'No tiene permiso para reportar a este estudiante.' : 'No tiene permiso para reportar este intento.')
       } else if (cause instanceof ApiError && cause.status === 409) {
-        setError('El control de ingreso ya no está disponible. Actualice la pantalla.')
+        setBlocked(duringExam)
+        setError(duringExam ? cause.message : 'El control de ingreso ya no está disponible. Actualice la pantalla.')
       } else {
-        setError('No se pudo enviar el reporte. Intente nuevamente.')
+        setBlocked(duringExam)
+        setError(duringExam
+          ? 'No se pudo confirmar el envío. Cierre y consulte las incidencias antes de volver a reportar.'
+          : 'No se pudo enviar el reporte. Intente nuevamente.')
       }
     } finally {
       sending.current = false
@@ -92,7 +108,7 @@ export function useReportIncident(context: ReportIncidentContext, onReported: (a
   }
 
   return {
-    types, loadingTypes, catalogError, busy, error, errors, submit,
+    types, loadingTypes, catalogError, busy, blocked, error, errors, submit,
     retryTypes: () => setCatalogVersion((value) => value + 1),
   }
 }
