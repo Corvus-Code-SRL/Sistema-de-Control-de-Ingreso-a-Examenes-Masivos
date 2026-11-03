@@ -45,6 +45,8 @@ export function ExamHistoryPage() {
     [materia, buscar, page]
   )
 
+  const exams = Array.isArray(data?.examenes) ? data.examenes : []
+
   function updateParam(key: string, value: string) {
     const next = new URLSearchParams(params)
     if (value) next.set(key, value)
@@ -73,16 +75,16 @@ export function ExamHistoryPage() {
     <Card className="gap-0 py-0">
       {status === 'loading' && <LoadingState rows={4} label="Cargando historial" />}
       {status === 'error' && error && <ErrorState error={error} onRetry={reload} />}
-      {status === 'success' && data?.examenes.length === 0 && <EmptyState icon={History} title={materia || buscar ? 'No hay exámenes que coincidan' : 'Aún no tiene exámenes finalizados'} description={materia || buscar ? 'Pruebe con otra materia o búsqueda.' : 'Aquí aparecerán sus exámenes cuando finalicen.'} />}
-      {status === 'success' && data && data.examenes.length > 0 && <>
+      {status === 'success' && exams.length === 0 && <EmptyState icon={History} title={materia || buscar ? 'No hay exámenes que coincidan' : 'Aún no tiene exámenes finalizados'} description={materia || buscar ? 'Pruebe con otra materia o búsqueda.' : 'Aquí aparecerán sus exámenes cuando finalicen.'} />}
+      {status === 'success' && data && exams.length > 0 && <>
         <div className="hidden md:block"><Table><TableHeader className="bg-sunken"><TableRow>
           <TableHead className="pl-4">Fecha</TableHead><TableHead>Examen</TableHead><TableHead>Materia</TableHead><TableHead className="text-center">Asistencia</TableHead><TableHead className="text-center">Incidencias</TableHead><TableHead><span className="sr-only">Acción</span></TableHead>
-        </TableRow></TableHeader><TableBody>{data.examenes.map((exam) => <TableRow key={exam.id_examen}>
+        </TableRow></TableHeader><TableBody>{exams.map((exam) => <TableRow key={exam.id_examen}>
           <TableCell className="whitespace-nowrap pl-4 tabular-nums">{formatDate(exam.fecha)}</TableCell><TableCell className="font-semibold">{exam.nombre_examen}</TableCell><TableCell>{exam.materia ?? '—'}</TableCell>
           <TableCell className="text-center tabular-nums">{exam.presentes} / {exam.esperados}</TableCell><TableCell className="text-center tabular-nums">{exam.incidencias}</TableCell>
           <TableCell><Button variant="outline" size="sm" asChild><Link to={`/historial/${exam.id_examen}${query ? `?${query}` : ''}`}>Ver resumen <ChevronRight className="size-4" aria-hidden="true" /></Link></Button></TableCell>
         </TableRow>)}</TableBody></Table></div>
-        <div className="divide-y md:hidden">{data.examenes.map((exam) => <div key={exam.id_examen} className="space-y-3 p-4">
+        <div className="divide-y md:hidden">{exams.map((exam) => <div key={exam.id_examen} className="space-y-3 p-4">
           <div className="flex items-start justify-between gap-3">
             <div><p className="font-semibold">{exam.nombre_examen}</p><p className="text-sm text-muted-foreground">{exam.materia ?? '—'} · {formatDate(exam.fecha)}</p></div>
             <Link to={`/historial/${exam.id_examen}${query ? `?${query}` : ''}`} aria-label={`Ver resumen de ${exam.nombre_examen}`} className="rounded-md border border-border p-2 text-brand"><ChevronRight className="size-4" /></Link>
