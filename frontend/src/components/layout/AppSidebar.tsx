@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { LogIn, LogOut } from 'lucide-react'
+import { LogIn, LogOut, PanelLeftClose } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { AREA_LABELS, LOGIN_PATH, useAuth, useCurrentUser } from '@/features/auth'
@@ -12,6 +12,10 @@ import { useSidebarSections } from './useSidebarSections'
 interface AppSidebarProps {
   /** Al navegar en móvil hay que cerrar el panel que contiene el menú. */
   onNavigate?: () => void
+  /** Solo en escritorio: oculta el menú. Sin esta función (panel móvil) no se muestra el botón. */
+  onCollapse?: () => void
+  /** `id` del contenedor que `onCollapse` oculta, para `aria-controls`. */
+  controlsId?: string
 }
 
 /**
@@ -27,7 +31,7 @@ interface AppSidebarProps {
  * del sidebar y no de los de superficie clara: el gris de texto secundario de la
  * aplicación resultaría ilegible aquí.
  */
-export function AppSidebar({ onNavigate }: AppSidebarProps) {
+export function AppSidebar({ onNavigate, onCollapse, controlsId }: AppSidebarProps) {
   const { user, area, capabilities } = useCurrentUser()
   const { estado, usuario, cerrarSesion } = useAuth()
   const navigate = useNavigate()
@@ -58,10 +62,23 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
         <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-bold text-sidebar-primary-foreground">
           S
         </span>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="sciem-wordmark truncate">SCIEM</p>
           <p className="truncate text-xs text-sb-sub">Control de Ingreso a Exámenes</p>
         </div>
+
+        {onCollapse && (
+          <button
+            type="button"
+            onClick={onCollapse}
+            aria-label="Ocultar menú"
+            aria-expanded={true}
+            aria-controls={controlsId}
+            className="flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground outline-none hover:bg-sb-hover focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          >
+            <PanelLeftClose className="size-4" aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       <nav

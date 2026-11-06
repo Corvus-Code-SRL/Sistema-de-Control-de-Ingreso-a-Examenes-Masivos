@@ -33,7 +33,7 @@ export function SidebarItem({ item, active, badgeCount, onNavigate }: SidebarIte
             className={cn(ROW_CLASSES, 'cursor-not-allowed text-sb-group/70')}
           >
             <item.icon className="size-4 shrink-0" aria-hidden="true" />
-            <span className="flex-1">{item.label}</span>
+            <span className="min-w-0 flex-1 break-words">{item.label}</span>
           </button>
         </TooltipTrigger>
         <TooltipContent side="right">{DISABLED_REASON}</TooltipContent>
@@ -55,9 +55,9 @@ export function SidebarItem({ item, active, badgeCount, onNavigate }: SidebarIte
       )}
     >
       <item.icon className="size-4 shrink-0" aria-hidden="true" />
-      <span className="flex-1">{item.label}</span>
+      <span className="min-w-0 flex-1 break-words">{item.label}</span>
       {badgeCount !== undefined && badgeCount > 0 && (
-        <span className="rounded-full bg-warn px-1.5 text-xs font-semibold text-warn-fg">
+        <span className="shrink-0 rounded-full bg-warn px-1.5 text-xs font-semibold text-warn-fg">
           {badgeCount}
         </span>
       )}

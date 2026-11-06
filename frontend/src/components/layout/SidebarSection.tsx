@@ -48,7 +48,7 @@ export function SidebarSection({
           <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-sb-hover text-sb-sub">
             <section.icon className="size-3.5" aria-hidden="true" />
           </span>
-          <span className="sciem-overline min-w-0 flex-1">{section.label}</span>
+          <span className="sciem-overline min-w-0 flex-1 break-words">{section.label}</span>
           <ChevronDown
             className={cn(
               'size-4 shrink-0 text-sb-sub transition-transform motion-reduce:transition-none',
