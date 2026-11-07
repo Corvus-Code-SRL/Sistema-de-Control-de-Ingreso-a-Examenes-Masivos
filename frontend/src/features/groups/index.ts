@@ -1,4 +1,3 @@
-// API pública del feature groups
 export { SubjectGroupsPage } from './pages/SubjectGroupsPage'
 export { MyCoursesPage } from './pages/MyCoursesPage'
 export { GroupDetailPage } from './pages/GroupDetailPage'
@@ -24,6 +23,7 @@ export {
 export type {
   Course,
   Group,
+  GroupCareer,
   GroupDetail,
   GroupDetailMeta,
   GroupDetailResponse,
