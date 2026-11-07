@@ -14,6 +14,8 @@ use App\Services\Academic\Importers\StudentRosterPreviewStore;
 use App\Services\Academic\Importers\StudentRosterReaderResolver;
 use App\Services\Academic\Importers\StudentRosterRowValidator;
 use App\Services\Academic\Importers\XlsxStudentRosterReader;
+use App\Services\Academic\GroupCareerService;
+use App\Services\Academic\Importers\StudentRosterCareerResolver;
 use App\Services\Academic\StudentRosterGroupAccess;
 use App\Services\Academic\SubjectCatalogService;
 use App\Services\Exams\ExamRosterLockService;
@@ -225,7 +227,9 @@ class StudentRosterPreviewServiceTest extends TestCase
                 new StudentRosterRowValidator()
             ),
             new StudentRosterDatabaseMatcher(),
-            $previewStore
+            $previewStore,
+            new GroupCareerService(),
+            new StudentRosterCareerResolver()
         );
 
         return [

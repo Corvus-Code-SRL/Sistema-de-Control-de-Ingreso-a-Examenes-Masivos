@@ -76,6 +76,7 @@ class StudentRosterAnalyzer
             if (
                 $row->lastNames() !== $first->lastNames()
                 || $row->firstNames() !== $first->firstNames()
+                || $row->careerText() !== $first->careerText()
             ) {
                 return false;
             }
