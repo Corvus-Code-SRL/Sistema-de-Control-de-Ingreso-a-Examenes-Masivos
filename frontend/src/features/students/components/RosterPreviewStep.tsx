@@ -61,6 +61,8 @@ export function RosterPreviewStep({
 }: RosterPreviewStepProps) {
   const [filter, setFilter] = useState<PreviewFilter>('all')
   const inputRef = useRef<HTMLInputElement | null>(null)
+  // HU-021 (multicarrera): la carrera de cada fila solo se muestra si el grupo atiende a varias.
+  const showCareer = (preview.carreras_grupo?.length ?? 0) > 1
 
   const counts = useMemo(
     () => countRosterRows(preview),
@@ -225,6 +227,7 @@ export function RosterPreviewStep({
                 <TableHead className="sciem-overline">Código SIS</TableHead>
                 <TableHead className="sciem-overline">Apellidos</TableHead>
                 <TableHead className="sciem-overline">Nombres</TableHead>
+                {showCareer && <TableHead className="sciem-overline">Carrera</TableHead>}
                 <TableHead className="sciem-overline">Estado</TableHead>
                 <TableHead className="sciem-overline">
                   Observaciones
@@ -238,6 +241,7 @@ export function RosterPreviewStep({
                   key={row.numero_fila}
                   row={row}
                   duplicateRows={duplicateRows}
+                  showCareer={showCareer}
                 />
               ))}
             </TableBody>
@@ -257,6 +261,7 @@ export function RosterPreviewStep({
                 key={row.numero_fila}
                 row={row}
                 duplicateRows={duplicateRows}
+                showCareer={showCareer}
               />
             ))
           )}
@@ -286,12 +291,19 @@ export function RosterPreviewStep({
   )
 }
 
+/** Carrera resuelta de la fila; si no se resolvió, lo que decía el archivo. */
+function careerText(row: RosterPreviewRow): string {
+  return row.carrera?.nombre ?? row.carrera_archivo ?? '—'
+}
+
 function DesktopPreviewRow({
   row,
   duplicateRows,
+  showCareer = false,
 }: {
   row: RosterPreviewRow
   duplicateRows: Map<string, number[]>
+  showCareer?: boolean
 }) {
   const issues = rowIssues(
     row,
@@ -309,6 +321,8 @@ function DesktopPreviewRow({
       <TableCell>{row.apellidos ?? '—'}</TableCell>
 
       <TableCell>{row.nombres ?? '—'}</TableCell>
+
+      {showCareer && <TableCell>{careerText(row)}</TableCell>}
 
       <TableCell>
         <RosterStatusLabel estado={row.estado} />
@@ -328,9 +342,11 @@ function DesktopPreviewRow({
 function MobilePreviewCard({
   row,
   duplicateRows,
+  showCareer = false,
 }: {
   row: RosterPreviewRow
   duplicateRows: Map<string, number[]>
+  showCareer?: boolean
 }) {
   const issues = rowIssues(
     row,
@@ -367,6 +383,13 @@ function MobilePreviewCard({
             {row.nombres ?? '—'}
           </dd>
         </div>
+
+        {showCareer && (
+          <div>
+            <dt className="sciem-caption">Carrera</dt>
+            <dd className="sciem-body mt-0.5">{careerText(row)}</dd>
+          </div>
+        )}
       </dl>
 
       {issues.length > 0 && (

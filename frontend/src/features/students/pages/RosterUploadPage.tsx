@@ -102,6 +102,7 @@ function RosterUploadView({ groupId }: { groupId: number }) {
           group={detail.group}
           subjectName={detail.subject.nombre}
           onReload={reload}
+          careers={detail.meta.carreras ?? []}
         />
       )}
     </RosterShell>

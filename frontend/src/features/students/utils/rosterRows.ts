@@ -70,6 +70,14 @@ const ERROR_ISSUE: Record<RosterRowError, RosterIssue> = {
     category: 'Duplicado',
     message: 'Código SIS repetido con datos distintos: no se importa ninguna de las filas',
   },
+  missing_career: {
+    category: 'Incompleto',
+    message: 'Falta la carrera: agregue la columna «Carrera» o elija la carrera de esta nómina',
+  },
+  career_not_in_group: {
+    category: 'Otro',
+    message: 'La carrera no corresponde a este grupo',
+  },
 }
 
 /*
