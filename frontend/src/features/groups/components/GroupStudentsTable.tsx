@@ -18,7 +18,7 @@ import {
 import type { AsyncStatus } from '@/hooks/useAsyncResource'
 import type { ApiError } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
-import type { GroupStudent, GroupStudentsPage } from '../types/group.types'
+import type { GroupCareer, GroupStudent, GroupStudentsPage } from '../types/group.types'
 import { MAX_SEARCH_LENGTH } from '../utils/studentFilters'
 
 interface GroupStudentsTableProps {
@@ -37,6 +37,16 @@ interface GroupStudentsTableProps {
   correctingPage: boolean
   /** Destino de «Cargar nómina»; sin él (período anterior o grupo inactivo) no se ofrece. */
   rosterTo?: string
+  /** Carreras del grupo (HU-021, multicarrera). Con más de una se ofrece el filtro y la columna. */
+  careers?: GroupCareer[]
+  /** Carrera filtrada; sin ella, todas. */
+  careerId?: number
+  onCareerChange?: (careerId: number | null) => void
+}
+
+/** «Ing. de Sistemas (12)»: la cifra solo si se conoce. */
+function careerOptionLabel(name: string, total: number | undefined): string {
+  return total === undefined ? name : `${name} (${total})`
 }
 
 function surnames(student: GroupStudent): string {
@@ -60,11 +70,17 @@ export function GroupStudentsTable({
   onPageChange,
   correctingPage,
   rosterTo,
+  careers = [],
+  careerId,
+  onCareerChange,
 }: GroupStudentsTableProps) {
   const settled = page !== null && !isStale && status !== 'error'
   const hasRows = page !== null && page.items.length > 0 && status !== 'error'
   const isEmptyGroup = settled && page.enrolledTotal === 0 && query === ''
   const noMatches = settled && page.items.length === 0 && !correctingPage && !isEmptyGroup
+  const isMultiCareer = careers.length > 1
+  const selectedCareer = careers.find((career) => career.id_carrera === careerId)
+  const totalsByCareer = new Map((page?.careerTotals ?? []).map((row) => [row.id_carrera, row.total]))
 
   return (
     <section aria-labelledby="group-students-title" className="space-y-3">
@@ -74,20 +90,40 @@ export function GroupStudentsTable({
         </h2>
 
         {!isEmptyGroup && (
-          <div className="relative sm:w-96">
-            <Search
-              aria-hidden="true"
-              className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              type="search"
-              value={searchInput}
-              maxLength={MAX_SEARCH_LENGTH}
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder="Buscar por nombre o código SIS"
-              aria-label="Buscar por apellido, nombre o código SIS"
-              className="h-11 pl-8"
-            />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {isMultiCareer && onCareerChange && (
+              <select
+                value={careerId ?? ''}
+                onChange={(event) =>
+                  onCareerChange(event.target.value === '' ? null : Number(event.target.value))
+                }
+                aria-label="Filtrar por carrera"
+                className="h-11 rounded-md border border-input bg-card px-3 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:w-64"
+              >
+                <option value="">Todas las carreras</option>
+                {careers.map((career) => (
+                  <option key={career.id_carrera} value={career.id_carrera}>
+                    {careerOptionLabel(career.nombre, totalsByCareer.get(career.id_carrera))}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <div className="relative sm:w-96">
+              <Search
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                type="search"
+                value={searchInput}
+                maxLength={MAX_SEARCH_LENGTH}
+                onChange={(event) => onSearchChange(event.target.value)}
+                placeholder="Buscar por nombre o código SIS"
+                aria-label="Buscar por apellido, nombre o código SIS"
+                className="h-11 pl-8"
+              />
+            </div>
           </div>
         )}
       </div>
@@ -126,12 +162,28 @@ export function GroupStudentsTable({
         {noMatches && (
           <EmptyState
             icon={SearchX}
-            title="Ningún estudiante coincide con la búsqueda"
-            description={`No hay inscritos cuyo nombre o código SIS contenga «${query}».`}
+            title={
+              query === '' && selectedCareer
+                ? `No hay inscritos de ${selectedCareer.nombre}`
+                : 'Ningún estudiante coincide con la búsqueda'
+            }
+            description={
+              query === ''
+                ? 'Elija otra carrera o vea todas.'
+                : `No hay inscritos cuyo nombre o código SIS contenga «${query}»${
+                    selectedCareer ? ` en ${selectedCareer.nombre}` : ''
+                  }.`
+            }
             action={
-              <Button variant="outline" size="sm" onClick={onClearSearch}>
-                Limpiar búsqueda
-              </Button>
+              query === '' && onCareerChange ? (
+                <Button variant="outline" size="sm" onClick={() => onCareerChange(null)}>
+                  Ver todas las carreras
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={onClearSearch}>
+                  Limpiar búsqueda
+                </Button>
+              )
             }
           />
         )}
@@ -145,6 +197,7 @@ export function GroupStudentsTable({
                     <TableHead className="w-40">Código SIS</TableHead>
                     <TableHead>Apellidos</TableHead>
                     <TableHead>Nombres</TableHead>
+                    {isMultiCareer && <TableHead>Carrera</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -153,6 +206,11 @@ export function GroupStudentsTable({
                       <TableCell className="sciem-tnum">{student.cod_sis}</TableCell>
                       <TableCell className="font-medium">{surnames(student)}</TableCell>
                       <TableCell>{student.nombre}</TableCell>
+                      {isMultiCareer && (
+                        <TableCell className="text-muted-foreground">
+                          {student.carrera?.nombre ?? '—'}
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -168,7 +226,10 @@ export function GroupStudentsTable({
                   <p className="text-sm font-medium text-foreground">
                     {surnames(student)}, {student.nombre}
                   </p>
-                  <p className="sciem-tnum text-xs text-muted-foreground">SIS {student.cod_sis}</p>
+                  <p className="sciem-tnum text-xs text-muted-foreground">
+                    SIS {student.cod_sis}
+                    {isMultiCareer && student.carrera?.nombre ? ` · ${student.carrera.nombre}` : ''}
+                  </p>
                 </li>
               ))}
             </ul>

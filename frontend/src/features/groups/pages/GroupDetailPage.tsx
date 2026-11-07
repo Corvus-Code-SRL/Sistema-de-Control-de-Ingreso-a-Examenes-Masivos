@@ -60,7 +60,7 @@ export function GroupDetailPage() {
 function GroupDetailView({ groupId }: { groupId: number }) {
   const { detail, isLoading, isForbidden, isNotFound, error, reload } = useGroupDetail(groupId)
 
-  const { filters, searchInput, setSearchInput, setPage, clear } = useGroupStudentsFilters()
+  const { filters, searchInput, setSearchInput, setPage, clear, setCareer } = useGroupStudentsFilters()
   // Se pide en paralelo al detalle: si el grupo no es suyo, el servidor responde 403 y no se muestra.
   const students = useGroupStudents(groupId, filters)
 
@@ -219,6 +219,9 @@ function GroupDetailView({ groupId }: { groupId: number }) {
             onPageChange={(next) => setPage(next)}
             correctingPage={correctingPage}
             rosterTo={canManage ? groupRosterPath(groupId) : undefined}
+            careers={detail.meta.carreras ?? []}
+            careerId={filters.carrera}
+            onCareerChange={setCareer}
           />
         </>
       )}
