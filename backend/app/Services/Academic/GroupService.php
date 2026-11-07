@@ -35,14 +35,18 @@ class GroupService
 
     private AuditLogService $auditLog;
 
+    private GroupCareerService $groupCareers;
+
     public function __construct(
         SubjectCatalogService $subjectCatalog,
         ExamRosterLockService $rosterLock,
-        AuditLogService $auditLog
+        AuditLogService $auditLog,
+        GroupCareerService $groupCareers
     ) {
         $this->subjectCatalog = $subjectCatalog;
         $this->rosterLock = $rosterLock;
         $this->auditLog = $auditLog;
+        $this->groupCareers = $groupCareers;
     }
 
     public function listGroupsForPair(int $careerId, int $subjectId, string $teacherId): array
@@ -67,6 +71,12 @@ class GroupService
                 'total_mios' => $groups->where('es_mio', true)->count(),
                 'id_periodo_activo' => $this->subjectCatalog->activePeriodId(),
                 'docente' => ['nombre_completo' => $this->teacherName($teacherId)],
+                // Carreras que también ofertan la materia: el registro puede sumarlas al grupo.
+                'carreras_materia' => $this->groupCareers->offeredCareers(
+                    $subjectId,
+                    $this->subjectCatalog->activePeriodId(),
+                    [$careerId]
+                ),
             ],
         ];
     }
@@ -98,6 +108,7 @@ class GroupService
         $this->markOwnGroup($group, $teacherId);
 
         $activePeriodId = $this->subjectCatalog->activePeriodId();
+        $careers = $this->groupCareers->careersOf($group);
 
         return [
             'group' => $group,
@@ -107,6 +118,13 @@ class GroupService
                 'es_periodo_activo' => (int) $group->id_gestion_periodo === $activePeriodId,
                 // La vista de edición avisa antes de que el docente intente guardar.
                 'edicion_bloqueada' => $this->rosterLock->isLocked((int) $group->id_grupo),
+                // HU-021 multicarrera: carreras que atiende el grupo y las que se le pueden sumar.
+                'carreras' => $careers,
+                'carreras_disponibles' => $this->groupCareers->offeredCareers(
+                    (int) $group->id_materia,
+                    (int) $group->id_gestion_periodo,
+                    array_column($careers, 'id_carrera')
+                ),
             ],
         ];
     }
@@ -152,6 +170,8 @@ class GroupService
                 throw $this->translateDatabaseError($exception);
             }
 
+            $careers = $this->groupCareers->syncAdditional($group, $data['carreras_adicionales'] ?? []);
+
             $this->auditLog->registrar(
                 'CREAR',
                 'grupo',
@@ -164,7 +184,7 @@ class GroupService
                     'estado',
                     'id_usuario_docente',
                     'id_gestion_periodo',
-                ]),
+                ]) + ['carreras' => $careers['despues']],
                 $teacherId
             );
 
@@ -175,8 +195,9 @@ class GroupService
     }
 
     /**
-     * HU-019: solo cambia el número de grupo. id_carrera, id_materia, id_usuario_docente y el
-     * período son inmutables: se leen del propio grupo, nunca del payload recibido.
+     * HU-019: cambia el número de grupo y, si llegan, las carreras adicionales (HU-021 multicarrera).
+     * id_carrera, id_materia, id_usuario_docente y el período son inmutables: se leen del propio
+     * grupo, nunca del payload recibido.
      */
     public function updateGroup(int $groupId, array $data, string $teacherId): array
     {
@@ -211,25 +232,39 @@ class GroupService
             );
 
             $before = $group->only(self::AUDITED_FIELDS);
+            $after = null;
 
             $group->fill(['num_grupo' => $data['num_grupo']]);
 
-            // Guardar sin cambios no es una modificación: no escribe ni deja rastro en la bitácora.
-            if (! $group->isDirty()) {
-                return $group;
+            if ($group->isDirty()) {
+                try {
+                    $group->save();
+                } catch (QueryException $exception) {
+                    throw $this->translateDatabaseError($exception, $data['num_grupo']);
+                }
+
+                $after = $group->only(self::AUDITED_FIELDS);
             }
 
-            try {
-                $group->save();
-            } catch (QueryException $exception) {
-                throw $this->translateDatabaseError($exception, $data['num_grupo']);
+            if (array_key_exists('carreras_adicionales', $data)) {
+                $careers = $this->groupCareers->syncAdditional($group, $data['carreras_adicionales'] ?? []);
+
+                if ($this->careersChanged($careers)) {
+                    $before['carreras'] = $careers['antes'];
+                    $after = ($after ?? $group->only(self::AUDITED_FIELDS)) + ['carreras' => $careers['despues']];
+                }
+            }
+
+            // Guardar sin cambios no es una modificación: no deja rastro en la bitácora.
+            if ($after === null) {
+                return $group;
             }
 
             $this->auditLog->registrar(
                 'MODIFICAR',
                 'grupo',
                 $before,
-                $group->only(self::AUDITED_FIELDS),
+                $after,
                 $teacherId
             );
 
@@ -237,6 +272,17 @@ class GroupService
         });
 
         return $this->showGroup($this->findGroup((int) $group->id_grupo), $teacherId);
+    }
+
+    /** @param array{antes: array<int, int>, despues: array<int, int>} $careers */
+    private function careersChanged(array $careers): bool
+    {
+        $before = $careers['antes'];
+        $after = $careers['despues'];
+        sort($before);
+        sort($after);
+
+        return $before !== $after;
     }
 
     /**

@@ -1726,3 +1726,46 @@ ALTER TABLE public.reporte_estudiante
 --             (2026_10_13_000001_add_foto_url_to_estudiante)
 
 ALTER TABLE public.estudiante ADD COLUMN foto_url text;
+
+-- Versión 12: un grupo para varias carreras (HU-021, multicarrera)
+--             (2026_11_06_000001_create_grupo_oferta_and_add_carrera_to_grupo_estudiante)
+--   * grupo_oferta une el grupo con cada oferta (carrera + materia + período) que atiende. La FK a
+--     grupo (id_grupo, id_materia, id_gestion_periodo) impide otra materia u otro período.
+--   * grupo.id_carrera se conserva como carrera principal.
+--   * grupo_estudiante.id_carrera: carrera con la que el estudiante está en el grupo.
+
+ALTER TABLE public.grupo
+    ADD CONSTRAINT unq_grupo_materia_periodo
+        UNIQUE (id_grupo, id_materia, id_gestion_periodo);
+
+CREATE TABLE public.grupo_oferta (
+    id_grupo            integer NOT NULL,
+    id_carrera          integer NOT NULL,
+    id_materia          integer NOT NULL,
+    id_gestion_periodo  integer NOT NULL,
+    fecha_registro      timestamp(0) with time zone DEFAULT now() NOT NULL,
+
+    CONSTRAINT pk_grupo_oferta
+        PRIMARY KEY (id_grupo, id_carrera),
+
+    CONSTRAINT fk_grupo_oferta_grupo
+        FOREIGN KEY (id_grupo, id_materia, id_gestion_periodo)
+        REFERENCES public.grupo(id_grupo, id_materia, id_gestion_periodo)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_grupo_oferta_oferta_academica
+        FOREIGN KEY (id_carrera, id_materia, id_gestion_periodo)
+        REFERENCES public.oferta_academica(id_carrera, id_materia, id_gestion_periodo)
+);
+
+CREATE INDEX idx_grupo_oferta_oferta
+    ON public.grupo_oferta(id_carrera, id_materia, id_gestion_periodo);
+
+ALTER TABLE public.grupo_estudiante
+    ADD COLUMN id_carrera integer,
+    ADD CONSTRAINT fk_grupo_estudiante_carrera
+        FOREIGN KEY (id_carrera)
+        REFERENCES public.carrera(id_carrera);
+
+CREATE INDEX idx_grupo_estudiante_carrera
+    ON public.grupo_estudiante(id_grupo, id_carrera);
