@@ -8,6 +8,7 @@ import { ExamForm } from './ExamForm'
 import type {
   Classroom,
   CreateExamFormData,
+  SubjectCareerOption,
 } from '../types/exams.types'
 
 const classrooms: Classroom[] = [
@@ -30,8 +31,10 @@ const initialForm: CreateExamFormData = {
 
 function ExamFormHarness({
   initialAmbientes = [],
+  subjects = [],
 }: {
   initialAmbientes?: number[]
+  subjects?: SubjectCareerOption[]
 }) {
   const [formData, setFormData] = useState<CreateExamFormData>({
     ...initialForm,
@@ -41,7 +44,7 @@ function ExamFormHarness({
   return (
     <ExamForm
       formData={formData}
-      subjects={[]}
+      subjects={subjects}
       classrooms={classrooms}
       errors={{}}
       warnings={{}}
@@ -54,6 +57,20 @@ function ExamFormHarness({
     />
   )
 }
+
+describe('ExamForm - materias', () => {
+  it('muestra una opción por materia aunque esté en varias carreras', async () => {
+    render(<ExamFormHarness subjects={[
+      { id_carrera: 1, id_materia: 10, nombre: 'Bases de Datos I', codigo: 'BD', carrera: 'Sistemas', es_mia: true },
+      { id_carrera: 2, id_materia: 10, nombre: 'Bases de Datos I', codigo: 'BD', carrera: 'Informática', es_mia: true },
+    ]} />)
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Materia *' }))
+    expect(screen.getAllByRole('option', { name: 'Bases de Datos I' })).toHaveLength(1)
+    await userEvent.click(screen.getByRole('option', { name: 'Bases de Datos I' }))
+    expect(screen.getByRole('combobox', { name: 'Materia *' })).toHaveTextContent('Bases de Datos I')
+  })
+})
 
 describe('ExamForm - ambientes (HU-024, CA-3)', () => {
   it('permite seleccionar dos ambientes sin reemplazar el primero', async () => {

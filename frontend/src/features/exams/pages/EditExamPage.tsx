@@ -236,6 +236,7 @@ export function EditExamPage() {
               <AssignGroupsForm
                 selectedSubject={selectedSubject}
                 availableGroups={subjectGroups}
+                subjects={options.materias}
                 selectedGroupIds={formData.grupos}
                 errors={{}}
                 onToggleGroup={toggleGroup}

@@ -13,11 +13,6 @@ interface Props {
   updateFormData: (fields: Partial<CreateExamFormData>) => void;
 }
 
-/** El par viaja como una sola opción del select: "idCarrera-idMateria". */
-function pairKey(pair: { id_carrera: number; id_materia: number }): string {
-  return `${pair.id_carrera}-${pair.id_materia}`;
-}
-
 export const ExamForm: React.FC<Props> = ({
   formData,
   subjects,
@@ -96,15 +91,17 @@ export const ExamForm: React.FC<Props> = ({
           </label>
           <FormSelect
             id="materia"
-            value={formData.materia ? pairKey(formData.materia) : undefined}
+            value={formData.materia ? String(formData.materia.id_materia) : undefined}
             placeholder="Seleccionar materia..."
             invalid={Boolean(errors.materia)}
-            options={subjects.map((subject) => ({
-              value: pairKey(subject),
-              label: `${subject.nombre} — ${subject.carrera}`,
+            options={subjects.filter((subject, index) =>
+              subjects.findIndex((item) => item.id_materia === subject.id_materia) === index
+            ).map((subject) => ({
+              value: String(subject.id_materia),
+              label: subject.nombre,
             }))}
             onValueChange={(value) => {
-              const pair = subjects.find((subject) => pairKey(subject) === value);
+              const pair = subjects.find((subject) => String(subject.id_materia) === value);
               updateFormData({
                 materia: pair
                   ? { id_carrera: pair.id_carrera, id_materia: pair.id_materia }

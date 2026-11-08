@@ -80,7 +80,7 @@ export interface ExamFormOptions {
   grupos: Group[];
 }
 
-/** El par se elige como una sola opción: nunca materia sin carrera. */
+/** La materia se elige por id; la carrera sirve como referencia válida del catálogo. */
 export interface SubjectCareerKey {
   id_carrera: number;
   id_materia: number;

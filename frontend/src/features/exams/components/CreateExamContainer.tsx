@@ -48,7 +48,6 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
   const validation = validateForm();
   const selectedSubject = options.materias.find(
     (subject) =>
-      subject.id_carrera === formData.materia?.id_carrera &&
       subject.id_materia === formData.materia?.id_materia
   );
 
@@ -130,6 +129,7 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
         <AssignGroupsForm
           selectedSubject={selectedSubject}
           availableGroups={subjectGroups}
+          subjects={options.materias}
           selectedGroupIds={formData.grupos}
           errors={showValidationErrors ? validation.errors : {}}
           onToggleGroup={toggleGroup}

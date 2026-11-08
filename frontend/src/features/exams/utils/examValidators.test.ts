@@ -25,7 +25,7 @@ describe('validateExamForm', () => {
     expect(validateExamForm(form(), now).isValid).toBe(true)
   })
 
-  it('exige materia como par materia-carrera', () => {
+  it('exige seleccionar una materia', () => {
     expect(validateExamForm(form({ materia: null }), now).errors.materia).toBeDefined()
   })
 
