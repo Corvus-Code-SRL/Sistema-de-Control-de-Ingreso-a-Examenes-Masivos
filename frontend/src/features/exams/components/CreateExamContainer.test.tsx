@@ -92,18 +92,31 @@ describe('CreateExamContainer (HU-024)', () => {
     expect(screen.getByTestId('ubicacion')).toHaveTextContent('/examenes/programados')
   })
 
-  it('tras crear el examen ofrece acceder a su detalle', async () => {
+  it('tras crear el examen muestra el toast y ofrece acceder a su detalle', async () => {
+    hook.overrides = {
+      formData: {
+        ...emptyForm,
+        materia: { id_carrera: 2, id_materia: 3 },
+        fecha: '2099-10-20',
+        hora_inicio: '08:00',
+        minutos_apertura: 10,
+      },
+      options: {
+        materias: [{ id_carrera: 2, id_materia: 3, nombre: 'Cálculo I', codigo: 'CAL-1', carrera: 'Sistemas', es_mia: true }],
+        ambientes: [],
+        grupos: [],
+      },
+      submitExam: () => hook.onSuccess?.({ ...createdExam, fecha: '2099-10-20' }),
+    }
     renderContainer()
 
     await userEvent.click(
       screen.getByRole('button', { name: /guardar examen/i })
     )
 
-    expect(
-      await screen.findByRole('dialog', {
-        name: 'Examen creado correctamente',
-      })
-    ).toBeInTheDocument()
+    expect(await screen.findByText('Examen registrado · Programado')).toBeVisible()
+    expect(screen.getByRole('status')).toHaveTextContent('Primer parcial · Cálculo I · mar 20/10 · 08:00. El control se abrirá a las 07:50.')
+    expect(screen.getByRole('status').parentElement).toHaveClass('[&>div]:bottom-4')
 
     expect(
       screen.getByRole('link', { name: 'Ver detalle del examen' })

@@ -14,15 +14,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { AlertTriangle, CheckCircle2, Loader2, Save } from 'lucide-react';
+import { AlertTriangle, Loader2, Save } from 'lucide-react';
 import { Exam } from '../types/exams.types';
 import { examDetailPath } from '../utils/paths';
 import { groupExamsPath } from '@/features/groups';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Toast } from '@/components/ui/toast';
+
+function formatExamToastDate(value: string): string {
+  const date = new Date(`${value}T00:00:00`);
+  const weekday = new Intl.DateTimeFormat('es-BO', { weekday: 'short' }).format(date).replace('.', '');
+  return `${weekday} ${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
 
 export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ initialGroupId }) => {
   const navigate = useNavigate();
   const [createdExam, setCreatedExam] = useState<Exam | null>(null);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showValidationErrors, setShowValidationErrors] = useState(false);
 
   const {
@@ -41,7 +49,10 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
     validateForm,
     toggleGroup,
     submitExam,
-  } = useCreateExam(setCreatedExam, initialGroupId);
+  } = useCreateExam((exam) => {
+    setCreatedExam(exam);
+    setShowSuccessToast(true);
+  }, initialGroupId);
 
   const cancelTo = initialGroupId === undefined ? '/examenes/programados' : groupExamsPath(initialGroupId);
   const detailGroupId = initialGroupId !== undefined && formData.grupos.includes(initialGroupId)
@@ -79,6 +90,13 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
         return { time: clock, date: date.toISOString().slice(0, 10).split('-').reverse().join('/') };
       })()
     : null;
+
+  const openingText = opening
+    ? `${opening.date === createdExam?.fecha.split('-').reverse().join('/') ? '' : `el ${opening.date} `}a las ${opening.time}`
+    : 'según lo programado';
+  const toastDescription = createdExam
+    ? `${[createdExam.nombre_examen, selectedSubject?.nombre, formatExamToastDate(createdExam.fecha), createdExam.hora_inicio.slice(0, 5)].filter(Boolean).join(' · ')}. El control se abrirá ${openingText}.`
+    : '';
 
   if (loading) {
     return (
@@ -119,6 +137,16 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader title="Registrar examen" />
 
+      {createdExam && showSuccessToast && (
+        <div className="[&>div]:!top-auto [&>div]:bottom-4 [&>div]:border-l-4 [&>div]:border-l-ok sm:[&>div]:bottom-6 sm:[&>div]:!w-[450px]">
+          <Toast
+            title="Examen registrado · Programado"
+            description={toastDescription}
+            onClose={() => setShowSuccessToast(false)}
+          />
+        </div>
+      )}
+
       {apiError && (
         <div role="alert" className="rounded-xl border border-danger-border bg-danger-soft p-4 text-sm font-medium text-danger-fg">
           {apiError}
@@ -127,40 +155,65 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
 
       <form onSubmit={handleSubmit} className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
         <div className="space-y-3">
-          <ExamForm
-            formData={formData}
-            subjects={options.materias}
-            errors={showValidationErrors ? validation.errors : {}}
-            updateFormData={updateFormData}
-          />
+          <fieldset disabled={createdExam !== null} className="space-y-3">
+            <ExamForm
+              formData={formData}
+              subjects={options.materias}
+              errors={showValidationErrors ? validation.errors : {}}
+              updateFormData={updateFormData}
+            />
 
-          <AssignGroupsForm
-            selectedSubject={selectedSubject}
-            availableGroups={subjectGroups}
-            subjects={options.materias}
-            selectedGroupIds={formData.grupos}
-            errors={showValidationErrors ? validation.errors : {}}
-            onToggleGroup={toggleGroup}
-          />
+            <AssignGroupsForm
+              selectedSubject={selectedSubject}
+              availableGroups={subjectGroups}
+              subjects={options.materias}
+              selectedGroupIds={formData.grupos}
+              errors={showValidationErrors ? validation.errors : {}}
+              onToggleGroup={toggleGroup}
+            />
 
-          <ExamAmbientesForm
-            classrooms={options.ambientes}
-            selectedRoomIds={formData.ambientes}
-            error={showValidationErrors ? validation.errors.ambientes : undefined}
-            updateFormData={updateFormData}
-          />
+            <ExamAmbientesForm
+              classrooms={options.ambientes}
+              selectedRoomIds={formData.ambientes}
+              error={showValidationErrors ? validation.errors.ambientes : undefined}
+              updateFormData={updateFormData}
+            />
+          </fieldset>
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-            <Button type="button" variant="outline" onClick={() => navigate(cancelTo)} disabled={submitting}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={submitting || warnings.length > 0}>
-              {submitting ? (
-                <><Loader2 className="size-4 animate-spin" /> Guardando...</>
-              ) : (
-                <><Save className="size-4" /> Guardar examen</>
-              )}
-            </Button>
+            {createdExam ? (
+              <>
+                <Button asChild variant="outline"><Link to={cancelTo}>
+                  {initialGroupId === undefined ? 'Ver en Programados' : 'Volver a exámenes del grupo'}
+                </Link></Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" onClick={() => {
+                    resetFormData();
+                    setShowValidationErrors(false);
+                    setCreatedExam(null);
+                    setShowSuccessToast(false);
+                  }}>
+                    Crear otro examen
+                  </Button>
+                  <Button asChild><Link to={examDetailPath(createdExam.id_examen, detailGroupId)}>
+                    Ver detalle del examen
+                  </Link></Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <Button type="button" variant="outline" onClick={() => navigate(cancelTo)} disabled={submitting}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={submitting || warnings.length > 0}>
+                  {submitting ? (
+                    <><Loader2 className="size-4 animate-spin" /> Guardando...</>
+                  ) : (
+                    <><Save className="size-4" /> Guardar examen</>
+                  )}
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -280,85 +333,6 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
         </DialogContent>
       </Dialog>
 
-      {/* Modal de registro exitoso */}
-      <Dialog
-        open={createdExam !== null}
-        onOpenChange={() => {
-          // La creación ya terminó: el usuario debe elegir
-          // una de las tres acciones explícitas.
-        }}
-      >
-        <DialogContent
-          showCloseButton={false}
-          className="sm:max-w-lg"
-          onEscapeKeyDown={(event) => event.preventDefault()}
-          onInteractOutside={(event) => event.preventDefault()}
-        >
-          <DialogHeader>
-            <div className="flex justify-center pb-2">
-              <div className="flex size-14 items-center justify-center rounded-full bg-brand-soft">
-                <CheckCircle2
-                  className="size-8 text-brand"
-                  aria-hidden="true"
-                />
-              </div>
-            </div>
-
-            <DialogTitle className="text-center text-lg">
-              Examen creado correctamente
-            </DialogTitle>
-
-            <DialogDescription className="text-center">
-              El examen se registró exitosamente y se encuentra
-              en estado Programado.
-            </DialogDescription>
-          </DialogHeader>
-
-          {createdExam && (
-            <>
-              <div className="rounded-lg border border-border-soft bg-sunken p-4 text-sm">
-                <p className="font-semibold text-text">
-                  {createdExam.nombre_examen}
-                </p>
-
-                <p className="mt-2 text-muted-foreground">
-                  Fecha: {createdExam.fecha}
-                </p>
-
-                <p className="text-muted-foreground">
-                  Horario: {createdExam.hora_inicio} – {createdExam.hora_fin}
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2 pt-2">
-                <Button asChild>
-                  <Link to={examDetailPath(createdExam.id_examen, detailGroupId)}>
-                    Ver detalle del examen
-                  </Link>
-                </Button>
-
-                <Button asChild variant="outline">
-                  <Link to={cancelTo}>
-                    {initialGroupId === undefined ? 'Ver en Programados' : 'Volver a exámenes del grupo'}
-                  </Link>
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    resetFormData();
-                    setShowValidationErrors(false);
-                    setCreatedExam(null);
-                  }}
-                >
-                  Crear otro examen
-                </Button>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
