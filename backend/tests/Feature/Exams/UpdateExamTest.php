@@ -72,6 +72,19 @@ class UpdateExamTest extends TestCase
         );
     }
 
+    public function test_actualiza_la_apertura_sin_perder_el_valor_si_no_se_envia(): void
+    {
+        $exam = $this->createExam(['minutos_apertura' => 25], [$this->aulaId]);
+
+        $this->putJson($this->url($exam), $this->validPayload())
+            ->assertOk()
+            ->assertJsonPath('data.minutos_apertura', 25);
+
+        $this->putJson($this->url($exam), $this->validPayload([
+            'minutos_apertura' => 5,
+        ]))->assertOk()->assertJsonPath('data.minutos_apertura', 5);
+    }
+
     /**
      * Descubierto en HU-09: quitar del examen un ambiente que ya tenía un auxiliar
      * asignado violaba la FK compuesta examen_auxiliar → examen_ambiente (500).
