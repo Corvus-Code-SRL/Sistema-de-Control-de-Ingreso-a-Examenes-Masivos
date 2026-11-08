@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 import { Navigate, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { LoadingState } from '@/components/common/LoadingState'
+import { AppLayout } from '@/components/layout/AppLayout'
 import { MyAssignmentsPage, MyAssistantsPage } from '@/features/assistants'
 import { ExamAssistantsPage } from '@/features/assistants/pages/ExamAssistantsPage'
 import {
@@ -75,120 +76,119 @@ function guarded(capability: Capability, element: ReactElement) {
 function DocenteRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/materias" replace />} />
-      <Route path="/materias" element={guarded('grupos.gestionar', <SubjectsPage />)} />
-      <Route
-        path="/carreras/:idCarrera/materias/:idMateria/grupos"
-        element={guarded('grupos.gestionar', <SubjectGroupsPage />)}
-      />
-      <Route path="/mis-cursos" element={guarded('grupos.gestionar', <MyCoursesPage />)} />
-      <Route
-        path="/mis-auxiliares"
-        element={guarded('auxiliares.gestionar', <MyAssistantsPage />)}
-      />
-      <Route
-        path="/grupos/:idGrupo"
-        element={guarded('grupos.gestionar', <GroupDetailPage />)}
-      />
+      <Route element={<AppLayout />}>
+        <Route path="/" element={<Navigate to="/materias" replace />} />
+        <Route path="/materias" element={guarded('grupos.gestionar', <SubjectsPage />)} />
+        <Route
+          path="/carreras/:idCarrera/materias/:idMateria/grupos"
+          element={guarded('grupos.gestionar', <SubjectGroupsPage />)}
+        />
+        <Route path="/mis-cursos" element={guarded('grupos.gestionar', <MyCoursesPage />)} />
+        <Route
+          path="/mis-auxiliares"
+          element={guarded('auxiliares.gestionar', <MyAssistantsPage />)}
+        />
+        <Route
+          path="/grupos/:idGrupo"
+          element={guarded('grupos.gestionar', <GroupDetailPage />)}
+        />
 
-      <Route
-        path="/grupos/:idGrupo/examenes"
-        element={guarded('examenes.gestionar', <GroupExamsPage />)}
-      />
-      <Route
-        path="/grupos/:idGrupo/auxiliares"
-        element={guarded('auxiliares.gestionar', <GroupAssistantsPage />)}
-      />
-      <Route
-        path="/grupos/:idGrupo/editar"
-        element={guarded('grupos.gestionar', <GroupEditPage />)}
-      />
+        <Route
+          path="/grupos/:idGrupo/examenes"
+          element={guarded('examenes.gestionar', <GroupExamsPage />)}
+        />
+        <Route
+          path="/grupos/:idGrupo/auxiliares"
+          element={guarded('auxiliares.gestionar', <GroupAssistantsPage />)}
+        />
+        <Route
+          path="/grupos/:idGrupo/editar"
+          element={guarded('grupos.gestionar', <GroupEditPage />)}
+        />
 
-      <Route
-        path="/grupos/:idGrupo/nomina"
-        element={guarded('grupos.gestionar', <RosterUploadPage />)}
-      />
+        <Route
+          path="/grupos/:idGrupo/nomina"
+          element={guarded('grupos.gestionar', <RosterUploadPage />)}
+        />
 
-      <Route
-        path="/cursos/:idGrupo"
-        element={<CourseDetailRedirect />}
-      />
+        <Route
+          path="/cursos/:idGrupo"
+          element={<CourseDetailRedirect />}
+        />
 
-      <Route
-        path="/examenes/nuevo"
-        element={guarded('examenes.gestionar', <CreateExamPage />)}
-      />
+        <Route
+          path="/examenes/nuevo"
+          element={guarded('examenes.gestionar', <CreateExamPage />)}
+        />
 
-      <Route
-        path="/examenes/programados"
-        element={guarded('examenes.gestionar', <ExamsPage />)}
-      />
+        <Route
+          path="/examenes/programados"
+          element={guarded('examenes.gestionar', <ExamsPage />)}
+        />
 
-      <Route
-        path="/examenes/reportes"
-        element={guarded('examenes.gestionar', <ExamReportsPage />)}
-      />
+        <Route
+          path="/examenes/reportes"
+          element={guarded('examenes.gestionar', <ExamReportsPage />)}
+        />
 
-      <Route
-        path="/examenes/:examId/auxiliares"
-        element={guarded('auxiliares.examen', <ExamAssistantsPage />)}
-      />
+        <Route
+          path="/examenes/:examId/auxiliares"
+          element={guarded('auxiliares.examen', <ExamAssistantsPage />)}
+        />
 
-      <Route
-        path="/examenes/:examId/editar"
-        element={guarded('examenes.gestionar', <EditExamPage />)}
-      />
+        <Route
+          path="/examenes/:examId/editar"
+          element={guarded('examenes.gestionar', <EditExamPage />)}
+        />
 
-      <Route
-        path="/examenes/:examId"
-        element={guarded('examenes.gestionar', <ExamDetailPage />)}
-      />
+        <Route
+          path="/examenes/:examId"
+          element={guarded('examenes.gestionar', <ExamDetailPage />)}
+        />
 
-      <Route
-        path="/examenes/:examId/reporte-final"
-        element={guarded('examenes.gestionar', <FinalReportPage />)}
-      />
+        <Route
+          path="/examenes/:examId/reporte-final"
+          element={guarded('examenes.gestionar', <FinalReportPage />)}
+        />
 
-      <Route path="/situacion-excepcional" element={guarded('situaciones.registrar', <ExamSituationsPage />)} />
-      <Route path="/reportar-incidencia" element={guarded('incidencias.registrar', <ReportIncidentPage />)} />
-      <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
+        <Route path="/situacion-excepcional" element={guarded('situaciones.registrar', <ExamSituationsPage />)} />
+        <Route path="/reportar-incidencia" element={guarded('incidencias.registrar', <ReportIncidentPage />)} />
+        <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
 
-      <Route
-        path="/examenes/:examId/control-ingreso"
-        element={guarded('ingreso.operar', <EntryControlPage />)}
-      />
+        <Route
+          path="/examenes/:examId/control-ingreso"
+          element={guarded('ingreso.operar', <EntryControlPage />)}
+        />
 
-      <Route
-        path="/examenes/en-curso"
-        element={guarded('ingreso.operar', <InProgressExamsPage />)}
-      />
+        <Route
+          path="/examenes/en-curso"
+          element={guarded('ingreso.operar', <InProgressExamsPage />)}
+        />
 
-      <Route
-        path="/examenes/:examId/en-curso"
-        element={guarded('ingreso.operar', <ExamInProgressPage extensions={examInProgressExtensions} />)}
-      />
-      <Route path={LATE_ENTRY_EXAMS_PATH} element={guarded('ingreso.operar', <LateEntryExamsPage />)} />
-      <Route path={LATE_ENTRY_PATH} element={guarded('ingreso.operar', <LateEntryPage />)} />
+        <Route
+          path="/examenes/:examId/en-curso"
+          element={guarded('ingreso.operar', <ExamInProgressPage extensions={examInProgressExtensions} />)}
+        />
+        <Route path={LATE_ENTRY_EXAMS_PATH} element={guarded('ingreso.operar', <LateEntryExamsPage />)} />
+        <Route path={LATE_ENTRY_PATH} element={guarded('ingreso.operar', <LateEntryPage />)} />
 
-      <Route path="/historial" element={guarded('examenes.gestionar', <ExamHistoryPage />)} />
-      <Route path="/historial/:id" element={guarded('examenes.gestionar', <ExamHistorySummaryPage />)} />
-      <Route path="/incidencias" element={guarded('incidencias.revisar', <IncidentsPage />)} />
+        <Route path="/historial" element={guarded('examenes.gestionar', <ExamHistoryPage />)} />
+        <Route path="/historial/:id" element={guarded('examenes.gestionar', <ExamHistorySummaryPage />)} />
+        <Route path="/incidencias" element={guarded('incidencias.revisar', <IncidentsPage />)} />
 
-      <Route
-        path="/central-riesgo/:id?"
-        element={guarded('riesgo.consultar', <RiskCenterPage />)}
-      />
+        <Route
+          path="/central-riesgo/:id?"
+          element={guarded('riesgo.consultar', <RiskCenterPage />)}
+        />
 
-      <Route
-        path="/reportes/intentos"
-        element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
-      />
-      <Route path="/bitacora" element={guarded('bitacora.consultar', <AuditLogPage />)} />
+        <Route
+          path="/reportes/intentos"
+          element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
+        />
+        <Route path="/bitacora" element={guarded('bitacora.consultar', <AuditLogPage />)} />
 
-      <Route path="*" element={<Navigate to="/materias" replace />} />
-
-      <Route path="*" element={<Navigate to="/materias" replace />} />
-
+        <Route path="*" element={<Navigate to="/materias" replace />} />
+      </Route>
     </Routes>
   )
 }
@@ -200,31 +200,33 @@ function DocenteRoutes() {
 function AuxiliarRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/mis-examenes" replace />} />
-      <Route path="/mis-examenes" element={guarded('ingreso.operar', <MyAssignmentsPage />)} />
-      <Route path="/situacion-excepcional" element={guarded('situaciones.registrar', <ExamSituationsPage />)} />
-      <Route path="/reportar-incidencia" element={guarded('incidencias.registrar', <ReportIncidentPage />)} />
-      <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
-      <Route
-        path="/examenes/:examId/control-ingreso"
-        element={guarded('ingreso.operar', <EntryControlPage />)}
-      />
-      <Route
-        path="/examenes/en-curso"
-        element={guarded('ingreso.operar', <InProgressExamsPage />)}
-      />
-      <Route
-        path="/examenes/:examId/en-curso"
-        element={guarded('ingreso.operar', <ExamInProgressPage extensions={examInProgressExtensions} />)}
-      />
-      <Route path={LATE_ENTRY_EXAMS_PATH} element={guarded('ingreso.operar', <LateEntryExamsPage />)} />
-      <Route path={LATE_ENTRY_PATH} element={guarded('ingreso.operar', <LateEntryPage />)} />
-      <Route
-        path="/reportes/intentos"
-        element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
-      />
-      <Route path="/bitacora" element={guarded('bitacora.consultar', <AuditLogPage />)} />
-      <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
+      <Route element={<AppLayout />}>
+        <Route path="/" element={<Navigate to="/mis-examenes" replace />} />
+        <Route path="/mis-examenes" element={guarded('ingreso.operar', <MyAssignmentsPage />)} />
+        <Route path="/situacion-excepcional" element={guarded('situaciones.registrar', <ExamSituationsPage />)} />
+        <Route path="/reportar-incidencia" element={guarded('incidencias.registrar', <ReportIncidentPage />)} />
+        <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
+        <Route
+          path="/examenes/:examId/control-ingreso"
+          element={guarded('ingreso.operar', <EntryControlPage />)}
+        />
+        <Route
+          path="/examenes/en-curso"
+          element={guarded('ingreso.operar', <InProgressExamsPage />)}
+        />
+        <Route
+          path="/examenes/:examId/en-curso"
+          element={guarded('ingreso.operar', <ExamInProgressPage extensions={examInProgressExtensions} />)}
+        />
+        <Route path={LATE_ENTRY_EXAMS_PATH} element={guarded('ingreso.operar', <LateEntryExamsPage />)} />
+        <Route path={LATE_ENTRY_PATH} element={guarded('ingreso.operar', <LateEntryPage />)} />
+        <Route
+          path="/reportes/intentos"
+          element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
+        />
+        <Route path="/bitacora" element={guarded('bitacora.consultar', <AuditLogPage />)} />
+        <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
+      </Route>
     </Routes>
   )
 }
@@ -263,42 +265,44 @@ function AssignmentsRedirect() {
 function AdministradorRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/cuentas/nueva" replace />} />
-      <Route path="/cuentas" element={<Navigate to="/cuentas/nueva" replace />} />
-      <Route
-        path="/cuentas/nueva"
-        element={guarded('administracion.gestionar', <RegistrarCuentaPage />)}
-      />
-      <Route
-        path="/cuentas/roles"
-        element={guarded('administracion.gestionar', <ModificarRolPage />)}
-      />
-      <Route
-        path="/cuentas/:idUsuario"
-        element={guarded('administracion.gestionar', <CuentaDetallePage />)}
-      />
-      <Route path="/ambientes" element={guarded('administracion.gestionar', <ClassroomsPage />)} />
-      <Route path="/materias" element={<AssignmentsRedirect />} />
-      <Route path="/materias/asignar" element={<AssignmentsRedirect />} />
-      <Route
-        path="/materias/asignaciones"
-        element={guarded('administracion.gestionar', <AdminSubjectAssignmentsPage />)}
-      />
-      <Route
-        path="/materias/catalogo"
-        element={guarded('administracion.gestionar', <AdminSubjectCatalogPage />)}
-      />
-      <Route
-        path="/central-riesgo/:id?"
-        element={guarded('riesgo.consultar', <RiskCenterPage />)}
-      />
-      <Route
-        path="/reportes/intentos"
-        element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
-      />
-      <Route path="/bitacora" element={guarded('bitacora.consultar', <AuditLogPage />)} />
+      <Route element={<AppLayout />}>
+        <Route path="/" element={<Navigate to="/cuentas/nueva" replace />} />
+        <Route path="/cuentas" element={<Navigate to="/cuentas/nueva" replace />} />
+        <Route
+          path="/cuentas/nueva"
+          element={guarded('administracion.gestionar', <RegistrarCuentaPage />)}
+        />
+        <Route
+          path="/cuentas/roles"
+          element={guarded('administracion.gestionar', <ModificarRolPage />)}
+        />
+        <Route
+          path="/cuentas/:idUsuario"
+          element={guarded('administracion.gestionar', <CuentaDetallePage />)}
+        />
+        <Route path="/ambientes" element={guarded('administracion.gestionar', <ClassroomsPage />)} />
+        <Route path="/materias" element={<AssignmentsRedirect />} />
+        <Route path="/materias/asignar" element={<AssignmentsRedirect />} />
+        <Route
+          path="/materias/asignaciones"
+          element={guarded('administracion.gestionar', <AdminSubjectAssignmentsPage />)}
+        />
+        <Route
+          path="/materias/catalogo"
+          element={guarded('administracion.gestionar', <AdminSubjectCatalogPage />)}
+        />
+        <Route
+          path="/central-riesgo/:id?"
+          element={guarded('riesgo.consultar', <RiskCenterPage />)}
+        />
+        <Route
+          path="/reportes/intentos"
+          element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
+        />
+        <Route path="/bitacora" element={guarded('bitacora.consultar', <AuditLogPage />)} />
 
-      <Route path="*" element={<Navigate to="/cuentas/nueva" replace />} />
+        <Route path="*" element={<Navigate to="/cuentas/nueva" replace />} />
+      </Route>
     </Routes>
   )
 }
