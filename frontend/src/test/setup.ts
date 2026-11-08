@@ -21,6 +21,25 @@ if (typeof Element !== 'undefined') {
   Element.prototype.releasePointerCapture ??= () => undefined
 }
 
+// jsdom no trae PointerEvent: sin él los eventos de puntero pierden `button`, `clientX` y `pointerId`.
+if (typeof window !== 'undefined' && typeof window.PointerEvent === 'undefined') {
+  class PointerEventPolyfill extends MouseEvent {
+    readonly pointerId: number
+
+    constructor(type: string, init: PointerEventInit = {}) {
+      super(type, init)
+      this.pointerId = init.pointerId ?? 0
+    }
+  }
+
+  window.PointerEvent = PointerEventPolyfill as unknown as typeof PointerEvent
+}
+
+// jsdom solo avisa «Not implemented»: el marco vuelve arriba al navegar y las pruebas lo observan con un espía.
+if (typeof window !== 'undefined') {
+  window.scrollTo = () => undefined
+}
+
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()

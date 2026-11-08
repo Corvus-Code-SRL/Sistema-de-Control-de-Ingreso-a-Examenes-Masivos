@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -55,7 +55,15 @@ vi.mock('@/features/incidents', () => ({
 
 type RoleName = 'Administrador' | 'Docente' | 'Auxiliar' | 'Invitado'
 
-function renderSidebar(role: RoleName, route: string, props: { onNavigate?: () => void } = {}) {
+function renderSidebar(
+  role: RoleName,
+  route: string,
+  props: {
+    onNavigate?: () => void
+    onNavScroll?: (top: number) => void
+    initialNavScroll?: number
+  } = {}
+) {
   session.role = role
 
   return render(
@@ -175,6 +183,158 @@ describe('AppSidebar — desplazamiento', () => {
     )
 
     expect(scrollers).toEqual([nav])
+  })
+})
+
+describe('AppSidebar — desplazamiento recordado (panel móvil)', () => {
+  function box(top: number, bottom: number): DOMRect {
+    return {
+      top,
+      bottom,
+      left: 0,
+      right: 0,
+      width: 0,
+      height: bottom - top,
+      x: 0,
+      y: top,
+      toJSON: () => ({})
+    }
+  }
+
+  /** Área del `<nav>` entre 0 y 500 px; la entrada activa, en la posición indicada. */
+  function layoutWithActiveAt(top: number, bottom: number) {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      if (this.tagName === 'NAV') return box(0, 500)
+      if (this.getAttribute('aria-current') === 'page') return box(top, bottom)
+
+      return box(0, 0)
+    })
+  }
+
+  /** Fotogramas a mano: la prueba decide cuándo corre cada `requestAnimationFrame`. */
+  function manualFrames() {
+    const callbacks = new Map<number, FrameRequestCallback>()
+    let next = 1
+
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callbacks.set(next, callback)
+
+      return next++
+    })
+    const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => {
+      callbacks.delete(id)
+    })
+
+    return {
+      cancel,
+      get pending() {
+        return callbacks.size
+      },
+      flush() {
+        const queued = [...callbacks.values()]
+        callbacks.clear()
+        queued.forEach((callback) => callback(0))
+      }
+    }
+  }
+
+  function getNav() {
+    return screen.getByRole('navigation', { name: MAIN_NAV })
+  }
+
+  it('restaura el desplazamiento inicial al montar', () => {
+    renderSidebar('Docente', '/mis-cursos', { initialNavScroll: 90 })
+
+    expect(getNav().scrollTop).toBe(90)
+  })
+
+  it('si la entrada activa ya se ve, conserva la posición y no desplaza nada', () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView')
+    layoutWithActiveAt(100, 140)
+
+    renderSidebar('Docente', '/mis-cursos', { initialNavScroll: 90 })
+
+    expect(getNav().scrollTop).toBe(90)
+    expect(scrollIntoView).not.toHaveBeenCalled()
+  })
+
+  it('si la entrada activa queda fuera, la acerca con block «nearest» (también sin posición previa)', () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView')
+    layoutWithActiveAt(800, 840)
+
+    renderSidebar('Docente', '/mis-cursos', { initialNavScroll: 0 })
+
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    expect(scrollIntoView.mock.contexts[0]).toBe(
+      within(getNav()).getByRole('link', { current: 'page' })
+    )
+  })
+
+  it('sin las props nuevas (escritorio) no restaura, no acerca nada ni avisa', () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView')
+    const frames = manualFrames()
+    layoutWithActiveAt(800, 840)
+
+    renderSidebar('Docente', '/mis-cursos')
+    fireEvent.scroll(getNav())
+
+    expect(getNav().scrollTop).toBe(0)
+    expect(scrollIntoView).not.toHaveBeenCalled()
+    expect(frames.pending).toBe(0)
+  })
+
+  it('avisa como mucho una vez por fotograma y con el último valor', () => {
+    const frames = manualFrames()
+    const onNavScroll = vi.fn()
+    renderSidebar('Docente', '/mis-cursos', { onNavScroll, initialNavScroll: 0 })
+    const nav = getNav()
+
+    nav.scrollTop = 30
+    fireEvent.scroll(nav)
+    nav.scrollTop = 75
+    fireEvent.scroll(nav)
+
+    expect(onNavScroll).not.toHaveBeenCalled()
+    expect(frames.pending).toBe(1)
+
+    frames.flush()
+
+    expect(onNavScroll).toHaveBeenCalledTimes(1)
+    expect(onNavScroll).toHaveBeenCalledWith(75)
+
+    nav.scrollTop = 120
+    fireEvent.scroll(nav)
+    frames.flush()
+
+    expect(onNavScroll).toHaveBeenLastCalledWith(120)
+  })
+
+  it('al desmontar entrega el último valor pendiente y cancela el fotograma', () => {
+    const frames = manualFrames()
+    const onNavScroll = vi.fn()
+    const view = renderSidebar('Docente', '/mis-cursos', { onNavScroll, initialNavScroll: 0 })
+    const nav = getNav()
+
+    nav.scrollTop = 64
+    fireEvent.scroll(nav)
+    view.unmount()
+
+    expect(frames.cancel).toHaveBeenCalledTimes(1)
+    expect(onNavScroll).toHaveBeenCalledTimes(1)
+    expect(onNavScroll).toHaveBeenCalledWith(64)
+  })
+
+  it('al desmontar sin desplazamiento pendiente no avisa', () => {
+    manualFrames()
+    const onNavScroll = vi.fn()
+    const view = renderSidebar('Docente', '/mis-cursos', { onNavScroll, initialNavScroll: 0 })
+
+    view.unmount()
+
+    expect(onNavScroll).not.toHaveBeenCalled()
   })
 })
 
