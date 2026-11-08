@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, type UIEvent } from 'react'
 import { LogIn, LogOut, PanelLeftClose } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -16,6 +16,24 @@ interface AppSidebarProps {
   onCollapse?: () => void
   /** `id` del contenedor que `onCollapse` oculta, para `aria-controls`. */
   controlsId?: string
+  /**
+   * Solo en el panel móvil, que se desmonta al cerrarse: recibe el desplazamiento del `<nav>`
+   * (como mucho una vez por fotograma) para que quien lo contiene lo recuerde.
+   */
+  onNavScroll?: (top: number) => void
+  /**
+   * Solo en el panel móvil: desplazamiento con el que debe nacer el `<nav>`. Su presencia (aunque
+   * sea 0) activa la restauración y el ajuste de la entrada activa al montar.
+   */
+  initialNavScroll?: number
+}
+
+/** `true` si el elemento cabe entero dentro del área visible del contenedor. */
+function isFullyVisible(container: HTMLElement, element: HTMLElement): boolean {
+  const area = container.getBoundingClientRect()
+  const box = element.getBoundingClientRect()
+
+  return box.top >= area.top && box.bottom <= area.bottom
 }
 
 /**
@@ -27,11 +45,73 @@ interface AppSidebarProps {
  * El `<nav>` es el único elemento que se desplaza (la cabecera y la cuenta quedan fijas) y no
  * muestra barra de desplazamiento; sigue respondiendo al tacto, la rueda y el foco por teclado.
  *
+ * En el panel móvil el menú se vuelve a montar en cada apertura. Para que reabrirlo lo deje donde
+ * estaba, `onNavScroll` informa del desplazamiento e `initialNavScroll` lo restaura antes del
+ * primer pintado (sin salto visible). Después, si la entrada activa quedó fuera del área visible,
+ * se acerca con `block: 'nearest'`; si ya se ve, la posición se conserva exacta. Todo es
+ * instantáneo (nunca `behavior: 'smooth'`), así que `prefers-reduced-motion` se respeta.
+ *
  * Va sobre el teal profundo de la marca, así que sus colores salen de los tokens
  * del sidebar y no de los de superficie clara: el gris de texto secundario de la
  * aplicación resultaría ilegible aquí.
  */
-export function AppSidebar({ onNavigate, onCollapse, controlsId }: AppSidebarProps) {
+export function AppSidebar({
+  onNavigate,
+  onCollapse,
+  controlsId,
+  onNavScroll,
+  initialNavScroll
+}: AppSidebarProps) {
+  const navRef = useRef<HTMLElement>(null)
+  const latestScroll = useRef(0)
+  const pendingFrame = useRef<number | null>(null)
+  const reportScroll = useRef(onNavScroll)
+
+  useLayoutEffect(() => {
+    reportScroll.current = onNavScroll
+  })
+
+  // Al montar (una vez): restaura el desplazamiento y acerca la entrada activa si quedó fuera.
+  useLayoutEffect(() => {
+    const nav = navRef.current
+    if (nav === null || initialNavScroll === undefined) return
+
+    nav.scrollTop = initialNavScroll
+
+    const activeLink = nav.querySelector<HTMLElement>('[aria-current="page"]')
+
+    if (activeLink !== null && !isFullyVisible(nav, activeLink)) {
+      activeLink.scrollIntoView({ block: 'nearest' })
+    }
+    // Solo al montar: después el usuario manda sobre el desplazamiento.
+  }, [])
+
+  // Al desmontar, un fotograma pendiente no debe perder el último valor: se entrega al instante.
+  useEffect(
+    () => () => {
+      if (pendingFrame.current === null) return
+
+      cancelAnimationFrame(pendingFrame.current)
+      pendingFrame.current = null
+      reportScroll.current?.(latestScroll.current)
+    },
+    []
+  )
+
+  function handleNavScroll(event: UIEvent<HTMLElement>) {
+    if (reportScroll.current === undefined) return
+
+    latestScroll.current = event.currentTarget.scrollTop
+
+    // Un aviso por fotograma como máximo: el desplazamiento dispara decenas de eventos por segundo.
+    if (pendingFrame.current !== null) return
+
+    pendingFrame.current = requestAnimationFrame(() => {
+      pendingFrame.current = null
+      reportScroll.current?.(latestScroll.current)
+    })
+  }
+
   const { user, area, capabilities } = useCurrentUser()
   const { estado, usuario, cerrarSesion } = useAuth()
   const navigate = useNavigate()
@@ -82,6 +162,8 @@ export function AppSidebar({ onNavigate, onCollapse, controlsId }: AppSidebarPro
       </div>
 
       <nav
+        ref={navRef}
+        onScroll={handleNavScroll}
         aria-label="Navegación principal"
         className="scrollbar-hidden flex-1 overflow-y-auto overscroll-contain px-2 py-3"
       >

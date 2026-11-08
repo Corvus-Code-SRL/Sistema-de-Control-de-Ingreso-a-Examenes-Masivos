@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
+import { useCallback, useId, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
 import { Menu, PanelLeftOpen } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -24,6 +24,9 @@ interface AppFrameProps {
  *
  * En escritorio el menú se puede ocultar. Se oculta sin desmontarlo (ancho cero y `invisible`), de
  * modo que conserva su desplazamiento, sus secciones abiertas y sus consultas.
+ *
+ * El panel móvil sí se desmonta al cerrarse; por eso este marco guarda su desplazamiento y se lo
+ * devuelve al abrirlo (ver `AppSidebar`).
  */
 export function AppFrame({ mode, header, mainRef, children }: AppFrameProps) {
   const { user } = useCurrentUser()
@@ -33,6 +36,12 @@ export function AppFrame({ mode, header, mainRef, children }: AppFrameProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const asideId = useId()
   const asideRef = useRef<HTMLElement>(null)
+  // El panel móvil se desmonta al cerrarse: su desplazamiento se recuerda aquí, en memoria (una
+  // recarga empieza arriba) y sin re-render, porque solo se lee al volver a montarlo.
+  const mobileMenuScroll = useRef(0)
+  const rememberMobileMenuScroll = useCallback((top: number) => {
+    mobileMenuScroll.current = top
+  }, [])
 
   return (
     <div data-shell={mode} className="flex min-h-screen bg-background">
@@ -89,7 +98,11 @@ export function AppFrame({ mode, header, mainRef, children }: AppFrameProps) {
             </SheetTrigger>
             <SheetContent side="left" className="w-72 p-0">
               <SheetTitle className="sr-only">Navegación principal</SheetTitle>
-              <AppSidebar onNavigate={() => setMenuOpen(false)} />
+              <AppSidebar
+                onNavigate={() => setMenuOpen(false)}
+                onNavScroll={rememberMobileMenuScroll}
+                initialNavScroll={mobileMenuScroll.current}
+              />
             </SheetContent>
           </Sheet>
 

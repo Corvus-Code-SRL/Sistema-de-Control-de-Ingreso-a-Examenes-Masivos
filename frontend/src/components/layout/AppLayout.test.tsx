@@ -265,6 +265,152 @@ describe('AppLayout — ocultar y mostrar el menú', () => {
   })
 })
 
+describe('AppLayout — desplazamiento del menú móvil', () => {
+  const INCIDENTS_LINK = 'Revisar reportes de incidencias'
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  async function renderDocente() {
+    stubBackend('docente')
+    const view = renderApp('/historial')
+    const desktopNav = await screen.findByRole('navigation', { name: MAIN_NAV })
+
+    return { view, desktopNav }
+  }
+
+  /** Abre el panel y devuelve el `<nav>` que contiene (distinto del de escritorio). */
+  async function openMenu(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: 'Abrir menú' }))
+    const dialog = await screen.findByRole('dialog')
+
+    return within(dialog).getByRole('navigation', { name: MAIN_NAV })
+  }
+
+  async function closeMenu(user: ReturnType<typeof userEvent.setup>) {
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  }
+
+  /** Deja pasar un fotograma: el menú avisa de su desplazamiento como mucho una vez por fotograma. */
+  function nextFrame() {
+    return new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  }
+
+  async function scrollTo(nav: HTMLElement, top: number) {
+    nav.scrollTop = top
+    fireEvent.scroll(nav)
+    await nextFrame()
+  }
+
+  function box(top: number, bottom: number): DOMRect {
+    return {
+      top,
+      bottom,
+      left: 0,
+      right: 0,
+      width: 0,
+      height: bottom - top,
+      x: 0,
+      y: top,
+      toJSON: () => ({})
+    }
+  }
+
+  it('al cerrar y volver a abrir el panel, el menú queda donde estaba', async () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView')
+    const user = userEvent.setup()
+    await renderDocente()
+
+    const first = await openMenu(user)
+    await scrollTo(first, 150)
+    await closeMenu(user)
+
+    const second = await openMenu(user)
+
+    // Es un nodo nuevo (el panel se desmonta al cerrar), pero nace en la misma posición.
+    expect(second).not.toBe(first)
+    expect(second.scrollTop).toBe(150)
+    expect(scrollIntoView).not.toHaveBeenCalled()
+  })
+
+  it('tras elegir una entrada (navega y cierra), al reabrir sigue en la misma posición', async () => {
+    const user = userEvent.setup()
+    const { view } = await renderDocente()
+
+    const first = await openMenu(user)
+    await openAllSections(user, first)
+    await scrollTo(first, 150)
+
+    await user.click(within(first).getByRole('link', { name: INCIDENTS_LINK }))
+    await waitFor(() => expect(view.pathname).toBe('/incidencias'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    const second = await openMenu(user)
+
+    expect(second.scrollTop).toBe(150)
+    expect(within(second).getByRole('link', { name: INCIDENTS_LINK })).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+  })
+
+  it('un desplazamiento hecho justo antes de cerrar tampoco se pierde', async () => {
+    const user = userEvent.setup()
+    await renderDocente()
+
+    const first = await openMenu(user)
+    // Sin esperar el fotograma: el aviso queda pendiente cuando el panel se desmonta.
+    first.scrollTop = 200
+    fireEvent.scroll(first)
+    await closeMenu(user)
+
+    expect((await openMenu(user)).scrollTop).toBe(200)
+  })
+
+  it('en la primera apertura trae la entrada activa a la vista si queda fuera', async () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView')
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      if (this.tagName === 'NAV') return box(0, 500)
+      if (this.getAttribute('aria-current') === 'page') return box(900, 940)
+
+      return box(0, 0)
+    })
+    const user = userEvent.setup()
+    await renderDocente()
+
+    // El menú de escritorio (montado desde el inicio) no se ajusta: no recibe la restauración.
+    expect(scrollIntoView).not.toHaveBeenCalled()
+
+    const nav = await openMenu(user)
+
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    expect(scrollIntoView.mock.contexts[0]).toBe(within(nav).getByRole('link', { current: 'page' }))
+  })
+
+  it('el menú de escritorio y el del panel llevan desplazamientos independientes', async () => {
+    const user = userEvent.setup()
+    const { desktopNav } = await renderDocente()
+    await openAllSections(user, desktopNav)
+    desktopNav.scrollTop = 80
+
+    const mobile = await openMenu(user)
+
+    // El panel no hereda el desplazamiento de escritorio.
+    expect(mobile.scrollTop).toBe(0)
+
+    await scrollTo(mobile, 150)
+    await closeMenu(user)
+
+    expect(desktopNav.scrollTop).toBe(80)
+    expect((await openMenu(user)).scrollTop).toBe(150)
+  })
+})
+
 describe('AppLayout — ancho del menú', () => {
   async function renderDocente() {
     stubBackend('docente')
