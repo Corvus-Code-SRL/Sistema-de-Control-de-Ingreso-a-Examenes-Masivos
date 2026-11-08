@@ -183,6 +183,9 @@ describe('CreateExamContainer (HU-024)', () => {
 
     const summary = screen.getByRole('region', { name: 'Resumen de capacidad del examen' })
     expect(summary).toHaveTextContent('90 estudiantes · 75 lugares')
+    const occupancy = within(summary).getByRole('progressbar', { name: 'Ocupación de ambientes' })
+    expect(occupancy).toHaveAttribute('aria-valuenow', '100')
+    expect(occupancy.firstElementChild).toHaveStyle({ width: '100%' })
     expect(within(summary).getByText(/Faltan 15 lugares/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /guardar examen/i })).toBeEnabled()
   })
