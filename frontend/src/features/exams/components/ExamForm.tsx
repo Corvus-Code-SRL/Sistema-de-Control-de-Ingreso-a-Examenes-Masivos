@@ -1,6 +1,7 @@
 import type { CreateExamFormData, SubjectCareerOption } from '../types/exams.types'
 import { localToday, MAX_DURATION_MINUTES } from '../utils/examValidators'
 import { FormSelect } from '@/components/common/FormSelect'
+import { CalendarDays, Clock3 } from 'lucide-react'
 
 interface Props {
   formData: CreateExamFormData
@@ -12,7 +13,15 @@ interface Props {
 const inputClass = (invalid: boolean, empty = false) =>
   `h-9 w-full rounded-lg border bg-card px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring ${empty ? 'text-muted-foreground' : 'text-foreground'} ${invalid ? 'border-danger' : 'border-border-strong'}`
 
+const pickerClass = (invalid: boolean) =>
+  `relative flex h-9 items-center justify-between rounded-lg border bg-card px-3 text-sm focus-within:ring-2 focus-within:ring-ring ${invalid ? 'border-danger' : 'border-border-strong'}`
+
 export function ExamForm({ formData, subjects, errors, updateFormData }: Props) {
+  const [hour, minute] = formData.hora_inicio.split(':').map(Number)
+  const displayedTime = formData.hora_inicio
+    ? `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`
+    : 'hh:mm AM/PM'
+
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
       <div className="border-b border-border px-4 py-3">
@@ -56,16 +65,30 @@ export function ExamForm({ formData, subjects, errors, updateFormData }: Props) 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <div className="space-y-1">
             <label htmlFor="fecha" className="block text-sm font-medium text-foreground">Fecha <span className="text-danger">*</span></label>
-            <input id="fecha" type="date" min={localToday()} value={formData.fecha}
-              onChange={(event) => updateFormData({ fecha: event.target.value })}
-              className={inputClass(Boolean(errors.fecha), !formData.fecha)} />
+            <div className={pickerClass(Boolean(errors.fecha))}>
+              <span aria-hidden="true" className={formData.fecha ? 'text-foreground' : 'text-muted-foreground'}>
+                {formData.fecha ? new Date(`${formData.fecha}T00:00:00`).toLocaleDateString() : 'Seleccionar fecha'}
+              </span>
+              <CalendarDays aria-hidden="true" className="size-4 text-muted-foreground" />
+              <input id="fecha" type="date" lang="es-BO" min={localToday()} value={formData.fecha}
+                onChange={(event) => updateFormData({ fecha: event.target.value })}
+                onClick={(event) => event.currentTarget.showPicker?.()}
+                className="absolute inset-0 size-full cursor-pointer opacity-0" />
+            </div>
             {errors.fecha && <p className="text-xs font-medium text-danger">{errors.fecha}</p>}
           </div>
           <div className="space-y-1">
             <label htmlFor="hora_inicio" className="block text-sm font-medium text-foreground">Hora de inicio <span className="text-danger">*</span></label>
-            <input id="hora_inicio" type="time" value={formData.hora_inicio}
-              onChange={(event) => updateFormData({ hora_inicio: event.target.value })}
-              className={inputClass(Boolean(errors.hora_inicio), !formData.hora_inicio)} />
+            <div className={pickerClass(Boolean(errors.hora_inicio))}>
+              <span aria-hidden="true" className={formData.hora_inicio ? 'text-foreground' : 'text-muted-foreground'}>
+                {displayedTime}
+              </span>
+              <Clock3 aria-hidden="true" className="size-4 text-muted-foreground" />
+              <input id="hora_inicio" type="time" lang="es-BO" value={formData.hora_inicio}
+                onChange={(event) => updateFormData({ hora_inicio: event.target.value })}
+                onClick={(event) => event.currentTarget.showPicker?.()}
+                className="absolute inset-0 size-full cursor-pointer opacity-0" />
+            </div>
             {errors.hora_inicio && <p className="text-xs font-medium text-danger">{errors.hora_inicio}</p>}
           </div>
           <div className="space-y-1">
