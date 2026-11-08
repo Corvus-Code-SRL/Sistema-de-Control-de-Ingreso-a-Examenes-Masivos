@@ -4,6 +4,7 @@ import type { Group, SubjectCareerOption } from '../types/exams.types'
 interface Props {
   selectedSubject?: SubjectCareerOption
   availableGroups: Group[]
+  subjects?: SubjectCareerOption[]
   selectedGroupIds: number[]
   errors: Record<string, string>
   onToggleGroup: (groupId: number) => void
@@ -12,12 +13,13 @@ interface Props {
 export function AssignGroupsForm({
   selectedSubject,
   availableGroups,
+  subjects = [],
   selectedGroupIds,
   errors,
   onToggleGroup,
 }: Props) {
   const subjectName = selectedSubject
-    ? `${selectedSubject.nombre} — ${selectedSubject.carrera}`
+    ? selectedSubject.nombre
     : 'la materia seleccionada'
 
   return (
@@ -41,16 +43,20 @@ export function AssignGroupsForm({
 
       {!selectedSubject ? (
         <p className="py-6 text-center text-xs text-muted-foreground">
-          Seleccione primero una materia junto con su carrera.
+          Seleccione primero una materia.
         </p>
       ) : availableGroups.length === 0 ? (
         <p className="py-6 text-center text-xs text-muted-foreground">
-          No tiene grupos activos de este par en el periodo vigente.
+          No tiene grupos activos de esta materia en el periodo vigente.
         </p>
       ) : (
         <div className="divide-y divide-border border border-border rounded-lg overflow-hidden">
           {availableGroups.map((group) => {
             const selected = selectedGroupIds.includes(group.id_grupo)
+            const career = subjects.find((subject) =>
+              subject.id_materia === group.id_materia &&
+              subject.id_carrera === group.id_carrera
+            )?.carrera
 
             return (
               <button
@@ -76,7 +82,7 @@ export function AssignGroupsForm({
                       Grupo {group.num_grupo}
                     </span>
                     <span className="block text-[11px] text-muted-foreground">
-                      Gestión {group.gestion}
+                      {career ?? 'Carrera no disponible'} · Gestión {group.gestion}
                     </span>
                   </span>
                 </span>

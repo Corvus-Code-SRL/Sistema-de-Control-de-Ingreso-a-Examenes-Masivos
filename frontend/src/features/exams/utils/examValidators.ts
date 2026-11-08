@@ -85,7 +85,7 @@ export function validateGroupsStep(
       selectedGroups.length !== formData.grupos.length ||
       selectedGroups.some((group) => !group.tiene_nomina)
     ) {
-      errors.grupos = 'Todos los grupos seleccionados deben pertenecer al par y tener nómina cargada.';
+      errors.grupos = 'Todos los grupos seleccionados deben pertenecer a la materia y tener nómina cargada.';
     }
   }
 

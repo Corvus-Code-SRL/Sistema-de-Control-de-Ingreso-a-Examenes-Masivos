@@ -72,14 +72,12 @@ export function useExamDetail(examId: number) {
     if (!formData.materia) return []
     return options.grupos.filter(
       (group) =>
-        group.id_carrera === formData.materia?.id_carrera &&
-        group.id_materia === formData.materia.id_materia
+        group.id_materia === formData.materia?.id_materia
     )
   }, [formData.materia, options.grupos])
 
   const selectedSubject = options.materias.find(
     (subject) =>
-      subject.id_carrera === formData.materia?.id_carrera &&
       subject.id_materia === formData.materia?.id_materia
   )
 

@@ -57,7 +57,23 @@ describe('AssignGroupsForm', () => {
     expect(screen.getByRole('button', { name: /Grupo 2/i })).toBeDisabled()
   })
 
-  it('pide seleccionar primero el par materia-carrera', () => {
+  it('identifica la carrera de cada grupo de la misma materia', () => {
+    render(
+      <AssignGroupsForm
+        selectedSubject={subject}
+        subjects={[subject, { ...subject, id_carrera: 4, carrera: 'Informática' }]}
+        availableGroups={[groups[0], { ...groups[0], id_grupo: 13, id_carrera: 4, num_grupo: '1' }]}
+        selectedGroupIds={[]}
+        errors={{}}
+        onToggleGroup={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('button', { name: /Grupo 1.*Ingeniería de Sistemas/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Grupo 1.*Informática/ })).toBeInTheDocument()
+  })
+
+  it('pide seleccionar primero la materia', () => {
     render(
       <AssignGroupsForm
         availableGroups={[]}
@@ -67,6 +83,6 @@ describe('AssignGroupsForm', () => {
       />
     )
 
-    expect(screen.getByText(/Seleccione primero una materia junto con su carrera/i)).toBeVisible()
+    expect(screen.getByText(/Seleccione primero una materia/i)).toBeVisible()
   })
 })
