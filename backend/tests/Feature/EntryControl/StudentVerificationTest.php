@@ -4,9 +4,12 @@ namespace Tests\Feature\EntryControl;
 
 use App\Jobs\OpenEntryControlJob;
 use App\Models\Exam;
+use App\Models\Group;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\EntryControl\RoomAssignmentService;
+use App\Support\RecordStatus;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Cache;
@@ -43,6 +46,31 @@ class StudentVerificationTest extends TestCase
 
         app(RoomAssignmentService::class)->prepare($this->exam->id_examen);
         $this->actingAs(User::query()->findOrFail($this->docenteId));
+    }
+
+    public function test_muestra_la_carrera_del_grupo_de_cada_estudiante(): void
+    {
+        $group = Group::create([
+            'id_carrera' => $this->informaticaId,
+            'id_materia' => $this->calculoId,
+            'num_grupo' => '9',
+            'estado' => RecordStatus::ACTIVE,
+            'id_usuario_docente' => $this->docenteId,
+            'id_gestion_periodo' => $this->periodoActivoId,
+        ]);
+        $this->enrollStudents($group->id_grupo, 1);
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $this->exam->id_examen,
+            'id_grupo' => $group->id_grupo,
+        ]);
+
+        $studentId = (int) DB::table('grupo_estudiante')
+            ->where('id_grupo', $group->id_grupo)
+            ->value('id_estudiante');
+        $career = DB::table('carrera')->where('id_carrera', $this->informaticaId)->value('nombre');
+        $record = app(EntryControlSnapshotService::class)->recordFor($this->exam, $studentId);
+
+        $this->assertSame($career, $record['estudiante']['carrera']);
     }
 
     public function testDeniedVerificationReturnsPersistedAttemptId(): void
