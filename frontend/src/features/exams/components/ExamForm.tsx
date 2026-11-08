@@ -1,261 +1,115 @@
-import React from 'react';
-import { CreateExamFormData, SubjectCareerOption, Classroom } from '../types/exams.types';
-import { localToday, MAX_DURATION_MINUTES } from '../utils/examValidators';
-import { Calendar as CalendarIcon, Clock as ClockIcon } from 'lucide-react';
-import { FormSelect } from '@/components/common/FormSelect';
+import type { CreateExamFormData, SubjectCareerOption } from '../types/exams.types'
+import { localToday, MAX_DURATION_MINUTES } from '../utils/examValidators'
+import { FormSelect } from '@/components/common/FormSelect'
 
 interface Props {
-  formData: CreateExamFormData;
-  subjects: SubjectCareerOption[];
-  classrooms: Classroom[];
-  errors: Record<string, string>;
-  warnings: Record<string, string>;
-  updateFormData: (fields: Partial<CreateExamFormData>) => void;
+  formData: CreateExamFormData
+  subjects: SubjectCareerOption[]
+  errors: Record<string, string>
+  updateFormData: (fields: Partial<CreateExamFormData>) => void
 }
 
-export const ExamForm: React.FC<Props> = ({
-  formData,
-  subjects,
-  classrooms,
-  errors,
-  updateFormData,
-}) => {
+const inputClass = (invalid: boolean, empty = false) =>
+  `h-9 w-full rounded-lg border bg-card px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring ${empty ? 'text-muted-foreground' : 'text-foreground'} ${invalid ? 'border-danger' : 'border-border-strong'}`
+
+export function ExamForm({ formData, subjects, errors, updateFormData }: Props) {
   return (
-    <div className="bg-card rounded-xl border border-border p-8 shadow-xs space-y-6">
-      <h2 className="text-base font-bold text-foreground">
-        Información general del examen
-      </h2>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-        <div className="space-y-1.5">
-          <label htmlFor="nombre_examen" className="block text-xs font-bold text-foreground">
-            Nombre del examen *
-          </label>
-          <input
-            id="nombre_examen"
-            type="text"
-            placeholder="Ej. Primer Parcial"
-            value={formData.nombre_examen}
-            onChange={(e) => updateFormData({ nombre_examen: e.target.value })}
-            className={`w-full px-3.5 py-2.5 bg-card border ${errors.nombre_examen ? 'border-danger' : 'border-border'
-              } rounded-lg text-xs outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors`}
-          />
-          {errors.nombre_examen && (
-            <p className="text-[11px] text-danger font-medium">{errors.nombre_examen}</p>
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          <label htmlFor="categoria" className="block text-xs font-bold text-foreground">
-            Categoría *
-          </label>
-          <FormSelect
-            id="categoria"
-            value={formData.categoria}
-            placeholder="Seleccionar categoría"
-            options={[
-              { value: 'REGULAR', label: 'REGULAR' },
-              { value: 'MESA', label: 'MESA' },
-              { value: 'ADMISION', label: 'ADMISIÓN' },
-            ]}
-            onValueChange={(value) => updateFormData({
-              categoria: value as CreateExamFormData['categoria'],
-            })}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label htmlFor="fecha" className="block text-xs font-bold text-foreground">
-            Fecha *
-          </label>
-          <div className="relative">
-            <input
-              id="fecha"
-              type="date"
-              min={localToday()}
-              value={formData.fecha}
-              onChange={(e) => updateFormData({ fecha: e.target.value })}
-              className={`w-full px-3.5 py-2.5 bg-card border ${errors.fecha ? 'border-danger' : 'border-border'
-                } rounded-lg text-xs outline-none focus:border-primary text-foreground transition-colors`}
-            />
-            <CalendarIcon className="h-4 w-4 text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-          {errors.fecha && (
-            <p className="text-[11px] text-danger font-medium">{errors.fecha}</p>
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          <label htmlFor="materia" className="block text-xs font-bold text-foreground">
-            Materia *
-          </label>
-          <FormSelect
-            id="materia"
-            value={formData.materia ? String(formData.materia.id_materia) : undefined}
-            placeholder="Seleccionar materia..."
-            invalid={Boolean(errors.materia)}
-            options={subjects.filter((subject, index) =>
-              subjects.findIndex((item) => item.id_materia === subject.id_materia) === index
-            ).map((subject) => ({
-              value: String(subject.id_materia),
-              label: subject.nombre,
-            }))}
-            onValueChange={(value) => {
-              const pair = subjects.find((subject) => String(subject.id_materia) === value);
-              updateFormData({
-                materia: pair
-                  ? { id_carrera: pair.id_carrera, id_materia: pair.id_materia }
-                  : null,
-              });
-            }}
-          />
-          {errors.materia && (
-            <p className="text-[11px] text-danger font-medium">{errors.materia}</p>
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          <label htmlFor="duracion" className="block text-xs font-bold text-foreground">
-            Duración (min) *
-          </label>
-          <input
-            id="duracion"
-            type="number"
-            min={1}
-            max={MAX_DURATION_MINUTES}
-            step={1}
-            placeholder="90"
-            value={formData.duracion || ''}
-            onChange={(e) => {
-              const val = e.target.value;
-              updateFormData({ duracion: val === '' ? 0 : parseInt(val, 10) || 0 });
-            }}
-            className={`w-full px-3.5 py-2.5 bg-card border ${errors.duracion ? 'border-danger' : 'border-border'
-              } rounded-lg text-xs outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors`}
-          />
-          {errors.duracion && (
-            <p className="text-[11px] text-danger font-medium">{errors.duracion}</p>
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          <label htmlFor="hora_inicio" className="block text-xs font-bold text-foreground">
-            Hora *
-          </label>
-          <div className="relative">
-            <input
-              id="hora_inicio"
-              type="time"
-              value={formData.hora_inicio}
-              onChange={(e) => updateFormData({ hora_inicio: e.target.value })}
-              className={`w-full px-3.5 py-2.5 bg-card border ${errors.hora_inicio ? 'border-danger' : 'border-border'
-                } rounded-lg text-xs outline-none focus:border-primary text-foreground transition-colors`}
-            />
-            <ClockIcon className="h-4 w-4 text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-          {errors.hora_inicio && (
-            <p className="text-[11px] text-danger font-medium">{errors.hora_inicio}</p>
-          )}
-        </div>
-
-        <fieldset className="space-y-2">
-          <legend className="text-xs font-bold text-text">
-            Ambiente(s) *
-          </legend>
-
-          <div
-            className={`max-h-52 overflow-y-auto rounded-lg border bg-surface ${
-              errors.ambientes
-                ? 'border-danger'
-                : 'border-border-soft'
-            }`}
-          >
-            {classrooms.length === 0 ? (
-              <p className="px-4 py-3 text-xs text-muted-foreground">
-                No hay ambientes disponibles.
-              </p>
-            ) : (
-              classrooms.map((room) => {
-                const selected = formData.ambientes.includes(
-                  room.id_ambiente
-                );
-
-                return (
-                  <label
-                    key={room.id_ambiente}
-                    className="flex cursor-pointer items-center
-                      justify-between gap-3 border-b
-                      border-border-soft px-4 py-3
-                      last:border-b-0 hover:bg-sunken"
-                  >
-                    <span className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        onChange={(event) => {
-                          const ambientes = event.target.checked
-                            ? [
-                                ...formData.ambientes,
-                                room.id_ambiente,
-                              ]
-                            : formData.ambientes.filter(
-                                (id) => id !== room.id_ambiente
-                              );
-
-                          updateFormData({ ambientes });
-                        }}
-                        className="h-4 w-4 rounded
-                          border-border-strong accent-brand"
-                      />
-
-                      <span className="text-xs font-medium text-text">
-                        Aula {room.nro_aula}
-                      </span>
-                    </span>
-
-                    <span className="text-xs text-muted-foreground">
-                      {room.capacidad} plazas
-                    </span>
-                  </label>
-                );
-              })
-            )}
-          </div>
-
-          {formData.ambientes.length > 0 && (
-            <div className="flex items-center justify-between
-              rounded-lg bg-sunken px-4 py-3 text-xs"
-            >
-              <span className="font-medium text-text">
-                {formData.ambientes.length}
-                {' '}
-                {formData.ambientes.length === 1
-                  ? 'ambiente seleccionado'
-                  : 'ambientes seleccionados'}
-              </span>
-
-              <span className="font-bold text-brand">
-                Capacidad total:{' '}
-                {classrooms
-                  .filter((room) =>
-                    formData.ambientes.includes(room.id_ambiente)
-                  )
-                  .reduce(
-                    (total, room) => total + room.capacidad,
-                    0
-                  )}
-              </span>
-            </div>
-          )}
-
-          {errors.ambientes && (
-            <p className="text-[11px] font-medium text-danger">
-              {errors.ambientes}
-            </p>
-          )}
-        </fieldset>
-
+    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+      <div className="border-b border-border px-4 py-3">
+        <h2 className="text-base font-semibold text-foreground">Datos generales</h2>
       </div>
-    </div>
-  );
-};
+
+      <div className="space-y-3 p-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <label htmlFor="materia" className="block text-sm font-medium text-foreground">Materia <span className="text-danger">*</span></label>
+            <FormSelect
+              id="materia"
+              className="h-9 border-border-strong bg-card px-3 text-sm font-normal data-[size=default]:h-9"
+              value={formData.materia ? String(formData.materia.id_materia) : undefined}
+              placeholder="Seleccionar materia..."
+              invalid={Boolean(errors.materia)}
+              options={subjects.filter((subject, index) =>
+                subjects.findIndex((item) => item.id_materia === subject.id_materia) === index
+              ).map((subject) => ({ value: String(subject.id_materia), label: subject.nombre }))}
+              onValueChange={(value) => {
+                const pair = subjects.find((subject) => String(subject.id_materia) === value)
+                updateFormData({ materia: pair ? { id_carrera: pair.id_carrera, id_materia: pair.id_materia } : null })
+              }}
+            />
+            {errors.materia && <p className="text-xs font-medium text-danger">{errors.materia}</p>}
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="nombre_examen" className="block text-sm font-medium text-foreground">Nombre del examen <span className="text-danger">*</span></label>
+            <input
+              id="nombre_examen"
+              type="text"
+              placeholder="Ej. Primer Parcial"
+              value={formData.nombre_examen}
+              onChange={(event) => updateFormData({ nombre_examen: event.target.value })}
+              className={inputClass(Boolean(errors.nombre_examen))}
+            />
+            {errors.nombre_examen && <p className="text-xs font-medium text-danger">{errors.nombre_examen}</p>}
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="space-y-1">
+            <label htmlFor="fecha" className="block text-sm font-medium text-foreground">Fecha <span className="text-danger">*</span></label>
+            <input id="fecha" type="date" min={localToday()} value={formData.fecha}
+              onChange={(event) => updateFormData({ fecha: event.target.value })}
+              className={inputClass(Boolean(errors.fecha), !formData.fecha)} />
+            {errors.fecha && <p className="text-xs font-medium text-danger">{errors.fecha}</p>}
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="hora_inicio" className="block text-sm font-medium text-foreground">Hora de inicio <span className="text-danger">*</span></label>
+            <input id="hora_inicio" type="time" value={formData.hora_inicio}
+              onChange={(event) => updateFormData({ hora_inicio: event.target.value })}
+              className={inputClass(Boolean(errors.hora_inicio), !formData.hora_inicio)} />
+            {errors.hora_inicio && <p className="text-xs font-medium text-danger">{errors.hora_inicio}</p>}
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="duracion" className="block text-sm font-medium text-foreground">Duración <span className="text-danger">*</span></label>
+            <div className="relative">
+              <input id="duracion" type="number" min={1} max={MAX_DURATION_MINUTES} step={1}
+                placeholder="90" value={formData.duracion || ''}
+                onChange={(event) => {
+                  const value = event.target.value
+                  updateFormData({ duracion: value === '' ? 0 : parseInt(value, 10) || 0 })
+                }}
+                className={`${inputClass(Boolean(errors.duracion))} pr-12`} />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">min</span>
+            </div>
+            {errors.duracion && <p className="text-xs font-medium text-danger">{errors.duracion}</p>}
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <label htmlFor="categoria" className="block text-sm font-medium text-foreground">Categoría <span className="text-danger">*</span></label>
+            <FormSelect id="categoria" className="h-9 border-border-strong bg-card px-3 text-sm font-normal data-[size=default]:h-9" value={formData.categoria} placeholder="Seleccionar categoría"
+              options={[
+                { value: 'REGULAR', label: 'REGULAR' },
+                { value: 'MESA', label: 'MESA' },
+                { value: 'ADMISION', label: 'ADMISIÓN' },
+              ]}
+              onValueChange={(value) => updateFormData({ categoria: value as CreateExamFormData['categoria'] })} />
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="minutos_apertura" className="block text-sm font-medium text-foreground">Apertura del control de ingreso</label>
+            <div className="relative">
+              <input id="minutos_apertura" type="number" min={0} step={1}
+                value={formData.minutos_apertura === null ? '' : formData.minutos_apertura ?? 10}
+                onChange={(event) => updateFormData({
+                  minutos_apertura: event.target.value === '' ? null : Number(event.target.value),
+                })}
+                className={`${inputClass(Boolean(errors.minutos_apertura))} pr-24`} />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">min antes</span>
+            </div>
+            {errors.minutos_apertura && <p className="text-xs font-medium text-danger">{errors.minutos_apertura}</p>}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}

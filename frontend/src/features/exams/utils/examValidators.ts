@@ -56,6 +56,14 @@ export function validateExamForm(
     errors.duracion = 'La duración debe ser un número entero de minutos, mayor a cero y menor a 24 horas.';
   }
 
+  if (formData.minutos_apertura !== undefined && (
+    !Number.isInteger(formData.minutos_apertura) ||
+    formData.minutos_apertura === null ||
+    formData.minutos_apertura < 0
+  )) {
+    errors.minutos_apertura = 'La apertura debe ser un número entero de minutos no negativo.';
+  }
+
   if (!formData.ambientes || formData.ambientes.length === 0) {
     errors.ambientes = 'El ambiente es obligatorio. Debe seleccionar un ambiente para el examen.';
   }

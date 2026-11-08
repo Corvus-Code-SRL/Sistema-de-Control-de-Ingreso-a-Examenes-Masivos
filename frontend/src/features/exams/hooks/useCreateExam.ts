@@ -148,6 +148,7 @@ export function useCreateExam(onSuccess?: (exam: Exam) => void, initialGroupId?:
         fecha: formData.fecha,
         hora_inicio: formData.hora_inicio,
         duracion: Number(formData.duracion),
+        minutos_apertura: formData.minutos_apertura ?? 10,
         ambientes: formData.ambientes,
         grupos: formData.grupos,
         normas: formData.normas || undefined,
