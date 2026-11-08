@@ -60,6 +60,9 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
   const capacityDeficit = hasSelectedRooms && hasSelectedGroups
     ? Math.max(0, totalStudents - totalCapacity)
     : 0;
+  const occupancyPercent = totalCapacity > 0 && hasSelectedGroups
+    ? Math.min(100, Math.round((totalStudents / totalCapacity) * 100))
+    : 0;
 
   const openingMinutes = formData.minutos_apertura === undefined ? 10 : formData.minutos_apertura;
   const [startHour, startMinute] = formData.hora_inicio.split(':').map(Number);
@@ -172,6 +175,20 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
             <div className="border-t border-border pt-3">
               <h3 className="text-sm font-medium text-muted-foreground">Capacidad</h3>
               <p className="mt-1 text-sm text-foreground"><strong>{totalStudents ?? 0}</strong> estudiantes · <strong>{totalCapacity}</strong> lugares</p>
+              <div
+                role="progressbar"
+                aria-label="Ocupación de ambientes"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={occupancyPercent}
+                aria-valuetext={`${totalStudents ?? 0} estudiantes para ${totalCapacity} lugares`}
+                className="mt-2 h-2 overflow-hidden rounded-full bg-sunken"
+              >
+                <div
+                  className={`h-full rounded-full ${capacityDeficit > 0 ? 'bg-warn' : 'bg-ok'}`}
+                  style={{ width: `${occupancyPercent}%` }}
+                />
+              </div>
               {hasSelectedRooms && hasSelectedGroups && capacityDeficit > 0 && (
                 <p role="status" className="mt-2 flex gap-2 rounded-lg border border-warn-border bg-warn-soft p-2 text-xs text-warn-fg">
                   <AlertTriangle aria-hidden="true" className="size-4 shrink-0" />
