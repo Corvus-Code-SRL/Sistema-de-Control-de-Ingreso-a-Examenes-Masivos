@@ -110,7 +110,7 @@ class EntryControlSnapshotService
                 $entries[$studentId] ?? null,
                 $assignedRooms[$studentId] ?? null,
                 $risks[$studentId] ?? ['total' => 0, 'latest' => null],
-                $career
+                $group['carrera'] ?? $career
             );
             $fullName = $payload['estudiante']['nombre_completo'];
 
@@ -535,7 +535,7 @@ class EntryControlSnapshotService
             $this->entries($examId, $studentId)[$studentId] ?? null,
             $assignedRooms[$studentId] ?? null,
             $this->riskCenter->summariesForSnapshot([$studentId])[$studentId] ?? ['total' => 0, 'latest' => null],
-            $this->careerName($exam)
+            $membersByStudent[$studentId]['carrera'] ?? $this->careerName($exam)
         );
     }
 
@@ -557,17 +557,18 @@ class EntryControlSnapshotService
     /**
      * Grupo de cada estudiante de la nómina: el menor de los grupos del examen en que está inscrito.
      *
-     * @return array<int, array{id_grupo: int, num_grupo: string}>
+     * @return array<int, array{id_grupo: int, num_grupo: string, carrera: string}>
      */
     private function memberships(int $examId): array
     {
         $memberships = DB::table('grupo_estudiante as gs')
             ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
             ->join('grupo as g', 'g.id_grupo', '=', 'gs.id_grupo')
+            ->join('carrera as c', 'c.id_carrera', '=', 'g.id_carrera')
             ->where('gx.id_examen', $examId)
             ->orderBy('gs.id_estudiante')
             ->orderBy('gs.id_grupo')
-            ->get(['gs.id_estudiante', 'gs.id_grupo', 'g.num_grupo']);
+            ->get(['gs.id_estudiante', 'gs.id_grupo', 'g.num_grupo', 'c.nombre as carrera']);
 
         $membersByStudent = [];
         foreach ($memberships as $membership) {
@@ -576,6 +577,7 @@ class EntryControlSnapshotService
                 $membersByStudent[$studentId] = [
                     'id_grupo' => (int) $membership->id_grupo,
                     'num_grupo' => $membership->num_grupo,
+                    'carrera' => $membership->carrera,
                 ];
             }
         }
