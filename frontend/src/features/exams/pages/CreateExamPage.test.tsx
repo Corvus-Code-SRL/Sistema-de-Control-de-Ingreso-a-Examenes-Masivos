@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
@@ -53,7 +53,7 @@ describe('CreateExamPage — contexto inicial', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Nombre del examen *')).toHaveValue('')
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Materia *' })).toHaveTextContent('Bases de Datos I'))
-    expect(within(screen.getByRole('region', { name: 'Resumen de capacidad del examen' })).getByText('20')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Grupo 1.*Sistemas/ })).toHaveAttribute('aria-pressed', 'true')
     expect(calls.filter((call) => call.method === 'POST')).toEqual([
       expect.objectContaining({ body: expect.objectContaining({ id_carrera: 1, id_materia: 10, grupos: [100] }) }),
     ])
@@ -71,7 +71,7 @@ describe('CreateExamPage — contexto inicial', () => {
     expect(screen.getAllByRole('option', { name: 'Bases de Datos I' })).toHaveLength(1)
     await userEvent.keyboard('{Escape}')
     await userEvent.click(screen.getByRole('button', { name: /Grupo 2/ }))
-    expect(within(screen.getByRole('region', { name: 'Resumen de capacidad del examen' })).getByText('50')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Grupo 2.*Informática/ })).toHaveAttribute('aria-pressed', 'true')
     expect(calls).toHaveLength(1)
   })
 
@@ -79,10 +79,10 @@ describe('CreateExamPage — contexto inicial', () => {
     stub()
     renderPage()
     const group = await screen.findByRole('button', { name: /Grupo 1/ })
-    await waitFor(() => expect(within(screen.getByRole('region', { name: 'Resumen de capacidad del examen' })).getByText('20')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('button', { name: /Grupo 1.*Sistemas/ })).toHaveAttribute('aria-pressed', 'true'))
     await userEvent.click(group)
     await userEvent.type(screen.getByLabelText('Nombre del examen *'), 'Parcial')
-    expect(screen.queryByRole('region', { name: 'Resumen de capacidad del examen' })).not.toBeInTheDocument()
+    expect(group).toHaveAttribute('aria-pressed', 'false')
   })
 
   it.each([
@@ -138,7 +138,7 @@ describe('CreateExamPage — contexto inicial', () => {
       } } }
     })
     renderPage()
-    await waitFor(() => expect(screen.getByRole('region', { name: 'Resumen de capacidad del examen' })).toHaveTextContent('20'))
+    await waitFor(() => expect(screen.getByRole('button', { name: /Grupo 1.*Sistemas/ })).toHaveAttribute('aria-pressed', 'true'))
     await userEvent.click(screen.getByRole('button', { name: /Grupo 2/ }))
     await userEvent.click(screen.getByRole('button', { name: /Grupo 1/ }))
     await userEvent.type(screen.getByLabelText('Nombre del examen *'), 'Parcial')

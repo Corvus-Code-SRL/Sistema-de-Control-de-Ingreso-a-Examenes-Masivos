@@ -16,10 +16,10 @@ export const CreateExamPage: React.FC = () => {
   const groupId = rawGroup === null ? undefined : groupIdFrom(rawGroup);
   return (
     <AppShell
-      mobileTitle="Nuevo examen"
+      mobileTitle="Registrar examen"
       breadcrumbs={groupId
-        ? [{ label: 'Exámenes del grupo', to: groupExamsPath(groupId) }, { label: 'Nuevo examen' }]
-        : [{ label: 'Exámenes' }, { label: 'Nuevo examen' }]}
+        ? [{ label: 'Exámenes del grupo', to: groupExamsPath(groupId) }, { label: 'Registrar examen' }]
+        : [{ label: 'Exámenes' }, { label: 'Registrar examen' }]}
     >
       {groupId === null ? (
         <div className="space-y-4">

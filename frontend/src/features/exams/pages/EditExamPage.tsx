@@ -19,6 +19,7 @@ import {
 import { AlertTriangle, Ban, DoorOpen, Loader2, Save, ShieldAlert } from 'lucide-react';
 import { useExamDetail } from '../hooks/useExamDetail';
 import { ExamForm } from '../components/ExamForm';
+import { ExamAmbientesForm } from '../components/ExamAmbientesForm';
 import { AssignGroupsForm } from '../components/AssignGroupsForm';
 import { ExamStatusBadge } from '../components/ExamStatusBadge';
 import { validateExamForm, validateGroupsStep } from '../utils/examValidators';
@@ -184,9 +185,13 @@ export function EditExamPage() {
               <ExamForm
                 formData={formData}
                 subjects={options.materias}
-                classrooms={options.ambientes}
                 errors={infoValidation.errors}
-                warnings={{}}
+                updateFormData={updateFormData}
+              />
+              <ExamAmbientesForm
+                classrooms={options.ambientes}
+                selectedRoomIds={formData.ambientes}
+                error={infoValidation.errors.ambientes}
                 updateFormData={updateFormData}
               />
 

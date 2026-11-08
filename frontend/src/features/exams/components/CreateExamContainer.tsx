@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCreateExam } from '../hooks/useCreateExam';
 import { ExamForm } from './ExamForm';
+import { ExamAmbientesForm } from './ExamAmbientesForm';
 import { AssignGroupsForm } from './AssignGroupsForm';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/common/PageHeader';
 import {
   Dialog,
   DialogContent,
@@ -47,22 +49,33 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
     : undefined;
   const validation = validateForm();
   const selectedSubject = options.materias.find(
-    (subject) =>
-      subject.id_materia === formData.materia?.id_materia
+    (subject) => subject.id_materia === formData.materia?.id_materia
   );
 
   const totalCapacity = options.ambientes
     .filter((room) => formData.ambientes.includes(room.id_ambiente))
     .reduce((total, room) => total + Number(room.capacidad), 0);
-
   const hasSelectedRooms = formData.ambientes.length > 0;
   const hasSelectedGroups = formData.grupos.length > 0;
+  const capacityDeficit = hasSelectedRooms && hasSelectedGroups
+    ? Math.max(0, totalStudents - totalCapacity)
+    : 0;
 
-  const capacityDeficit =
-    hasSelectedRooms && hasSelectedGroups
-      ? Math.max(0, totalStudents - totalCapacity)
-      : 0;
-
+  const openingMinutes = formData.minutos_apertura === undefined ? 10 : formData.minutos_apertura;
+  const [startHour, startMinute] = formData.hora_inicio.split(':').map(Number);
+  const opening = /^\d{4}-\d{2}-\d{2}$/.test(formData.fecha)
+    && Number.isInteger(startHour) && Number.isInteger(startMinute)
+    && typeof openingMinutes === 'number' && Number.isInteger(openingMinutes)
+    && openingMinutes >= 0
+    ? (() => {
+        const total = startHour * 60 + startMinute - openingMinutes;
+        const minutesOfDay = ((total % 1440) + 1440) % 1440;
+        const clock = `${String(Math.floor(minutesOfDay / 60)).padStart(2, '0')}:${String(minutesOfDay % 60).padStart(2, '0')}`;
+        const date = new Date(`${formData.fecha}T00:00:00Z`);
+        date.setUTCDate(date.getUTCDate() + Math.floor(total / 1440));
+        return { time: clock, date: date.toISOString().slice(0, 10).split('-').reverse().join('/') };
+      })()
+    : null;
 
   if (loading) {
     return (
@@ -100,152 +113,77 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Configurar nuevo examen
-        </h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Crear un nuevo examen para la materia seleccionada.
-        </p>
-      </div>
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader title="Registrar examen" />
 
       {apiError && (
-        <div className="p-4 rounded-xl bg-danger-soft border border-danger/20 text-danger-fg text-xs font-medium">
+        <div role="alert" className="rounded-xl border border-danger-border bg-danger-soft p-4 text-sm font-medium text-danger-fg">
           {apiError}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <ExamForm
-          formData={formData}
-          subjects={options.materias}
-          classrooms={options.ambientes}
-          errors={showValidationErrors ? validation.errors : {}}
-          warnings={validation.warnings}
-          updateFormData={updateFormData}
-        />
+      <form onSubmit={handleSubmit} className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+        <div className="space-y-3">
+          <ExamForm
+            formData={formData}
+            subjects={options.materias}
+            errors={showValidationErrors ? validation.errors : {}}
+            updateFormData={updateFormData}
+          />
 
-        <AssignGroupsForm
-          selectedSubject={selectedSubject}
-          availableGroups={subjectGroups}
-          subjects={options.materias}
-          selectedGroupIds={formData.grupos}
-          errors={showValidationErrors ? validation.errors : {}}
-          onToggleGroup={toggleGroup}
-        />
+          <AssignGroupsForm
+            selectedSubject={selectedSubject}
+            availableGroups={subjectGroups}
+            subjects={options.materias}
+            selectedGroupIds={formData.grupos}
+            errors={showValidationErrors ? validation.errors : {}}
+            onToggleGroup={toggleGroup}
+          />
 
-        {(hasSelectedRooms || hasSelectedGroups) && (
-          <section
-            aria-label="Resumen de capacidad del examen"
-            aria-live="polite"
-            className="rounded-xl border border-border-soft bg-surface p-6 space-y-4"
-          >
-            <div>
-              <h2 className="text-base font-bold text-text">
-                Resumen de capacidad
-              </h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Compare las plazas disponibles con los estudiantes
-                de los grupos seleccionados.
-              </p>
-            </div>
+          <ExamAmbientesForm
+            classrooms={options.ambientes}
+            selectedRoomIds={formData.ambientes}
+            error={showValidationErrors ? validation.errors.ambientes : undefined}
+            updateFormData={updateFormData}
+          />
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-lg bg-sunken p-4">
-                <p className="text-xs text-muted-foreground">
-                  Capacidad total
-                </p>
-                <p className="mt-1 text-xl font-bold text-text">
-                  {totalCapacity}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  plazas disponibles
-                </p>
-              </div>
-
-              <div className="rounded-lg bg-sunken p-4">
-                <p className="text-xs text-muted-foreground">
-                  Estudiantes
-                </p>
-                <p className="mt-1 text-xl font-bold text-text">
-                  {totalStudents}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  inscritos en los grupos
-                </p>
-              </div>
-
-              <div className="rounded-lg bg-sunken p-4">
-                <p className="text-xs text-muted-foreground">
-                  Plazas faltantes
-                </p>
-                <p
-                  className={`mt-1 text-xl font-bold ${
-                    capacityDeficit > 0 ? 'text-danger' : 'text-text'
-                  }`}
-                >
-                  {capacityDeficit}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  respecto a los estudiantes
-                </p>
-              </div>
-            </div>
-
-            {hasSelectedRooms && hasSelectedGroups && capacityDeficit > 0 && (
-              <div
-                role="status"
-                className="flex items-start gap-2 rounded-lg border border-border-soft p-3"
-              >
-                <AlertTriangle
-                  aria-hidden="true"
-                  className="h-4 w-4 shrink-0 text-danger"
-                />
-                <p className="text-xs text-text">
-                  La capacidad seleccionada es insuficiente para
-                  todos los estudiantes. El servidor solicitará
-                  confirmación antes de registrar el examen.
-                </p>
-              </div>
-            )}
-
-            {(!hasSelectedRooms || !hasSelectedGroups) && (
-              <p className="text-xs text-muted-foreground">
-                Seleccione ambientes y grupos para completar
-                la comparación de capacidad.
-              </p>
-            )}
-          </section>
-        )}
-
-        <div className="flex items-center justify-end gap-3 pt-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate(cancelTo)}
-            disabled={submitting}
-            className="bg-card border-border text-foreground hover:bg-muted text-xs font-medium px-5 py-2.5 rounded-lg"
-          >
-            Cancelar
-          </Button>
-
-          <Button
-            type="submit"
-            disabled={submitting || warnings.length > 0}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold px-6 py-2.5 rounded-lg shadow-xs flex items-center gap-2"
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Guardando...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" /> Guardar examen
-              </>
-            )}
-          </Button>
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <Button type="button" variant="outline" onClick={() => navigate(cancelTo)} disabled={submitting}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={submitting || warnings.length > 0}>
+              {submitting ? (
+                <><Loader2 className="size-4 animate-spin" /> Guardando...</>
+              ) : (
+                <><Save className="size-4" /> Guardar examen</>
+              )}
+            </Button>
+          </div>
         </div>
+
+        <section aria-label="Resumen de capacidad del examen" className="rounded-xl border border-border bg-card p-4 shadow-xs lg:sticky lg:top-16">
+          <h2 className="text-base font-semibold text-foreground">Resumen</h2>
+          <div className="mt-3 space-y-3">
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground">Apertura del control de ingreso</h3>
+              <p className="mt-1 text-base font-semibold text-foreground">{opening?.time ?? 'Sin definir'}</p>
+              {opening && <p className="text-sm text-muted-foreground">{opening.date}</p>}
+            </div>
+            <div className="border-t border-border pt-3">
+              <h3 className="text-sm font-medium text-muted-foreground">Capacidad</h3>
+              <p className="mt-1 text-sm text-foreground"><strong>{totalStudents ?? 0}</strong> estudiantes · <strong>{totalCapacity}</strong> lugares</p>
+              {hasSelectedRooms && hasSelectedGroups && capacityDeficit > 0 && (
+                <p role="status" className="mt-2 flex gap-2 rounded-lg border border-warn-border bg-warn-soft p-2 text-xs text-warn-fg">
+                  <AlertTriangle aria-hidden="true" className="size-4 shrink-0" />
+                  Faltan {capacityDeficit} lugares; podrá confirmar el registro de todos modos.
+                </p>
+              )}
+              {(!hasSelectedRooms || !hasSelectedGroups) && (
+                <p className="mt-1 text-xs text-muted-foreground">Seleccione ambientes y grupos para comparar la capacidad.</p>
+              )}
+            </div>
+          </div>
+        </section>
       </form>
 
       {/* Modal de confirmación de advertencias */}

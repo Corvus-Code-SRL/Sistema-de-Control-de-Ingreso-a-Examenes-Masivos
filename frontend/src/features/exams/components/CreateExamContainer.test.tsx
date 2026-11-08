@@ -149,46 +149,26 @@ describe('CreateExamContainer (HU-024)', () => {
     expect(screen.getByRole('button', { name: /guardar examen/i })).toBeInTheDocument()
   })
 
-  it('muestra capacidad suficiente cuando las plazas alcanzan', () => {
+  it('muestra la fecha exacta de apertura cuando se programa varios días antes', () => {
     hook.overrides = {
       formData: {
         ...emptyForm,
-        ambientes: [1, 2],
-        grupos: [101],
+        fecha: '2026-10-20',
+        hora_inicio: '08:00',
+        minutos_apertura: 2880,
       },
-      options: {
-        materias: [],
-        ambientes: [
-          { id_ambiente: 1, nro_aula: '691A', capacidad: 40 },
-          { id_ambiente: 2, nro_aula: '691B', capacidad: 50 },
-        ],
-        grupos: [],
-      },
-      totalStudents: 75,
     }
-
     renderContainer()
 
-    const summary = screen.getByRole('region', {
-      name: /resumen de capacidad del examen/i,
-    })
-
-    expect(within(summary).getByText('90')).toBeInTheDocument()
-    expect(within(summary).getByText('75')).toBeInTheDocument()
-    expect(within(summary).getByText('0')).toBeInTheDocument()
-
-    expect(
-      within(summary).queryByText(/la capacidad seleccionada es insuficiente/i)
-    ).not.toBeInTheDocument()
+    const summary = screen.getByRole('region', { name: 'Resumen de capacidad del examen' })
+    const time = within(summary).getByText('08:00')
+    const date = within(summary).getByText('18/10/2026')
+    expect(time.compareDocumentPosition(date)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
   })
 
-  it('advierte cuando faltan plazas sin bloquear el registro', () => {
+  it('muestra estudiantes, lugares y déficit sin bloquear el guardado', () => {
     hook.overrides = {
-      formData: {
-        ...emptyForm,
-        ambientes: [1, 2],
-        grupos: [101],
-      },
+      formData: { ...emptyForm, ambientes: [1, 2], grupos: [101] },
       options: {
         materias: [],
         ambientes: [
@@ -199,54 +179,12 @@ describe('CreateExamContainer (HU-024)', () => {
       },
       totalStudents: 90,
     }
-
     renderContainer()
 
-    const summary = screen.getByRole('region', {
-      name: /resumen de capacidad del examen/i,
-    })
-
-    expect(within(summary).getByText('75')).toBeInTheDocument()
-    expect(within(summary).getByText('90')).toBeInTheDocument()
-    expect(within(summary).getByText('15')).toBeInTheDocument()
-
-    expect(
-      within(summary).getByText(/la capacidad seleccionada es insuficiente/i)
-    ).toBeInTheDocument()
-
-    expect(
-      screen.getByRole('button', { name: /guardar examen/i })
-    ).toBeEnabled()
-  })
-
-  it('solicita completar la seleccion antes de comparar capacidad', () => {
-    hook.overrides = {
-      formData: {
-        ...emptyForm,
-        ambientes: [1],
-        grupos: [],
-      },
-      options: {
-        materias: [],
-        ambientes: [
-          { id_ambiente: 1, nro_aula: '691A', capacidad: 40 },
-        ],
-        grupos: [],
-      },
-      totalStudents: 0,
-    }
-
-    renderContainer()
-
-    const summary = screen.getByRole('region', {
-      name: /resumen de capacidad del examen/i,
-    })
-
-    expect(
-      within(summary).getByText(
-        /seleccione ambientes y grupos para completar la comparación de capacidad/i
-      )
-    ).toBeInTheDocument()
+    const summary = screen.getByRole('region', { name: 'Resumen de capacidad del examen' })
+    expect(summary).toHaveTextContent('90 estudiantes · 75 lugares')
+    expect(within(summary).getByText(/Faltan 15 lugares/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /guardar examen/i })).toBeEnabled()
   })
 
   it('bloquea el guardado normal cuando hay advertencias pendientes', () => {

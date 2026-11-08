@@ -64,6 +64,13 @@ describe('validateExamForm', () => {
     expect(validateExamForm(form({ duracion }), now).errors.duracion).toBeDefined()
   })
 
+  it('acepta apertura anticipada sin máximo y rechaza valores negativos', () => {
+    expect(validateExamForm(form({ minutos_apertura: 0 }), now).isValid).toBe(true)
+    expect(validateExamForm(form({ minutos_apertura: 2880 }), now).isValid).toBe(true)
+    expect(validateExamForm(form({ minutos_apertura: null }), now).errors.minutos_apertura).toBeDefined()
+    expect(validateExamForm(form({ minutos_apertura: -1 }), now).errors.minutos_apertura).toBeDefined()
+  })
+
   it('acepta duraciones cortas y exámenes que cruzan la medianoche', () => {
     expect(validateExamForm(form({ duracion: 1 }), now).isValid).toBe(true)
     expect(validateExamForm(form({ hora_inicio: '23:00', duracion: 120 }), now).isValid).toBe(true)
