@@ -1174,6 +1174,32 @@ class StudentVerificationTest extends TestCase
         }
     }
 
+    public function test_apertura_automatica_admite_mas_de_un_dia_de_anticipacion(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-09-27 12:30:00', config('sciem.zona_horaria')));
+        try {
+            $exam = $this->createExam([
+                'fecha' => '2026-09-29',
+                'hora_inicio' => '12:31',
+                'hora_fin' => '14:01',
+                'minutos_apertura' => 2880,
+            ], [$this->aulaId]);
+            DB::table('grupo_examen')->insert([
+                'id_examen' => $exam->id_examen,
+                'id_grupo' => $this->grupoPropioId,
+            ]);
+
+            app()->call([app(OpenEntryControlJob::class), 'handle']);
+            $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+
+            Carbon::setTestNow(Carbon::parse('2026-09-27 12:31:00', config('sciem.zona_horaria')));
+            app()->call([app(OpenEntryControlJob::class), 'handle']);
+            $this->assertSame(Exam::EN_INGRESO, $exam->fresh()->estado);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
     public function test_job_abre_en_la_ventana_configurada_y_calcula_el_aula_estable(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-09-29 12:05:00', config('sciem.zona_horaria')));
