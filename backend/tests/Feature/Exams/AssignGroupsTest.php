@@ -217,9 +217,8 @@ class AssignGroupsTest extends TestCase
         $this->assertGroupIsRejected($this->groupWithoutRosterId);
     }
 
-    public function test_rechaza_grupo_de_la_misma_materia_en_otra_carrera(): void
+    public function test_permite_grupos_de_la_misma_materia_en_distintas_carreras(): void
     {
-        // Calculo II también se dicta en Informatica: mismo id_materia, otro id_carrera.
         $group = Group::create([
             'id_carrera' => $this->informaticaId,
             'id_materia' => $this->calculoId,
@@ -230,7 +229,19 @@ class AssignGroupsTest extends TestCase
         ]);
         $this->enrollStudents($group->id_grupo, 1);
 
-        $this->assertGroupIsRejected($group->id_grupo);
+        $response = $this->postJson('/api/examenes', $this->validPayload([
+            'grupos' => [$this->grupoPropioId, $group->id_grupo],
+        ]))->assertCreated();
+
+        $examId = (int) $response->json('data.id_examen');
+        $this->assertDatabaseHas('grupo_examen', [
+            'id_examen' => $examId,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
+        $this->assertDatabaseHas('grupo_examen', [
+            'id_examen' => $examId,
+            'id_grupo' => $group->id_grupo,
+        ]);
     }
 
     public function test_grupos_de_dos_docentes_en_el_mismo_examen_no_se_fusionan(): void
