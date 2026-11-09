@@ -90,6 +90,9 @@ describe('alcance por clics desde el menú lateral', () => {
         )
         // La capacidad de la entrada alcanza para la ruta: ProtectedRoute no la rechaza.
         expect(screen.queryByText('Sin permiso')).not.toBeInTheDocument()
+        // Ninguna ruta real pinta el marco aislado de AppShell: el menú es el persistente de AppLayout.
+        expect(document.querySelectorAll('[data-shell="standalone"]')).toHaveLength(0)
+        expect(document.querySelectorAll('[data-shell="layout"]')).toHaveLength(1)
       }
     )
 

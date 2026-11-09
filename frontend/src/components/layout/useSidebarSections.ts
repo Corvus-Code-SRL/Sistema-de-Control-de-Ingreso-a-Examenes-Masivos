@@ -40,8 +40,9 @@ export interface SidebarSectionsState {
 /**
  * Qué secciones del menú están abiertas, recordado por usuario en `localStorage`.
  *
- * Cada pantalla monta su propio menú, así que el estado debe sobrevivir a la navegación: se lee del
- * almacenamiento al montar y se guarda en cada cambio. Sin nada guardado arranca solo con la
+ * El menú vive en el marco persistente (`AppLayout`) y no se remonta al navegar, pero el estado
+ * también debe sobrevivir a recargas y a otros montajes (panel móvil): se lee del almacenamiento al
+ * montar y se guarda en cada cambio. Sin nada guardado arranca solo con la
  * sección activa abierta (o la primera, si ninguna lo está). La sección que contiene la entrada
  * activa se abre siempre, aunque el usuario la hubiera contraído antes de navegar.
  *
