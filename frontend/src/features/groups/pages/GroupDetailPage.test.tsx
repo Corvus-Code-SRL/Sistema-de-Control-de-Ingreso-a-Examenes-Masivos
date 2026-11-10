@@ -286,7 +286,7 @@ describe('GroupDetailPage — paginación (CA-3)', () => {
 })
 
 describe('GroupDetailPage — grupo sin estudiantes (CA-4)', () => {
-  it('lo dice y ofrece «Cargar nómina» hacia la vista de carga', async () => {
+  it('lo dice y remite a la entrada «Cargar nómina de estudiantes» del menú', async () => {
     stubGroupApi({ group: makeGroupWithoutRoster(), students: [] })
 
     renderPage('/grupos/300')
@@ -294,12 +294,10 @@ describe('GroupDetailPage — grupo sin estudiantes (CA-4)', () => {
     expect(await screen.findByText('Este grupo aún no tiene estudiantes')).toBeInTheDocument()
     expect(screen.getByText('Sin inscritos')).toBeInTheDocument()
     expect(screen.getByText('Sin nómina')).toBeInTheDocument()
+    expect(screen.getByText(/Cárguela desde «Cargar nómina de estudiantes»/)).toBeInTheDocument()
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
-
-    const actions = screen.getAllByRole('link', { name: /cargar nómina/i })
-
-    expect(actions.length).toBeGreaterThan(0)
-    actions.forEach((action) => expect(action).toHaveAttribute('href', '/grupos/300/nomina'))
+    // HU-021 es independiente: el detalle del grupo no ofrece su propio botón de carga.
+    expect(screen.queryByRole('link', { name: /cargar nómina/i })).not.toBeInTheDocument()
   })
 })
 
@@ -310,10 +308,7 @@ describe('GroupDetailPage — acciones (CA-5)', () => {
     renderPage()
     await loadedTable()
 
-    expect(screen.getByRole('link', { name: /cargar nómina/i })).toHaveAttribute(
-      'href',
-      '/grupos/100/nomina'
-    )
+    expect(screen.queryByRole('link', { name: /cargar nómina/i })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: /ver exámenes/i })).toHaveAttribute(
       'href',
       '/grupos/100/examenes'

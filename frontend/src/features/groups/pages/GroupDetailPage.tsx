@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CalendarClock, History, Pencil, Upload, UsersRound } from 'lucide-react'
+import { CalendarClock, History, Pencil, UsersRound } from 'lucide-react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import { AppShell } from '@/components/layout/AppShell'
@@ -25,7 +25,6 @@ import {
   groupEditPath,
   groupExamsPath,
   groupIdFrom,
-  groupRosterPath,
   MY_COURSES_PATH,
 } from '../utils/paths'
 
@@ -33,9 +32,10 @@ import {
  * Detalle del grupo (HU-020): datos del grupo, total de inscritos, estado de la nómina y la lista
  * de estudiantes.
  *
- * Es una sola vista: editar el grupo (HU-019), cargar la nómina (HU-021), sus exámenes y sus
- * auxiliares son botones que llevan a la vista de cada acción. Un grupo de un período anterior o
- * inactivo es de solo lectura.
+ * Es una sola vista: editar el grupo (HU-019), sus exámenes y sus auxiliares son botones que llevan
+ * a la vista de cada acción. La nómina (HU-021) se carga desde su propia entrada del menú, «Cargar
+ * nómina de estudiantes», que no depende de esta vista. Un grupo de un período anterior o inactivo
+ * es de solo lectura.
  */
 export function GroupDetailPage() {
   const groupId = groupIdFrom(useParams().idGrupo)
@@ -127,21 +127,12 @@ function GroupDetailView({ groupId }: { groupId: number }) {
           isVisible && (
             <>
               {canManage && (
-                <>
-                  <Button variant="secondary" size="sm" className="gap-2" asChild>
-                    <Link to={groupEditPath(groupId)}>
-                      <Pencil className="size-4" aria-hidden="true" />
-                      Editar grupo
-                    </Link>
-                  </Button>
-
-                  <Button variant="secondary" size="sm" className="gap-2" asChild>
-                    <Link to={groupRosterPath(groupId)}>
-                      <Upload className="size-4" aria-hidden="true" />
-                      Cargar nómina
-                    </Link>
-                  </Button>
-                </>
+                <Button variant="secondary" size="sm" className="gap-2" asChild>
+                  <Link to={groupEditPath(groupId)}>
+                    <Pencil className="size-4" aria-hidden="true" />
+                    Editar grupo
+                  </Link>
+                </Button>
               )}
 
               <Button variant="outline" size="sm" className="gap-2" asChild>
@@ -218,7 +209,7 @@ function GroupDetailView({ groupId }: { groupId: number }) {
             onRetry={students.reload}
             onPageChange={(next) => setPage(next)}
             correctingPage={correctingPage}
-            rosterTo={canManage ? groupRosterPath(groupId) : undefined}
+            canUploadRoster={canManage}
             careers={detail.meta.carreras ?? []}
             careerId={filters.carrera}
             onCareerChange={setCareer}

@@ -1,5 +1,4 @@
-import { Search, SearchX, Upload, Users } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Search, SearchX, Users } from 'lucide-react'
 import { DataPagination } from '@/components/common/DataPagination'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -35,8 +34,8 @@ interface GroupStudentsTableProps {
   onPageChange: (page: number) => void
   /** La página pedida no existe (por ejemplo, tras una búsqueda): se está volviendo a la última. */
   correctingPage: boolean
-  /** Destino de «Cargar nómina»; sin él (período anterior o grupo inactivo) no se ofrece. */
-  rosterTo?: string
+  /** El grupo admite cargar la nómina (activo, del período vigente y del docente). */
+  canUploadRoster?: boolean
   /** Carreras del grupo (HU-021, multicarrera). Con más de una se ofrece el filtro y la columna. */
   careers?: GroupCareer[]
   /** Carrera filtrada; sin ella, todas. */
@@ -69,7 +68,7 @@ export function GroupStudentsTable({
   onRetry,
   onPageChange,
   correctingPage,
-  rosterTo,
+  canUploadRoster = false,
   careers = [],
   careerId,
   onCareerChange,
@@ -142,19 +141,9 @@ export function GroupStudentsTable({
             icon={Users}
             title="Este grupo aún no tiene estudiantes"
             description={
-              rosterTo
-                ? 'Cargue la nómina para ver aquí a los estudiantes inscritos.'
+              canUploadRoster
+                ? 'Cárguela desde «Cargar nómina de estudiantes», en el menú, para verlos aquí.'
                 : 'Este grupo ya no admite cargar la nómina.'
-            }
-            action={
-              rosterTo && (
-                <Button asChild size="sm">
-                  <Link to={rosterTo}>
-                    <Upload className="size-4" aria-hidden="true" />
-                    Cargar nómina
-                  </Link>
-                </Button>
-              )
             }
           />
         )}
