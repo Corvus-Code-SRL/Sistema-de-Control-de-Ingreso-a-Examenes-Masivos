@@ -36,7 +36,7 @@ interface GroupStudentsTableProps {
   correctingPage: boolean
   /** El grupo admite cargar la nómina (activo, del período vigente y del docente). */
   canUploadRoster?: boolean
-  /** Carreras del grupo (HU-021, multicarrera). Con más de una se ofrece el filtro y la columna. */
+  /** Carreras del grupo (HU-021). Con alguna se ofrece el filtro; con más de una, también la columna. */
   careers?: GroupCareer[]
   /** Carrera filtrada; sin ella, todas. */
   careerId?: number
@@ -77,6 +77,9 @@ export function GroupStudentsTable({
   const hasRows = page !== null && page.items.length > 0 && status !== 'error'
   const isEmptyGroup = settled && page.enrolledTotal === 0 && query === ''
   const noMatches = settled && page.items.length === 0 && !correctingPage && !isEmptyGroup
+  // El filtro está siempre que el grupo tenga carreras (una sola: «Todas» y esa); la columna, solo
+  // con varias, porque con una sola repetiría lo mismo en cada fila.
+  const hasCareers = careers.length > 0
   const isMultiCareer = careers.length > 1
   const selectedCareer = careers.find((career) => career.id_carrera === careerId)
   const totalsByCareer = new Map((page?.careerTotals ?? []).map((row) => [row.id_carrera, row.total]))
@@ -90,7 +93,7 @@ export function GroupStudentsTable({
 
         {!isEmptyGroup && (
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            {isMultiCareer && onCareerChange && (
+            {hasCareers && onCareerChange && (
               <select
                 value={careerId ?? ''}
                 onChange={(event) =>
