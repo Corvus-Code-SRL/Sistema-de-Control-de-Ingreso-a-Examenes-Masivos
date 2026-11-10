@@ -121,7 +121,7 @@ class StudentRosterPreviewService
      *     last_names: ?string,
      *     first_names: ?string,
      *     career_text: ?string,
-     *     career: ?array{id_carrera: int, nombre: string},
+     *     career: ?array{id_carrera: int, nombre: string, origen: ?string},
      *     status: string,
      *     errors: array<int, string>
      * }>
@@ -174,6 +174,7 @@ class StudentRosterPreviewService
                 'career' => $row->careerId() === null ? null : [
                     'id_carrera' => $row->careerId(),
                     'nombre' => (string) ($careerNames[$row->careerId()] ?? ''),
+                    'origen' => $row->careerSource(),
                 ],
                 'status' => $status,
                 'errors' => $rowAnalysis->errors(),

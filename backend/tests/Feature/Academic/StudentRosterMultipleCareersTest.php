@@ -212,6 +212,88 @@ class StudentRosterMultipleCareersTest extends TestCase
             ->assertJsonValidationErrors('id_carrera');
     }
 
+    public function test_sin_columna_usa_la_carrera_que_el_estudiante_ya_tiene_en_otro_grupo(): void
+    {
+        $this->addInformatica();
+        $this->enrollIn($this->grupoAjenoId, '202400001', $this->informaticaId, '2026-03-02');
+        $this->enrollIn($this->grupoPeriodoAnteriorId, '202400002', $this->sistemasId, '2025-08-04');
+
+        $preview = $this->preview(implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres',
+            '202400001,ROJAS VACA,ANA',
+            '202400002,PAZ LUNA,LUIS',
+            '202400003,MAMANI CRUZ,EVA',
+        ]))->assertOk();
+
+        $preview->assertJsonPath('data.filas_validas', 2)
+            ->assertJsonPath('data.filas.0.carrera.id_carrera', $this->informaticaId)
+            ->assertJsonPath('data.filas.0.carrera.origen', 'previous')
+            ->assertJsonPath('data.filas.1.carrera.id_carrera', $this->sistemasId)
+            ->assertJsonPath('data.filas.1.carrera.origen', 'previous')
+            ->assertJsonPath('data.filas.2.carrera', null)
+            ->assertJsonPath('data.filas.2.errores', ['missing_career']);
+
+        $this->confirm($preview->json('data.token'))->assertOk();
+
+        $this->assertSame($this->informaticaId, $this->careerOf('202400001'));
+        $this->assertSame($this->sistemasId, $this->careerOf('202400002'));
+        $this->assertNull($this->careerOf('202400003'));
+    }
+
+    public function test_usa_la_carrera_de_la_inscripcion_mas_reciente(): void
+    {
+        $this->addInformatica();
+        $this->enrollIn($this->grupoPeriodoAnteriorId, '202400001', $this->sistemasId, '2025-08-04');
+        $this->enrollIn($this->grupoAjenoId, '202400001', $this->informaticaId, '2026-03-02');
+
+        $this->preview("Estudiante,Apellidos,Nombres\n202400001,ROJAS VACA,ANA")
+            ->assertOk()
+            ->assertJsonPath('data.filas.0.carrera.id_carrera', $this->informaticaId);
+    }
+
+    public function test_no_usa_una_carrera_anterior_que_el_grupo_no_atiende(): void
+    {
+        $this->addInformatica();
+        $economia = DB::table('carrera')->insertGetId([
+            'nombre' => 'Economia',
+            'codigo' => 'ECO',
+            'estado' => RecordStatus::ACTIVE,
+            'id_facultad' => $this->facultadId,
+        ], 'id_carrera');
+        $this->enrollIn($this->grupoAjenoId, '202400001', (int) $economia, '2026-03-02');
+
+        $this->preview("Estudiante,Apellidos,Nombres\n202400001,ROJAS VACA,ANA")
+            ->assertOk()
+            ->assertJsonPath('data.filas_validas', 0)
+            ->assertJsonPath('data.filas.0.errores', ['missing_career']);
+    }
+
+    public function test_la_columna_y_la_carrera_elegida_mandan_sobre_la_anterior(): void
+    {
+        $this->addInformatica();
+        $this->enrollIn($this->grupoAjenoId, '202400001', $this->informaticaId, '2026-03-02');
+
+        $this->preview("Estudiante,Apellidos,Nombres,Carrera\n202400001,ROJAS VACA,ANA,SIS")
+            ->assertOk()
+            ->assertJsonPath('data.filas.0.carrera.id_carrera', $this->sistemasId)
+            ->assertJsonPath('data.filas.0.carrera.origen', 'file');
+
+        $this->preview("Estudiante,Apellidos,Nombres\n202400001,ROJAS VACA,ANA", $this->sistemasId)
+            ->assertOk()
+            ->assertJsonPath('data.filas.0.carrera.id_carrera', $this->sistemasId)
+            ->assertJsonPath('data.filas.0.carrera.origen', 'chosen');
+    }
+
+    public function test_en_un_grupo_de_una_sola_carrera_no_busca_la_carrera_anterior(): void
+    {
+        $this->enrollIn($this->grupoAjenoId, '202400001', $this->informaticaId, '2026-03-02');
+
+        $this->preview("Estudiante,Apellidos,Nombres\n202400001,ROJAS VACA,ANA")
+            ->assertOk()
+            ->assertJsonPath('data.filas.0.carrera.id_carrera', $this->sistemasId)
+            ->assertJsonPath('data.filas.0.carrera.origen', 'only');
+    }
+
     private function addInformatica(): void
     {
         $group = DB::table('grupo')->where('id_grupo', $this->grupoPropioId)->first();
@@ -239,6 +321,26 @@ class StudentRosterMultipleCareersTest extends TestCase
             'id_grupo' => $this->grupoPropioId,
             'id_estudiante' => $studentId,
             'fecha_inscripcion' => now()->toDateString(),
+            'estado' => RecordStatus::ACTIVE,
+            'id_carrera' => $careerId,
+        ]);
+    }
+
+    /** Inscribe al estudiante (lo crea si no existe) en otro grupo con esa carrera y fecha. */
+    private function enrollIn(int $groupId, string $sisCode, int $careerId, string $date): void
+    {
+        $studentId = DB::table('estudiante')->where('cod_sis', $sisCode)->value('id_estudiante')
+            ?? DB::table('estudiante')->insertGetId([
+                'cod_sis' => $sisCode,
+                'nombre' => 'NOMBRE' . $sisCode,
+                'apellido_paterno' => 'APELLIDO' . $sisCode,
+                'estado' => RecordStatus::ACTIVE,
+            ], 'id_estudiante');
+
+        DB::table('grupo_estudiante')->insert([
+            'id_grupo' => $groupId,
+            'id_estudiante' => $studentId,
+            'fecha_inscripcion' => $date,
             'estado' => RecordStatus::ACTIVE,
             'id_carrera' => $careerId,
         ]);

@@ -25,6 +25,18 @@ export type RosterRowError =
   | 'missing_career'
   | 'career_not_in_group'
 
+/**
+ * De dónde salió la carrera de la fila: la columna del archivo, la elegida para toda la nómina,
+ * la que el estudiante ya tenía en otra inscripción o la única carrera del grupo.
+ */
+export type RosterCareerSource = 'file' | 'chosen' | 'previous' | 'only'
+
+export interface RosterRowCareer {
+  id_carrera: number
+  nombre: string
+  origen?: RosterCareerSource | null
+}
+
 /** Una carrera que atiende el grupo (HU-021, multicarrera). */
 export interface RosterGroupCareer {
   id_carrera: number
@@ -42,7 +54,7 @@ export interface RosterPreviewRow {
   /** Texto de la columna opcional «carrera», tal como vino en el archivo. */
   carrera_archivo?: string | null
   /** Carrera con la que el estudiante quedará en el grupo; null si no se pudo resolver. */
-  carrera?: { id_carrera: number; nombre: string } | null
+  carrera?: RosterRowCareer | null
   estado: RosterRowState
   errores: RosterRowError[]
 }

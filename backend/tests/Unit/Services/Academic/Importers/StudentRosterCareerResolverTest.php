@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Services\Academic\Importers;
 
+use App\Services\Academic\Importers\StudentCareerHistory;
 use App\Services\Academic\Importers\StudentRosterAnalysisResult;
 use App\Services\Academic\Importers\StudentRosterCareerResolver;
 use App\Services\Academic\Importers\StudentRosterRow;
@@ -68,12 +69,77 @@ class StudentRosterCareerResolverTest extends TestCase
         );
     }
 
+    public function test_completa_con_la_carrera_anterior_solo_si_el_grupo_la_atiende(): void
+    {
+        // 202400001 ya es de Informática; 202400002 es de otra carrera (99); 202400003 es nuevo.
+        $history = $this->history(['202400001' => 20, '202400002' => 99]);
+
+        $result = $this->resolve([null, null, null], [self::SISTEMAS, self::INFORMATICA], null, $history);
+
+        $this->assertSame([20, null, null], $this->careerIds($result));
+        $this->assertSame(StudentRosterCareerResolver::SOURCE_PREVIOUS, $result->rows()[0]->row()->careerSource());
+        $this->assertSame([StudentRosterCareerResolver::MISSING_CAREER], $result->rows()[1]->errors());
+        $this->assertSame([StudentRosterCareerResolver::MISSING_CAREER], $result->rows()[2]->errors());
+    }
+
+    public function test_la_columna_y_la_eleccion_mandan_y_no_consultan_el_historial(): void
+    {
+        $history = $this->history(['202400001' => 20, '202400002' => 20]);
+
+        $byColumn = $this->resolve(['SIS', 'SIS'], [self::SISTEMAS, self::INFORMATICA], null, $history);
+        $byChoice = $this->resolve([null, null], [self::SISTEMAS, self::INFORMATICA], 10, $history);
+
+        $this->assertSame([10, 10], $this->careerIds($byColumn));
+        $this->assertSame([10, 10], $this->careerIds($byChoice));
+        $this->assertSame(StudentRosterCareerResolver::SOURCE_CHOSEN, $byChoice->rows()[0]->row()->careerSource());
+        $this->assertSame(0, $history->calls);
+    }
+
+    public function test_un_grupo_de_una_sola_carrera_no_consulta_el_historial(): void
+    {
+        $history = $this->history(['202400001' => 20]);
+
+        $result = $this->resolve([null], [self::SISTEMAS], null, $history);
+
+        $this->assertSame([10], $this->careerIds($result));
+        $this->assertSame(StudentRosterCareerResolver::SOURCE_ONLY, $result->rows()[0]->row()->careerSource());
+        $this->assertSame(0, $history->calls);
+    }
+
+    /** @param array<string, int> $careers */
+    private function history(array $careers): StudentCareerHistory
+    {
+        return new class ($careers) extends StudentCareerHistory {
+            public int $calls = 0;
+
+            /** @var array<string, int> */
+            private array $careers;
+
+            /** @param array<string, int> $careers */
+            public function __construct(array $careers)
+            {
+                $this->careers = $careers;
+            }
+
+            public function latestCareerBySis(array $sisCodes): array
+            {
+                $this->calls++;
+
+                return array_intersect_key($this->careers, array_flip($sisCodes));
+            }
+        };
+    }
+
     /**
      * @param array<int, string|null> $careerTexts
      * @param array<int, array{id_carrera: int, codigo: string, nombre: string}> $careers
      */
-    private function resolve(array $careerTexts, array $careers, ?int $defaultCareerId = null): StudentRosterAnalysisResult
-    {
+    private function resolve(
+        array $careerTexts,
+        array $careers,
+        ?int $defaultCareerId = null,
+        ?StudentCareerHistory $history = null
+    ): StudentRosterAnalysisResult {
         $rows = [];
 
         foreach ($careerTexts as $index => $careerText) {
@@ -83,7 +149,7 @@ class StudentRosterCareerResolverTest extends TestCase
             );
         }
 
-        return (new StudentRosterCareerResolver())->resolve(
+        return (new StudentRosterCareerResolver($history))->resolve(
             new StudentRosterAnalysisResult($rows),
             $careers,
             $defaultCareerId

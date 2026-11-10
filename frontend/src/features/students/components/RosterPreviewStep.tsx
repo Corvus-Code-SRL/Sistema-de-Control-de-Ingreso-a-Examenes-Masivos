@@ -27,6 +27,7 @@ import {
   countRosterRows,
   duplicateRowsBySis,
   isIncorporable,
+  rowCareerText,
   rowIssues,
 } from '../utils/rosterRows'
 import { RosterStatusLabel } from './RosterStatusLabel'
@@ -291,11 +292,6 @@ export function RosterPreviewStep({
   )
 }
 
-/** Carrera resuelta de la fila; si no se resolvió, lo que decía el archivo. */
-function careerText(row: RosterPreviewRow): string {
-  return row.carrera?.nombre ?? row.carrera_archivo ?? '—'
-}
-
 function DesktopPreviewRow({
   row,
   duplicateRows,
@@ -322,7 +318,7 @@ function DesktopPreviewRow({
 
       <TableCell>{row.nombres ?? '—'}</TableCell>
 
-      {showCareer && <TableCell>{careerText(row)}</TableCell>}
+      {showCareer && <TableCell>{rowCareerText(row)}</TableCell>}
 
       <TableCell>
         <RosterStatusLabel estado={row.estado} />
@@ -387,7 +383,7 @@ function MobilePreviewCard({
         {showCareer && (
           <div>
             <dt className="sciem-caption">Carrera</dt>
-            <dd className="sciem-body mt-0.5">{careerText(row)}</dd>
+            <dd className="sciem-body mt-0.5">{rowCareerText(row)}</dd>
           </div>
         )}
       </dl>

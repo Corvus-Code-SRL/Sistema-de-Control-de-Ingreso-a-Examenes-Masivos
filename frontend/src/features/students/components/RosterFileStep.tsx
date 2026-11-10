@@ -130,7 +130,8 @@ export function RosterFileStep({
 
             <p className="sciem-supporting text-muted-foreground">
               Si el archivo mezcla carreras, deje «Según la columna» y agregue la columna «Carrera»
-              con el código o el nombre de cada una.
+              con el código o el nombre de cada una. A quien ya está inscrito en otro grupo con una
+              carrera de este grupo se le asigna esa, aunque la fila no la traiga.
             </p>
           </div>
         )}
