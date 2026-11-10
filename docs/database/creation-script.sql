@@ -1724,7 +1724,7 @@ ALTER TABLE public.reporte_estudiante
 --
 -- Versión 11: fotografía opcional del estudiante (HU-032)
 --             (2026_10_13_000001_add_foto_url_to_estudiante)
-
+--
 ALTER TABLE public.estudiante ADD COLUMN foto_url text;
 
 -- Versión 12: un grupo para varias carreras (HU-021, multicarrera)

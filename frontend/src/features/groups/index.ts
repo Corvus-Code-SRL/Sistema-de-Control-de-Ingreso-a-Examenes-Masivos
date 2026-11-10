@@ -1,3 +1,4 @@
+// API pública del feature groups
 export { SubjectGroupsPage } from './pages/SubjectGroupsPage'
 export { MyCoursesPage } from './pages/MyCoursesPage'
 export { GroupDetailPage } from './pages/GroupDetailPage'
