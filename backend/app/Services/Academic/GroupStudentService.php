@@ -37,6 +37,10 @@ class GroupStudentService
      * encabezado, que no cambia mientras se busca. `$careerId` deja solo a los inscritos con esa
      * carrera (HU-021 multicarrera); `por_carrera` cuenta los inscritos de cada carrera del grupo.
      *
+     * Una inscripción sin carrera (cargada por fuera de la nómina: datos de prueba, scripts) cuenta
+     * con la carrera del grupo solo si el grupo atiende una sola: ahí no hay duda. En un grupo de
+     * varias carreras queda sin carrera: aparece en «Todas» pero en ninguna carrera.
+     *
      * @return array{
      *     students: LengthAwarePaginator,
      *     total_inscritos: int,
@@ -56,13 +60,15 @@ class GroupStudentService
             throw new AuthorizationException('Solo el docente que dicta el grupo puede ver su detalle.');
         }
 
+        $career = $this->careerExpression($group);
+
         $query = Student::query()
             ->join('grupo_estudiante', 'grupo_estudiante.id_estudiante', '=', 'estudiante.id_estudiante')
             ->where('grupo_estudiante.id_grupo', $group->id_grupo)
-            ->leftJoin('carrera', 'carrera.id_carrera', '=', 'grupo_estudiante.id_carrera')
+            ->leftJoin('carrera', 'carrera.id_carrera', '=', DB::raw($career))
             ->where('grupo_estudiante.estado', RecordStatus::ACTIVE)
-            ->when($careerId !== null, function (Builder $query) use ($careerId): void {
-                $query->where('grupo_estudiante.id_carrera', $careerId);
+            ->when($careerId !== null, function (Builder $query) use ($career, $careerId): void {
+                $query->whereRaw($career . ' = ?', [$careerId]);
             })
             ->select([
                 'estudiante.id_estudiante',
@@ -70,7 +76,7 @@ class GroupStudentService
                 'estudiante.nombre',
                 'estudiante.apellido_paterno',
                 'estudiante.apellido_materno',
-                'grupo_estudiante.id_carrera',
+                DB::raw($career . ' as id_carrera'),
                 'carrera.nombre as carrera_nombre',
             ])
             ->orderByRaw(
@@ -100,17 +106,30 @@ class GroupStudentService
         ];
     }
 
+    /**
+     * Carrera de la inscripción; sin ella, la del grupo si atiende una sola (StudentCareerHistory
+     * aplica la misma regla). Los ids salen del modelo (enteros), así que van en el SQL sin riesgo.
+     */
+    private function careerExpression(Group $group): string
+    {
+        return 'COALESCE(grupo_estudiante.id_carrera, CASE WHEN '
+            . '(SELECT count(*) FROM grupo_oferta WHERE grupo_oferta.id_grupo = ' . (int) $group->id_grupo
+            . ') <= 1 THEN ' . (int) $group->id_carrera . ' END)';
+    }
+
     /** @return array<int, array{id_carrera: int, nombre: string, total: int}> */
     private function countByCareer(Group $group): array
     {
+        $career = $this->careerExpression($group);
+
         return DB::table('grupo_estudiante')
-            ->join('carrera', 'carrera.id_carrera', '=', 'grupo_estudiante.id_carrera')
+            ->join('carrera', 'carrera.id_carrera', '=', DB::raw($career))
             ->where('grupo_estudiante.id_grupo', $group->id_grupo)
             ->where('grupo_estudiante.estado', RecordStatus::ACTIVE)
-            ->groupBy('grupo_estudiante.id_carrera', 'carrera.nombre')
+            ->groupBy(DB::raw($career), 'carrera.nombre')
             ->orderBy('carrera.nombre')
             ->get([
-                'grupo_estudiante.id_carrera',
+                DB::raw($career . ' as id_carrera'),
                 'carrera.nombre',
                 DB::raw('count(*) as total'),
             ])

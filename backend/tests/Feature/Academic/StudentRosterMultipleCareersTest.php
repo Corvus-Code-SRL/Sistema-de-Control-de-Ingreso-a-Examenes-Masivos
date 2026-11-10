@@ -294,13 +294,76 @@ class StudentRosterMultipleCareersTest extends TestCase
             ->assertJsonPath('data.filas.0.carrera.origen', 'only');
     }
 
+    public function test_una_inscripcion_anterior_sin_carrera_cuenta_con_la_principal_de_su_grupo(): void
+    {
+        $this->addInformatica();
+        // Cargada por fuera de la nómina (datos de prueba, scripts): sin id_carrera.
+        $this->enrollIn($this->grupoPeriodoAnteriorId, '202400001', null, '2025-08-04');
+
+        $this->preview("Estudiante,Apellidos,Nombres\n202400001,ROJAS VACA,ANA")
+            ->assertOk()
+            ->assertJsonPath('data.filas.0.carrera.id_carrera', $this->informaticaId)
+            ->assertJsonPath('data.filas.0.carrera.origen', 'previous');
+    }
+
+    public function test_una_inscripcion_anterior_sin_carrera_en_un_grupo_de_varias_carreras_no_se_adivina(): void
+    {
+        $this->addInformatica();
+        // El grupo ajeno también atiende Informática: su inscripción sin carrera es ambigua.
+        $this->addCareerTo($this->grupoAjenoId);
+        $this->enrollIn($this->grupoAjenoId, '202400001', null, '2026-03-02');
+
+        $this->preview("Estudiante,Apellidos,Nombres\n202400001,ROJAS VACA,ANA")
+            ->assertOk()
+            ->assertJsonPath('data.filas.0.carrera', null)
+            ->assertJsonPath('data.filas.0.errores', ['missing_career']);
+    }
+
+    public function test_en_un_grupo_de_una_carrera_la_inscripcion_sin_carrera_cuenta_con_esa(): void
+    {
+        $this->enrollIn($this->grupoPropioId, '202400001', null, '2026-03-02');
+
+        $url = '/api/grupos/' . $this->grupoPropioId . '/estudiantes';
+
+        $this->getJson($url . '?id_carrera=' . $this->sistemasId)
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.carrera.id_carrera', $this->sistemasId)
+            ->assertJsonPath('meta.por_carrera.0.total', 1);
+    }
+
+    public function test_en_un_grupo_de_varias_carreras_la_inscripcion_sin_carrera_no_se_adivina(): void
+    {
+        $this->addInformatica();
+        $this->enrollIn($this->grupoPropioId, '202400001', null, '2026-03-02');
+        $this->enrollIn($this->grupoPropioId, '202400002', $this->informaticaId, '2026-03-02');
+
+        $url = '/api/grupos/' . $this->grupoPropioId . '/estudiantes';
+        $all = $this->getJson($url)->assertOk()->assertJsonCount(2, 'data');
+
+        // Está en «Todas», pero no cuenta en ninguna carrera.
+        $totals = array_column($all->json('meta.por_carrera'), 'total', 'id_carrera');
+        $this->assertNull($totals[$this->sistemasId] ?? null);
+        $this->assertSame(1, $totals[$this->informaticaId] ?? null);
+
+        $this->getJson($url . '?id_carrera=' . $this->sistemasId)
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
     private function addInformatica(): void
     {
-        $group = DB::table('grupo')->where('id_grupo', $this->grupoPropioId)->first();
+        $this->addCareerTo($this->grupoPropioId);
+    }
+
+    /** El grupo (de Sistemas) pasa a atender también Informática. */
+    private function addCareerTo(int $groupId): void
+    {
+        $group = DB::table('grupo')->where('id_grupo', $groupId)->first();
 
         foreach ([$this->sistemasId, $this->informaticaId] as $careerId) {
             DB::table('grupo_oferta')->insertOrIgnore([
-                'id_grupo' => $this->grupoPropioId,
+                'id_grupo' => $groupId,
                 'id_carrera' => $careerId,
                 'id_materia' => (int) $group->id_materia,
                 'id_gestion_periodo' => (int) $group->id_gestion_periodo,
@@ -326,8 +389,8 @@ class StudentRosterMultipleCareersTest extends TestCase
         ]);
     }
 
-    /** Inscribe al estudiante (lo crea si no existe) en otro grupo con esa carrera y fecha. */
-    private function enrollIn(int $groupId, string $sisCode, int $careerId, string $date): void
+    /** Inscribe al estudiante (lo crea si no existe) en otro grupo con esa carrera (o sin ella) y fecha. */
+    private function enrollIn(int $groupId, string $sisCode, ?int $careerId, string $date): void
     {
         $studentId = DB::table('estudiante')->where('cod_sis', $sisCode)->value('id_estudiante')
             ?? DB::table('estudiante')->insertGetId([
