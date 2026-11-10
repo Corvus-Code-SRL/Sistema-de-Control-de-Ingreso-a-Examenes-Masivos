@@ -66,13 +66,13 @@ describe('AppRouter — detalle del grupo', () => {
     expect(app.pathname).toBe('/grupos/100/editar')
   })
 
-  it('la carga de nómina tiene su propia URL', async () => {
+  it('la carga de nómina tiene su propia URL y la vieja lleva a ella con el grupo elegido', async () => {
     stubBackend()
 
     const app = renderApp('/grupos/100/nomina')
 
     expect(await screen.findByText('Carga de nómina', {}, BOOT)).toBeInTheDocument()
-    expect(app.pathname).toBe('/grupos/100/nomina')
+    expect(app.pathname).toBe('/cargar-nomina')
   })
 })
 

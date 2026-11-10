@@ -233,7 +233,8 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'teacher-upload-roster',
         label: 'Cargar nómina de estudiantes',
         icon: FileUp,
-        capability: 'grupos.gestionar'
+        capability: 'grupos.gestionar',
+        to: '/cargar-nomina'
       },
       {
         id: 'teacher-my-assistants',

@@ -107,9 +107,10 @@ function DocenteRoutes() {
         />
 
         <Route
-          path="/grupos/:idGrupo/nomina"
+          path="/cargar-nomina"
           element={guarded('grupos.gestionar', <RosterUploadPage />)}
         />
+        <Route path="/grupos/:idGrupo/nomina" element={<RosterUploadRedirect />} />
 
         <Route
           path="/cursos/:idGrupo"
@@ -237,6 +238,16 @@ function CourseDetailRedirect() {
   const { search } = useLocation()
 
   return <Navigate to={{ pathname: `/grupos/${encodeURIComponent(idGrupo)}`, search }} replace />
+}
+
+/**
+ * La carga de nómina pasó de `/grupos/:idGrupo/nomina` a su propia pantalla, `/cargar-nomina`
+ * (HU-021 independiente); los enlaces viejos la abren con ese grupo elegido.
+ */
+function RosterUploadRedirect() {
+  const { idGrupo = '' } = useParams()
+
+  return <Navigate to={`/cargar-nomina?grupo=${encodeURIComponent(idGrupo)}`} replace />
 }
 
 /**
