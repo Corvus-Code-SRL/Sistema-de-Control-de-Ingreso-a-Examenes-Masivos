@@ -80,12 +80,11 @@ describe('AppRouter — navegación contextual', () => {
   afterEach(() => window.localStorage.clear())
 
   it.each([
-    ['Ver exámenes', '/grupos/100/examenes', 'Exámenes del grupo'],
-    ['Auxiliares', '/grupos/100/auxiliares', 'Auxiliares del grupo'],
-  ])('%s abre su página independiente y permite regresar', async (action, destination, title) => {
+    ['/grupos/100/examenes', 'Exámenes del grupo'],
+    ['/grupos/100/auxiliares', 'Auxiliares del grupo'],
+  ])('%s es una página independiente que permite regresar al grupo', async (destination, title) => {
     stubBackend()
-    const app = renderApp('/grupos/100')
-    await userEvent.click(await screen.findByRole('link', { name: action }, BOOT))
+    const app = renderApp(destination)
     await waitFor(() => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument()
       expect(screen.getByRole('heading', { name: title })).toBeInTheDocument()
