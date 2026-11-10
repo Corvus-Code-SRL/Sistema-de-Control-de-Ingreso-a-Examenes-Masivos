@@ -125,7 +125,7 @@ describe('FinalReportPage (HU-051)', () => {
     const links = screen.getAllByRole('link', { name: /resumen del examen/i })
 
     expect(links.length).toBeGreaterThan(0)
-    links.forEach((link) => expect(link).toHaveAttribute('href', '/examenes/9'))
+    links.forEach((link) => expect(link).toHaveAttribute('href', '/historial/9'))
   })
 
   it('sin incidencias muestra el mensaje exacto', async () => {
