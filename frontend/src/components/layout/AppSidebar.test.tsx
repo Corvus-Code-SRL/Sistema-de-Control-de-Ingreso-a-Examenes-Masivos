@@ -543,6 +543,21 @@ describe('AppSidebar — entradas y estado activo', () => {
     expect(screen.getByRole('link', { name: 'Programados' })).not.toHaveAttribute('aria-current')
   })
 
+    it('/examenes/:id/reporte-final resalta Generar reporte de examen y no Programados', async () => {
+    const user = userEvent.setup()
+    renderSidebar('Docente', '/examenes/12/reporte-final')
+    await openAllSections(user)
+
+    expect(screen.getByRole('link', { name: 'Generar reporte de examen' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Programados' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('/examenes/:id/reporte-final deja abierta la sección Historial de exámenes y reportes', () => {
+    renderSidebar('Docente', '/examenes/12/reporte-final')
+
+    expect(screen.getByRole('button', { name: /historial de exámenes y reportes/i })).toHaveAttribute('aria-expanded', 'true')
+  })
+
   it('la Central de riesgo sigue resaltada con el detalle abierto y la query', () => {
     renderSidebar('Administrador', '/central-riesgo/9941?tipo=3')
 

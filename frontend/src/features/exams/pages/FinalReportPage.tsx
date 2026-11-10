@@ -16,7 +16,6 @@ import {
 } from '@/components/ui/table'
 import { useFinalReport } from '../hooks/useFinalReport'
 import { useFinalReportPdf } from '../hooks/useFinalReportPdf'
-import { examDetailPath } from '../utils/paths'
 import type { FinalReport } from '../types/finalReport.types'
 
 const NO_INCIDENTS_MESSAGE = 'No se registraron incidencias en este examen'
@@ -193,8 +192,8 @@ export function FinalReportPage() {
   const { report, loading, notFound, loadError, reload } = useFinalReport(examId)
   const { download, downloading, downloadError } = useFinalReportPdf(report)
 
-  const summaryPath = examDetailPath(Number(examId))
-  const breadcrumbs = [
+    const summaryPath = `/historial/${examId}`
+    const breadcrumbs = [
     { label: 'Exámenes' },
     { label: 'Resumen del examen', to: summaryPath },
     { label: 'Reporte final' },

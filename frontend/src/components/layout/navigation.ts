@@ -384,7 +384,8 @@ export const NAVIGATION: readonly NavSection[] = [
         label: 'Generar reporte de examen',
         icon: FileText,
         capability: 'examenes.gestionar',
-        to: '/examenes/reportes'
+        to: '/examenes/reportes',
+        matches: ['/examenes/:examId/reporte-final']
 
       }
     ]
