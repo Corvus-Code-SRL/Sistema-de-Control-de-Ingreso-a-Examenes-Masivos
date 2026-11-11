@@ -77,7 +77,7 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
 
   const openingMinutes = formData.minutos_apertura === undefined ? 10 : formData.minutos_apertura;
   const [startHour, startMinute] = formData.hora_inicio.split(':').map(Number);
-  const opening = /^\d{4}-\d{2}-\d{2}$/.test(formData.fecha)
+  const opening = formData.control_ingreso !== false && /^\d{4}-\d{2}-\d{2}$/.test(formData.fecha)
     && Number.isInteger(startHour) && Number.isInteger(startMinute)
     && typeof openingMinutes === 'number' && Number.isInteger(openingMinutes)
     && openingMinutes >= 0
@@ -95,7 +95,7 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
     ? `${opening.date === createdExam?.fecha.split('-').reverse().join('/') ? '' : `el ${opening.date} `}a las ${opening.time}`
     : 'según lo programado';
   const toastDescription = createdExam
-    ? `${[createdExam.nombre_examen, selectedSubject?.nombre, formatExamToastDate(createdExam.fecha), createdExam.hora_inicio.slice(0, 5)].filter(Boolean).join(' · ')}. El control se abrirá ${openingText}.`
+    ? `${[createdExam.nombre_examen, selectedSubject?.nombre, formatExamToastDate(createdExam.fecha), createdExam.hora_inicio.slice(0, 5)].filter(Boolean).join(' · ')}. ${formData.control_ingreso === false ? 'No se realizará control de ingreso.' : `El control se abrirá ${openingText}.`}`
     : '';
 
   if (loading) {
@@ -221,9 +221,9 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
           <h2 className="text-base font-semibold text-foreground">Resumen</h2>
           <div className="mt-3 space-y-3">
             <div>
-              <h3 className="text-sm font-medium text-muted-foreground">Apertura del control de ingreso</h3>
-              <p className="mt-1 text-base font-semibold text-foreground">{opening?.time ?? 'Sin definir'}</p>
-              {opening && <p className="text-sm text-muted-foreground">{opening.date}</p>}
+              <h3 className="text-sm font-medium text-muted-foreground">{formData.control_ingreso === false ? 'Control de ingreso' : 'Apertura del control de ingreso'}</h3>
+              <p className="mt-1 text-base font-semibold text-foreground">{formData.control_ingreso === false ? 'No se realizará' : opening?.time ?? 'Sin definir'}</p>
+              {formData.control_ingreso !== false && opening && <p className="text-sm text-muted-foreground">{opening.date}</p>}
             </div>
             <div className="border-t border-border pt-3">
               <h3 className="text-sm font-medium text-muted-foreground">Capacidad</h3>

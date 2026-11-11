@@ -56,7 +56,7 @@ export function validateExamForm(
     errors.duracion = 'La duración debe ser un número entero de minutos, mayor a cero y menor a 24 horas.';
   }
 
-  if (formData.minutos_apertura !== undefined && (
+  if (formData.control_ingreso !== false && formData.minutos_apertura !== undefined && (
     !Number.isInteger(formData.minutos_apertura) ||
     formData.minutos_apertura === null ||
     formData.minutos_apertura < 0
