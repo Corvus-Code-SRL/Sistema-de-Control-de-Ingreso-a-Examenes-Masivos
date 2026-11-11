@@ -54,6 +54,7 @@ class LateEntryService
     private LateEntryOtherExamService $otherExams;
     private ExamTimingService $timing;
     private ExamExpulsionService $expulsions;
+    private EntryAttemptService $attempts;
 
     public function __construct(
         LateEntryAccessService $access,
@@ -63,7 +64,8 @@ class LateEntryService
         AuditLogService $auditLog,
         LateEntryOtherExamService $otherExams,
         ExamTimingService $timing,
-        ExamExpulsionService $expulsions
+        ExamExpulsionService $expulsions,
+        EntryAttemptService $attempts
     ) {
         $this->access = $access;
         $this->snapshots = $snapshots;
@@ -73,14 +75,16 @@ class LateEntryService
         $this->otherExams = $otherExams;
         $this->timing = $timing;
         $this->expulsions = $expulsions;
+        $this->attempts = $attempts;
     }
 
     /**
-     * Verifica por código SIS y CI sin escribir nada. Devuelve el resultado de HU-032, la
-     * solicitud pendiente del estudiante, si la hay, para que la vista la resuelva ahí mismo, y
-     * la advertencia de otro examen si el resultado autoriza.
+     * Verifica por código SIS y CI. Devuelve el resultado de HU-032, la solicitud pendiente del
+     * estudiante, si la hay, para que la vista la resuelva ahí mismo, y la advertencia de otro
+     * examen si el resultado autoriza. Como en HU-032, un resultado negativo deja registrado el
+     * intento en el ambiente de control para poder reportarlo; uno positivo no escribe nada.
      *
-     * @param array{cod_sis: string, ci?: string|null, id_ambiente?: int|null} $input
+     * @param array{cod_sis: string, ci?: string|null, id_ambiente: int} $input
      * @return array{
      *     verificacion: array{
      *         veredicto: string, motivo: string, autorizado: bool,
@@ -103,18 +107,23 @@ class LateEntryService
         $access = $this->access->resolve($exam, $actor);
         $this->assertInProgress($exam);
         $this->assertBeforeEnd($exam);
-        $roomId = $this->access->controlRoom(
-            $exam,
-            $access,
-            isset($input['id_ambiente']) ? (int) $input['id_ambiente'] : null
-        );
+        $requestedRoomId = (int) $input['id_ambiente'];
+        $roomId = $this->access->controlRoom($exam, $access, $requestedRoomId);
+        // El docente no compara ambientes al verificar (null), pero el intento queda en el que eligió.
+        $attemptRoomId = $roomId ?? $requestedRoomId;
 
         $studentId = Student::query()->where('cod_sis', SisCode::normalize($input['cod_sis']))->value('id_estudiante');
         $record = $studentId === null ? null : $this->recordFor($exam, (int) $studentId);
 
         if ($record === null) {
             return [
-                'verificacion' => $this->verification->notFoundResult(),
+                'verificacion' => $this->withDeniedAttempt(
+                    $exam,
+                    $input,
+                    $attemptRoomId,
+                    $actor,
+                    $this->verification->notFoundResult()
+                ),
                 'solicitud_pendiente' => null,
                 'otro_examen' => null,
             ];
@@ -131,10 +140,47 @@ class LateEntryService
         }
 
         return [
-            'verificacion' => $verdict,
+            'verificacion' => $this->withDeniedAttempt($exam, $input, $attemptRoomId, $actor, $verdict),
             'solicitud_pendiente' => $this->pendingQuery($exam, (int) $studentId)->with(self::RELATIONS)->first(),
             'otro_examen' => $verdict['autorizado'] ? $this->otherExams->forStudent($exam, (int) $studentId) : null,
         ];
+    }
+
+    /**
+     * Rechazo que decide quien controla sobre un resultado que autoriza (por ejemplo, ante la
+     * advertencia de otro examen). Igual que en HU-032, deja un intento para poder reportarlo; si
+     * el resultado ya no autoriza responde con su veredicto y no registra nada.
+     *
+     * @param array{id_estudiante: int, ci?: string|null, id_ambiente: int, motivo: string,
+     *     observacion?: string|null} $input
+     * @return array{id_intento: int, registrado_en: string, registrado: bool, motivo: string}
+     */
+    public function rejectAttempt(Exam $exam, array $input, User $actor): array
+    {
+        return DB::transaction(function () use ($exam, $input, $actor): array {
+            $locked = $this->lockExam($exam);
+            $access = $this->access->resolve($locked, $actor);
+            $this->assertInProgress($locked);
+            $this->assertBeforeEnd($locked);
+
+            $requestedRoomId = (int) $input['id_ambiente'];
+            $roomId = $this->access->controlRoom($locked, $access, $requestedRoomId);
+            $studentId = (int) $input['id_estudiante'];
+            $this->assertNotExpelled($locked, $studentId);
+            $record = $this->allowedRecord($this->recordFor($locked, $studentId), $input, $roomId);
+
+            return $this->attempts->recordManualRejection(
+                (int) $locked->id_examen,
+                [
+                    'id_ambiente' => $roomId ?? $requestedRoomId,
+                    'ci' => $input['ci'] ?? null,
+                    'motivo' => $input['motivo'],
+                    'observacion' => $input['observacion'] ?? null,
+                ],
+                $actor,
+                ['estudiante' => $record['estudiante']]
+            );
+        });
     }
 
     /**
@@ -337,6 +383,26 @@ class LateEntryService
 
             throw LateEntryException::denied(VerificationService::DUPLICATE, self::ALREADY_ENTERED_MESSAGE);
         }
+    }
+
+    /**
+     * Registra el intento de un resultado negativo con la misma regla de HU-032
+     * (EntryAttemptService::recordDenied) y le agrega su id y hora para poder reportarlo.
+     *
+     * @param array{cod_sis: string, ci?: string|null} $input
+     * @param array{veredicto: string, autorizado: bool} $verdict
+     * @return array{veredicto: string, autorizado: bool}
+     */
+    private function withDeniedAttempt(Exam $exam, array $input, int $roomId, User $actor, array $verdict): array
+    {
+        $attempt = $this->attempts->recordDenied(
+            (int) $exam->id_examen,
+            array_merge($input, ['id_ambiente' => $roomId]),
+            $actor,
+            $verdict
+        );
+
+        return array_merge($verdict, $attempt ?? []);
     }
 
     private function lockExam(Exam $exam): Exam

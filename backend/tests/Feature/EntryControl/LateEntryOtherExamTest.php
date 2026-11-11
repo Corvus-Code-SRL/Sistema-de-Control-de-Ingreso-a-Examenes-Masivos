@@ -66,6 +66,7 @@ class LateEntryOtherExamTest extends TestCase
     {
         return $this->postJson($this->lateEntryUrl('verificar'), [
             'cod_sis' => $this->studentColumn($this->secondStudentId, 'cod_sis'),
+            'id_ambiente' => $this->otraAulaId,
         ]);
     }
 

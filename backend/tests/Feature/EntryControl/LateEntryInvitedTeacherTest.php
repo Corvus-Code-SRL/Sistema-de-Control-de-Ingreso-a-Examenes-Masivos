@@ -52,6 +52,7 @@ class LateEntryInvitedTeacherTest extends TestCase
 
         $this->postJson($this->lateEntryUrl('verificar'), [
             'cod_sis' => $this->studentColumn($this->secondStudentId, 'cod_sis'),
+            'id_ambiente' => $this->otraAulaId,
         ])->assertOk()->assertJsonPath('data.autorizado', true);
         $this->getJson($this->lateEntryUrl('buscar') . '?sis=' . substr(
             $this->studentColumn($this->secondStudentId, 'cod_sis'),
@@ -97,6 +98,7 @@ class LateEntryInvitedTeacherTest extends TestCase
 
         $this->postJson($this->lateEntryUrl('verificar'), [
             'cod_sis' => $this->studentColumn($this->secondStudentId, 'cod_sis'),
+            'id_ambiente' => $this->otraAulaId,
         ])->assertForbidden();
         $this->getJson($this->lateEntryUrl('buscar') . '?nombre=ana')->assertForbidden();
         $this->getJson($this->lateEntryUrl('solicitudes'))->assertForbidden();
