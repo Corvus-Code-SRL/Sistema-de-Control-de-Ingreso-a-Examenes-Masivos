@@ -74,6 +74,16 @@ describe('ExamForm - materias', () => {
 })
 
 describe('ExamForm - apertura', () => {
+  it('permite desactivar el control y oculta los minutos de apertura', async () => {
+    render(<ExamFormHarness />)
+    const switchControl = screen.getByRole('switch', { name: '¿Realizar control de ingreso?' })
+
+    expect(switchControl).toBeChecked()
+    await userEvent.click(switchControl)
+    expect(switchControl).not.toBeChecked()
+    expect(screen.queryByRole('spinbutton', { name: 'Apertura del control de ingreso' })).not.toBeInTheDocument()
+  })
+
   it('permite configurar los minutos antes del examen', async () => {
     render(<ExamFormHarness />)
     const opening = screen.getByRole('spinbutton', { name: 'Apertura del control de ingreso' })
