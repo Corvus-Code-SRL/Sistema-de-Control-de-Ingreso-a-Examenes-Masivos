@@ -10,7 +10,11 @@ import { AppShell } from '@/components/layout/AppShell'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { EXAM_STATUS, examInProgressService, type ExamInProgress } from '@/features/exams'
+import {
+  REPORT_INCIDENT_FLOW, REPORT_INCIDENT_MESSAGES, ReportIncidentDialog, type ReportIncidentContext,
+} from '@/features/incidents'
 import { useAsyncResource } from '@/hooks/useAsyncResource'
+import { attemptTime } from '../components/entryAttemptPresentation'
 import { IdentificationForm } from '../components/IdentificationForm'
 import { LateEntryAnnouncement } from '../components/LateEntryAnnouncement'
 import { LateEntryNextButton } from '../components/LateEntryNextButton'
@@ -29,11 +33,13 @@ import { useLateEntryRequests } from '../hooks/useLateEntryRequests'
 import { useLateEntryVerification } from '../hooks/useLateEntryVerification'
 import { LATE_ENTRY_SEARCH } from '../services/lateEntryService'
 import { LATE_ENTRY_EXAMS_PATH } from '../paths'
+import type { CurrentRejectedAttempt } from '../types/entry-control.types'
 import { CONTROLLER_ROLE } from '../types/late-entry.types'
 
 /** Campo SIS de IdentificationForm, al que vuelve el foco con «Siguiente estudiante». */
 const SIS_INPUT_ID = 'entry-sis'
 const ROOM_SELECT_ID = 'late-entry-room'
+const CONTROL_ROOM_SELECT_ID = 'late-entry-control-room'
 
 export function LateEntryPage() {
   const { examId } = useParams<{ examId: string }>()
@@ -94,19 +100,28 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
   const open = exam.estado === EXAM_STATUS.EN_CURSO
   // El ingreso con retraso termina en el fin programado, aunque el examen siga EN_CURSO hasta su cierre.
   const timeOver = useLateEntryDeadline(exam.fin_programado_en, exam.hora_servidor_en)
-  const controlRoomId = isTeacher ? null : exam.id_ambiente_asignado
+  // El docente elige desde qué ambiente verifica, como en HU-032; el auxiliar usa el suyo.
+  const [teacherControlRoomId, setTeacherControlRoomId] = useState<number | null>(
+    exam.ambientes[0]?.id_ambiente ?? null
+  )
+  const controlRoomId = isTeacher ? teacherControlRoomId : exam.id_ambiente_asignado
   const verification = useLateEntryVerification(exam.id_examen, controlRoomId, onConflict)
   const requests = useLateEntryRequests(exam.id_examen, exam.rol_controlador, open && !timeOver)
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null)
   const [confirmingOtherExam, setConfirmingOtherExam] = useState(false)
+  const [reportContext, setReportContext] = useState<ReportIncidentContext | null>(null)
   const focusSisOnReset = useRef(false)
 
-  const { result, sentRequest, busy } = verification
+  const { result, sentRequest, rejectedAttempt, busy } = verification
   const { track } = requests
 
   useEffect(() => {
     setSelectedRoomId(null)
     setConfirmingOtherExam(false)
+  }, [result])
+
+  useEffect(() => {
+    if (result === null) setReportContext(null)
   }, [result])
 
   useEffect(() => {
@@ -125,6 +140,27 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
   }
 
   const warning = result?.autorizado ? result.otro_examen : null
+
+  function openReport(attempt: CurrentRejectedAttempt | null) {
+    const room = exam.ambientes.find((item) => item.id_ambiente === attempt?.roomId)
+    if (!attempt || attempt.reported || !room) return
+    setReportContext({
+      flow: REPORT_INCIDENT_FLOW.LATE_ENTRY,
+      examId: exam.id_examen, examName: exam.nombre_examen, roomId: attempt.roomId, attemptId: attempt.attemptId,
+      student: attempt.student, roomName: room.nro_aula, reason: attempt.reason,
+      timeLabel: attemptTime(attempt.registeredAt),
+    })
+  }
+
+  async function rejectAndReport() {
+    openReport(await verification.reject())
+  }
+
+  function reported(alreadyReported: boolean) {
+    if (reportContext) verification.markReported(reportContext.attemptId)
+    verification.setNotice(alreadyReported ? REPORT_INCIDENT_MESSAGES.alreadyReported : REPORT_INCIDENT_MESSAGES.sent)
+    setReportContext(null)
+  }
 
   async function resolveInline(requestId: number, approve: boolean) {
     const done = approve
@@ -274,7 +310,21 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
         </p>
       )}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-        <div className={result ? 'hidden lg:block' : ''}>
+        <div className={`space-y-5${result ? ' hidden lg:block' : ''}`}>
+          {isTeacher && (
+            <div className="space-y-1.5 rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+              <Label htmlFor={CONTROL_ROOM_SELECT_ID}>{LATE_ENTRY_MESSAGES.controlRoomField}</Label>
+              <FormSelect
+                id={CONTROL_ROOM_SELECT_ID}
+                value={teacherControlRoomId === null ? undefined : String(teacherControlRoomId)}
+                placeholder={LATE_ENTRY_MESSAGES.roomPlaceholder}
+                options={exam.ambientes.map((room) => ({ value: String(room.id_ambiente), label: room.nro_aula }))}
+                onValueChange={(value) => setTeacherControlRoomId(Number(value))}
+                disabled={busy !== null || result !== null}
+                className="sm:max-w-xs"
+              />
+            </div>
+          )}
           <IdentificationForm
             examId={exam.id_examen}
             sis={verification.sis}
@@ -299,7 +349,9 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
               caution={warning ? LATE_ENTRY_MESSAGES.cautionTitle : undefined}
               actionsLayout="card"
               onConfirm={confirm}
-              onReject={next}
+              onReject={warning ? () => void rejectAndReport() : next}
+              onReport={rejectedAttempt ? () => openReport(rejectedAttempt) : undefined}
+              reported={rejectedAttempt?.reported}
               onNext={next}
               extra={extra()}
               footer={footer()}
@@ -307,6 +359,14 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
           ) : list}
         </div>
       </div>
+      {reportContext && (
+        <ReportIncidentDialog
+          key={reportContext.attemptId}
+          context={reportContext}
+          onClose={() => setReportContext(null)}
+          onReported={reported}
+        />
+      )}
       <LateEntryOtherExamDialog
         open={confirmingOtherExam}
         studentName={result?.estudiante?.nombre_completo ?? ''}

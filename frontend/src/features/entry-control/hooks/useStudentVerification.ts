@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { ApiError } from '@/lib/api-client'
-import { rejectionLabel } from '../components/entryAttemptPresentation'
 import { entryControlService } from '../services/entryControlService'
 import type { CurrentRejectedAttempt, EntryActionInput, RejectionReason, StudentMatch, Verification, VerificationInput } from '../types/entry-control.types'
 import { CI_MAX_LENGTH, digitsOnly, isValidCi, isValidSis, SIS_LENGTH } from '../utils/identificationValidation'
+import { toManualRejection, toRejectedAttempt, withManualRejection, withReported } from '../utils/rejectedAttempt'
 
 export function useStudentVerification(examId: number, roomId: number | null, onChange: () => void) {
   const [sis, setSis] = useState('')
@@ -71,10 +71,7 @@ export function useStudentVerification(examId: number, roomId: number | null, on
 
   function applyVerdict(verdict: Verification, selectedRoomId: number) {
     setResult(verdict)
-    setRejectedAttempt(!verdict.autorizado && verdict.id_intento && verdict.estudiante ? {
-      attemptId: verdict.id_intento, student: verdict.estudiante, roomId: selectedRoomId,
-      registeredAt: verdict.registrado_en, reason: verdict.motivo, reported: verdict.reportado ?? false,
-    } : null)
+    setRejectedAttempt(toRejectedAttempt(verdict, selectedRoomId))
     if (!verdict.autorizado && verdict.id_intento) onChange()
   }
 
@@ -139,15 +136,9 @@ export function useStudentVerification(examId: number, roomId: number | null, on
       if (!rejected.registrado || !rejected.id_intento) {
         throw new Error('No se pudo registrar el rechazo. Verifique nuevamente al estudiante.')
       }
-      const attempt: CurrentRejectedAttempt = {
-        attemptId: rejected.id_intento, student: result.estudiante, roomId,
-        registeredAt: rejected.registrado_en, reason: rejectionLabel(rejected.motivo), reported: false,
-      }
+      const attempt = toManualRejection(rejected, result.estudiante, roomId)
       setRejectedAttempt(attempt)
-      setResult({
-        ...result, autorizado: false, veredicto: 'RECHAZADO_MANUAL', motivo: attempt.reason,
-        id_intento: attempt.attemptId, registrado_en: attempt.registeredAt, reportado: false,
-      })
+      setResult(withManualRejection(result, attempt))
       setNotice('Intento rechazado y registrado.')
       onChange()
       return attempt
@@ -161,7 +152,7 @@ export function useStudentVerification(examId: number, roomId: number | null, on
 
   function markReported(attemptId: number) {
     setRejectedAttempt((current) => current?.attemptId === attemptId ? { ...current, reported: true } : current)
-    setResult((current) => current?.id_intento === attemptId ? { ...current, reportado: true } : current)
+    setResult((current) => withReported(current, attemptId))
   }
 
   return { sis, ci, result, rejectedAttempt, busy, error, notice, setNotice, changeSis, changeCi, choose, verify, confirm, reject, reset, markReported }
