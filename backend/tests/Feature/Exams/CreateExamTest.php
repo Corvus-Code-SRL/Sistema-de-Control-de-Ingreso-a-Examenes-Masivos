@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Exams;
 
+use App\Jobs\OpenEntryControlJob;
 use App\Models\Exam;
 use App\Models\AuditLog;
 use Carbon\Carbon;
@@ -57,6 +58,24 @@ class CreateExamTest extends TestCase
             'id_examen'   => $response->json('data.id_examen'),
             'id_ambiente' => $this->aulaId,
         ]);
+    }
+
+    public function test_guarda_la_eleccion_sin_abrir_control_de_ingreso(): void
+    {
+        $response = $this->postJson(self::URL, $this->validPayload(['control_ingreso' => false]))
+            ->assertCreated()
+            ->assertJsonPath('data.control_ingreso', false);
+        $exam = Exam::query()->findOrFail($response->json('data.id_examen'));
+        $this->assertFalse($exam->control_ingreso);
+
+        Carbon::setTestNow(Carbon::parse($exam->fecha->toDateString() . ' 07:50', config('sciem.zona_horaria')));
+        try {
+            $this->getJson('/api/control-ingreso/examenes')->assertOk()->assertJsonPath('data', []);
+            app()->call([app(OpenEntryControlJob::class), 'handle']);
+            $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_guarda_la_apertura_sin_maximo_y_rechaza_valores_negativos(): void

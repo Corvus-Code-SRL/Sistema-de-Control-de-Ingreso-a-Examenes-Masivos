@@ -19,6 +19,7 @@ class ExamResource extends JsonResource
             'hora_fin'           => $this->formatTime($this->hora_fin),
             'duracion'           => $this->duracion,
             'minutos_apertura'   => $this->minutos_apertura,
+            'control_ingreso'    => (bool) $this->control_ingreso,
             'normas'             => $this->normas,
             'estado'             => $this->estado,
             'inicio_real_en'     => $this->inicio_real_en ? $this->inicio_real_en->toIso8601String() : null,

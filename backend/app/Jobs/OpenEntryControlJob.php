@@ -28,6 +28,7 @@ class OpenEntryControlJob implements ShouldQueue
         $localNow = $now->format('Y-m-d H:i:s');
         $exams = Exam::query()
             ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_INGRESO])
+            ->where('control_ingreso', true)
             ->whereRaw(
                 '(fecha + hora_inicio - make_interval(mins => minutos_apertura)) <= CAST(? AS timestamp)',
                 [$localNow]

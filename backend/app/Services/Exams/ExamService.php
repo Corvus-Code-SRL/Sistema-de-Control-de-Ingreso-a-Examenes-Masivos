@@ -408,6 +408,10 @@ class ExamService
             $attributes['minutos_apertura'] = (int) $data['minutos_apertura'];
         }
 
+        if (array_key_exists('control_ingreso', $data)) {
+            $attributes['control_ingreso'] = (bool) $data['control_ingreso'];
+        }
+
         return $attributes;
     }
 

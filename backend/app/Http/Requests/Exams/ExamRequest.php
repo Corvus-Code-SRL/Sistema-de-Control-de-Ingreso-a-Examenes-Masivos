@@ -74,6 +74,7 @@ abstract class ExamRequest extends FormRequest
             // Menos de un día: la hora de fin se guarda como hora del día.
             'duracion'      => ['required', 'integer', 'min:1', 'max:1439'],
             'minutos_apertura' => ['sometimes', 'required', 'integer', 'min:0'],
+            'control_ingreso' => ['sometimes', 'required', 'boolean'],
             'ambientes'     => ['required', 'array', 'min:1'],
             'ambientes.*'   => [
                 'bail',
