@@ -66,13 +66,13 @@ describe('AppRouter — detalle del grupo', () => {
     expect(app.pathname).toBe('/grupos/100/editar')
   })
 
-  it('la carga de nómina tiene su propia URL', async () => {
+  it('la carga de nómina tiene su propia URL y la vieja lleva a ella con el grupo elegido', async () => {
     stubBackend()
 
     const app = renderApp('/grupos/100/nomina')
 
     expect(await screen.findByText('Carga de nómina', {}, BOOT)).toBeInTheDocument()
-    expect(app.pathname).toBe('/grupos/100/nomina')
+    expect(app.pathname).toBe('/cargar-nomina')
   })
 })
 
@@ -80,12 +80,11 @@ describe('AppRouter — navegación contextual', () => {
   afterEach(() => window.localStorage.clear())
 
   it.each([
-    ['Ver exámenes', '/grupos/100/examenes', 'Exámenes del grupo'],
-    ['Auxiliares', '/grupos/100/auxiliares', 'Auxiliares del grupo'],
-  ])('%s abre su página independiente y permite regresar', async (action, destination, title) => {
+    ['/grupos/100/examenes', 'Exámenes del grupo'],
+    ['/grupos/100/auxiliares', 'Auxiliares del grupo'],
+  ])('%s es una página independiente que permite regresar al grupo', async (destination, title) => {
     stubBackend()
-    const app = renderApp('/grupos/100')
-    await userEvent.click(await screen.findByRole('link', { name: action }, BOOT))
+    const app = renderApp(destination)
     await waitFor(() => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument()
       expect(screen.getByRole('heading', { name: title })).toBeInTheDocument()

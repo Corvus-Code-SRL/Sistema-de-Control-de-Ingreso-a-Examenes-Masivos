@@ -12,13 +12,13 @@ export function groupEditPath(groupId: number): string {
 }
 
 /**
- * Carga de nómina del grupo (HU-021).
+ * Carga de nómina (HU-021) con el grupo ya elegido.
  *
- * Hoy la sirve una vista interina que monta el asistente de carga; HU-021 publicará la suya en
- * esta misma URL, así que los enlaces no cambian.
+ * La carga vive en su propia pantalla, `/cargar-nomina`, a la que se entra desde el menú; este
+ * enlace solo la abre con el grupo preseleccionado (por ejemplo, tras registrar un grupo).
  */
 export function groupRosterPath(groupId: number): string {
-  return `/grupos/${groupId}/nomina`
+  return `/cargar-nomina?grupo=${groupId}`
 }
 
 /** Exámenes asociados al grupo. */

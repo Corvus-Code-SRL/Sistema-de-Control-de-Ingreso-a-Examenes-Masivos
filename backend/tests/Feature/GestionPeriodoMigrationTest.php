@@ -20,6 +20,9 @@ class GestionPeriodoMigrationTest extends TestCase
     private const OFFERING = '2026_10_12_000002_create_oferta_academica.php';
     private const RENAME = '2026_10_12_000003_rename_activo_to_vigente.php';
 
+    /** Depende de oferta_academica: se revierte antes que ella (HU-021 multicarrera). */
+    private const GROUP_OFFERING = '2026_11_06_000001_create_grupo_oferta_and_add_carrera_to_grupo_estudiante.php';
+
     private int $careerId;
     private int $calculusId;
     private int $algebraId;
@@ -32,6 +35,7 @@ class GestionPeriodoMigrationTest extends TestCase
         require_once database_path('migrations/' . self::NORMALIZE);
         require_once database_path('migrations/' . self::OFFERING);
         require_once database_path('migrations/' . self::RENAME);
+        require_once database_path('migrations/' . self::GROUP_OFFERING);
     }
 
     protected function tearDown(): void
@@ -44,6 +48,7 @@ class GestionPeriodoMigrationTest extends TestCase
 
     private function migrateDown(): void
     {
+        (new \CreateGrupoOfertaAndAddCarreraToGrupoEstudiante())->down();
         (new \RenameActivoToVigente())->down();
         (new \CreateOfertaAcademica())->down();
         (new \NormalizeGestionAndPeriodo())->down();

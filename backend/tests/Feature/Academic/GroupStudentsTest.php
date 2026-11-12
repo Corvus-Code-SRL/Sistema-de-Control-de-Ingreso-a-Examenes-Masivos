@@ -60,7 +60,7 @@ class GroupStudentsTest extends TestCase
         $student = $this->getJson($this->url($this->grupoPropioId))->assertOk()->json('data.0');
 
         $this->assertSame(
-            ['id_estudiante', 'cod_sis', 'apellido_paterno', 'apellido_materno', 'nombre'],
+            ['id_estudiante', 'cod_sis', 'apellido_paterno', 'apellido_materno', 'nombre', 'carrera'],
             array_keys($student)
         );
     }
