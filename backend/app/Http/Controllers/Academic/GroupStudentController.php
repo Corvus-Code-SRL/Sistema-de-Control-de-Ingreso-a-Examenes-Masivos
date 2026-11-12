@@ -44,10 +44,14 @@ class GroupStudentController extends Controller
             $group,
             $teacherId,
             $request->search(),
-            $request->page()
+            $request->page(),
+            $request->careerId()
         );
 
         return GroupStudentResource::collection($result['students'])
-            ->additional(['meta' => ['total_inscritos' => $result['total_inscritos']]]);
+            ->additional(['meta' => [
+                'total_inscritos' => $result['total_inscritos'],
+                'por_carrera' => $result['por_carrera'],
+            ]]);
     }
 }

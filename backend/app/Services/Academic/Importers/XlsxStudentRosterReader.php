@@ -16,6 +16,9 @@ class XlsxStudentRosterReader implements StudentRosterReader
         'nombres',
     ];
 
+    /** Columna opcional (HU-021 multicarrera): código o nombre de la carrera del estudiante. */
+    private const CAREER_HEADER = 'carrera';
+
     /** Valor por defecto cuando no hay aplicación (pruebas unitarias); el contenedor inyecta la configuración. */
     private const DEFAULT_MAX_ROWS = 2000;
 
@@ -108,7 +111,10 @@ class XlsxStudentRosterReader implements StudentRosterReader
                     ),
                     $this->cellValue(
                         $row[$headers['nombres']] ?? null
-                    )
+                    ),
+                    isset($headers[self::CAREER_HEADER])
+                        ? $this->cellValue($row[$headers[self::CAREER_HEADER]] ?? null)
+                        : null
                 );
             }
 

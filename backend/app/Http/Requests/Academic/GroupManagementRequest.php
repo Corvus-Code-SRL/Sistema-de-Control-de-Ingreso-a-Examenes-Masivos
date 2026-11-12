@@ -19,6 +19,9 @@ abstract class GroupManagementRequest extends FormRequest
     /** Máximo de un integer de PostgreSQL: por encima la consulta falla con 500. */
     protected const MAX_ID = 2147483647;
 
+    /** Tope de carreras adicionales por grupo (HU-021 multicarrera). */
+    protected const MAX_ADDITIONAL_CAREERS = 10;
+
     public function authorize(CurrentUser $currentUser, UserRoleService $roles): bool
     {
         return $roles->isTeacher($currentUser->id());

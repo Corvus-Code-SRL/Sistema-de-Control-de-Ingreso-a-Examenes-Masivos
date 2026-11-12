@@ -18,6 +18,9 @@ class StoreGroupRequest extends GroupManagementRequest
             'id_materia' => ['required', 'integer', 'min:1', 'max:' . self::MAX_ID],
             'num_grupo' => ['required', 'string', 'max:5'],
             'id_periodo' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_ID],
+            // HU-021 multicarrera: otras carreras que el grupo atiende, además de la principal.
+            'carreras_adicionales' => ['sometimes', 'array', 'max:' . self::MAX_ADDITIONAL_CAREERS],
+            'carreras_adicionales.*' => ['integer', 'min:1', 'max:' . self::MAX_ID, 'distinct'],
         ];
     }
 
@@ -28,6 +31,7 @@ class StoreGroupRequest extends GroupManagementRequest
             'id_materia' => 'materia',
             'num_grupo' => 'número de grupo',
             'id_periodo' => 'período académico',
+            'carreras_adicionales' => 'carreras adicionales',
         ];
     }
 
@@ -46,6 +50,13 @@ class StoreGroupRequest extends GroupManagementRequest
             'id_periodo.integer' => 'El identificador del período debe ser numérico.',
             'id_periodo.min' => 'El identificador del período no es válido.',
             'id_periodo.max' => 'El identificador del período no es válido.',
+            'carreras_adicionales.array' => 'Las carreras adicionales deben enviarse como lista.',
+            'carreras_adicionales.max' => 'Un grupo puede atender como máximo '
+                . self::MAX_ADDITIONAL_CAREERS . ' carreras adicionales.',
+            'carreras_adicionales.*.integer' => 'El identificador de la carrera debe ser numérico.',
+            'carreras_adicionales.*.min' => 'El identificador de la carrera no es válido.',
+            'carreras_adicionales.*.max' => 'El identificador de la carrera no es válido.',
+            'carreras_adicionales.*.distinct' => 'Una carrera se repite en la lista.',
         ];
     }
 }

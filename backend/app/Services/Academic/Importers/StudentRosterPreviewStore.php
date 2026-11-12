@@ -20,7 +20,8 @@ class StudentRosterPreviewStore
     public function store(
         int $groupId,
         string $teacherId,
-        StudentRosterAnalysisResult $analysis
+        StudentRosterAnalysisResult $analysis,
+        ?int $defaultCareerId = null
     ): string {
         $token = bin2hex(random_bytes(32));
 
@@ -35,6 +36,7 @@ class StudentRosterPreviewStore
                     'sis_code' => $row->sisCode(),
                     'last_names' => $row->lastNames(),
                     'first_names' => $row->firstNames(),
+                    'career_text' => $row->careerText(),
                 ];
             },
             $analysis->rows()
@@ -46,6 +48,7 @@ class StudentRosterPreviewStore
                 'group_id' => $groupId,
                 'teacher_id' => $teacherId,
                 'rows' => $rows,
+                'default_career_id' => $defaultCareerId,
             ],
             self::TTL_SECONDS
         );
@@ -91,14 +94,18 @@ class StudentRosterPreviewStore
                 (int) $row['row_number'],
                 $this->nullableString($row['sis_code']),
                 $this->nullableString($row['last_names']),
-                $this->nullableString($row['first_names'])
+                $this->nullableString($row['first_names']),
+                $this->nullableString($row['career_text'] ?? null)
             );
         }
+
+        $defaultCareerId = $data['default_career_id'] ?? null;
 
         return new StudentRosterPreview(
             (int) $data['group_id'],
             (string) $data['teacher_id'],
-            $rows
+            $rows,
+            $defaultCareerId === null ? null : (int) $defaultCareerId
         );
     }
 

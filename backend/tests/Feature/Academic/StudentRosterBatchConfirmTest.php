@@ -67,7 +67,8 @@ class StudentRosterBatchConfirmTest extends TestCase
 
     /**
      * Una consulta más que antes: el período activo ya no sale de la configuración sino de
-     * gestion_periodo.vigente. El costo sigue siendo constante respecto de las filas.
+     * gestion_periodo.vigente. Y otra por las carreras del grupo (HU-021 multicarrera). El costo
+     * sigue siendo constante respecto de las filas.
      */
     public function test_confirmar_50_filas_nuevas_cuesta_11_consultas_o_menos(): void
     {
@@ -78,7 +79,7 @@ class StudentRosterBatchConfirmTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('data.estudiantes_creados', 50);
         $response->assertJsonPath('data.estudiantes_inscritos', 50);
-        $this->assertLessThanOrEqual(13, $queries, "Se esperaban 13 consultas o menos:\n" . implode("\n", $statements));
+        $this->assertLessThanOrEqual(14, $queries, "Se esperaban 14 consultas o menos:\n" . implode("\n", $statements));
         $this->assertSame(50, $this->enrolled());
         $this->assertSame(3, count(array_filter($statements, function (string $sql): bool {
        return strpos($sql, 'insert into') === 0;
@@ -93,7 +94,7 @@ class StudentRosterBatchConfirmTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('data.estudiantes_creados', 1000);
-        $this->assertLessThanOrEqual(14, $queries, "Se esperaban 14 consultas o menos:\n" . implode("\n", $statements));
+        $this->assertLessThanOrEqual(15, $queries, "Se esperaban 15 consultas o menos:\n" . implode("\n", $statements));
         $this->assertSame(1000, $this->enrolled());
     }
 
@@ -116,7 +117,7 @@ class StudentRosterBatchConfirmTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('data.estudiantes_creados', 0);
         $response->assertJsonPath('data.estudiantes_inscritos', 50);
-        $this->assertLessThanOrEqual(12, $queries);
+        $this->assertLessThanOrEqual(13, $queries);
         $this->assertSame(50, $this->enrolled());
     }
 

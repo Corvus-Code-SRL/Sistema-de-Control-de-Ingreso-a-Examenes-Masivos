@@ -14,6 +14,8 @@ use App\Services\Academic\Importers\StudentRosterRow;
 use App\Services\Academic\Importers\StudentRosterRowValidator;
 use App\Services\Academic\Importers\StudentRosterStudentCreator;
 use App\Services\Academic\Importers\StudentRosterStudentMapper;
+use App\Services\Academic\GroupCareerService;
+use App\Services\Academic\Importers\StudentRosterCareerResolver;
 use App\Services\Academic\StudentRosterGroupAccess;
 use App\Services\Academic\SubjectCatalogService;
 use App\Services\Exams\ExamRosterLockService;
@@ -317,7 +319,9 @@ class StudentRosterConfirmationServiceTest extends TestCase
             new StudentRosterRowValidator()
                 ),
             $confirmer,
-            new AuditLogService()
+            new AuditLogService(),
+            new GroupCareerService(),
+            new StudentRosterCareerResolver()
             );
 
         try {
@@ -478,7 +482,9 @@ class StudentRosterConfirmationServiceTest extends TestCase
                     new StudentRosterStudentMapper()
                 )
             ),
-            new AuditLogService()
+            new AuditLogService(),
+            new GroupCareerService(),
+            new StudentRosterCareerResolver()
     );
 }
 

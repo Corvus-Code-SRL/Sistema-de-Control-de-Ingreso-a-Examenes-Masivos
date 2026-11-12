@@ -48,7 +48,7 @@ export function useGroupStudentsFilters() {
 
     const timer = window.setTimeout(() => {
       lastWritten.current = term
-      update(() => ({ q: term, page: 1 }), true)
+      update((current) => ({ ...current, q: term, page: 1 }), true)
     }, SEARCH_DEBOUNCE_MS)
 
     return () => window.clearTimeout(timer)
@@ -69,8 +69,18 @@ export function useGroupStudentsFilters() {
   const clear = useCallback(() => {
     lastWritten.current = ''
     setSearchInput('')
-    update(() => ({ q: '', page: 1 }), false)
+    update((current) => ({ ...current, q: '', page: 1 }), false)
   }, [update])
+
+  /** HU-021 (multicarrera): `null` vuelve a «Todas las carreras». Cambiar de carrera vuelve a la página 1. */
+  const setCareer = useCallback(
+    (carrera: number | null) =>
+      update(
+        (current) => ({ q: current.q, page: 1, ...(carrera === null ? {} : { carrera }) }),
+        false
+      ),
+    [update]
+  )
 
   return {
     filters,
@@ -78,5 +88,6 @@ export function useGroupStudentsFilters() {
     setSearchInput,
     setPage,
     clear,
+    setCareer,
   }
 }
