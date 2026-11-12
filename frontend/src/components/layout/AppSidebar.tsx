@@ -4,6 +4,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { AREA_LABELS, LOGIN_PATH, useAuth, useCurrentUser } from '@/features/auth'
 import { usePendingIncidentsCount } from '@/features/incidents'
+import { usePendingInvitationsCount } from '@/features/invitations'
 import type { NavBadge } from './navigation'
 import { findActiveItem, visibleSections } from './navigationSelectors'
 import { SidebarSection } from './SidebarSection'
@@ -128,7 +129,11 @@ export function AppSidebar({
     section.items.some((item) => item.badge === 'pendingIncidents')
   )
   const pendingIncidents = usePendingIncidentsCount(showsPendingIncidents)
-  const badges: Partial<Record<NavBadge, number>> = { pendingIncidents }
+  const showsPendingInvitations = sections.some((section) =>
+    section.items.some((item) => item.badge === 'pendingInvitations')
+  )
+  const pendingInvitations = usePendingInvitationsCount(showsPendingInvitations)
+  const badges: Partial<Record<NavBadge, number>> = { pendingIncidents, pendingInvitations }
 
   async function handleLogout() {
     await cerrarSesion()

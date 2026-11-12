@@ -12,6 +12,7 @@ const session = vi.hoisted(() => ({
   userId: 'user-1' as string | undefined,
   hasSession: true,
   pending: 0,
+  invitations: 0,
   logout: vi.fn()
 }))
 
@@ -53,6 +54,16 @@ vi.mock('@/features/incidents', () => ({
   }
 }))
 
+const pendingInvitationsSpy = vi.hoisted(() => vi.fn())
+
+vi.mock('@/features/invitations', () => ({
+  usePendingInvitationsCount: (enabled: boolean) => {
+    pendingInvitationsSpy(enabled)
+
+    return enabled ? session.invitations : 0
+  }
+}))
+
 type RoleName = 'Administrador' | 'Docente' | 'Auxiliar' | 'Invitado'
 
 function renderSidebar(
@@ -87,8 +98,10 @@ beforeEach(() => {
   session.userId = 'user-1'
   session.hasSession = true
   session.pending = 0
+  session.invitations = 0
   session.logout.mockReset()
   pendingIncidentsSpy.mockClear()
+  pendingInvitationsSpy.mockClear()
   vi.restoreAllMocks()
 })
 
@@ -484,6 +497,7 @@ describe('AppSidebar — entradas y estado activo', () => {
       ['Mis auxiliares', '/mis-auxiliares'],
       ['Programados', '/examenes/programados'],
       ['Registrar examen', '/examenes/nuevo'],
+      ['Invitaciones recibidas', '/invitaciones'],
       ['Control de ingreso', '/control-ingreso'],
       ['En curso', '/examenes/en-curso'],
       ['Registrar estudiante con retraso', '/retrasos'],
@@ -678,6 +692,25 @@ describe('AppSidebar — contador de incidencias', () => {
 
     expect(pendingIncidentsSpy).toHaveBeenCalledWith(false)
     expect(pendingIncidentsSpy).not.toHaveBeenCalledWith(true)
+  })
+})
+
+describe('AppSidebar — contador de invitaciones (HU-027)', () => {
+  it('muestra las invitaciones por responder junto a «Invitaciones recibidas»', async () => {
+    const user = userEvent.setup()
+    session.invitations = 2
+    renderSidebar('Docente', '/invitaciones')
+    await openAllSections(user)
+
+    expect(screen.getByRole('link', { name: /Invitaciones recibidas/ })).toHaveTextContent('2')
+    expect(pendingInvitationsSpy).toHaveBeenCalledWith(true)
+  })
+
+  it('no se pide a quien no ve esa entrada', () => {
+    renderSidebar('Administrador', '/cuentas')
+
+    expect(pendingInvitationsSpy).toHaveBeenCalledWith(false)
+    expect(pendingInvitationsSpy).not.toHaveBeenCalledWith(true)
   })
 })
 
