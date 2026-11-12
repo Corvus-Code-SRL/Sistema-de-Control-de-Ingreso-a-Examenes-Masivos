@@ -85,18 +85,6 @@ class UpdateExamTest extends TestCase
         ]))->assertOk()->assertJsonPath('data.minutos_apertura', 5);
     }
 
-    public function test_actualiza_y_conserva_la_eleccion_de_control_de_ingreso(): void
-    {
-        $exam = $this->createExam([], [$this->aulaId]);
-
-        $this->putJson($this->url($exam), $this->validPayload([
-            'control_ingreso' => false,
-        ]))->assertOk()->assertJsonPath('data.control_ingreso', false);
-
-        $this->putJson($this->url($exam), $this->validPayload())
-            ->assertOk()->assertJsonPath('data.control_ingreso', false);
-    }
-
     /**
      * Descubierto en HU-09: quitar del examen un ambiente que ya tenía un auxiliar
      * asignado violaba la FK compuesta examen_auxiliar → examen_ambiente (500).

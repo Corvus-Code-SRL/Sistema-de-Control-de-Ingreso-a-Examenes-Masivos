@@ -107,33 +107,19 @@ export function ExamForm({ formData, subjects, errors, updateFormData }: Props) 
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1">
-            <label htmlFor="categoria" className="block text-sm font-medium text-foreground">Categoría <span className="text-danger">*</span></label>
-            <FormSelect id="categoria" className="h-9 border-border-strong bg-card px-3 text-sm font-normal data-[size=default]:h-9" value={formData.categoria} placeholder="Seleccionar categoría"
+        <div className="space-y-1">
+          <label htmlFor="categoria" className="block text-sm font-medium text-foreground">Categoría <span className="text-danger">*</span></label>
+          <FormSelect id="categoria" className="h-9 border-border-strong bg-card px-3 text-sm font-normal data-[size=default]:h-9" value={formData.categoria} placeholder="Seleccionar categoría"
               options={[
                 { value: 'REGULAR', label: 'REGULAR' },
                 { value: 'MESA', label: 'MESA' },
                 { value: 'ADMISION', label: 'ADMISIÓN' },
               ]}
               onValueChange={(value) => updateFormData({ categoria: value as CreateExamFormData['categoria'] })} />
-          </div>
-          <div className="space-y-1">
-            <label htmlFor="control_ingreso" className="block text-sm font-medium text-foreground">¿Realizar control de ingreso?</label>
-            <div className="flex h-9 items-center gap-3 text-sm text-foreground">
-              <input id="control_ingreso" type="checkbox" role="switch"
-                checked={formData.control_ingreso ?? true}
-                onChange={(event) => updateFormData({ control_ingreso: event.target.checked })}
-                className="peer sr-only" />
-              <label htmlFor="control_ingreso" aria-hidden="true" className="relative h-6 w-11 cursor-pointer rounded-full bg-muted ring-1 ring-border-strong transition-colors peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-card after:shadow-sm after:transition-transform peer-checked:after:translate-x-5" />
-              <span>{formData.control_ingreso === false ? 'No' : 'Sí'}</span>
-            </div>
-          </div>
         </div>
-        {formData.control_ingreso !== false && (
-          <div className="space-y-1">
-            <label htmlFor="minutos_apertura" className="block text-sm font-medium text-foreground">Apertura del control de ingreso</label>
-            <div className="relative">
+        <div className="space-y-1">
+          <label htmlFor="minutos_apertura" className="block text-sm font-medium text-foreground">Apertura del control de ingreso</label>
+          <div className="relative">
               <input id="minutos_apertura" type="number" min={0} step={1}
                 value={formData.minutos_apertura === null ? '' : formData.minutos_apertura ?? 10}
                 onChange={(event) => updateFormData({
@@ -141,10 +127,9 @@ export function ExamForm({ formData, subjects, errors, updateFormData }: Props) 
                 })}
                 className={`${inputClass(Boolean(errors.minutos_apertura))} pr-24`} />
               <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">min antes</span>
-            </div>
-            {errors.minutos_apertura && <p className="text-xs font-medium text-danger">{errors.minutos_apertura}</p>}
           </div>
-        )}
+          {errors.minutos_apertura && <p className="text-xs font-medium text-danger">{errors.minutos_apertura}</p>}
+        </div>
       </div>
     </section>
   )

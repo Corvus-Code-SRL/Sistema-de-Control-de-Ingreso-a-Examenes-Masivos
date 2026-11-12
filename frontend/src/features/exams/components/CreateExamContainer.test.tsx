@@ -92,24 +92,6 @@ describe('CreateExamContainer (HU-024)', () => {
     expect(screen.getByTestId('ubicacion')).toHaveTextContent('/examenes/programados')
   })
 
-  it('sin control muestra la elección en el resumen y el toast', async () => {
-    hook.overrides = {
-      formData: {
-        ...emptyForm,
-        control_ingreso: false,
-        fecha: '2099-10-20',
-        hora_inicio: '08:15',
-      },
-      submitExam: () => hook.onSuccess?.({ ...createdExam, fecha: '2099-10-20', hora_inicio: '08:15', control_ingreso: false }),
-    }
-    renderContainer()
-
-    expect(screen.getByText('No se realizará')).toBeVisible()
-    expect(screen.queryByLabelText('Apertura del control de ingreso')).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: /guardar examen/i }))
-    expect(screen.getByRole('status')).toHaveTextContent('No se realizará control de ingreso.')
-  })
-
   it('tras crear el examen muestra el toast y ofrece acceder a su detalle', async () => {
     hook.overrides = {
       formData: {

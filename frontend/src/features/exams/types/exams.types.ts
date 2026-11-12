@@ -58,7 +58,6 @@ export interface Exam {
   hora_fin: string;
   duracion: number;
   minutos_apertura?: number;
-  control_ingreso?: boolean;
   normas: string | null;
   estado: ExamStatus;
   inicio_real_en?: string | null;
@@ -96,7 +95,6 @@ export interface CreateExamFormData {
   hora_inicio: string;
   duracion: number;
   minutos_apertura?: number | null;
-  control_ingreso?: boolean;
   ambientes: number[];
   grupos: number[];
   normas: string;
@@ -111,7 +109,6 @@ export interface CreateExamDto {
   hora_inicio: string;
   duracion: number;
   minutos_apertura?: number;
-  control_ingreso?: boolean;
   ambientes: number[];
   grupos: number[];
   normas?: string;
@@ -131,7 +128,6 @@ export interface UpdateExamDto {
   hora_inicio: string;
   duracion: number;
   minutos_apertura?: number;
-  control_ingreso?: boolean;
   ambientes: number[];
   normas?: string;
   confirmar_advertencias?: boolean;

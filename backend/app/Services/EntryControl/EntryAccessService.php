@@ -33,7 +33,6 @@ class EntryAccessService
         $exams = Exam::query()
             ->with(['subject', 'career', 'classrooms'])
             ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_INGRESO])
-            ->where('control_ingreso', true)
             ->whereNotNull('duracion')
             ->whereRaw(
                 '(examen.fecha + examen.hora_inicio + make_interval(mins => examen.duracion)) > ?::timestamp',
@@ -188,8 +187,7 @@ class EntryAccessService
             }
         }
 
-        if (! $exam->control_ingreso
-            || ! in_array($exam->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO], true)
+        if (! in_array($exam->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO], true)
             || $exam->duracion === null
             || $this->timing->hasEnded($exam)) {
             throw new ExamStateException('El tiempo de control de ingreso del examen ya terminó.');

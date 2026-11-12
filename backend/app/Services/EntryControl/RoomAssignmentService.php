@@ -28,8 +28,7 @@ class RoomAssignmentService
         DB::transaction(function () use ($examId): void {
             $exam = Exam::query()->whereKey($examId)->lockForUpdate()->firstOrFail();
 
-            if (! $exam->control_ingreso
-                || ! in_array($exam->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO], true)) {
+            if (! in_array($exam->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO], true)) {
                 throw new DomainException('El examen no admite preparación de ambientes.');
             }
 
