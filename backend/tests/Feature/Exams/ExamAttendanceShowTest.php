@@ -11,8 +11,10 @@ use App\Services\EntryControl\RoomAssignmentService;
 use App\Support\RecordStatus;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Tests\Concerns\AssignsIncidentRole;
 use Tests\Concerns\SeedsExamAssistants;
@@ -29,6 +31,23 @@ class ExamAttendanceShowTest extends TestCase
         parent::setUp();
 
         $this->seedExamAssistants();
+    }
+
+    public function test_el_detalle_usa_la_cuota_de_polling_y_respeta_su_limite(): void
+    {
+        config(['sciem.rate_limits.api' => 3, 'sciem.rate_limits.polling' => 1]);
+        $exam = $this->createExam(['estado' => Exam::EN_CURSO]);
+        $routes = Route::getRoutes();
+        $router = $this->app['router'];
+        $detail = $router->gatherRouteMiddleware($routes->getByName('examenes.estudiantes-ingresados.show'));
+        $catalog = $router->gatherRouteMiddleware($routes->getByName('examenes.estudiantes-ingresados'));
+
+        $this->assertContains(ThrottleRequests::class . ':polling', $detail);
+        $this->assertNotContains(ThrottleRequests::class . ':api', $detail);
+        $this->assertContains(ThrottleRequests::class . ':api', $catalog);
+        $this->getJson($this->url($exam))->assertOk();
+        $this->getJson($this->url($exam))->assertStatus(429)->assertHeader('Retry-After');
+        $this->getJson('/api/examenes/estudiantes-ingresados')->assertOk();
     }
 
     public function test_rechaza_el_acceso_directo_de_un_docente_ajeno(): void

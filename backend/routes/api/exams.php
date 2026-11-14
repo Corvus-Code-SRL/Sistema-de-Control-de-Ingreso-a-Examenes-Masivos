@@ -44,6 +44,8 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
         ->name('estudiantes-ingresados');
 
     Route::get('/{exam}/estudiantes-ingresados', [ExamAttendanceController::class, 'show'])
+        ->withoutMiddleware('throttle:api')
+        ->middleware('throttle:polling')
         ->where('exam', '[0-9]{1,9}')
         ->name('estudiantes-ingresados.show');
 
