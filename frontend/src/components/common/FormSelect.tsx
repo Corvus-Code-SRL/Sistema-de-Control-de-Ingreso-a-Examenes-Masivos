@@ -24,6 +24,7 @@ interface FormSelectProps {
   /** Nombre accesible para lectores de pantalla y `getByRole('combobox', { name })`. */
   ariaLabel?: string
   className?: string
+  contentClassName?: string
 }
 
 /** Selector controlado común para formularios; el contenido vive en un portal estable. */
@@ -37,6 +38,7 @@ export function FormSelect({
   invalid = false,
   ariaLabel,
   className,
+  contentClassName,
 }: FormSelectProps) {
   return (
     <Select value={value ?? ''} onValueChange={onValueChange} disabled={disabled}>
@@ -48,7 +50,7 @@ export function FormSelect({
       >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent position="popper" align="start">
+      <SelectContent position="popper" align="start" className={contentClassName}>
         {options.map((option) => (
           <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
             {option.label}
