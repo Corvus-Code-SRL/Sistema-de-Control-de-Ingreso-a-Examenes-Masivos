@@ -1,5 +1,5 @@
 import { apiClient, apiPost, apiPut } from '@/lib/api-client';
-import type { ExamAttendanceExam } from '../types/examAttendance.types';
+import type { ExamAttendanceDetail, ExamAttendanceExam } from '../types/examAttendance.types';
 import { EXAM_ATTENDANCE_PATH } from '../utils/paths';
 import {
   AssignGroupsPayload,
@@ -27,6 +27,13 @@ export const examsService = {
 
   async listAttendanceExams(signal?: AbortSignal): Promise<ExamAttendanceExam[]> {
     const response = await apiClient<DataResponse<ExamAttendanceExam[]>>(EXAM_ATTENDANCE_PATH, { signal });
+    return response.data;
+  },
+
+  async getAttendance(examId: number, signal?: AbortSignal): Promise<ExamAttendanceDetail> {
+    const response = await apiClient<DataResponse<ExamAttendanceDetail>>(
+      `/examenes/${examId}/estudiantes-ingresados`, { signal }
+    );
     return response.data;
   },
 
