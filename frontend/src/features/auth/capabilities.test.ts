@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { areaForRole, capabilitiesOf, hasCapability } from './capabilities'
 
 describe('capacidades por rol', () => {
+  it('la consulta de asistencia tiene acceso propio para docente, invitado y auxiliar', () => {
+    for (const role of ['Docente', 'Invitado', 'Auxiliar']) {
+      expect(hasCapability(role, 'asistencia.consultar')).toBe(true)
+    }
+    expect(hasCapability('Administrador', 'asistencia.consultar')).toBe(false)
+    expect(hasCapability(null, 'asistencia.consultar')).toBe(false)
+  })
+
   it('situaciones excepcionales permite docente, invitado y auxiliar, pero no administrador', () => {
     expect(hasCapability('Docente', 'situaciones.registrar')).toBe(true)
     expect(hasCapability('Invitado', 'situaciones.registrar')).toBe(true)

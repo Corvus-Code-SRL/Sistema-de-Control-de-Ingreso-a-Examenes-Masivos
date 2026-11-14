@@ -29,6 +29,7 @@ export type AccessFeature =
   | 'special_cases'
   | 'invite_teachers'
   | 'audit_log'
+  | 'exam_attendance'
 
 /**
  * Qué roles ejercen cada función. El Invitado (docente sin código SIS) ejerce la docencia, habilita
@@ -46,6 +47,7 @@ export const ACCESS_BY_FEATURE: Record<AccessFeature, readonly RoleName[]> = {
   special_cases: ['Docente'],
   invite_teachers: ['Docente'],
   audit_log: ['Administrador'],
+  exam_attendance: ['Docente', 'Invitado', 'Auxiliar'],
 }
 
 const CAPABILITIES_BY_FEATURE = {
@@ -64,6 +66,7 @@ const CAPABILITIES_BY_FEATURE = {
   special_cases: ['casos-especiales.gestionar'],
   invite_teachers: ['docentes.invitar'],
   audit_log: ['bitacora.consultar'],
+  exam_attendance: ['asistencia.consultar'],
 } as const
 
 const ROLE_OWN_CAPABILITIES = {
