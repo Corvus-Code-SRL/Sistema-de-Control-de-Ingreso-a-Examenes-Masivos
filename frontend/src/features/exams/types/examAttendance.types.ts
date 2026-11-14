@@ -15,7 +15,7 @@ export interface ExamAttendanceStudent {
   id_estudiante: number
   nombre_completo: string
   cod_sis: string
-  ci?: string | null
+  ci: string | null
   carrera: { id_carrera: number; nombre: string } | null
   id_ambiente: number | null
   ambiente: string | null
