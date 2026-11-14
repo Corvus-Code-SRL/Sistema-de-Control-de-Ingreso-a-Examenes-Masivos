@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Exams\ExamInProgressController;
 use App\Http\Controllers\Exams\AssistantClassroomController;
+use App\Http\Controllers\Exams\ExamAttendanceController;
 use App\Http\Controllers\Exams\ExamController;
 use App\Http\Controllers\Exams\ExamHistoryController;
 use App\Http\Controllers\Exams\ExamGroupController;
@@ -38,6 +39,9 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
 
     Route::post('/', [ExamController::class, 'store'])
         ->name('store');
+
+    Route::get('/estudiantes-ingresados', [ExamAttendanceController::class, 'index'])
+        ->name('estudiantes-ingresados');
 
     Route::get('/{exam}', [ExamController::class, 'show'])
         ->where('exam', '[0-9]{1,9}')
