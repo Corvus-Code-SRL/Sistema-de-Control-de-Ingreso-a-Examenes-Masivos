@@ -32,6 +32,8 @@ class LateEntryIncidentReportTest extends TestCase
 
     private const WRONG_CI = '0000001';
     private const DESCRIPTION = 'Presentó un carnet que no corresponde a la fotografía.';
+    /** Id de ambiente que no pertenece al examen sembrado. */
+    private const ROOM_OUTSIDE_EXAM = 999999;
 
     protected function setUp(): void
     {
@@ -210,6 +212,44 @@ class LateEntryIncidentReportTest extends TestCase
             'id_ambiente' => $this->otraAulaId,
             'motivo' => 'DECISION_CONTROLADOR',
         ])->assertStatus(409)->assertJsonPath('veredicto', LateEntryException::EXAM_NOT_IN_PROGRESS);
+
+        $this->assertSame(0, $this->attemptsCount());
+    }
+
+    public function test_el_docente_no_verifica_desde_un_ambiente_ajeno_al_examen(): void
+    {
+        $this->verify($this->secondStudentId, self::ROOM_OUTSIDE_EXAM, ['ci' => self::WRONG_CI])
+            ->assertForbidden()
+            ->assertJsonPath('message', EntryControlSnapshotService::ROOM_NOT_IN_EXAM_MESSAGE);
+
+        $this->assertSame(0, $this->attemptsCount());
+    }
+
+    public function test_el_auxiliar_no_rechaza_desde_un_ambiente_ajeno(): void
+    {
+        $this->actAsUserId($this->assistantBId);
+
+        $this->postJson($this->lateEntryUrl('rechazar'), [
+            'id_estudiante' => $this->secondStudentId,
+            'id_ambiente' => $this->aulaId,
+            'motivo' => 'DECISION_CONTROLADOR',
+        ])->assertForbidden()->assertJsonPath('message', EntryControlSnapshotService::FOREIGN_ROOM_MESSAGE);
+
+        $this->assertSame(0, $this->attemptsCount());
+    }
+
+    public function test_no_rechaza_a_un_estudiante_expulsado(): void
+    {
+        $this->insertEntry($this->secondStudentId, '10:02:00', $this->otraAulaId);
+        DB::table('examen_estudiante')->where('id_examen', $this->exam->id_examen)
+            ->where('id_estudiante', $this->secondStudentId)
+            ->update(['expulsado_en' => Carbon::parse('2026-10-30T14:40:00Z')]);
+
+        $this->postJson($this->lateEntryUrl('rechazar'), [
+            'id_estudiante' => $this->secondStudentId,
+            'id_ambiente' => $this->otraAulaId,
+            'motivo' => 'DECISION_CONTROLADOR',
+        ])->assertStatus(409)->assertJsonPath('veredicto', VerificationService::DUPLICATE);
 
         $this->assertSame(0, $this->attemptsCount());
     }
