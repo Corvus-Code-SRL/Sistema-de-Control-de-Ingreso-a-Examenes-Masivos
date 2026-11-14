@@ -26,6 +26,8 @@ import {
 import {
   CreateExamPage,
   EditExamPage,
+  EXAM_ATTENDANCE_PATH,
+  ExamAttendancePage,
   ExamDetailPage,
   ExamInProgressPage,
   ExamsPage,
@@ -170,6 +172,7 @@ function DocenteRoutes() {
           path="/examenes/:examId/en-curso"
           element={guarded('ingreso.operar', <ExamInProgressPage extensions={examInProgressExtensions} />)}
         />
+        <Route path={EXAM_ATTENDANCE_PATH} element={guarded('asistencia.consultar', <ExamAttendancePage />)} />
         <Route path={LATE_ENTRY_EXAMS_PATH} element={guarded('ingreso.operar', <LateEntryExamsPage />)} />
         <Route path={LATE_ENTRY_PATH} element={guarded('ingreso.operar', <LateEntryPage />)} />
 
@@ -221,6 +224,7 @@ function AuxiliarRoutes() {
         />
         <Route path={LATE_ENTRY_EXAMS_PATH} element={guarded('ingreso.operar', <LateEntryExamsPage />)} />
         <Route path={LATE_ENTRY_PATH} element={guarded('ingreso.operar', <LateEntryPage />)} />
+        <Route path={EXAM_ATTENDANCE_PATH} element={guarded('asistencia.consultar', <ExamAttendancePage />)} />
         <Route
           path="/reportes/intentos"
           element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
@@ -311,6 +315,7 @@ function AdministradorRoutes() {
           element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
         />
         <Route path="/bitacora" element={guarded('bitacora.consultar', <AuditLogPage />)} />
+        <Route path={EXAM_ATTENDANCE_PATH} element={guarded('asistencia.consultar', <ExamAttendancePage />)} />
 
         <Route path="*" element={<Navigate to="/cuentas/nueva" replace />} />
       </Route>
