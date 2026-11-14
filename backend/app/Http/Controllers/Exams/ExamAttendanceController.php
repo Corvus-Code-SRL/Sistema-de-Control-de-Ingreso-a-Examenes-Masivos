@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Exams;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Exams\ExamAttendanceDetailResource;
 use App\Http\Resources\Exams\ExamAttendanceExamResource;
 use App\Services\Exams\ExamAttendanceQueryService;
 use App\Support\ApiResponse;
@@ -25,5 +26,18 @@ class ExamAttendanceController extends Controller
         }
 
         return ApiResponse::success(ExamAttendanceExamResource::collection($exams));
+    }
+
+    public function show(Request $request, int $exam, ExamAttendanceQueryService $service): JsonResponse
+    {
+        try {
+            $detail = $service->show($exam, $request->user());
+        } catch (CommunicationException | ServerException | RedisException $exception) {
+            report($exception);
+
+            return ApiResponse::error('No se pudo comprobar la apertura del control de ingreso.', 503);
+        }
+
+        return ApiResponse::success(new ExamAttendanceDetailResource($detail));
     }
 }

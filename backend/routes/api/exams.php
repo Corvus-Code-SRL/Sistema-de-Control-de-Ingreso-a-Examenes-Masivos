@@ -43,6 +43,10 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
     Route::get('/estudiantes-ingresados', [ExamAttendanceController::class, 'index'])
         ->name('estudiantes-ingresados');
 
+    Route::get('/{exam}/estudiantes-ingresados', [ExamAttendanceController::class, 'show'])
+        ->where('exam', '[0-9]{1,9}')
+        ->name('estudiantes-ingresados.show');
+
     Route::get('/{exam}', [ExamController::class, 'show'])
         ->where('exam', '[0-9]{1,9}')
         ->name('show');
