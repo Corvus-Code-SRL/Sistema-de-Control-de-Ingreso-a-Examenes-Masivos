@@ -64,7 +64,7 @@ const emptyAttendance: ExamAttendanceDetail = {
 }
 
 type Session = AccountKey | 'invitado'
-type ApiResponse = { status?: number; body: unknown }
+type ApiResponse = { status?: number; body: unknown; headers?: Record<string, string> }
 
 function stubCatalog(
   session: Session,
@@ -96,6 +96,7 @@ function LocationControls() {
   return <>
     <output aria-label="Parámetros actuales">{search}</output>
     <button onClick={() => navigate(-1)}>Volver en el historial</button>
+    <button onClick={() => navigate(`${EXAM_ATTENDANCE_PATH}?examen=8`)}>Abrir segundo examen</button>
   </>
 }
 
@@ -106,7 +107,12 @@ function currentFilters() {
 afterEach(() => {
   window.localStorage.clear()
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
+
+async function advance(ms: number) {
+  await act(async () => { await vi.advanceTimersByTimeAsync(ms) })
+}
 
 describe('HU-066: acceso al catálogo de asistencia', () => {
   it.each(['docente', 'invitado', 'auxiliar'] as const)('%s puede abrir la ruta y tiene una sola entrada', async (role) => {
@@ -377,5 +383,157 @@ describe('HU-066: nómina del examen', () => {
     expect(await screen.findByRole('heading', { name: 'El examen seleccionado no está disponible' })).toBeVisible()
     expect(screen.getByRole('combobox', { name: 'Examen' })).toHaveTextContent('Seleccione un examen')
     expect(detailCalls()).toHaveLength(0)
+  })
+})
+
+describe('HU-066: actualización automática', () => {
+  const catalog = () => vi.fn(() => ({ body: { data: exams } }))
+  const route = `${EXAM_ATTENDANCE_PATH}?examen=7`
+
+  it('refresca después de cinco segundos y conserva filtros, CI y alcance del auxiliar', async () => {
+    const first = { ...attendance.estudiantes[0], estado: 'PENDIENTE' as const, hora_ingreso: null }
+    const initial: ExamAttendanceDetail = {
+      ...attendance, estado: EXAM_STATUS.EN_INGRESO, id_ambiente_asignado: 3,
+      ambientes: [attendance.ambientes[0]], estudiantes: [first],
+      totales: { ...attendance.totales, total: 1, pendientes: 1, a_tiempo: 0, sin_clasificar: 0 },
+    }
+    const execute = vi.fn<(id: number) => ApiResponse>()
+      .mockReturnValueOnce({ body: { data: initial } })
+      .mockReturnValue({ body: { data: {
+        ...initial, estado: EXAM_STATUS.EN_CURSO, estudiantes: [attendance.estudiantes[0]],
+        totales: { ...initial.totales, pendientes: 0, a_tiempo: 1 },
+      } } })
+    stubCatalog('auxiliar', catalog(), execute)
+    vi.useFakeTimers()
+    const app = renderApp(`${route}&q=4567891&ambiente=4`, <LocationControls />)
+
+    await advance(0)
+    expect(screen.getByRole('cell', { name: '4567891' })).toBeVisible()
+    expect(screen.getByText('En ingreso')).toBeVisible()
+    expect(screen.queryByRole('combobox', { name: 'Ambiente' })).not.toBeInTheDocument()
+    await advance(4999)
+    expect(execute).toHaveBeenCalledTimes(1)
+    await advance(1)
+    expect(execute).toHaveBeenCalledTimes(2)
+    expect(within(screen.getByRole('main')).getByText('En curso')).toBeVisible()
+    expect(screen.getByRole('cell', { name: '08:00' })).toBeVisible()
+    expect(screen.getByRole('searchbox', { name: 'Nombre, SIS o CI' })).toHaveValue('4567891')
+    expect(currentFilters().get('ambiente')).toBe('4')
+
+    app.unmount()
+    await advance(60000)
+    expect(execute).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([['45', 45000], ['2', 5000], [undefined, 5000]] as const)(
+    'ante Retry-After %s espera %s ms y conserva la nómina anterior', async (retryAfter, delay) => {
+      const execute = vi.fn<(id: number) => ApiResponse>()
+        .mockReturnValueOnce({ body: { data: attendance } })
+        .mockReturnValueOnce({
+          status: 429, body: { message: 'Demasiadas solicitudes.' },
+          headers: retryAfter ? { 'Retry-After': retryAfter } : undefined,
+        })
+        .mockReturnValue({ body: { data: attendance } })
+      stubCatalog('docente', catalog(), execute)
+      vi.useFakeTimers()
+      renderApp(route)
+
+      await advance(0)
+      await advance(5000)
+      expect(execute).toHaveBeenCalledTimes(2)
+      expect(screen.getByText(/Muchas consultas seguidas/)).toBeVisible()
+      expect(screen.getByRole('table')).toBeVisible()
+      expect(screen.queryByRole('button', { name: 'Reintentar' })).not.toBeInTheDocument()
+      await advance(delay - 1)
+      expect(execute).toHaveBeenCalledTimes(2)
+      await advance(1)
+      expect(execute).toHaveBeenCalledTimes(3)
+      expect(screen.queryByText(/Muchas consultas seguidas/)).not.toBeInTheDocument()
+    },
+  )
+
+  it('conserva la espera del limitador al cambiar de examen', async () => {
+    const execute = vi.fn<(id: number) => ApiResponse>()
+      .mockReturnValueOnce({ status: 429, body: {}, headers: { 'Retry-After': '45' } })
+      .mockReturnValue({ body: { data: emptyAttendance } })
+    stubCatalog('docente', catalog(), execute)
+    vi.useFakeTimers()
+    renderApp(`${route}&q=nunez`, <LocationControls />)
+    await advance(0)
+
+    act(() => screen.getByRole('button', { name: 'Abrir segundo examen' }).click())
+    expect(currentFilters().get('examen')).toBe('8')
+    expect(currentFilters().get('q')).toBeNull()
+    await advance(44999)
+    expect(execute.mock.calls).toEqual([[7]])
+    await advance(1)
+    expect(execute.mock.calls).toEqual([[7], [8]])
+  })
+
+  it.each([403, 404, 409, 503])('limpia la nómina y detiene el ciclo al recibir %s', async (status) => {
+    const execute = vi.fn<(id: number) => ApiResponse>()
+      .mockReturnValueOnce({ body: { data: attendance } })
+      .mockReturnValue({ status, body: { message: 'Consulta interrumpida.' } })
+    stubCatalog('docente', catalog(), execute)
+    vi.useFakeTimers()
+    renderApp(route)
+
+    await advance(0)
+    expect(screen.getByRole('table')).toBeVisible()
+    await advance(5000)
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(screen.getByText('Consulta interrumpida.')).toBeVisible()
+    await advance(60000)
+    expect(execute).toHaveBeenCalledTimes(2)
+    if (status === 503) expect(screen.getByRole('button', { name: 'Reintentar' })).toBeVisible()
+    else expect(screen.getByRole('button', { name: 'Actualizar exámenes' })).toBeVisible()
+  })
+
+  it('detiene el ciclo si el servidor devuelve el estado Finalizado en el detalle', async () => {
+    const execute = vi.fn<(id: number) => ApiResponse>()
+      .mockReturnValueOnce({ body: { data: attendance } })
+      .mockReturnValue({ body: { data: { ...attendance, estado: EXAM_STATUS.FINALIZADO } } })
+    stubCatalog('docente', catalog(), execute)
+    vi.useFakeTimers()
+    renderApp(route)
+
+    await advance(0)
+    expect(screen.getByRole('table')).toBeVisible()
+    await advance(5000)
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Actualizar exámenes' })).toBeVisible()
+    await advance(60000)
+    expect(execute).toHaveBeenCalledTimes(2)
+  })
+
+  it('no superpone refrescos y libera la petición pendiente al salir', async () => {
+    const { detailCalls } = stubCatalog('docente', catalog())
+    const respond = globalThis.fetch
+    let refreshSignal: AbortSignal | null | undefined
+    let release!: () => void
+    const pending = new Promise<void>((resolve) => { release = resolve })
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith('/examenes/7/estudiantes-ingresados') && detailCalls().length > 0) {
+        refreshSignal = init?.signal
+        await pending
+      }
+      return respond(input, init)
+    })
+    vi.useFakeTimers()
+    const app = renderApp(route)
+
+    await advance(0)
+    await advance(5000)
+    const pendingSignal = refreshSignal
+    expect(pendingSignal?.aborted).toBe(false)
+    await advance(8000)
+    expect(refreshSignal).toBe(pendingSignal)
+    expect(detailCalls()).toHaveLength(1)
+    app.unmount()
+    expect(pendingSignal?.aborted).toBe(true)
+    await act(async () => { release(); await pending })
+    expect(vi.getTimerCount()).toBe(0)
+    await advance(60000)
+    expect(detailCalls()).toHaveLength(2)
   })
 })

@@ -14,6 +14,7 @@ import { useCurrentUser } from '@/features/auth'
 import { useAsyncResource } from '@/hooks/useAsyncResource'
 import { clearAttendanceFilters, ExamAttendanceRoster } from '../components/ExamAttendanceRoster'
 import { ExamStatusBadge } from '../components/ExamStatusBadge'
+import { useExamAttendanceDetail } from '../hooks/useExamAttendanceDetail'
 import { examsService } from '../services/examsService'
 import type { ExamAttendanceExam } from '../types/examAttendance.types'
 
@@ -96,13 +97,9 @@ export function ExamAttendancePage() {
 
 function SelectedAttendance({ exam, onRefreshExams }: { exam: ExamAttendanceExam; onRefreshExams: () => void }) {
   const { area } = useCurrentUser()
-  const { data, status, error, reload } = useAsyncResource(
-    (signal) => examsService.getAttendance(exam.id_examen, signal), [exam.id_examen]
-  )
-  const unavailable = error?.status === 409
-  const detailRoom = status === 'success' && data
-    ? data.ambientes.find((room) => room.id_ambiente === data.id_ambiente_asignado)?.nro_aula
-    : undefined
+  const { data, error, pollNotice, reload } = useExamAttendanceDetail(exam.id_examen)
+  const unavailable = error !== null && (error.status === 409 || error.isNotFound)
+  const detailRoom = data?.ambientes.find((room) => room.id_ambiente === data.id_ambiente_asignado)?.nro_aula
   const assignedRoom = area === 'auxiliar' ? detailRoom : detailRoom ?? exam.ambiente?.nro_aula
 
   return (
@@ -121,17 +118,25 @@ function SelectedAttendance({ exam, onRefreshExams }: { exam: ExamAttendanceExam
           {assignedRoom && <p>Ambiente: {assignedRoom}</p>}
         </CardContent>
       </Card>
-      {status === 'loading' && <LoadingState rows={3} label="Cargando estudiantes del examen" />}
+      {!data && !error && !pollNotice && <LoadingState rows={3} label="Cargando estudiantes del examen" />}
+      {pollNotice && (
+        <p role="status" className="rounded-lg border border-warn-border bg-warn-soft p-3 text-sm text-warn-fg">
+          {pollNotice}
+        </p>
+      )}
       {unavailable && (
         <StatePanel role="status" tone="neutral" icon={ClipboardList} title="La consulta del examen ha terminado">
           <p>{error.message}</p>
           <Button variant="outline" onClick={onRefreshExams}>Actualizar exámenes</Button>
         </StatePanel>
       )}
-      {status === 'error' && error && !unavailable && (
-        <ErrorState error={error} onRetry={error.isForbidden || error.isNotFound ? undefined : reload} />
+      {error && !unavailable && (
+        <>
+          <ErrorState error={error} onRetry={error.isForbidden || error.isUnauthorized ? undefined : reload} />
+          {error.isForbidden && <Button variant="outline" onClick={onRefreshExams}>Actualizar exámenes</Button>}
+        </>
       )}
-      {status === 'success' && data && <ExamAttendanceRoster detail={data} />}
+      {data && <ExamAttendanceRoster detail={data} />}
     </>
   )
 }
