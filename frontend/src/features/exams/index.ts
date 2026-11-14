@@ -14,8 +14,9 @@ export * from './types/exams.types';
 export * from './services/examsService';
 
 export { ExamHistoryPage } from './pages/ExamHistoryPage';
+export { ExamAttendancePage } from './pages/ExamAttendancePage';
 export { ExamHistorySummaryPage } from './pages/ExamHistorySummaryPage';
-export { examDetailPath, examFinalReportPath } from './utils/paths';
+export { EXAM_ATTENDANCE_PATH, examDetailPath, examFinalReportPath } from './utils/paths';
 export { ExamInProgressPage } from './pages/ExamInProgressPage';
 export { FinishExamAction } from './components/FinishExamAction';
 export { InProgressExamsPage } from './pages/InProgressExamsPage';
