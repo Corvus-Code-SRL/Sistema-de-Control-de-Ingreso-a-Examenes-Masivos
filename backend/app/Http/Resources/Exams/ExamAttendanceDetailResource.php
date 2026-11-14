@@ -12,7 +12,6 @@ class ExamAttendanceDetailResource extends JsonResource
         $exam = $this->resource['exam'];
         $classroom = $this->resource['classroom'];
         $students = $this->resource['students'];
-        $canViewCi = $this->resource['can_view_ci'];
         $roomNames = $this->resource['rooms']->pluck('nro_aula', 'id_ambiente');
 
         return [
@@ -26,6 +25,7 @@ class ExamAttendanceDetailResource extends JsonResource
             'estudiantes' => $students->map(static fn (object $student): array => [
                 'id_estudiante' => (int) $student->id_estudiante,
                 'cod_sis' => $student->cod_sis,
+                'ci' => $student->ci,
                 'nombre_completo' => trim(implode(' ', array_filter([
                     $student->nombre, $student->apellido_paterno, $student->apellido_materno,
                 ]))),
@@ -39,7 +39,7 @@ class ExamAttendanceDetailResource extends JsonResource
                 'hora_ingreso' => $student->hora_ingreso === null ? null : substr($student->hora_ingreso, 0, 5),
                 'expulsado_en' => $student->expulsado_en === null
                     ? null : Carbon::parse($student->expulsado_en)->utc()->toIso8601String(),
-            ] + ($canViewCi ? ['ci' => $student->ci] : []))->all(),
+            ])->all(),
             'totales' => $this->resource['totals'],
         ];
     }

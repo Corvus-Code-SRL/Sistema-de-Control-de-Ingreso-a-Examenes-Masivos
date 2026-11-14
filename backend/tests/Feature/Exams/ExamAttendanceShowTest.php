@@ -215,7 +215,7 @@ class ExamAttendanceShowTest extends TestCase
             ->assertJsonPath('data.totales.ausentes', 1);
     }
 
-    public function test_el_ci_se_omite_para_el_auxiliar_y_se_conserva_para_el_docente_y_el_colaborador(): void
+    public function test_el_ci_se_entrega_a_cada_perfil_autorizado_y_puede_ser_nulo(): void
     {
         $exam = $this->examWithAssistants(['estado' => Exam::EN_CURSO], $this->aulaId);
         $exam->groups()->attach($this->grupoPropioId);
@@ -236,10 +236,11 @@ class ExamAttendanceShowTest extends TestCase
 
         $this->assignRole($this->mariaId, Role::AUXILIAR);
         $this->actAsUserId($this->mariaId);
-        $this->getJson($this->url($exam) . '?ci=' . $ci)->assertOk()
+        $this->getJson($this->url($exam))->assertOk()
             ->assertJsonCount(2, 'data.estudiantes')
+            ->assertJsonPath('data.estudiantes.0.ci', $ci)
             ->assertJson(fn (AssertableJson $json) => $json
-                ->missing('data.estudiantes.0.ci')->missing('data.estudiantes.1.ci')->etc());
+                ->has('data.estudiantes.1.ci')->where('data.estudiantes.1.ci', null)->etc());
     }
 
     public function test_auxiliar_solo_recibe_su_ambiente_con_ingresos_trasladados_y_totales_acotados(): void
@@ -259,11 +260,20 @@ class ExamAttendanceShowTest extends TestCase
         $this->recordEntry($exam, $first, StudentExam::CON_RETRASO, $this->otraAulaId, '08:20');
         $this->recordEntry($exam, $second, StudentExam::INGRESO, $this->aulaId, '08:05');
 
-        $this->getJson($this->url($exam) . '?id_ambiente=' . $this->aulaId)->assertOk()
+        $ciByStudent = DB::table('estudiante')->whereIn('id_estudiante', [$first, $second])->pluck('ci', 'id_estudiante');
+        $query = http_build_query([
+            'id_ambiente' => $this->aulaId,
+            'ambiente' => $this->aulaId,
+            'ci' => $ciByStudent[$second],
+            'q' => $ciByStudent[$second],
+        ]);
+        $this->getJson($this->url($exam) . '?' . $query)->assertOk()
             ->assertJsonPath('data.id_ambiente_asignado', $this->otraAulaId)
             ->assertJsonPath('data.ambientes', [['id_ambiente' => $this->otraAulaId, 'nro_aula' => '692B']])
             ->assertJsonCount(1, 'data.estudiantes')
             ->assertJsonPath('data.estudiantes.0.id_estudiante', $first)
+            ->assertJsonPath('data.estudiantes.0.ci', $ciByStudent[$first])
+            ->assertJsonMissing(['ci' => $ciByStudent[$second]])
             ->assertJsonPath('data.estudiantes.0.estado', 'CON_RETRASO')
             ->assertJsonPath('data.totales.total', 1)
             ->assertJsonPath('data.totales.con_retraso', 1)

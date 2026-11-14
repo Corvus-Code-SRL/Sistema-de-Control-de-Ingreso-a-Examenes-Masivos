@@ -96,7 +96,7 @@ class ExamAttendanceQueryService
             'capacidad' => (int) $room->capacidad,
         ])->values();
 
-        $students = $this->attendanceRows($examId, $rooms->all(), $isTeacher);
+        $students = $this->attendanceRows($examId, $rooms->all());
 
         if ($classroom !== null) {
             $roomId = (int) $classroom->id_ambiente;
@@ -115,13 +115,12 @@ class ExamAttendanceQueryService
             'classroom' => $classroom,
             'rooms' => $rooms,
             'students' => $students,
-            'can_view_ci' => $isTeacher,
             // HU-028 aún no registra la carga de una nómina de habilitados para el examen.
             'totals' => ['total' => $students->count(), 'no_habilitados' => 0] + $totals,
         ];
     }
 
-    private function attendanceRows(int $examId, array $rooms, bool $canViewCi): BaseCollection
+    private function attendanceRows(int $examId, array $rooms): BaseCollection
     {
         // Se usa el grupo canónico de la nómina, con el respaldo multicarrera del grupo.
         $careerId = 'COALESCE(ge.id_carrera, CASE WHEN '
@@ -141,13 +140,12 @@ class ExamAttendanceQueryService
                     ->where('ee.id_examen', $examId);
             })
             ->select([
-                'nomina.id_estudiante', 'nomina.cod_sis',
+                'nomina.id_estudiante', 'nomina.cod_sis', 'nomina.ci',
                 'nomina.nombre', 'nomina.apellido_paterno', 'nomina.apellido_materno',
                 'c.id_carrera', 'c.nombre as carrera',
                 'ee.id_estudiante as id_registro_asistencia', 'ee.estado_ingreso', 'ee.hora_ingreso',
                 'ee.id_ambiente', 'ee.expulsado_en',
             ])
-            ->when($canViewCi, static fn ($query) => $query->addSelect('nomina.ci'))
             ->orderBy('nomina.id_estudiante')
             ->get();
 
