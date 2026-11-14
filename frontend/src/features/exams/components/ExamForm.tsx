@@ -120,7 +120,7 @@ export function ExamForm({ formData, subjects, errors, updateFormData }: Props) 
         <div className="space-y-1">
           <label htmlFor="minutos_apertura" className="block text-sm font-medium text-foreground">Apertura del control de ingreso</label>
           <div className="relative">
-              <input id="minutos_apertura" type="number" min={0} step={1}
+              <input id="minutos_apertura" type="number" min={0} max={120} step={1}
                 value={formData.minutos_apertura === null ? '' : formData.minutos_apertura ?? 10}
                 onChange={(event) => updateFormData({
                   minutos_apertura: event.target.value === '' ? null : Number(event.target.value),

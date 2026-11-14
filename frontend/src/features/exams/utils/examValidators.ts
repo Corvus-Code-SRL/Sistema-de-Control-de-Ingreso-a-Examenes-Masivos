@@ -2,6 +2,7 @@ import { CreateExamFormData, Group, StepValidationResult } from '../types/exams.
 
 /** Menos de un día: el backend guarda la hora de fin como hora del día. */
 export const MAX_DURATION_MINUTES = 1439;
+export const MAX_OPENING_MINUTES = 120;
 
 function pad(value: number): string {
   return String(value).padStart(2, '0');
@@ -62,6 +63,8 @@ export function validateExamForm(
     formData.minutos_apertura < 0
   )) {
     errors.minutos_apertura = 'La apertura debe ser un número entero de minutos no negativo.';
+  } else if (formData.minutos_apertura !== undefined && formData.minutos_apertura > MAX_OPENING_MINUTES) {
+    errors.minutos_apertura = `Los minutos de apertura no pueden superar ${MAX_OPENING_MINUTES}.`;
   }
 
   if (!formData.ambientes || formData.ambientes.length === 0) {
