@@ -15,13 +15,16 @@ interface Result {
  * anterior al cambiar la búsqueda e ignora lo que ella devuelva. Mientras llega la nueva se conserva
  * la página anterior en pantalla; `isStale` avisa que esos datos ya no son los de la URL actual.
  */
-export function useGroupStudents(groupId: number, { q, page }: GroupStudentFilters) {
-  const key = `${groupId}|${q}|${page}`
+export function useGroupStudents(groupId: number, { q, page, carrera }: GroupStudentFilters) {
+  const key = `${groupId}|${q}|${page}|${carrera ?? ''}`
 
   const resource = useAsyncResource<Result>(
     useCallback(
-      async (signal) => ({ key, page: await getGroupStudents(groupId, { q, page }, signal) }),
-      // La clave resume el grupo, la búsqueda y la página.
+      async (signal) => ({
+        key,
+        page: await getGroupStudents(groupId, { q, page, carrera }, signal),
+      }),
+      // La clave resume el grupo, la búsqueda, la página y la carrera.
       // eslint-disable-next-line react-hooks/exhaustive-deps
       [key]
     ),

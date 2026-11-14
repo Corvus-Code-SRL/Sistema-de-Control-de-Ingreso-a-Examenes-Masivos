@@ -3,6 +3,7 @@
 namespace App\Services\Academic\Importers;
 
 use App\Exceptions\Academic\StudentRosterPreviewUnavailableException;
+use App\Services\Academic\GroupCareerService;
 use App\Services\Academic\StudentRosterGroupAccess;
 use App\Services\Security\AuditLogService;
 use Illuminate\Support\Facades\DB;
@@ -19,18 +20,26 @@ class StudentRosterConfirmationService
 
     private StudentRosterConfirmer $confirmer;
 
+    private GroupCareerService $groupCareers;
+
+    private StudentRosterCareerResolver $careerResolver;
+
     public function __construct(
         StudentRosterPreviewStore $previewStore,
         StudentRosterGroupAccess $groupAccess,
         StudentRosterAnalyzer $analyzer,
         StudentRosterConfirmer $confirmer,
-        AuditLogService $auditLog
+        AuditLogService $auditLog,
+        GroupCareerService $groupCareers,
+        StudentRosterCareerResolver $careerResolver
     ) {
         $this->previewStore = $previewStore;
         $this->groupAccess = $groupAccess;
         $this->analyzer = $analyzer;
         $this->confirmer = $confirmer;
         $this->auditLog = $auditLog;
+        $this->groupCareers = $groupCareers;
+        $this->careerResolver = $careerResolver;
     }
 
     public function confirm(
@@ -66,11 +75,14 @@ class StudentRosterConfirmationService
             $teacherId
         );
 
-        $analysis = $this->analyzer->analyze(
-            $preview->rows()
+        // La carrera se resuelve otra vez: el grupo pudo dejar de atender una carrera desde el preview.
+        $analysis = $this->careerResolver->resolve(
+            $this->analyzer->analyze($preview->rows()),
+            $this->groupCareers->careersOf($group),
+            $preview->defaultCareerId()
         );
 
-            $result = DB::transaction(function () use ($group, $analysis, $teacherId) {
+        $result = DB::transaction(function () use ($group, $analysis, $teacherId) {
             $result = $this->confirmer->confirm(
                 (int) $group->id_grupo,
                 $analysis

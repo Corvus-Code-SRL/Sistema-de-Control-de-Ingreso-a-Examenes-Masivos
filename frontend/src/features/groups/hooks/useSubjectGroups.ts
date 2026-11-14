@@ -3,7 +3,7 @@ import { useAsyncResource } from '@/hooks/useAsyncResource'
 import type { SubjectCareer } from '@/features/subjects'
 import type { ApiError } from '@/lib/api-client'
 import { getGroupsByPair } from '../services/groupsService'
-import type { Group, SubjectGroups } from '../types/group.types'
+import type { Group, GroupCareer, SubjectGroups } from '../types/group.types'
 
 export interface UseSubjectGroupsResult {
   subject: SubjectCareer | null
@@ -18,6 +18,8 @@ export interface UseSubjectGroupsResult {
   isEmpty: boolean
   /** Hay grupos en el par, pero ninguno es del docente. */
   hasNoOwnGroups: boolean
+  /** Otras carreras que ofertan la materia: el registro puede sumarlas al grupo (HU-021). */
+  otherCareers: GroupCareer[]
   error: ApiError | null
   reload: () => void
 }
@@ -47,6 +49,7 @@ export function useSubjectGroups(careerId: number, subjectId: number): UseSubjec
     isLoading: resource.status === 'loading',
     isEmpty: loaded && resource.data!.meta.total === 0,
     hasNoOwnGroups: loaded && resource.data!.meta.total_mios === 0,
+    otherCareers: resource.data?.meta.carreras_materia ?? [],
     error: resource.error,
     reload: resource.reload,
   }

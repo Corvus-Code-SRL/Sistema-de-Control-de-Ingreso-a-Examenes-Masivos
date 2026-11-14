@@ -41,6 +41,7 @@ export function SubjectGroupsPage() {
     isLoading,
     isEmpty,
     hasNoOwnGroups,
+    otherCareers,
     error,
     reload,
   } = useSubjectGroups(careerId, subjectId)
@@ -192,6 +193,7 @@ export function SubjectGroupsPage() {
             subjectCareerLabel={subjectCareerLabel}
             onCancel={() => setIsCreateOpen(false)}
             onRegistered={handleGroupRegistered}
+            additionalCareerOptions={otherCareers}
           />
         </DialogContent>
       </Dialog>

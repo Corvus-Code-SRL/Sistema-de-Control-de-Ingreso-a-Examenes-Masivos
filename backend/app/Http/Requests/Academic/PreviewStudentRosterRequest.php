@@ -34,7 +34,16 @@ class PreviewStudentRosterRequest extends RosterManagementRequest
                     }
                 },
             ],
+            // HU-021 multicarrera: carrera de las filas que no traen la columna «carrera».
+            'id_carrera' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_ID],
         ];
+    }
+
+    public function defaultCareerId(): ?int
+    {
+        $careerId = $this->validated()['id_carrera'] ?? null;
+
+        return $careerId === null ? null : (int) $careerId;
     }
 
     public function messages(): array
@@ -46,6 +55,9 @@ class PreviewStudentRosterRequest extends RosterManagementRequest
             // PHP descarta el archivo antes de Laravel si pasa de upload_max_filesize (12 MB).
             'archivo.uploaded' => 'No se pudo recibir la nómina. Verifique que no supere los 10 MB '
                 . 'y vuelva a intentarlo.',
+            'id_carrera.integer' => 'El identificador de la carrera debe ser numérico.',
+            'id_carrera.min' => 'El identificador de la carrera no es válido.',
+            'id_carrera.max' => 'El identificador de la carrera no es válido.',
         ];
     }
 }

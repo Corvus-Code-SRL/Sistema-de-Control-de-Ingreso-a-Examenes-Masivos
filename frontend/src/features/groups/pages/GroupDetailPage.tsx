@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CalendarClock, History, Pencil, Upload, UsersRound } from 'lucide-react'
+import { History, Pencil } from 'lucide-react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import { AppShell } from '@/components/layout/AppShell'
@@ -21,11 +21,8 @@ import { courseTitle } from '../types/group.types'
 import { flashMessageFrom } from '../utils/flash'
 import { PAST_PERIOD_MESSAGE } from '../utils/messages'
 import {
-  groupAssistantsPath,
   groupEditPath,
-  groupExamsPath,
   groupIdFrom,
-  groupRosterPath,
   MY_COURSES_PATH,
 } from '../utils/paths'
 
@@ -33,9 +30,9 @@ import {
  * Detalle del grupo (HU-020): datos del grupo, total de inscritos, estado de la nómina y la lista
  * de estudiantes.
  *
- * Es una sola vista: editar el grupo (HU-019), cargar la nómina (HU-021), sus exámenes y sus
- * auxiliares son botones que llevan a la vista de cada acción. Un grupo de un período anterior o
- * inactivo es de solo lectura.
+ * Es una sola vista: editar el grupo (HU-019) es el único botón. La nómina (HU-021), los exámenes y
+ * los auxiliares se gestionan desde sus propias entradas del menú, que no dependen de esta vista. Un grupo de un período anterior o inactivo
+ * es de solo lectura.
  */
 export function GroupDetailPage() {
   const groupId = groupIdFrom(useParams().idGrupo)
@@ -60,7 +57,7 @@ export function GroupDetailPage() {
 function GroupDetailView({ groupId }: { groupId: number }) {
   const { detail, isLoading, isForbidden, isNotFound, error, reload } = useGroupDetail(groupId)
 
-  const { filters, searchInput, setSearchInput, setPage, clear } = useGroupStudentsFilters()
+  const { filters, searchInput, setSearchInput, setPage, clear, setCareer } = useGroupStudentsFilters()
   // Se pide en paralelo al detalle: si el grupo no es suyo, el servidor responde 403 y no se muestra.
   const students = useGroupStudents(groupId, filters)
 
@@ -124,40 +121,14 @@ function GroupDetailView({ groupId }: { groupId: number }) {
           )
         }
         actions={
-          isVisible && (
-            <>
-              {canManage && (
-                <>
-                  <Button variant="secondary" size="sm" className="gap-2" asChild>
-                    <Link to={groupEditPath(groupId)}>
-                      <Pencil className="size-4" aria-hidden="true" />
-                      Editar grupo
-                    </Link>
-                  </Button>
-
-                  <Button variant="secondary" size="sm" className="gap-2" asChild>
-                    <Link to={groupRosterPath(groupId)}>
-                      <Upload className="size-4" aria-hidden="true" />
-                      Cargar nómina
-                    </Link>
-                  </Button>
-                </>
-              )}
-
-              <Button variant="outline" size="sm" className="gap-2" asChild>
-                <Link to={groupExamsPath(groupId)}>
-                  <CalendarClock className="size-4" aria-hidden="true" />
-                  Ver exámenes
-                </Link>
-              </Button>
-
-              <Button variant="outline" size="sm" className="gap-2" asChild>
-                <Link to={groupAssistantsPath(groupId)}>
-                  <UsersRound className="size-4" aria-hidden="true" />
-                  Auxiliares
-                </Link>
-              </Button>
-            </>
+          isVisible &&
+          canManage && (
+            <Button variant="secondary" size="sm" className="gap-2" asChild>
+              <Link to={groupEditPath(groupId)}>
+                <Pencil className="size-4" aria-hidden="true" />
+                Editar grupo
+              </Link>
+            </Button>
           )
         }
       />
@@ -218,7 +189,10 @@ function GroupDetailView({ groupId }: { groupId: number }) {
             onRetry={students.reload}
             onPageChange={(next) => setPage(next)}
             correctingPage={correctingPage}
-            rosterTo={canManage ? groupRosterPath(groupId) : undefined}
+            canUploadRoster={canManage}
+            careers={detail.meta.carreras ?? []}
+            careerId={filters.carrera}
+            onCareerChange={setCareer}
           />
         </>
       )}

@@ -24,6 +24,9 @@ export interface UseRosterUploadResult {
   errorMessage: string | null
   /** Un fallo de red se puede repetir con el mismo archivo. */
   canRetry: boolean
+  /** Carrera de las filas sin columna «carrera» (HU-021, multicarrera); null = según el archivo. */
+  careerId: number | null
+  selectCareer: (careerId: number | null) => void
   selectFile: (file: File) => void
   submitPreview: () => void
   retry: () => void
@@ -52,6 +55,7 @@ export function useRosterUpload(groupId: number): UseRosterUploadResult {
   const [result, setResult] = useState<RosterConfirmationData | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [canRetry, setCanRetry] = useState(false)
+  const [careerId, setCareerId] = useState<number | null>(null)
 
   const requestRef = useRef<AbortController | null>(null)
   const confirmingRef = useRef(false)
@@ -95,7 +99,8 @@ export function useRosterUpload(groupId: number): UseRosterUploadResult {
         const response = await previewStudentRoster(
           groupId,
           selectedFile,
-          controller.signal
+          controller.signal,
+          careerId
         )
 
         if (!isCurrent(controller)) return
@@ -113,7 +118,7 @@ export function useRosterUpload(groupId: number): UseRosterUploadResult {
         setStep('file')
       }
     },
-    [groupId, isCurrent, startRequest]
+    [careerId, groupId, isCurrent, startRequest]
   )
 
   const runConfirm = useCallback(
@@ -225,6 +230,11 @@ export function useRosterUpload(groupId: number): UseRosterUploadResult {
     setResult(null)
     setErrorMessage(null)
     setCanRetry(false)
+    setCareerId(null)
+  }, [])
+
+  const selectCareer = useCallback((selected: number | null): void => {
+    setCareerId(selected)
   }, [])
 
   return {
@@ -234,6 +244,8 @@ export function useRosterUpload(groupId: number): UseRosterUploadResult {
     result,
     errorMessage,
     canRetry,
+    careerId,
+    selectCareer,
     selectFile,
     submitPreview,
     retry,
@@ -255,7 +267,7 @@ function previewErrorMessage(error: ApiError): string {
   }
 
   if (error.isValidation) {
-    const rejected: string | undefined = error.errors.archivo?.[0]
+    const rejected: string | undefined = error.errors.archivo?.[0] ?? error.errors.id_carrera?.[0]
 
     return rejected ?? `${error.message} ${ROSTER_UNTOUCHED}`
   }
