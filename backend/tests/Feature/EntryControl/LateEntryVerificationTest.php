@@ -3,6 +3,7 @@
 namespace Tests\Feature\EntryControl;
 
 use App\Exceptions\EntryControl\LateEntryException;
+use App\Http\Requests\EntryControl\VerifyLateEntryRequest;
 use App\Models\Exam;
 use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\EntryControl\VerificationService;
@@ -41,6 +42,7 @@ class LateEntryVerificationTest extends TestCase
         return $this->postJson($this->lateEntryUrl('verificar'), array_merge([
             'cod_sis' => $this->studentColumn($studentId, 'cod_sis'),
             'ci' => $this->studentColumn($studentId, 'ci'),
+            'id_ambiente' => $this->aulaId,
         ], $overrides));
     }
 
@@ -115,7 +117,7 @@ class LateEntryVerificationTest extends TestCase
 
     public function test_sis_desconocido_no_encontrado(): void
     {
-        $this->postJson($this->lateEntryUrl('verificar'), ['cod_sis' => '999999999'])
+        $this->postJson($this->lateEntryUrl('verificar'), ['cod_sis' => '999999999', 'id_ambiente' => $this->aulaId])
             ->assertOk()
             ->assertJsonPath('data.veredicto', VerificationService::NOT_FOUND)
             ->assertJsonPath('data.estudiante', null);
@@ -179,6 +181,10 @@ class LateEntryVerificationTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors(['cod_sis', 'ci', 'id_ambiente'])
             ->assertJsonPath('errors.cod_sis.0', 'El código SIS debe tener exactamente 9 dígitos.');
+        $this->postJson($this->lateEntryUrl('verificar'), ['cod_sis' => '999999999'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['id_ambiente'])
+            ->assertJsonPath('errors.id_ambiente.0', VerifyLateEntryRequest::CONTROL_ROOM_REQUIRED_MESSAGE);
     }
 
     public function test_un_examen_inexistente_o_con_id_no_numerico_es_404(): void

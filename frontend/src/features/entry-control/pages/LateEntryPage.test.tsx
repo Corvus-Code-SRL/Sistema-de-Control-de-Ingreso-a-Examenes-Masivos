@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react'
-import { act, screen, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { examInProgressService } from '@/features/exams'
 import { ApiError } from '@/lib/api-client'
+import { mockApiWith } from '@/test/http'
 import {
   makeExamInProgress, makeLateEntryRequest, makeLateEntryVerification, makeOtherExamWarning,
 } from '@/test/lateEntryFixtures'
@@ -17,6 +18,7 @@ vi.mock('@/components/layout/AppShell', () => ({
 }))
 
 const hidden = Object.getOwnPropertyDescriptor(document, 'hidden')
+const FAULT_TYPES = [{ id_falta: 4, nombre: 'Suplantación', descripcion: null }]
 
 async function renderPage(route = '/examenes/7/retrasos') {
   renderWithRouter(<LateEntryPage />, { route, path: '/examenes/:examId/retrasos' })
@@ -45,6 +47,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   if (hidden) Object.defineProperty(document, 'hidden', hidden)
 })
 
@@ -60,7 +63,8 @@ describe('HU-037: registrar estudiante con retraso', () => {
 
     await verifyStudent(user)
 
-    expect(verify).toHaveBeenCalledWith(7, { cod_sis: '202301903', ci: '9342145' })
+    // El docente verifica desde el primer ambiente del examen, preseleccionado como ambiente de control.
+    expect(verify).toHaveBeenCalledWith(7, { cod_sis: '202301903', ci: '9342145', id_ambiente: 5 })
     expect(await screen.findByText('AUTORIZADO')).toBeInTheDocument()
     expect(screen.getByLabelText('Ambiente de ingreso')).toHaveTextContent('692B')
     expect(screen.queryByText(/Intento registrado/)).not.toBeInTheDocument()
@@ -243,21 +247,121 @@ describe('HU-037: registrar estudiante con retraso', () => {
     })
   })
 
-  it('«Rechazar» ante la advertencia vuelve a la identificación sin escribir', async () => {
+  it('«Rechazar» ante la advertencia registra el intento y abre el reporte, como en el control de ingreso', async () => {
     const user = userEvent.setup()
+    mockApiWith((request) => (request.url.endsWith('/tipos-falta') ? { body: { data: FAULT_TYPES } } : undefined))
     vi.spyOn(examInProgressService, 'get').mockResolvedValue(makeExamInProgress())
     vi.spyOn(lateEntryService, 'verify').mockResolvedValue(makeLateEntryVerification({
       otro_examen: makeOtherExamWarning(),
     }))
     const register = vi.spyOn(lateEntryService, 'register')
+    const rejectEntry = vi.spyOn(lateEntryService, 'rejectEntry').mockResolvedValue({
+      id_intento: 92, registrado: true, motivo: 'DECISION_CONTROLADOR', registrado_en: '2026-10-31T14:25:00Z',
+    })
     await renderPage()
     await verifyStudent(user)
 
     await user.click(await screen.findByRole('button', { name: 'Rechazar' }))
 
     expect(register).not.toHaveBeenCalled()
-    expect(screen.queryByText('Ingreso en otro examen')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Código SIS')).toHaveFocus()
+    expect(rejectEntry).toHaveBeenCalledWith(7, {
+      id_estudiante: 501, id_ambiente: 5, ci: '9342145', motivo: 'DECISION_CONTROLADOR',
+    })
+    const dialog = await screen.findByRole('dialog', { name: 'Reportar incidencia' })
+    expect(within(dialog).getByText('Rechazo por decisión del controlador')).toBeInTheDocument()
+    expect(within(dialog).getByText(/691A/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'INGRESO RECHAZADO' })).toBeInTheDocument()
+  })
+
+  it('un veredicto negativo registra el intento y se reporta con el mismo formulario', async () => {
+    const user = userEvent.setup()
+    const { calls } = mockApiWith((request) => {
+      if (request.url.endsWith('/tipos-falta')) return { body: { data: FAULT_TYPES } }
+      if (request.url.endsWith('/retrasos/intentos/91/reporte')) {
+        return { status: 201, body: { data: { id_reporte_est: 300, id_intento: 91, estado: 'PENDIENTE' } } }
+      }
+      return undefined
+    })
+    vi.spyOn(examInProgressService, 'get').mockResolvedValue(makeExamInProgress())
+    vi.spyOn(lateEntryService, 'verify').mockResolvedValue(makeLateEntryVerification({
+      veredicto: 'CI_NO_COINCIDE', autorizado: false, motivo: 'El CI no coincide con el registrado',
+      id_intento: 91, registrado_en: '2026-10-31T14:20:00Z', reportado: false,
+    }))
+    await renderPage()
+    await verifyStudent(user)
+
+    expect(await screen.findByText('Intento registrado con hora, ambiente y controlador.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Reportar incidencia' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Reportar incidencia' })
+    expect(within(dialog).getByText('El CI no coincide con el registrado')).toBeInTheDocument()
+    await waitFor(() => expect(within(dialog).getByRole('combobox')).toBeEnabled())
+    await user.click(within(dialog).getByRole('combobox'))
+    await user.click(await screen.findByRole('option', { name: 'Suplantación' }))
+    await user.type(within(dialog).getByRole('textbox', { name: 'Descripción' }), 'Presentó un carnet que no es suyo.')
+    await user.click(within(dialog).getByRole('button', { name: 'Enviar a revisión' }))
+
+    expect(await screen.findByText('Enviado a revisión del docente')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ya reportado' })).toBeDisabled()
+    const post = calls.find((call) => call.method === 'POST')!
+    expect(post.url).toMatch(/\/control-ingreso\/examenes\/7\/retrasos\/intentos\/91\/reporte$/)
+    expect((post.body as FormData).get('id_tipo_falta')).toBe('4')
+  })
+
+  it('un intento ya reportado avisa sin duplicar el reporte', async () => {
+    const user = userEvent.setup()
+    mockApiWith((request) => {
+      if (request.url.endsWith('/tipos-falta')) return { body: { data: FAULT_TYPES } }
+      if (request.url.endsWith('/retrasos/intentos/91/reporte')) {
+        return { status: 422, body: { message: 'Datos inválidos', errors: { id_intento: ['Este intento ya fue reportado.'] } } }
+      }
+      return undefined
+    })
+    vi.spyOn(examInProgressService, 'get').mockResolvedValue(makeExamInProgress())
+    vi.spyOn(lateEntryService, 'verify').mockResolvedValue(makeLateEntryVerification({
+      veredicto: 'NO_PERTENECE', autorizado: false, motivo: 'No pertenece a los grupos de este examen',
+      id_intento: 91, registrado_en: '2026-10-31T14:20:00Z', reportado: false,
+    }))
+    await renderPage()
+    await verifyStudent(user)
+
+    await user.click(await screen.findByRole('button', { name: 'Reportar incidencia' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Reportar incidencia' })
+    await waitFor(() => expect(within(dialog).getByRole('combobox')).toBeEnabled())
+    await user.click(within(dialog).getByRole('combobox'))
+    await user.click(await screen.findByRole('option', { name: 'Suplantación' }))
+    await user.type(within(dialog).getByRole('textbox', { name: 'Descripción' }), 'Intentó ingresar sin estar inscrito.')
+    await user.click(within(dialog).getByRole('button', { name: 'Enviar a revisión' }))
+
+    expect(await screen.findByText('Este intento ya fue reportado.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ya reportado' })).toBeDisabled()
+  })
+
+  it('el docente elige el ambiente de control antes de verificar', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(examInProgressService, 'get').mockResolvedValue(makeExamInProgress())
+    const verify = vi.spyOn(lateEntryService, 'verify').mockResolvedValue(makeLateEntryVerification())
+    await renderPage()
+
+    const select = await screen.findByRole('combobox', { name: 'Ambiente de control' })
+    expect(select).toHaveTextContent('691A')
+    await user.click(select)
+    await user.click(await screen.findByRole('option', { name: '692B' }))
+    await verifyStudent(user)
+
+    expect(verify).toHaveBeenCalledWith(7, { cod_sis: '202301903', ci: '9342145', id_ambiente: 6 })
+    expect(screen.getByRole('combobox', { name: 'Ambiente de control' })).toBeDisabled()
+  })
+
+  it('el auxiliar no elige ambiente de control: verifica en el suyo', async () => {
+    vi.spyOn(examInProgressService, 'get').mockResolvedValue(
+      makeExamInProgress({ rol_controlador: 'AUXILIAR', id_ambiente_asignado: 6 })
+    )
+    await renderPage()
+
+    expect(await screen.findByLabelText('Código SIS')).toBeEnabled()
+    expect(screen.queryByRole('combobox', { name: 'Ambiente de control' })).not.toBeInTheDocument()
   })
 
   it('con otro examen el auxiliar envía la solicitud de todos modos', async () => {
@@ -315,6 +419,46 @@ describe('HU-037: registrar estudiante con retraso', () => {
       .toBeInTheDocument()
     expect(screen.queryByLabelText('Código SIS')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Volver a la lista' })).toHaveAttribute('href', '/retrasos')
+  })
+
+  it('un reporte abierto sobrevive al fin programado y se envía, porque el examen sigue en curso', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const { calls } = mockApiWith((request) => {
+      if (request.url.endsWith('/tipos-falta')) return { body: { data: FAULT_TYPES } }
+      if (request.url.endsWith('/retrasos/intentos/91/reporte')) {
+        return { status: 201, body: { data: { id_reporte_est: 300, id_intento: 91, estado: 'PENDIENTE' } } }
+      }
+      return undefined
+    })
+    vi.spyOn(examInProgressService, 'get').mockResolvedValue(makeExamInProgress({
+      hora_servidor_en: '2026-10-31T15:55:00+00:00',
+      fin_programado_en: '2026-10-31T16:00:00+00:00',
+    }))
+    vi.spyOn(lateEntryService, 'verify').mockResolvedValue(makeLateEntryVerification({
+      veredicto: 'CI_NO_COINCIDE', autorizado: false, motivo: 'El CI no coincide con el registrado',
+      id_intento: 91, registrado_en: '2026-10-31T15:55:00Z', reportado: false,
+    }))
+    await renderPage()
+    await verifyStudent(user)
+    await user.click(await screen.findByRole('button', { name: 'Reportar incidencia' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Reportar incidencia' })
+    await waitFor(() => expect(within(dialog).getByRole('combobox')).toBeEnabled())
+    await user.click(within(dialog).getByRole('combobox'))
+    await user.click(await screen.findByRole('option', { name: 'Suplantación' }))
+    await user.type(within(dialog).getByRole('textbox', { name: 'Descripción' }), 'Presentó un carnet que no es suyo.')
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(5 * 60_000) })
+
+    expect(screen.getByText('El tiempo del examen terminó; ya no se pueden registrar ingresos con retraso.'))
+      .toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Reportar incidencia' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Enviar a revisión' }))
+
+    expect(await screen.findByText('Enviado a revisión del docente')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(calls.some((call) => call.method === 'POST' && call.url.endsWith('/retrasos/intentos/91/reporte')))
+      .toBe(true)
   })
 
   it('con el fin programado ya pasado no muestra el formulario', async () => {
