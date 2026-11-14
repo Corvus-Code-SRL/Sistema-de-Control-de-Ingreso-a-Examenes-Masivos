@@ -564,7 +564,7 @@ class EntryControlSnapshotService
         $memberships = DB::table('grupo_estudiante as gs')
             ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
             ->join('grupo as g', 'g.id_grupo', '=', 'gs.id_grupo')
-            ->join('carrera as c', 'c.id_carrera', '=', 'g.id_carrera')
+            ->join('carrera as c', 'c.id_carrera', '=', DB::raw('COALESCE(gs.id_carrera, g.id_carrera)'))
             ->where('gx.id_examen', $examId)
             ->orderBy('gs.id_estudiante')
             ->orderBy('gs.id_grupo')
