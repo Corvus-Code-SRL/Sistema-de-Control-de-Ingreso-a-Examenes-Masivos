@@ -268,6 +268,24 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
     />
   )
 
+  const announcement = (
+    <LateEntryAnnouncement
+      message={verification.notice ?? requests.announcement}
+      error={verification.error ?? requests.actionError}
+      onClose={() => { verification.setNotice(null); requests.clearAnnouncement() }}
+    />
+  )
+
+  // El reporte sigue abierto al cumplirse el fin programado: el examen continúa EN_CURSO y lo admite.
+  const reportDialog = reportContext && (
+    <ReportIncidentDialog
+      key={reportContext.attemptId}
+      context={reportContext}
+      onClose={() => setReportContext(null)}
+      onReported={reported}
+    />
+  )
+
   if (!open) {
     return (
       <div className="space-y-5">
@@ -282,6 +300,7 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
   if (timeOver) {
     return (
       <div className="space-y-5">
+        {announcement}
         <StatePanel tone="neutral" icon={Clock} title={LATE_ENTRY_MESSAGES.timeOverTitle}>
           {LATE_ENTRY_MESSAGES.timeOver}
         </StatePanel>
@@ -289,6 +308,7 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
           <Link to={LATE_ENTRY_EXAMS_PATH}>{LATE_ENTRY_MESSAGES.backToListShort}</Link>
         </Button>
         {list}
+        {reportDialog}
       </div>
     )
   }
@@ -299,11 +319,7 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
 
   return (
     <div className="space-y-5">
-      <LateEntryAnnouncement
-        message={verification.notice ?? requests.announcement}
-        error={verification.error ?? requests.actionError}
-        onClose={() => { verification.setNotice(null); requests.clearAnnouncement() }}
-      />
+      {announcement}
       {missingRoom && (
         <p role="alert" className="rounded-lg border border-danger/30 bg-danger-soft p-4 text-sm text-danger-fg">
           {LATE_ENTRY_MESSAGES.noRoom}
@@ -359,14 +375,7 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
           ) : list}
         </div>
       </div>
-      {reportContext && (
-        <ReportIncidentDialog
-          key={reportContext.attemptId}
-          context={reportContext}
-          onClose={() => setReportContext(null)}
-          onReported={reported}
-        />
-      )}
+      {reportDialog}
       <LateEntryOtherExamDialog
         open={confirmingOtherExam}
         studentName={result?.estudiante?.nombre_completo ?? ''}

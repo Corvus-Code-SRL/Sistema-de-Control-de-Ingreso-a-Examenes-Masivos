@@ -421,6 +421,46 @@ describe('HU-037: registrar estudiante con retraso', () => {
     expect(screen.getByRole('link', { name: 'Volver a la lista' })).toHaveAttribute('href', '/retrasos')
   })
 
+  it('un reporte abierto sobrevive al fin programado y se envía, porque el examen sigue en curso', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const { calls } = mockApiWith((request) => {
+      if (request.url.endsWith('/tipos-falta')) return { body: { data: FAULT_TYPES } }
+      if (request.url.endsWith('/retrasos/intentos/91/reporte')) {
+        return { status: 201, body: { data: { id_reporte_est: 300, id_intento: 91, estado: 'PENDIENTE' } } }
+      }
+      return undefined
+    })
+    vi.spyOn(examInProgressService, 'get').mockResolvedValue(makeExamInProgress({
+      hora_servidor_en: '2026-10-31T15:55:00+00:00',
+      fin_programado_en: '2026-10-31T16:00:00+00:00',
+    }))
+    vi.spyOn(lateEntryService, 'verify').mockResolvedValue(makeLateEntryVerification({
+      veredicto: 'CI_NO_COINCIDE', autorizado: false, motivo: 'El CI no coincide con el registrado',
+      id_intento: 91, registrado_en: '2026-10-31T15:55:00Z', reportado: false,
+    }))
+    await renderPage()
+    await verifyStudent(user)
+    await user.click(await screen.findByRole('button', { name: 'Reportar incidencia' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Reportar incidencia' })
+    await waitFor(() => expect(within(dialog).getByRole('combobox')).toBeEnabled())
+    await user.click(within(dialog).getByRole('combobox'))
+    await user.click(await screen.findByRole('option', { name: 'Suplantación' }))
+    await user.type(within(dialog).getByRole('textbox', { name: 'Descripción' }), 'Presentó un carnet que no es suyo.')
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(5 * 60_000) })
+
+    expect(screen.getByText('El tiempo del examen terminó; ya no se pueden registrar ingresos con retraso.'))
+      .toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Reportar incidencia' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Enviar a revisión' }))
+
+    expect(await screen.findByText('Enviado a revisión del docente')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(calls.some((call) => call.method === 'POST' && call.url.endsWith('/retrasos/intentos/91/reporte')))
+      .toBe(true)
+  })
+
   it('con el fin programado ya pasado no muestra el formulario', async () => {
     vi.spyOn(examInProgressService, 'get').mockResolvedValue(makeExamInProgress({
       hora_servidor_en: '2026-10-31T16:05:00+00:00',
