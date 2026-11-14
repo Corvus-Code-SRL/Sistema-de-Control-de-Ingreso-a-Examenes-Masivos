@@ -210,6 +210,14 @@ class ExamAttendanceIndexTest extends TestCase
             ->assertJson(fn (AssertableJson $json) => $json->missing('data')->etc());
     }
 
+    public function test_el_catalogo_respeta_su_configuracion_de_acceso_independiente(): void
+    {
+        $this->createExam(['estado' => Exam::EN_CURSO]);
+        config(['sciem.access.exam_attendance' => [Role::AUXILIAR]]);
+
+        $this->getJson(self::URL)->assertForbidden();
+    }
+
     /** @dataProvider excludedStates */
     public function test_excluye_estados_fuera_del_catalogo(string $state): void
     {
