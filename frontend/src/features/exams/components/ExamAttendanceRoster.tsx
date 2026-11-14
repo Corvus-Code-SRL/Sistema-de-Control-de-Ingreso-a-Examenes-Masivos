@@ -24,6 +24,7 @@ const STATUS_OPTIONS = Object.entries(STATUS)
 
 const FILTER_KEYS = ['q', 'carrera', 'estado', 'ambiente'] as const
 const ALL = 'todos'
+const FILTER_CONTENT_CLASS = 'w-(--radix-select-trigger-width) min-w-0 max-w-(--radix-select-content-available-width) [&_[data-slot=select-item]]:wrap-anywhere'
 
 export function clearAttendanceFilters(params: URLSearchParams) {
   FILTER_KEYS.forEach((key) => params.delete(key))
@@ -105,6 +106,7 @@ export function ExamAttendanceRoster({ detail }: { detail: ExamAttendanceDetail 
                 <FormSelect id="attendance-career" value={career === undefined ? ALL : String(career)}
                   onValueChange={(value) => updateFilter('carrera', value)} placeholder="Todas las carreras"
                   className="min-w-0 [&_[data-slot=select-value]]:truncate"
+                  contentClassName={FILTER_CONTENT_CLASS}
                   options={[{ value: ALL, label: 'Todas las carreras' }, ...[...careers].map(([id, label]) => ({
                     value: String(id), label,
                   }))]} />
@@ -113,6 +115,7 @@ export function ExamAttendanceRoster({ detail }: { detail: ExamAttendanceDetail 
                 <Label htmlFor="attendance-status">Estado</Label>
                 <FormSelect id="attendance-status" value={state ?? ALL} placeholder="Todos los estados"
                   onValueChange={(value) => updateFilter('estado', value)}
+                  contentClassName={FILTER_CONTENT_CLASS}
                   options={[{ value: ALL, label: 'Todos los estados' }, ...STATUS_OPTIONS.map(([value, info]) => ({
                     value, label: info.label,
                   }))]} />
@@ -122,6 +125,8 @@ export function ExamAttendanceRoster({ detail }: { detail: ExamAttendanceDetail 
                   <Label htmlFor="attendance-room">Ambiente</Label>
                   <FormSelect id="attendance-room" value={room === undefined ? ALL : String(room)}
                     placeholder="Todos los ambientes" onValueChange={(value) => updateFilter('ambiente', value)}
+                    className="min-w-0 [&_[data-slot=select-value]]:truncate"
+                    contentClassName={FILTER_CONTENT_CLASS}
                     options={[{ value: ALL, label: 'Todos los ambientes' }, ...ambientes.map((item) => ({
                       value: String(item.id_ambiente), label: item.nro_aula,
                     }))]} />
