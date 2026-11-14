@@ -73,7 +73,7 @@ abstract class ExamRequest extends FormRequest
             'hora_inicio'   => ['required', 'date_format:H:i'],
             // Menos de un día: la hora de fin se guarda como hora del día.
             'duracion'      => ['required', 'integer', 'min:1', 'max:1439'],
-            'minutos_apertura' => ['sometimes', 'required', 'integer', 'min:0'],
+            'minutos_apertura' => ['bail', 'sometimes', 'required', 'integer', 'min:0', 'max:120'],
             'ambientes'     => ['required', 'array', 'min:1'],
             'ambientes.*'   => [
                 'bail',
@@ -135,6 +135,7 @@ abstract class ExamRequest extends FormRequest
             'duracion.integer'       => 'La duración debe ser un número entero de minutos.',
             'duracion.min'           => 'La duración del examen debe ser de al menos 1 minuto.',
             'duracion.max'           => 'La duración del examen debe ser menor a 24 horas.',
+            'minutos_apertura.max'   => 'Los minutos de apertura no pueden superar 120.',
             'minutos_apertura.*'     => 'La apertura debe ser un número entero de minutos no negativo.',
             'ambientes.required'     => 'Debe asignar al menos un ambiente para el examen.',
             'ambientes.array'        => 'Los ambientes deben enviarse como una lista.',

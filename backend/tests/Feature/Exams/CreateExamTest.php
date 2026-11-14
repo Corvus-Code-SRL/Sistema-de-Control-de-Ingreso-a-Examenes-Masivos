@@ -59,7 +59,7 @@ class CreateExamTest extends TestCase
         ]);
     }
 
-    public function test_guarda_la_apertura_sin_maximo_y_rechaza_valores_negativos(): void
+    public function test_guarda_la_apertura_hasta_120_minutos_y_rechaza_el_resto(): void
     {
         $response = $this->postJson(self::URL, $this->validPayload([
             'minutos_apertura' => 0,
@@ -74,9 +74,17 @@ class CreateExamTest extends TestCase
 
         $this->postJson(self::URL, $this->validPayload([
             'nombre_examen' => 'Otro examen',
-            'minutos_apertura' => 2880,
+            'minutos_apertura' => 120,
             'confirmar_advertencias' => true,
-        ]))->assertCreated()->assertJsonPath('data.minutos_apertura', 2880);
+        ]))->assertCreated()->assertJsonPath('data.minutos_apertura', 120);
+
+        foreach ([121, 2147483648] as $value) {
+            $this->postJson(self::URL, $this->validPayload([
+                'nombre_examen' => 'Apertura ' . $value,
+                'minutos_apertura' => $value,
+            ]))->assertUnprocessable()
+                ->assertJsonPath('errors.minutos_apertura.0', 'Los minutos de apertura no pueden superar 120.');
+        }
 
         $this->postJson(self::URL, $this->validPayload([
             'nombre_examen' => 'Apertura invalida',
