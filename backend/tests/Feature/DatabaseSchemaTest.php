@@ -82,14 +82,13 @@ class DatabaseSchemaTest extends TestCase
         $this->assertSame('NO', $teacherColumn->is_nullable);
     }
 
-    public function testOpeningMinutesStayBetweenZeroAndThirty(): void
+    public function testOpeningMinutesAreNonNegative(): void
     {
         $teacher = $this->insertUser('docente');
 
         $this->insertExam($teacher, ['minutos_apertura' => 0]);
-        $this->insertExam($teacher, ['minutos_apertura' => 30]);
+        $this->insertExam($teacher, ['minutos_apertura' => 120]);
 
-        $this->assertRejected(fn () => $this->insertExam($teacher, ['minutos_apertura' => 31]));
         $this->assertRejected(fn () => $this->insertExam($teacher, ['minutos_apertura' => -1]));
     }
 

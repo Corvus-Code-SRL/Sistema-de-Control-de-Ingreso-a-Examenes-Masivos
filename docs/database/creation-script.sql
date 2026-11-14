@@ -1769,3 +1769,13 @@ ALTER TABLE public.grupo_estudiante
 
 CREATE INDEX idx_grupo_estudiante_carrera
     ON public.grupo_estudiante(id_grupo, id_carrera);
+
+-- Versión 13: apertura del control de ingreso sin tope de base (HU-024)
+--             (2026_11_07_000000_remove_exam_opening_upper_limit)
+--   * examen.minutos_apertura: el CHECK pasa de 0..30 a >= 0. El máximo de negocio (120 min)
+--     lo valida la API (ExamRequest), no la base.
+
+ALTER TABLE public.examen DROP CONSTRAINT chk_examen_minutos_apertura;
+
+ALTER TABLE public.examen
+    ADD CONSTRAINT chk_examen_minutos_apertura CHECK (minutos_apertura >= 0);

@@ -59,6 +59,39 @@ class CreateExamTest extends TestCase
         ]);
     }
 
+    public function test_guarda_la_apertura_hasta_120_minutos_y_rechaza_el_resto(): void
+    {
+        $response = $this->postJson(self::URL, $this->validPayload([
+            'minutos_apertura' => 0,
+        ]));
+
+        $response->assertCreated()
+            ->assertJsonPath('data.minutos_apertura', 0);
+        $this->assertDatabaseHas('examen', [
+            'id_examen' => $response->json('data.id_examen'),
+            'minutos_apertura' => 0,
+        ]);
+
+        $this->postJson(self::URL, $this->validPayload([
+            'nombre_examen' => 'Otro examen',
+            'minutos_apertura' => 120,
+            'confirmar_advertencias' => true,
+        ]))->assertCreated()->assertJsonPath('data.minutos_apertura', 120);
+
+        foreach ([121, 2147483648] as $value) {
+            $this->postJson(self::URL, $this->validPayload([
+                'nombre_examen' => 'Apertura ' . $value,
+                'minutos_apertura' => $value,
+            ]))->assertUnprocessable()
+                ->assertJsonPath('errors.minutos_apertura.0', 'Los minutos de apertura no pueden superar 120.');
+        }
+
+        $this->postJson(self::URL, $this->validPayload([
+            'nombre_examen' => 'Apertura invalida',
+            'minutos_apertura' => -1,
+        ]))->assertUnprocessable()->assertJsonValidationErrors('minutos_apertura');
+    }
+
     public function test_la_categoria_final_no_crea_tipos_de_examen_falsos(): void
     {
         $typesBefore = DB::table('tipo_examen')->count();

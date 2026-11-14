@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCreateExam } from '../hooks/useCreateExam';
 import { ExamForm } from './ExamForm';
+import { ExamAmbientesForm } from './ExamAmbientesForm';
 import { AssignGroupsForm } from './AssignGroupsForm';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/common/PageHeader';
 import {
   Dialog,
   DialogContent,
@@ -12,15 +14,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { AlertTriangle, CheckCircle2, Loader2, Save } from 'lucide-react';
+import { AlertTriangle, Loader2, Save } from 'lucide-react';
 import { Exam } from '../types/exams.types';
 import { examDetailPath } from '../utils/paths';
 import { groupExamsPath } from '@/features/groups';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Toast } from '@/components/ui/toast';
+
+function formatExamToastDate(value: string): string {
+  const date = new Date(`${value}T00:00:00`);
+  const weekday = new Intl.DateTimeFormat('es-BO', { weekday: 'short' }).format(date).replace('.', '');
+  return `${weekday} ${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
 
 export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ initialGroupId }) => {
   const navigate = useNavigate();
   const [createdExam, setCreatedExam] = useState<Exam | null>(null);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showValidationErrors, setShowValidationErrors] = useState(false);
 
   const {
@@ -39,7 +49,10 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
     validateForm,
     toggleGroup,
     submitExam,
-  } = useCreateExam(setCreatedExam, initialGroupId);
+  } = useCreateExam((exam) => {
+    setCreatedExam(exam);
+    setShowSuccessToast(true);
+  }, initialGroupId);
 
   const cancelTo = initialGroupId === undefined ? '/examenes/programados' : groupExamsPath(initialGroupId);
   const detailGroupId = initialGroupId !== undefined && formData.grupos.includes(initialGroupId)
@@ -47,23 +60,43 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
     : undefined;
   const validation = validateForm();
   const selectedSubject = options.materias.find(
-    (subject) =>
-      subject.id_carrera === formData.materia?.id_carrera &&
-      subject.id_materia === formData.materia?.id_materia
+    (subject) => subject.id_materia === formData.materia?.id_materia
   );
 
   const totalCapacity = options.ambientes
     .filter((room) => formData.ambientes.includes(room.id_ambiente))
     .reduce((total, room) => total + Number(room.capacidad), 0);
-
   const hasSelectedRooms = formData.ambientes.length > 0;
   const hasSelectedGroups = formData.grupos.length > 0;
+  const capacityDeficit = hasSelectedRooms && hasSelectedGroups
+    ? Math.max(0, totalStudents - totalCapacity)
+    : 0;
+  const occupancyPercent = totalCapacity > 0 && hasSelectedGroups
+    ? Math.min(100, Math.round((totalStudents / totalCapacity) * 100))
+    : 0;
 
-  const capacityDeficit =
-    hasSelectedRooms && hasSelectedGroups
-      ? Math.max(0, totalStudents - totalCapacity)
-      : 0;
+  const openingMinutes = formData.minutos_apertura === undefined ? 10 : formData.minutos_apertura;
+  const [startHour, startMinute] = formData.hora_inicio.split(':').map(Number);
+  const opening = /^\d{4}-\d{2}-\d{2}$/.test(formData.fecha)
+    && Number.isInteger(startHour) && Number.isInteger(startMinute)
+    && typeof openingMinutes === 'number' && Number.isInteger(openingMinutes)
+    && openingMinutes >= 0
+    ? (() => {
+        const total = startHour * 60 + startMinute - openingMinutes;
+        const minutesOfDay = ((total % 1440) + 1440) % 1440;
+        const clock = `${String(Math.floor(minutesOfDay / 60)).padStart(2, '0')}:${String(minutesOfDay % 60).padStart(2, '0')}`;
+        const date = new Date(`${formData.fecha}T00:00:00Z`);
+        date.setUTCDate(date.getUTCDate() + Math.floor(total / 1440));
+        return { time: clock, date: date.toISOString().slice(0, 10).split('-').reverse().join('/') };
+      })()
+    : null;
 
+  const openingText = opening
+    ? `${opening.date === createdExam?.fecha.split('-').reverse().join('/') ? '' : `el ${opening.date} `}a las ${opening.time}`
+    : 'según lo programado';
+  const toastDescription = createdExam
+    ? `${[createdExam.nombre_examen, selectedSubject?.nombre, formatExamToastDate(createdExam.fecha), createdExam.hora_inicio.slice(0, 5)].filter(Boolean).join(' · ')}. El control se abrirá ${openingText}.`
+    : '';
 
   if (loading) {
     return (
@@ -101,151 +134,126 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Configurar nuevo examen
-        </h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Crear un nuevo examen para la materia seleccionada.
-        </p>
-      </div>
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader title="Registrar examen" />
+
+      {createdExam && showSuccessToast && (
+        <div className="[&>div]:!top-auto [&>div]:bottom-4 [&>div]:border-l-4 [&>div]:border-l-ok sm:[&>div]:bottom-6 sm:[&>div]:!w-[450px]">
+          <Toast
+            title="Examen registrado · Programado"
+            description={toastDescription}
+            onClose={() => setShowSuccessToast(false)}
+          />
+        </div>
+      )}
 
       {apiError && (
-        <div className="p-4 rounded-xl bg-danger-soft border border-danger/20 text-danger-fg text-xs font-medium">
+        <div role="alert" className="rounded-xl border border-danger-border bg-danger-soft p-4 text-sm font-medium text-danger-fg">
           {apiError}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <ExamForm
-          formData={formData}
-          subjects={options.materias}
-          classrooms={options.ambientes}
-          errors={showValidationErrors ? validation.errors : {}}
-          warnings={validation.warnings}
-          updateFormData={updateFormData}
-        />
+      <form onSubmit={handleSubmit} className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+        <div className="space-y-3">
+          <fieldset disabled={createdExam !== null} className="space-y-3">
+            <ExamForm
+              formData={formData}
+              subjects={options.materias}
+              errors={showValidationErrors ? validation.errors : {}}
+              updateFormData={updateFormData}
+            />
 
-        <AssignGroupsForm
-          selectedSubject={selectedSubject}
-          availableGroups={subjectGroups}
-          selectedGroupIds={formData.grupos}
-          errors={showValidationErrors ? validation.errors : {}}
-          onToggleGroup={toggleGroup}
-        />
+            <AssignGroupsForm
+              selectedSubject={selectedSubject}
+              availableGroups={subjectGroups}
+              subjects={options.materias}
+              selectedGroupIds={formData.grupos}
+              errors={showValidationErrors ? validation.errors : {}}
+              onToggleGroup={toggleGroup}
+            />
 
-        {(hasSelectedRooms || hasSelectedGroups) && (
-          <section
-            aria-label="Resumen de capacidad del examen"
-            aria-live="polite"
-            className="rounded-xl border border-border-soft bg-surface p-6 space-y-4"
-          >
-            <div>
-              <h2 className="text-base font-bold text-text">
-                Resumen de capacidad
-              </h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Compare las plazas disponibles con los estudiantes
-                de los grupos seleccionados.
-              </p>
-            </div>
+            <ExamAmbientesForm
+              classrooms={options.ambientes}
+              selectedRoomIds={formData.ambientes}
+              error={showValidationErrors ? validation.errors.ambientes : undefined}
+              updateFormData={updateFormData}
+            />
+          </fieldset>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-lg bg-sunken p-4">
-                <p className="text-xs text-muted-foreground">
-                  Capacidad total
-                </p>
-                <p className="mt-1 text-xl font-bold text-text">
-                  {totalCapacity}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  plazas disponibles
-                </p>
-              </div>
-
-              <div className="rounded-lg bg-sunken p-4">
-                <p className="text-xs text-muted-foreground">
-                  Estudiantes
-                </p>
-                <p className="mt-1 text-xl font-bold text-text">
-                  {totalStudents}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  inscritos en los grupos
-                </p>
-              </div>
-
-              <div className="rounded-lg bg-sunken p-4">
-                <p className="text-xs text-muted-foreground">
-                  Plazas faltantes
-                </p>
-                <p
-                  className={`mt-1 text-xl font-bold ${
-                    capacityDeficit > 0 ? 'text-danger' : 'text-text'
-                  }`}
-                >
-                  {capacityDeficit}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  respecto a los estudiantes
-                </p>
-              </div>
-            </div>
-
-            {hasSelectedRooms && hasSelectedGroups && capacityDeficit > 0 && (
-              <div
-                role="status"
-                className="flex items-start gap-2 rounded-lg border border-border-soft p-3"
-              >
-                <AlertTriangle
-                  aria-hidden="true"
-                  className="h-4 w-4 shrink-0 text-danger"
-                />
-                <p className="text-xs text-text">
-                  La capacidad seleccionada es insuficiente para
-                  todos los estudiantes. El servidor solicitará
-                  confirmación antes de registrar el examen.
-                </p>
-              </div>
-            )}
-
-            {(!hasSelectedRooms || !hasSelectedGroups) && (
-              <p className="text-xs text-muted-foreground">
-                Seleccione ambientes y grupos para completar
-                la comparación de capacidad.
-              </p>
-            )}
-          </section>
-        )}
-
-        <div className="flex items-center justify-end gap-3 pt-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate(cancelTo)}
-            disabled={submitting}
-            className="bg-card border-border text-foreground hover:bg-muted text-xs font-medium px-5 py-2.5 rounded-lg"
-          >
-            Cancelar
-          </Button>
-
-          <Button
-            type="submit"
-            disabled={submitting || warnings.length > 0}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold px-6 py-2.5 rounded-lg shadow-xs flex items-center gap-2"
-          >
-            {submitting ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+            {createdExam ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Guardando...
+                <Button asChild variant="outline"><Link to={cancelTo}>
+                  {initialGroupId === undefined ? 'Ver en Programados' : 'Volver a exámenes del grupo'}
+                </Link></Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" onClick={() => {
+                    resetFormData();
+                    setShowValidationErrors(false);
+                    setCreatedExam(null);
+                    setShowSuccessToast(false);
+                  }}>
+                    Crear otro examen
+                  </Button>
+                  <Button asChild><Link to={examDetailPath(createdExam.id_examen, detailGroupId)}>
+                    Ver detalle del examen
+                  </Link></Button>
+                </div>
               </>
             ) : (
               <>
-                <Save className="h-4 w-4" /> Guardar examen
+                <Button type="button" variant="outline" onClick={() => navigate(cancelTo)} disabled={submitting}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={submitting || warnings.length > 0}>
+                  {submitting ? (
+                    <><Loader2 className="size-4 animate-spin" /> Guardando...</>
+                  ) : (
+                    <><Save className="size-4" /> Guardar examen</>
+                  )}
+                </Button>
               </>
             )}
-          </Button>
+          </div>
         </div>
+
+        <section aria-label="Resumen de capacidad del examen" className="rounded-xl border border-border bg-card p-4 shadow-xs lg:sticky lg:top-16">
+          <h2 className="text-base font-semibold text-foreground">Resumen</h2>
+          <div className="mt-3 space-y-3">
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground">Apertura del control de ingreso</h3>
+              <p className="mt-1 text-base font-semibold text-foreground">{opening?.time ?? 'Sin definir'}</p>
+              {opening && <p className="text-sm text-muted-foreground">{opening.date}</p>}
+            </div>
+            <div className="border-t border-border pt-3">
+              <h3 className="text-sm font-medium text-muted-foreground">Capacidad</h3>
+              <p className="mt-1 text-sm text-foreground"><strong>{totalStudents ?? 0}</strong> estudiantes · <strong>{totalCapacity}</strong> lugares</p>
+              <div
+                role="progressbar"
+                aria-label="Ocupación de ambientes"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={occupancyPercent}
+                aria-valuetext={`${totalStudents ?? 0} estudiantes para ${totalCapacity} lugares`}
+                className="mt-2 h-2 overflow-hidden rounded-full bg-sunken"
+              >
+                <div
+                  className={`h-full rounded-full ${capacityDeficit > 0 ? 'bg-warn' : 'bg-ok'}`}
+                  style={{ width: `${occupancyPercent}%` }}
+                />
+              </div>
+              {hasSelectedRooms && hasSelectedGroups && capacityDeficit > 0 && (
+                <p role="status" className="mt-2 flex gap-2 rounded-lg border border-warn-border bg-warn-soft p-2 text-xs text-warn-fg">
+                  <AlertTriangle aria-hidden="true" className="size-4 shrink-0" />
+                  Faltan {capacityDeficit} lugares; podrá confirmar el registro de todos modos.
+                </p>
+              )}
+              {(!hasSelectedRooms || !hasSelectedGroups) && (
+                <p className="mt-1 text-xs text-muted-foreground">Seleccione ambientes y grupos para comparar la capacidad.</p>
+              )}
+            </div>
+          </div>
+        </section>
       </form>
 
       {/* Modal de confirmación de advertencias */}
@@ -325,85 +333,6 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
         </DialogContent>
       </Dialog>
 
-      {/* Modal de registro exitoso */}
-      <Dialog
-        open={createdExam !== null}
-        onOpenChange={() => {
-          // La creación ya terminó: el usuario debe elegir
-          // una de las tres acciones explícitas.
-        }}
-      >
-        <DialogContent
-          showCloseButton={false}
-          className="sm:max-w-lg"
-          onEscapeKeyDown={(event) => event.preventDefault()}
-          onInteractOutside={(event) => event.preventDefault()}
-        >
-          <DialogHeader>
-            <div className="flex justify-center pb-2">
-              <div className="flex size-14 items-center justify-center rounded-full bg-brand-soft">
-                <CheckCircle2
-                  className="size-8 text-brand"
-                  aria-hidden="true"
-                />
-              </div>
-            </div>
-
-            <DialogTitle className="text-center text-lg">
-              Examen creado correctamente
-            </DialogTitle>
-
-            <DialogDescription className="text-center">
-              El examen se registró exitosamente y se encuentra
-              en estado Programado.
-            </DialogDescription>
-          </DialogHeader>
-
-          {createdExam && (
-            <>
-              <div className="rounded-lg border border-border-soft bg-sunken p-4 text-sm">
-                <p className="font-semibold text-text">
-                  {createdExam.nombre_examen}
-                </p>
-
-                <p className="mt-2 text-muted-foreground">
-                  Fecha: {createdExam.fecha}
-                </p>
-
-                <p className="text-muted-foreground">
-                  Horario: {createdExam.hora_inicio} – {createdExam.hora_fin}
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2 pt-2">
-                <Button asChild>
-                  <Link to={examDetailPath(createdExam.id_examen, detailGroupId)}>
-                    Ver detalle del examen
-                  </Link>
-                </Button>
-
-                <Button asChild variant="outline">
-                  <Link to={cancelTo}>
-                    {initialGroupId === undefined ? 'Ver en Programados' : 'Volver a exámenes del grupo'}
-                  </Link>
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    resetFormData();
-                    setShowValidationErrors(false);
-                    setCreatedExam(null);
-                  }}
-                >
-                  Crear otro examen
-                </Button>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

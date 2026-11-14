@@ -57,6 +57,7 @@ export interface Exam {
   hora_inicio: string;
   hora_fin: string;
   duracion: number;
+  minutos_apertura?: number;
   normas: string | null;
   estado: ExamStatus;
   inicio_real_en?: string | null;
@@ -80,7 +81,7 @@ export interface ExamFormOptions {
   grupos: Group[];
 }
 
-/** El par se elige como una sola opción: nunca materia sin carrera. */
+/** La materia se elige por id; la carrera sirve como referencia válida del catálogo. */
 export interface SubjectCareerKey {
   id_carrera: number;
   id_materia: number;
@@ -93,6 +94,7 @@ export interface CreateExamFormData {
   fecha: string;
   hora_inicio: string;
   duracion: number;
+  minutos_apertura?: number | null;
   ambientes: number[];
   grupos: number[];
   normas: string;
@@ -106,6 +108,7 @@ export interface CreateExamDto {
   fecha: string;
   hora_inicio: string;
   duracion: number;
+  minutos_apertura?: number;
   ambientes: number[];
   grupos: number[];
   normas?: string;
@@ -124,6 +127,7 @@ export interface UpdateExamDto {
   fecha: string;
   hora_inicio: string;
   duracion: number;
+  minutos_apertura?: number;
   ambientes: number[];
   normas?: string;
   confirmar_advertencias?: boolean;

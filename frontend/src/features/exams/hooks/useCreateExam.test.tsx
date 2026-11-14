@@ -21,7 +21,10 @@ vi.mock('./useExamFormOptions', () => ({
     options: {
       materias: [],
       ambientes: [],
-      grupos: [],
+      grupos: [
+        { id_grupo: 101, id_carrera: 4, id_materia: 3, num_grupo: '1', gestion: '2026', estado: 'ACTIVO', cantidad_estudiantes: 10, tiene_nomina: true },
+        { id_grupo: 102, id_carrera: 2, id_materia: 3, num_grupo: '2', gestion: '2026', estado: 'ACTIVO', cantidad_estudiantes: 8, tiene_nomina: true },
+      ],
     },
     loading: false,
     error: null,
@@ -63,6 +66,21 @@ vi.mock('../utils/examValidators', () => ({
 describe('useCreateExam - confirmación de advertencias (HU-024)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  it('reúne los grupos de la materia y usa la carrera del grupo seleccionado al crear', async () => {
+    mocks.createExam.mockResolvedValueOnce({ id_examen: 77 })
+    const { result } = renderHook(() => useCreateExam())
+
+    expect(result.current.subjectGroups.map((group) => group.id_grupo)).toEqual([101, 102])
+
+    await act(async () => {
+      await result.current.submitExam()
+    })
+
+    expect(mocks.createExam).toHaveBeenCalledWith(
+      expect.objectContaining({ id_materia: 3, id_carrera: 4, grupos: [101] })
+    )
   })
 
   it('muestra las advertencias estructuradas del HTTP 409', async () => {
