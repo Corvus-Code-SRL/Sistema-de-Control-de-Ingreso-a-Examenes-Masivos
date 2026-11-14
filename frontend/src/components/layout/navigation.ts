@@ -321,6 +321,13 @@ export const NAVIGATION: readonly NavSection[] = [
         matches: ['/examenes/:examId/en-curso']
       },
       {
+        id: 'teacher-exam-attendance',
+        label: 'Estudiantes ingresados',
+        icon: ClipboardList,
+        capability: 'asistencia.consultar',
+        to: '/examenes/estudiantes-ingresados'
+      },
+      {
         id: 'teacher-late-student',
         label: 'Registrar estudiante con retraso',
         icon: Clock,
@@ -449,6 +456,13 @@ export const NAVIGATION: readonly NavSection[] = [
         to: '/examenes/en-curso',
         capability: 'ingreso.operar',
         matches: ['/examenes/:examId/en-curso']
+      },
+      {
+        id: 'assistant-exam-attendance',
+        label: 'Estudiantes ingresados',
+        icon: ClipboardList,
+        capability: 'asistencia.consultar',
+        to: '/examenes/estudiantes-ingresados'
       },
       {
         id: 'assistant-late-student',

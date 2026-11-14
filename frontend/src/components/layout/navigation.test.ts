@@ -110,6 +110,7 @@ describe('menú por capacidades', () => {
         items: [
           ['Control de ingreso', '/control-ingreso'],
           ['En curso', '/examenes/en-curso'],
+          ['Estudiantes ingresados', '/examenes/estudiantes-ingresados'],
           ['Registrar estudiante con retraso', '/retrasos'],
           ['Registrar situación excepcional', '/situacion-excepcional'],
           ['Reportar incidencia', '/reportar-incidencia']
@@ -148,6 +149,7 @@ describe('menú por capacidades', () => {
           ['Registrar situación excepcional', '/situacion-excepcional'],
           ['Reportar incidencia', '/reportar-incidencia'],
           ['En curso', '/examenes/en-curso'],
+          ['Estudiantes ingresados', '/examenes/estudiantes-ingresados'],
           ['Registrar estudiante con retraso', '/retrasos']
         ]
       }
@@ -174,6 +176,7 @@ describe('menú por capacidades', () => {
         'Habilitar auxiliar para el examen',
         'Control de ingreso',
         'En curso',
+        'Estudiantes ingresados',
         'Registrar situación excepcional',
         'Reportar incidencia',
         'Registrar estudiante con retraso',
