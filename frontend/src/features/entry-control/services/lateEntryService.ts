@@ -1,9 +1,10 @@
 import { ApiError, apiClient, apiPost } from '@/lib/api-client'
 import { throttleWaitSeconds } from '@/lib/throttle'
 import { LATE_ENTRY_MESSAGES } from '../components/lateEntryMessages'
-import type { StudentMatch, StudentSearchSource } from '../types/entry-control.types'
+import type { RejectionResponse, StudentMatch, StudentSearchSource } from '../types/entry-control.types'
 import type {
-  LateEntryActionInput, LateEntryRegistration, LateEntryRequest, LateEntryVerification, LateEntryVerificationInput,
+  LateEntryActionInput, LateEntryRegistration, LateEntryRejectInput, LateEntryRequest, LateEntryVerification,
+  LateEntryVerificationInput,
 } from '../types/late-entry.types'
 
 interface DataResponse<T> { data: T }
@@ -62,6 +63,12 @@ export const lateEntryService = {
 
   async register(examId: number, input: LateEntryActionInput): Promise<LateEntryRegistration> {
     const response = await apiPost<DataResponse<LateEntryRegistration>>(`${base(examId)}/registrar`, input)
+    return response.data
+  },
+
+  /** Rechazo manual: deja el intento registrado para poder reportarlo, como en HU-032. */
+  async rejectEntry(examId: number, input: LateEntryRejectInput): Promise<RejectionResponse> {
+    const response = await apiPost<DataResponse<RejectionResponse>>(`${base(examId)}/rechazar`, input)
     return response.data
   },
 }

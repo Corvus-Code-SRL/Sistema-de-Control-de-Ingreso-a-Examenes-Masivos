@@ -54,6 +54,11 @@ Route::prefix('control-ingreso')->group(function () {
                 ->name('control-ingreso.examenes.retrasos.solicitudes.rechazar');
             Route::post('/registrar', [LateEntryController::class, 'register'])
                 ->name('control-ingreso.examenes.retrasos.registrar');
+            Route::post('/rechazar', [LateEntryController::class, 'rejectAttempt'])
+                ->name('control-ingreso.examenes.retrasos.rechazar');
+            Route::post('/intentos/{intento}/reporte', [IncidentReportController::class, 'storeLateEntry'])
+                ->where('intento', '[0-9]{1,9}')
+                ->name('control-ingreso.examenes.retrasos.intentos.reporte.store');
         });
     });
 });

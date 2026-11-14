@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { ApiError } from '@/lib/api-client'
+import { ATTEMPT_REPORT_ERRORS } from '../components/reportIncidentMessages'
 import { incidentService } from '../services/incidentService'
-import type {
-  IncidentFormErrors, IncidentReportInput, IncidentType, IncidentDialogContext,
+import {
+  REPORT_INCIDENT_FLOW,
+  type IncidentFormErrors, type IncidentReportInput, type IncidentType, type IncidentDialogContext,
 } from '../types/incident.types'
 
 const MAX_EVIDENCE_BYTES = 5 * 1024 * 1024
@@ -10,6 +12,9 @@ const EVIDENCE_TYPES = ['image/jpeg', 'image/png', 'application/pdf']
 
 export function useReportIncident(context: IncidentDialogContext, onReported: (alreadyReported: boolean) => void) {
   const duringExam = 'origin' in context && context.origin === 'EN_CURSO'
+  const attemptErrors = ATTEMPT_REPORT_ERRORS['flow' in context && context.flow
+    ? context.flow
+    : REPORT_INCIDENT_FLOW.ENTRY_CONTROL]
   const [blocked, setBlocked] = useState(false)
   const [types, setTypes] = useState<IncidentType[]>([])
   const [loadingTypes, setLoadingTypes] = useState(true)
@@ -68,7 +73,7 @@ export function useReportIncident(context: IncidentDialogContext, onReported: (a
       if ('origin' in context) {
         await incidentService.reportDuringExam(context.examId, context.student.id_estudiante, context.roomId, input)
       } else {
-        await incidentService.report(context.examId, context.attemptId, input)
+        await incidentService.report(context.examId, context.attemptId, input, context.flow)
       }
       if (mounted.current) onReported(false)
     } catch (cause) {
@@ -88,13 +93,13 @@ export function useReportIncident(context: IncidentDialogContext, onReported: (a
         setBlocked(duringExam)
         setError(duringExam
           ? 'No se pudo confirmar el envío. Cierre y consulte las incidencias antes de volver a reportar.'
-          : 'No se pudo confirmar el envío. Revise los últimos rechazos antes de reintentar.')
+          : attemptErrors.unconfirmed)
       } else if (cause instanceof ApiError && cause.status === 403) {
         setBlocked(duringExam)
         setError(duringExam ? 'No tiene permiso para reportar a este estudiante.' : 'No tiene permiso para reportar este intento.')
       } else if (cause instanceof ApiError && cause.status === 409) {
         setBlocked(duringExam)
-        setError(duringExam ? cause.message : 'El control de ingreso ya no está disponible. Actualice la pantalla.')
+        setError(duringExam ? cause.message : attemptErrors.closed)
       } else {
         setBlocked(duringExam)
         setError(duringExam

@@ -2,9 +2,11 @@
 
 namespace Tests\Feature\EntryControl;
 
+use App\Models\IncidentType;
 use App\Models\LateEntryRequest;
 use App\Models\Role;
 use App\Models\StudentExam;
+use Database\Seeders\IncidentTypeSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\AssignsIncidentRole;
@@ -52,6 +54,7 @@ class LateEntryInvitedTeacherTest extends TestCase
 
         $this->postJson($this->lateEntryUrl('verificar'), [
             'cod_sis' => $this->studentColumn($this->secondStudentId, 'cod_sis'),
+            'id_ambiente' => $this->otraAulaId,
         ])->assertOk()->assertJsonPath('data.autorizado', true);
         $this->getJson($this->lateEntryUrl('buscar') . '?sis=' . substr(
             $this->studentColumn($this->secondStudentId, 'cod_sis'),
@@ -97,6 +100,7 @@ class LateEntryInvitedTeacherTest extends TestCase
 
         $this->postJson($this->lateEntryUrl('verificar'), [
             'cod_sis' => $this->studentColumn($this->secondStudentId, 'cod_sis'),
+            'id_ambiente' => $this->otraAulaId,
         ])->assertForbidden();
         $this->getJson($this->lateEntryUrl('buscar') . '?nombre=ana')->assertForbidden();
         $this->getJson($this->lateEntryUrl('solicitudes'))->assertForbidden();
@@ -109,5 +113,26 @@ class LateEntryInvitedTeacherTest extends TestCase
 
         $this->assertNull($this->entryOf($this->secondStudentId));
         $this->assertSame(LateEntryRequest::PENDIENTE, LateEntryRequest::query()->findOrFail($requestId)->estado);
+    }
+
+    public function test_el_invitado_dueno_reporta_un_intento_del_retraso(): void
+    {
+        $this->seed(IncidentTypeSeeder::class);
+        $this->actAsUserId($this->docenteId);
+        $attemptId = (int) $this->postJson($this->lateEntryUrl('verificar'), [
+            'cod_sis' => $this->studentColumn($this->secondStudentId, 'cod_sis'),
+            'ci' => '0000001',
+            'id_ambiente' => $this->otraAulaId,
+        ])->assertOk()->json('data.id_intento');
+
+        $this->postJson($this->lateEntryUrl("intentos/{$attemptId}/reporte"), [
+            'id_tipo_falta' => IncidentType::query()->firstOrFail()->id_falta,
+            'descripcion' => 'Presentó un carnet que no corresponde a la fotografía.',
+        ])->assertCreated()->assertJsonPath('data.origen', 'CONTROL_INGRESO');
+
+        $this->assertDatabaseHas('reporte_estudiante', [
+            'id_intento' => $attemptId,
+            'id_usuario_reportante' => $this->docenteId,
+        ]);
     }
 }

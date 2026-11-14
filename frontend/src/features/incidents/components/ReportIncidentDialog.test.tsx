@@ -2,6 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { mockApiWith } from '@/test/http'
+import { REPORT_INCIDENT_FLOW } from '../types/incident.types'
+import { ATTEMPT_REPORT_ERRORS } from './reportIncidentMessages'
 import { ReportIncidentDialog } from './ReportIncidentDialog'
 
 const context = {
@@ -153,4 +155,55 @@ describe('HU-042 ReportIncidentDialog', () => {
     expect(click).toHaveBeenCalledOnce()
   })
 
+})
+
+describe('HU-037 ReportIncidentDialog desde el ingreso con retraso', () => {
+  const lateContext = { ...context, flow: REPORT_INCIDENT_FLOW.LATE_ENTRY, reason: 'El CI no coincide con el registrado' }
+
+  function setupLate(postStatus = 201, postBody: unknown = { data: { id_reporte_est: 101, id_intento: 30, estado: 'PENDIENTE' } }) {
+    const { calls } = mockApiWith((request) => {
+      if (request.url.endsWith('/tipos-falta')) return { body: { data: [{ id_falta: 4, nombre: 'Suplantación', descripcion: null }] } }
+      if (request.url.endsWith('/retrasos/intentos/30/reporte')) return { status: postStatus, body: postBody }
+    })
+    const onReported = vi.fn()
+    render(<ReportIncidentDialog context={lateContext} onClose={vi.fn()} onReported={onReported} />)
+    return { calls, onReported, user: userEvent.setup({ applyAccept: false }) }
+  }
+
+  it('muestra el mismo formulario y envía a la ruta del retraso con los mismos campos', async () => {
+    const { user, calls, onReported } = setupLate()
+    expect(screen.getByText('Datos del intento · no se editan')).toBeInTheDocument()
+    expect(screen.getByText('El CI no coincide con el registrado')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Retirar al estudiante del examen')).not.toBeInTheDocument()
+    await complete(user)
+    await user.click(screen.getByRole('button', { name: 'Enviar a revisión' }))
+
+    await waitFor(() => expect(onReported).toHaveBeenCalledWith(false))
+    const request = calls.find((call) => call.method === 'POST')!
+    expect(request.url).toMatch(/\/control-ingreso\/examenes\/7\/retrasos\/intentos\/30\/reporte$/)
+    const body = request.body as FormData
+    expect([...body.keys()].sort()).toEqual(['descripcion', 'id_tipo_falta'])
+  })
+
+  it('interpreta el duplicado igual que el control de ingreso', async () => {
+    const { user, onReported } = setupLate(422, { message: 'Ya reportado', errors: { id_intento: ['Ya reportado'] } })
+    await complete(user)
+    await user.click(screen.getByRole('button', { name: 'Enviar a revisión' }))
+    await waitFor(() => expect(onReported).toHaveBeenCalledWith(true))
+  })
+
+  it('un 409 indica que el ingreso con retraso ya no está disponible', async () => {
+    const { user, onReported } = setupLate(409, { message: 'El examen no está en curso.' })
+    await complete(user)
+    await user.click(screen.getByRole('button', { name: 'Enviar a revisión' }))
+    expect(await screen.findByText(ATTEMPT_REPORT_ERRORS[REPORT_INCIDENT_FLOW.LATE_ENTRY].closed)).toBeInTheDocument()
+    expect(onReported).not.toHaveBeenCalled()
+  })
+
+  it('el control de ingreso conserva su aviso ante un 409', async () => {
+    const { user } = setup(409, { message: 'El control de ingreso no está abierto.' })
+    await complete(user)
+    await user.click(screen.getByRole('button', { name: 'Enviar a revisión' }))
+    expect(await screen.findByText('El control de ingreso ya no está disponible. Actualice la pantalla.')).toBeInTheDocument()
+  })
 })

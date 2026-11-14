@@ -83,4 +83,17 @@ describe('lateEntryService', () => {
     await expect(LATE_ENTRY_SEARCH.byName(7, 'lucia'))
       .rejects.toMatchObject({ status: 409, message: 'El examen no está en curso.' })
   })
+
+  it('rechaza al estudiante verificado y devuelve el intento registrado', async () => {
+    const rejection = { id_intento: 92, registrado: true, motivo: 'DECISION_CONTROLADOR', registrado_en: '2026-10-31T14:25:00Z' }
+    const { calls } = mockApiWith(() => ({ status: 201, body: { data: rejection } }))
+
+    await expect(lateEntryService.rejectEntry(7, {
+      id_estudiante: 501, id_ambiente: 5, ci: '9342145', motivo: 'DECISION_CONTROLADOR',
+    })).resolves.toEqual(rejection)
+
+    expect(calls[0].method).toBe('POST')
+    expect(calls[0].url).toContain('/control-ingreso/examenes/7/retrasos/rechazar')
+    expect(calls[0].body).toEqual({ id_estudiante: 501, id_ambiente: 5, ci: '9342145', motivo: 'DECISION_CONTROLADOR' })
+  })
 })
