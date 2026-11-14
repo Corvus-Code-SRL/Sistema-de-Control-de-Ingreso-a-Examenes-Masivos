@@ -1,4 +1,6 @@
 import { apiClient, apiPost, apiPut } from '@/lib/api-client';
+import type { ExamAttendanceExam } from '../types/examAttendance.types';
+import { EXAM_ATTENDANCE_PATH } from '../utils/paths';
 import {
   AssignGroupsPayload,
   CreateExamPayload,
@@ -20,6 +22,11 @@ export const examsService = {
 
   async listExams(signal?: AbortSignal): Promise<Exam[]> {
     const response = await apiClient<DataResponse<Exam[]>>('/examenes', { signal });
+    return response.data;
+  },
+
+  async listAttendanceExams(signal?: AbortSignal): Promise<ExamAttendanceExam[]> {
+    const response = await apiClient<DataResponse<ExamAttendanceExam[]>>(EXAM_ATTENDANCE_PATH, { signal });
     return response.data;
   },
 

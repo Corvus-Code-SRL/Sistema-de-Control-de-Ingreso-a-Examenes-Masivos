@@ -8,3 +8,6 @@ export function examDetailPath(examId: number, groupId?: number): string {
 export function examFinalReportPath(examId: number): string {
   return `/examenes/${examId}/reporte-final`
 }
+
+/** Acceso al catálogo de exámenes para la consulta de asistencia (HU-066). */
+export const EXAM_ATTENDANCE_PATH = '/examenes/estudiantes-ingresados'
