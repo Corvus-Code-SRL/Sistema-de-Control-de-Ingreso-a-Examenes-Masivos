@@ -34,8 +34,10 @@ class EntryConfirmationService
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                if ($currentExam->estado !== Exam::EN_INGRESO) {
-                    $started = in_array($currentExam->estado, [Exam::EN_CURSO, Exam::FINALIZADO], true);
+                if (! in_array($currentExam->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::EN_CURSO], true)
+                    || CloseOrdinaryEntryService::isClosed((int) $currentExam->id_examen)
+                    || ! $this->snapshots->ready((int) $currentExam->id_examen)) {
+                    $started = $currentExam->estado === Exam::FINALIZADO;
 
                     return [
                         'creado' => false,
