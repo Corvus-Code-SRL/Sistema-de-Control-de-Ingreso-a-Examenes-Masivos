@@ -7,6 +7,7 @@ use App\Models\Exam;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\EntryControl\EntryControlSnapshotService;
+use App\Services\EntryControl\CloseOrdinaryEntryService;
 use App\Services\Security\UserRoleService;
 use App\Services\Incidents\ExamInProgressSituationService;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -85,9 +86,10 @@ class ExamInProgressQueryService
         }
 
         if (!in_array($exam->estado, [
+            Exam::PROGRAMADO,
             Exam::EN_CURSO,
             Exam::FINALIZADO,
-        ], true)) {
+        ], true) || ($exam->estado === Exam::PROGRAMADO && ! CloseOrdinaryEntryService::isClosed($examId))) {
             throw new ExamStateException(
                 'El examen todavía no está en curso.'
             );

@@ -38,7 +38,7 @@ export interface ExamInProgress {
     id_examen: number;
     nombre_examen: string;
     materia: string | null;
-    estado: 'EN_CURSO' | 'FINALIZADO';
+    estado: 'PROGRAMADO' | 'EN_CURSO' | 'FINALIZADO';
     rol_controlador: 'DOCENTE' | 'AUXILIAR';
     id_ambiente_asignado: number | null;
     ambientes: {
