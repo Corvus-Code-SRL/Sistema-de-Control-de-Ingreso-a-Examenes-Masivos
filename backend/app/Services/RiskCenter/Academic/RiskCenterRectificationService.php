@@ -2,9 +2,8 @@
 
 namespace App\Services\RiskCenter\Academic;
 
-use App\Exceptions\RiskCenter\RiskRectificationConflictException;
+use App\Exceptions\RiskCenter\RiskRecordAlreadyRectifiedException;
 use App\Models\RiskCenter;
-use App\Models\RiskCenterVersion;
 use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\Security\AuditLogService;
 use Carbon\Carbon;
@@ -14,11 +13,11 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Rectifica registros confirmados de la Central de Riesgo (HU-062).
+ * Rectifica registros de la Central de Riesgo de estudiantes (HU-062).
  *
- * El registro confirmado nunca se sobrescribe: cada rectificación agrega una versión vigente y la
- * anterior pasa a ser histórica. Solo se corrigen el tipo de falta y la descripción; el estudiante, el
- * examen, la fecha, la evidencia, quien reportó y quien aprobó no cambian. El actor entra por argumento.
+ * Rectificar es retirar el registro de la Central: se marca con quién, cuándo y por qué. La fila nunca se borra
+ * ni se reactiva, y el reporte original, su evidencia y sus datos de revisión no se tocan. El actor entra por
+ * argumento.
  */
 class RiskCenterRectificationService
 {
@@ -33,96 +32,57 @@ class RiskCenterRectificationService
     }
 
     /**
-     * Crea la nueva versión vigente. `$baseVersion` es el número de la versión que la persona vio al abrir
-     * el formulario: si ya cambió, otra rectificación se adelantó.
+     * Retira el registro de la Central.
      *
-     * @throws ModelNotFoundException
-     * @throws RiskRectificationConflictException
+     * @throws ModelNotFoundException si el registro no existe
+     * @throws RiskRecordAlreadyRectifiedException si ya estaba rectificado
      */
-    public function rectify(
-        int $recordId,
-        string $adminId,
-        int $faultTypeId,
-        ?string $description,
-        string $reason,
-        int $baseVersion
-    ): RiskCenter {
-        $record = DB::transaction(function () use (
-            $recordId,
-            $adminId,
-            $faultTypeId,
-            $description,
-            $reason,
-            $baseVersion
-        ) {
+    public function rectify(int $recordId, string $adminId, string $reason): RiskCenter
+    {
+        $record = DB::transaction(function () use ($recordId, $adminId, $reason) {
             // Esta fila es el punto de serialización: dos rectificaciones del mismo registro se esperan aquí.
-            $record = RiskCenter::query()->lockForUpdate()->find($recordId);
+            $record = RiskCenter::withVoided()->lockForUpdate()->find($recordId);
 
             if ($record === null) {
                 throw new ModelNotFoundException('No existe el registro de la Central de Riesgo indicado.');
             }
 
-            $report = $record->studentReport()->first();
-            $current = $record->currentVersion()->first();
-            $currentNumber = $current === null ? 1 : $current->numero_version;
-            $currentTypeId = $current === null ? (int) $report->id_tipo_falta : $current->id_tipo_falta;
-            $currentDescription = $this->clean($current === null ? $report->descripcion : $current->descripcion);
-            $description = $this->clean($description);
-
-            if ($baseVersion !== $currentNumber) {
-                throw RiskRectificationConflictException::staleVersion();
+            if ($record->isRectified()) {
+                throw RiskRecordAlreadyRectifiedException::make();
             }
 
-            if ($faultTypeId === $currentTypeId && $description === $currentDescription) {
-                throw RiskRectificationConflictException::unchanged();
-            }
+            $now = Carbon::now();
 
-            if ($current === null) {
-                RiskCenterVersion::query()->create([
-                    'id_cr_estudiante' => $record->id_cr_estudiante,
-                    'numero_version' => 1,
-                    'id_tipo_falta' => $currentTypeId,
-                    'descripcion' => $currentDescription,
-                    'motivo' => null,
-                    'id_usuario_autor' => $report->id_usuario_revisor ?? $report->id_usuario_reportante,
-                    'fecha_registro' => $record->fecha_registro,
-                    'es_vigente' => false,
+            // La condición protege aun si el bloqueo no hubiera bastado: solo se rectifica una vez.
+            $changed = RiskCenter::withVoided()
+                ->where('id_cr_estudiante', $record->id_cr_estudiante)
+                ->whereNull('rectificado_en')
+                ->update([
+                    'rectificado_en' => $now,
+                    'id_usuario_rectificador' => $adminId,
+                    'motivo_rectificacion' => $reason,
                 ]);
-            } else {
-                // Es lo único de una versión guardada que cambia: deja de ser la vigente.
-                RiskCenterVersion::query()
-                    ->where('id_version', $current->id_version)
-                    ->update(['es_vigente' => false]);
+
+            if ($changed !== 1) {
+                throw RiskRecordAlreadyRectifiedException::make();
             }
 
-            $new = RiskCenterVersion::query()->create([
+            $identity = [
                 'id_cr_estudiante' => $record->id_cr_estudiante,
-                'numero_version' => $currentNumber + 1,
-                'id_tipo_falta' => $faultTypeId,
-                'descripcion' => $description,
-                'motivo' => $reason,
-                'id_usuario_autor' => $adminId,
-                'fecha_registro' => Carbon::now(),
-                'es_vigente' => true,
-            ]);
+                'id_reporte_est' => $record->id_reporte_est,
+                'id_estudiante' => $record->id_estudiante,
+                'id_examen' => (int) $record->studentReport()->value('id_examen'),
+            ];
 
             $this->auditLog->registrar(
                 'RECTIFICAR_REGISTRO',
                 'central_riesgo',
-                [
-                    'id_cr_estudiante' => $record->id_cr_estudiante,
-                    'id_estudiante' => $record->id_estudiante,
-                    'numero_version' => $currentNumber,
-                    'id_tipo_falta' => $currentTypeId,
-                    'descripcion' => $currentDescription,
-                ],
-                [
-                    'id_cr_estudiante' => $record->id_cr_estudiante,
-                    'id_estudiante' => $record->id_estudiante,
-                    'numero_version' => $new->numero_version,
-                    'id_tipo_falta' => $new->id_tipo_falta,
-                    'descripcion' => $new->descripcion,
-                    'motivo' => $new->motivo,
+                $identity + ['estado' => 'ACTIVO'],
+                $identity + [
+                    'estado' => 'RECTIFICADO',
+                    'motivo_rectificacion' => $reason,
+                    'rectificado_en' => $now->toIso8601String(),
+                    'id_usuario_rectificador' => $adminId,
                 ],
                 $adminId
             );
@@ -137,7 +97,7 @@ class RiskCenterRectificationService
 
     /**
      * El aviso de antecedentes del control de ingreso se actualiza después de guardar. Un fallo de Redis no
-     * deshace una rectificación ya confirmada: se registra y el siguiente snapshot saldrá bien.
+     * deshace una rectificación ya confirmada: se registra y los siguientes snapshots saldrán bien.
      */
     private function refreshOpenSnapshots(int $studentId): void
     {
@@ -149,12 +109,5 @@ class RiskCenterRectificationService
                 'error' => $exception->getMessage(),
             ]);
         }
-    }
-
-    private function clean(?string $text): ?string
-    {
-        $text = $text === null ? '' : trim($text);
-
-        return $text === '' ? null : $text;
     }
 }

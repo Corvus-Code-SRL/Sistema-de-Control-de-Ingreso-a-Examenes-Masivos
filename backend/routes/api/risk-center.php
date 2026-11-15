@@ -22,9 +22,9 @@ Route::prefix('central-riesgo')->group(function () {
         ->name('central-riesgo.evidencia');
 });
 
-// Rectificación de registros confirmados (HU-062): solo el Administrador. Es un prefijo aparte de
-// central-riesgo para que esa consulta siga siendo de solo lectura. No hay rutas de edición ni de borrado:
-// la única escritura es crear una versión nueva.
+// Rectificación de registros confirmados (HU-062): solo el Administrador. Rectificar es retirar el registro de
+// la Central. Es un prefijo aparte de central-riesgo para que esa consulta siga siendo de solo lectura. No hay
+// rutas de edición, de borrado ni de reactivación: la única escritura es rectificar un registro activo.
 Route::prefix('rectificacion-riesgo')->group(function () {
     Route::get('estudiantes', [RiskCenterRectificationController::class, 'students'])
         ->name('rectificacion-riesgo.estudiantes');
@@ -32,9 +32,6 @@ Route::prefix('rectificacion-riesgo')->group(function () {
     Route::get('estudiantes/{id}/registros', [RiskCenterRectificationController::class, 'studentRecords'])
         ->where('id', '[0-9]{1,9}')
         ->name('rectificacion-riesgo.estudiantes.registros');
-
-    Route::get('tipos-falta', [RiskCenterRectificationController::class, 'faultTypes'])
-        ->name('rectificacion-riesgo.tipos-falta');
 
     Route::get('registros/{id}', [RiskCenterRectificationController::class, 'show'])
         ->where('id', '[0-9]{1,9}')

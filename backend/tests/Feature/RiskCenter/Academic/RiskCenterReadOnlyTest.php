@@ -15,8 +15,8 @@ use Tests\TestCase;
 /**
  * HU-046: la consulta es de solo lectura. No existe ninguna ruta que escriba bajo /api/central-riesgo.
  *
- * HU-062: la única escritura sobre la Central es crear una versión nueva en /api/rectificacion-riesgo; no hay
- * rutas para editar ni borrar un registro ni sus versiones.
+ * HU-062: la única escritura sobre la Central es rectificar (retirar) un registro activo en
+ * /api/rectificacion-riesgo; no hay rutas para editar, borrar ni reactivar un registro.
  */
 class RiskCenterReadOnlyTest extends TestCase
 {
@@ -73,7 +73,7 @@ class RiskCenterReadOnlyTest extends TestCase
         $this->assertSame(['POST api/rectificacion-riesgo/registros/{id}/rectificar'], $writes);
     }
 
-    public function test_ninguna_ruta_de_la_api_edita_o_borra_registros_o_versiones_de_la_central(): void
+    public function test_ninguna_ruta_de_la_api_edita_borra_o_reactiva_registros_de_la_central(): void
     {
         foreach (Route::getRoutes()->getRoutes() as $route) {
             $isRiskUri = strpos($route->uri(), 'central-riesgo') !== false
@@ -85,22 +85,19 @@ class RiskCenterReadOnlyTest extends TestCase
         }
     }
 
-    public function test_editar_o_borrar_un_registro_o_una_version_no_es_posible_ni_para_el_administrador(): void
+    public function test_editar_borrar_o_reactivar_un_registro_no_es_posible_ni_para_el_administrador(): void
     {
         $this->seedSecurityAccounts();
         $context = $this->createReportingContext();
         $id = $this->insertApprovedRecord($context)['id_cr_estudiante'];
-        $this->rectify($id)->assertCreated();
-        $versionId = (int) DB::table('central_riesgo_version')->where('id_cr_estudiante', $id)->value('id_version');
+        $this->rectify($id)->assertOk();
         $recordBefore = (array) DB::table('central_riesgo')->where('id_cr_estudiante', $id)->first();
-        $versionsBefore = $this->versionsOf($id);
 
         $urls = [
             "/api/rectificacion-riesgo/registros/{$id}",
             "/api/rectificacion-riesgo/registros/{$id}/rectificar",
-            "/api/rectificacion-riesgo/registros/{$id}/versiones",
-            "/api/rectificacion-riesgo/registros/{$id}/versiones/{$versionId}",
-            "/api/rectificacion-riesgo/versiones/{$versionId}",
+            "/api/rectificacion-riesgo/registros/{$id}/reactivar",
+            "/api/rectificacion-riesgo/registros/{$id}/restaurar",
             "/api/rectificacion-riesgo/estudiantes/{$context['id_estudiante']}/registros",
         ];
 
@@ -113,8 +110,16 @@ class RiskCenterReadOnlyTest extends TestCase
             }
         }
 
+        $urls = [
+            "/api/rectificacion-riesgo/registros/{$id}/reactivar",
+            "/api/rectificacion-riesgo/registros/{$id}/restaurar",
+        ];
+
+        foreach ($urls as $url) {
+            $this->postJson($url, ['motivo' => 'Intento de reactivar'])->assertNotFound();
+        }
+
         $this->assertSame($recordBefore, (array) DB::table('central_riesgo')->where('id_cr_estudiante', $id)->first());
-        $this->assertSame($versionsBefore, $this->versionsOf($id));
     }
 
     /** @return array<int, LaravelRoute> */

@@ -2,7 +2,6 @@
 
 namespace App\Services\RiskCenter\Academic;
 
-use App\Models\IncidentType;
 use App\Models\RiskCenter;
 use App\Models\Student;
 use App\Support\Database\AccentInsensitiveSearch;
@@ -12,11 +11,11 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 /**
- * Consultas de la vista «Rectificar registro de la central» (HU-062): búsqueda de estudiantes, sus
- * registros confirmados con su estado de rectificación y el detalle con el historial de versiones.
+ * Consultas de la vista «Rectificar registro de la central» (HU-062): búsqueda de estudiantes, sus registros
+ * activos, sus registros ya rectificados (aparte) y la ficha completa de un registro activo.
  *
- * Solo lectura. Es independiente de RiskCenterQueryService (HU-046): esa consulta no expone el estado
- * de rectificación.
+ * Solo lectura. Es independiente de RiskCenterQueryService (HU-046), que nunca devuelve rectificados. Aquí los
+ * rectificados se piden a propósito con RiskCenter::withVoided().
  */
 class RiskCenterRectificationQueryService
 {
@@ -57,9 +56,14 @@ class RiskCenterRectificationQueryService
     }
 
     /**
-     * Estudiante con sus registros confirmados, del más reciente al más antiguo.
+     * Estudiante con sus registros activos (del más reciente al más antiguo) y, aparte, los que ya se
+     * rectificaron (el más recientemente rectificado primero).
      *
-     * @return array{estudiante: Student, registros: Collection<int, RiskCenter>}
+     * @return array{
+     *     estudiante: Student,
+     *     registros: Collection<int, RiskCenter>,
+     *     rectificados: Collection<int, RiskCenter>
+     * }
      *
      * @throws ModelNotFoundException
      */
@@ -71,24 +75,32 @@ class RiskCenterRectificationQueryService
             throw new ModelNotFoundException('No existe el estudiante indicado.');
         }
 
-        $records = RiskCenter::query()
+        $summaryRelations = [
+            'studentReport.incidentType',
+            'studentReport.exam.subject',
+            'studentReport.userReviewer',
+        ];
+
+        $active = RiskCenter::query()
             ->where('id_estudiante', $studentId)
-            ->with([
-                'studentReport.incidentType',
-                'studentReport.exam.subject',
-                'studentReport.userReviewer',
-                'currentVersion.incidentType',
-            ])
-            ->withCount('versions')
+            ->with($summaryRelations)
             ->orderByDesc('fecha_registro')
             ->orderByDesc('id_cr_estudiante')
             ->get();
 
-        return ['estudiante' => $student, 'registros' => $records];
+        $voided = RiskCenter::withVoided()
+            ->where('id_estudiante', $studentId)
+            ->whereNotNull('rectificado_en')
+            ->with(array_merge($summaryRelations, ['rectifier']))
+            ->orderByDesc('rectificado_en')
+            ->orderByDesc('id_cr_estudiante')
+            ->get();
+
+        return ['estudiante' => $student, 'registros' => $active, 'rectificados' => $voided];
     }
 
     /**
-     * Un registro con lo fijo, el estado vigente y el historial completo (la versión más nueva primero).
+     * Ficha completa de un registro activo. Uno rectificado ya no está en la Central: se trata como inexistente.
      *
      * @throws ModelNotFoundException
      */
@@ -101,14 +113,10 @@ class RiskCenterRectificationQueryService
                 'studentReport.exam.subject',
                 'studentReport.exam.career',
                 'studentReport.entryAttempt.classroom',
+                'studentReport.incidentRoom',
                 'studentReport.userReporter',
                 'studentReport.userReviewer',
-                'currentVersion.incidentType',
-                'versions' => fn ($versions) => $versions->orderByDesc('numero_version'),
-                'versions.incidentType',
-                'versions.author',
             ])
-            ->withCount('versions')
             ->find($id);
 
         if ($record === null) {
@@ -118,10 +126,28 @@ class RiskCenterRectificationQueryService
         return $record;
     }
 
-    /** Catálogo de tipos de falta para el selector de la rectificación. */
-    public function faultTypes(): Collection
+    /**
+     * Un registro ya rectificado con lo que muestra la lista «Registros rectificados».
+     *
+     * @throws ModelNotFoundException
+     */
+    public function findRectifiedRecord(int $id): RiskCenter
     {
-        return IncidentType::query()->orderBy('nombre')->orderBy('id_falta')->get();
+        $record = RiskCenter::withVoided()
+            ->whereNotNull('rectificado_en')
+            ->with([
+                'studentReport.incidentType',
+                'studentReport.exam.subject',
+                'studentReport.userReviewer',
+                'rectifier',
+            ])
+            ->find($id);
+
+        if ($record === null) {
+            throw new ModelNotFoundException('No existe el registro de la Central de Riesgo indicado.');
+        }
+
+        return $record;
     }
 
     private function byName(string $term): Builder

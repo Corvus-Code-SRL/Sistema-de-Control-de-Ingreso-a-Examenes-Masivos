@@ -5,7 +5,6 @@ namespace Tests\Feature\RiskCenter\Academic\Rectification;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\EntryControl\EntryControlSnapshotService;
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -16,8 +15,8 @@ use Tests\Concerns\SeedsSecurityAccounts;
 use Tests\TestCase;
 
 /**
- * HU-062: POST /api/rectificacion-riesgo/registros/{id}/rectificar crea una versión nueva del registro
- * sin sobrescribir el original.
+ * HU-062: POST /api/rectificacion-riesgo/registros/{id}/rectificar retira el registro de la Central de Riesgo.
+ * Es irreversible y no edita el tipo de falta ni la descripción.
  */
 class RectifyRiskRecordTest extends TestCase
 {
@@ -30,243 +29,156 @@ class RectifyRiskRecordTest extends TestCase
 
     private int $recordId;
 
+    private int $reportId;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->seedSecurityAccounts();
         $this->context = $this->createReportingContext();
-        $this->recordId = $this->insertApprovedRecord($this->context, ['descripcion' => 'Descripción original.'])
-            ['id_cr_estudiante'];
+        $record = $this->insertApprovedRecord($this->context, ['descripcion' => 'Descripción original.']);
+        $this->recordId = $record['id_cr_estudiante'];
+        $this->reportId = $record['id_reporte_est'];
     }
 
-    /** @return array<string, mixed> */
-    private function rowOf(string $table, string $key, int $id): array
+    private function reportRow(): array
     {
-        return (array) DB::table($table)->where($key, $id)->first();
+        return (array) DB::table('reporte_estudiante')->where('id_reporte_est', $this->reportId)->first();
     }
 
-    public function test_la_primera_rectificacion_crea_la_version_uno_y_la_dos_vigente(): void
+    private function assertStillActive(int $recordId): void
     {
-        $newTypeId = $this->insertFaultType('Suplantación');
-
-        $this->rectify($this->recordId, [
-            'id_tipo_falta' => $newTypeId,
-            'descripcion' => '  Nueva descripción.  ',
-            'motivo' => '  Se confirmó otra falta.  ',
-        ])
-            ->assertCreated()
-            ->assertJsonPath('data.estado', 'Rectificado')
-            ->assertJsonPath('data.version_vigente', 2)
-            ->assertJsonPath('data.tipo_falta.id_falta', $newTypeId)
-            ->assertJsonPath('data.descripcion', 'Nueva descripción.')
-            ->assertJsonCount(2, 'data.historial');
-
-        [$first, $second] = $this->versionsOf($this->recordId);
-
-        $this->assertSame(1, $first['numero_version']);
-        $this->assertSame($this->context['id_tipo_falta'], $first['id_tipo_falta']);
-        $this->assertSame('Descripción original.', $first['descripcion']);
-        $this->assertNull($first['motivo']);
-        $this->assertSame($this->context['id_usuario'], $first['id_usuario_autor']);
-        $this->assertSame('2026-10-02 12:00:00+00', $first['fecha_registro']);
-        $this->assertFalse($first['es_vigente']);
-
-        $this->assertSame(2, $second['numero_version']);
-        $this->assertSame($newTypeId, $second['id_tipo_falta']);
-        $this->assertSame('Nueva descripción.', $second['descripcion']);
-        $this->assertSame('Se confirmó otra falta.', $second['motivo']);
-        $this->assertSame($this->administratorId, $second['id_usuario_autor']);
-        $this->assertTrue($second['es_vigente']);
+        $row = $this->recordRow($recordId);
+        $this->assertNull($row['rectificado_en']);
+        $this->assertNull($row['id_usuario_rectificador']);
+        $this->assertNull($row['motivo_rectificacion']);
     }
 
-    public function test_cada_rectificacion_agrega_una_version_consecutiva_y_deja_una_sola_vigente(): void
+    public function test_rectifica_el_registro_con_el_administrador_la_fecha_y_el_motivo(): void
     {
-        $this->rectify($this->recordId)->assertCreated();
-        $this->rectify($this->recordId, ['version_base' => 2])->assertCreated();
-        $this->rectify($this->recordId, ['version_base' => 3])->assertCreated()
-            ->assertJsonPath('data.numero_rectificaciones', 3)
-            ->assertJsonPath('data.version_vigente', 4);
+        $this->rectify($this->recordId, ['motivo' => '  Se retira: el estudiante no era el implicado.  '])
+            ->assertOk()
+            ->assertJsonPath('data.id_cr_estudiante', $this->recordId)
+            ->assertJsonPath('data.rectificacion.motivo', 'Se retira: el estudiante no era el implicado.')
+            ->assertJsonStructure(['data' => [
+                'rectificacion' => ['fecha', 'administrador' => ['nombre_completo'], 'motivo'],
+            ]]);
 
-        $versions = $this->versionsOf($this->recordId);
-
-        $this->assertSame([1, 2, 3, 4], array_column($versions, 'numero_version'));
-        $this->assertSame([false, false, false, true], array_column($versions, 'es_vigente'));
+        $row = $this->recordRow($this->recordId);
+        $this->assertNotNull($row['rectificado_en']);
+        $this->assertSame($this->administratorId, $row['id_usuario_rectificador']);
+        $this->assertSame('Se retira: el estudiante no era el implicado.', $row['motivo_rectificacion']);
     }
 
-    public function test_el_registro_y_el_reporte_originales_no_se_modifican(): void
+    public function test_responde_200_y_no_201(): void
     {
-        $recordBefore = $this->rowOf('central_riesgo', 'id_cr_estudiante', $this->recordId);
-        $reportBefore = $this->rowOf('reporte_estudiante', 'id_reporte_est', $recordBefore['id_reporte_est']);
-
-        $this->rectify($this->recordId)->assertCreated();
-        $this->rectify($this->recordId, ['version_base' => 2])->assertCreated();
-
-        $this->assertSame($recordBefore, $this->rowOf('central_riesgo', 'id_cr_estudiante', $this->recordId));
-        $this->assertSame(
-            $reportBefore,
-            $this->rowOf('reporte_estudiante', 'id_reporte_est', $recordBefore['id_reporte_est'])
-        );
+        $this->rectify($this->recordId)->assertStatus(200);
     }
 
-    public function test_una_version_guardada_solo_cambia_su_bandera_de_vigente(): void
+    public function test_la_fila_y_el_reporte_originales_no_se_modifican(): void
     {
-        $this->rectify($this->recordId)->assertCreated();
-        $beforeSecond = $this->versionsOf($this->recordId)[1];
+        $recordBefore = $this->recordRow($this->recordId);
+        $reportBefore = $this->reportRow();
 
-        $this->rectify($this->recordId, ['version_base' => 2])->assertCreated();
+        $this->rectify($this->recordId)->assertOk();
 
-        $versions = $this->versionsOf($this->recordId);
-        $afterSecond = $versions[1];
-        $this->assertFalse($afterSecond['es_vigente']);
-        $this->assertSame(
-            array_diff_key($beforeSecond, ['es_vigente' => 1]),
-            array_diff_key($afterSecond, ['es_vigente' => 1])
-        );
-        $this->assertSame('Descripción original.', $versions[0]['descripcion']);
-    }
-
-    public function test_una_descripcion_vacia_se_guarda_como_nula(): void
-    {
-        $this->rectify($this->recordId, ['descripcion' => '   '])->assertCreated()
-            ->assertJsonPath('data.descripcion', null);
-
-        $this->assertNull($this->versionsOf($this->recordId)[1]['descripcion']);
-    }
-
-    public function test_se_puede_corregir_solo_la_descripcion(): void
-    {
-        $this->rectify($this->recordId, [
-            'id_tipo_falta' => $this->context['id_tipo_falta'],
-            'descripcion' => 'Otra descripción.',
-        ])->assertCreated();
-
-        $second = $this->versionsOf($this->recordId)[1];
-        $this->assertSame($this->context['id_tipo_falta'], $second['id_tipo_falta']);
-        $this->assertSame('Otra descripción.', $second['descripcion']);
-    }
-
-    public function test_se_puede_corregir_solo_el_tipo_de_falta(): void
-    {
-        $this->rectify($this->recordId, ['descripcion' => 'Descripción original.'])->assertCreated();
-
-        $this->assertSame('Descripción original.', $this->versionsOf($this->recordId)[1]['descripcion']);
-    }
-
-    public function test_sin_cambios_responde_409_y_no_guarda_nada(): void
-    {
-        foreach (['Descripción original.', '  Descripción original.  '] as $description) {
-            $this->rectify($this->recordId, [
-                'id_tipo_falta' => $this->context['id_tipo_falta'],
-                'descripcion' => $description,
-            ])
-                ->assertStatus(409)
-                ->assertJsonPath('message', 'Los valores indicados son iguales a los de la versión vigente.');
+        $recordAfter = $this->recordRow($this->recordId);
+        foreach (['id_cr_estudiante', 'id_reporte_est', 'id_estudiante', 'fecha_registro'] as $column) {
+            $this->assertSame($recordBefore[$column], $recordAfter[$column], $column);
         }
-
-        $this->assertSame([], $this->versionsOf($this->recordId));
-        $this->assertSame(0, DB::table('log')->where('tabla_afectada', 'central_riesgo')->count());
+        $this->assertSame($reportBefore, $this->reportRow());
+        $this->assertSame(1, DB::table('central_riesgo')->where('id_cr_estudiante', $this->recordId)->count());
     }
 
-    public function test_sin_cambios_frente_a_la_version_vigente_rectificada_responde_409(): void
+    public function test_rectificar_dos_veces_responde_409_y_conserva_la_primera_rectificacion(): void
     {
-        $this->rectify($this->recordId, ['id_tipo_falta' => $this->context['id_tipo_falta'], 'descripcion' => 'Nueva.'])
-            ->assertCreated();
+        $this->rectify($this->recordId, ['motivo' => 'Primer motivo válido.'])->assertOk();
+        $first = $this->recordRow($this->recordId);
+
+        $this->rectify($this->recordId, ['motivo' => 'Segundo motivo válido.'])
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'Este registro ya fue rectificado y ya no está en la Central de Riesgo.');
+
+        $this->assertSame($first, $this->recordRow($this->recordId));
+        $this->assertSame(1, DB::table('log')
+            ->join('accion', 'accion.id_accion', '=', 'log.id_accion')
+            ->where('accion.operacion', 'RECTIFICAR_REGISTRO')->count());
+    }
+
+    public function test_otro_administrador_tampoco_puede_rectificar_un_registro_ya_rectificado(): void
+    {
+        $this->voidRecord($this->recordId, null, 'Motivo previo suficiente.');
+        $before = $this->recordRow($this->recordId);
+        $this->actAs($this->createAccount(Role::ADMINISTRADOR));
+
+        $this->rectify($this->recordId)->assertStatus(409);
+
+        $this->assertSame($before, $this->recordRow($this->recordId));
+    }
+
+    public function test_el_409_no_actualiza_los_antecedentes(): void
+    {
+        $this->voidRecord($this->recordId);
+        $this->mock(EntryControlSnapshotService::class, function ($mock) {
+            $mock->shouldReceive('refreshBackground')->never();
+        });
+
+        $this->rectify($this->recordId)->assertStatus(409);
+    }
+
+    public function test_los_campos_de_la_falta_no_se_pueden_enviar_para_editarla(): void
+    {
+        $reportBefore = $this->reportRow();
+        $otherType = $this->insertFaultType('Otra falta ' . uniqid());
 
         $this->rectify($this->recordId, [
-            'id_tipo_falta' => $this->context['id_tipo_falta'],
-            'descripcion' => 'Nueva.',
-            'version_base' => 2,
-        ])->assertStatus(409);
+            'id_tipo_falta' => $otherType,
+            'descripcion' => 'Descripción nueva.',
+            'id_estudiante' => 1,
+            'version_base' => 1,
+        ])->assertOk();
 
-        $this->assertCount(2, $this->versionsOf($this->recordId));
+        $this->assertSame($reportBefore, $this->reportRow());
+        $this->assertSame($this->context['id_estudiante'], (int) $this->recordRow($this->recordId)['id_estudiante']);
     }
 
-    public function test_una_version_base_desactualizada_responde_409_y_no_guarda_nada(): void
-    {
-        $this->rectify($this->recordId)->assertCreated();
-
-        $this->rectify($this->recordId, ['version_base' => 1])
-            ->assertStatus(409)
-            ->assertJsonPath(
-                'message',
-                'El registro fue rectificado mientras usted lo editaba. Recargue para ver la versión vigente.'
-            );
-
-        $versions = $this->versionsOf($this->recordId);
-        $this->assertSame([1, 2], array_column($versions, 'numero_version'));
-        $this->assertSame([false, true], array_column($versions, 'es_vigente'));
-        $this->assertSame(1, DB::table('log')->where('tabla_afectada', 'central_riesgo')->count());
-    }
-
-    public function test_una_version_base_adelantada_tambien_responde_409(): void
-    {
-        $this->rectify($this->recordId, ['version_base' => 5])->assertStatus(409);
-
-        $this->assertSame([], $this->versionsOf($this->recordId));
-    }
-
-    /** @return array<string, array{0: array<string, mixed>, 1: string}> */
+    /** @return array<string, array{0: array<string, mixed>}> */
     public function invalidBodies(): array
     {
         return [
-            'sin motivo' => [['motivo' => null], 'motivo'],
-            'motivo en blanco' => [['motivo' => '      '], 'motivo'],
-            'motivo corto' => [['motivo' => 'corto'], 'motivo'],
-            'motivo largo' => [['motivo' => str_repeat('a', 501)], 'motivo'],
-            'sin tipo de falta' => [['id_tipo_falta' => null], 'id_tipo_falta'],
-            'tipo de falta inexistente' => [['id_tipo_falta' => 999999999], 'id_tipo_falta'],
-            'tipo de falta no numérico' => [['id_tipo_falta' => 'abc'], 'id_tipo_falta'],
-            'descripción larga' => [['descripcion' => str_repeat('a', 2001)], 'descripcion'],
-            'sin versión base' => [['version_base' => null], 'version_base'],
-            'versión base cero' => [['version_base' => 0], 'version_base'],
+            'sin motivo' => [[ 'motivo' => null ]],
+            'motivo vacío' => [['motivo' => '']],
+            'motivo solo espacios' => [['motivo' => '          ']],
+            'motivo de 9 caracteres' => [['motivo' => str_repeat('a', 9)]],
+            'motivo de 501 caracteres' => [['motivo' => str_repeat('a', 501)]],
+            'motivo que no es texto' => [['motivo' => ['a', 'b']]],
         ];
     }
 
-    /**
-     * @dataProvider invalidBodies
-     * @param array<string, mixed> $overrides
-     */
-    public function test_un_cuerpo_invalido_responde_422_y_no_guarda_nada(array $overrides, string $field): void
+    /** @dataProvider invalidBodies */
+    public function test_un_motivo_invalido_responde_422_y_no_guarda_nada(array $body): void
     {
-        $this->rectify($this->recordId, $overrides)
+        $this->postJson($this->rectifyUrl($this->recordId), $body)
             ->assertStatus(422)
-            ->assertJsonValidationErrors($field);
+            ->assertJsonValidationErrors(['motivo']);
 
-        $this->assertSame([], $this->versionsOf($this->recordId));
-        $this->assertSame(0, DB::table('log')->where('tabla_afectada', 'central_riesgo')->count());
+        $this->assertStillActive($this->recordId);
     }
 
-    public function test_el_motivo_faltante_dice_que_es_obligatorio(): void
+    public function test_sin_cuerpo_el_motivo_es_obligatorio(): void
     {
-        $this->rectify($this->recordId, ['motivo' => ''])
+        $this->postJson($this->rectifyUrl($this->recordId), [])
             ->assertStatus(422)
             ->assertJsonPath('errors.motivo.0', 'El motivo es obligatorio');
     }
 
-    public function test_el_motivo_de_diez_y_de_quinientos_caracteres_es_valido(): void
+    public function test_un_motivo_de_diez_y_de_quinientos_caracteres_es_valido(): void
     {
-        $this->rectify($this->recordId, ['motivo' => str_repeat('a', 10)])->assertCreated();
-        $this->rectify($this->recordId, ['motivo' => str_repeat('b', 500), 'version_base' => 2])->assertCreated();
-    }
+        $other = $this->insertApprovedRecord($this->context)['id_cr_estudiante'];
 
-    public function test_los_campos_fijos_no_se_pueden_enviar_para_cambiarlos(): void
-    {
-        $otherStudent = $this->insertStudent('Otro', 'Estudiante', null, '202499992');
-        $before = $this->rowOf('central_riesgo', 'id_cr_estudiante', $this->recordId);
-
-        $this->rectify($this->recordId, [
-            'id_estudiante' => $otherStudent,
-            'id_examen' => 1,
-            'fecha_registro' => '2020-01-01',
-            'evidencia_url' => 'http://x',
-        ])->assertCreated();
-
-        $this->assertSame($before, $this->rowOf('central_riesgo', 'id_cr_estudiante', $this->recordId));
-        $this->assertSame(
-            $this->context['id_estudiante'],
-            (int) DB::table('reporte_estudiante')->where('id_reporte_est', $before['id_reporte_est'])->value('id_estudiante')
-        );
+        $this->rectify($this->recordId, ['motivo' => str_repeat('a', 10)])->assertOk();
+        $this->rectify($other, ['motivo' => str_repeat('b', 500)])->assertOk();
     }
 
     public function test_sin_token_responde_401(): void
@@ -291,7 +203,7 @@ class RectifyRiskRecordTest extends TestCase
             ->assertForbidden()
             ->assertJsonPath('message', 'No tiene permiso para rectificar registros de la Central de Riesgo.');
 
-        $this->assertSame([], $this->versionsOf($this->recordId));
+        $this->assertStillActive($this->recordId);
     }
 
     public function test_una_cuenta_inactiva_recibe_403(): void
@@ -299,6 +211,7 @@ class RectifyRiskRecordTest extends TestCase
         $this->actAs($this->createAccount(Role::ADMINISTRADOR, User::ESTADO_INACTIVO));
 
         $this->rectify($this->recordId)->assertForbidden();
+        $this->assertStillActive($this->recordId);
     }
 
     public function test_un_docente_que_consulta_la_central_no_puede_rectificar(): void
@@ -315,15 +228,21 @@ class RectifyRiskRecordTest extends TestCase
         $this->rectify(1234567890)->assertNotFound();
     }
 
-    public function test_deja_una_fila_de_bitacora_con_el_administrador_los_valores_y_el_motivo(): void
+    public function test_el_403_y_el_404_no_actualizan_los_antecedentes(): void
     {
-        $newTypeId = $this->insertFaultType('Suplantación');
+        $this->mock(EntryControlSnapshotService::class, function ($mock) {
+            $mock->shouldReceive('refreshBackground')->never();
+        });
 
-        $this->rectify($this->recordId, [
-            'id_tipo_falta' => $newTypeId,
-            'descripcion' => 'Nueva descripción.',
-            'motivo' => 'Se confirmó otra falta.',
-        ])->assertCreated();
+        $this->rectify(999999999)->assertNotFound();
+        $this->rectify($this->recordId, ['motivo' => ''])->assertStatus(422);
+        $this->actAs($this->createAccount(Role::DOCENTE));
+        $this->rectify($this->recordId)->assertForbidden();
+    }
+
+    public function test_deja_una_fila_de_bitacora_con_administrador_registro_estudiante_examen_y_motivo(): void
+    {
+        $this->rectify($this->recordId, ['motivo' => 'Se retira por error de identificación.'])->assertOk();
 
         $log = DB::table('log')
             ->join('accion', 'accion.id_accion', '=', 'log.id_accion')
@@ -337,20 +256,25 @@ class RectifyRiskRecordTest extends TestCase
 
         $before = json_decode($log->antiguo_valor, true);
         $after = json_decode($log->nuevo_valor, true);
-        $this->assertSame($this->recordId, $before['id_cr_estudiante']);
-        $this->assertSame(1, $before['numero_version']);
-        $this->assertSame($this->context['id_tipo_falta'], $before['id_tipo_falta']);
-        $this->assertSame('Descripción original.', $before['descripcion']);
-        $this->assertSame($this->recordId, $after['id_cr_estudiante']);
-        $this->assertSame(2, $after['numero_version']);
-        $this->assertSame($newTypeId, $after['id_tipo_falta']);
-        $this->assertSame('Nueva descripción.', $after['descripcion']);
-        $this->assertSame('Se confirmó otra falta.', $after['motivo']);
+        $identity = [
+            'id_cr_estudiante' => $this->recordId,
+            'id_reporte_est' => $this->reportId,
+            'id_estudiante' => $this->context['id_estudiante'],
+            'id_examen' => $this->context['id_examen'],
+        ];
+
+        $this->assertEquals($identity + ['estado' => 'ACTIVO'], $before);
+        $this->assertSame('RECTIFICADO', $after['estado']);
+        $this->assertEquals($identity, array_intersect_key($after, $identity));
+        $this->assertSame('Se retira por error de identificación.', $after['motivo_rectificacion']);
+        $this->assertSame($this->administratorId, $after['id_usuario_rectificador']);
+        $stored = \Carbon\Carbon::parse($this->recordRow($this->recordId)['rectificado_en']);
+        $this->assertLessThan(1, abs($stored->floatDiffInSeconds(\Carbon\Carbon::parse($after['rectificado_en']))));
     }
 
     public function test_la_rectificacion_aparece_en_la_consulta_de_la_bitacora(): void
     {
-        $this->rectify($this->recordId)->assertCreated();
+        $this->rectify($this->recordId)->assertOk();
 
         $this->getJson('/api/bitacora?accion=RECTIFICAR_REGISTRO&modulo=central_riesgo')
             ->assertOk()
@@ -364,61 +288,43 @@ class RectifyRiskRecordTest extends TestCase
             $statements[] = strtolower($query->sql);
         });
 
-        $this->rectify($this->recordId)->assertCreated();
+        $this->rectify($this->recordId)->assertOk();
 
         $locks = array_filter($statements, fn (string $sql) => strpos($sql, 'from "central_riesgo"') !== false
             && strpos($sql, 'for update') !== false);
         $this->assertNotEmpty($locks, 'La rectificación debe bloquear la fila de central_riesgo con FOR UPDATE.');
     }
 
-    public function test_el_indice_parcial_impide_dos_versiones_vigentes(): void
+    public function test_la_actualizacion_solo_alcanza_registros_aun_activos(): void
     {
-        $this->rectify($this->recordId)->assertCreated();
-        $current = $this->versionsOf($this->recordId)[1];
+        $statements = [];
+        DB::listen(function ($query) use (&$statements) {
+            $statements[] = strtolower($query->sql);
+        });
 
-        $this->expectException(QueryException::class);
+        $this->rectify($this->recordId)->assertOk();
 
-        DB::table('central_riesgo_version')->insert([
-            'id_cr_estudiante' => $this->recordId,
-            'numero_version' => 3,
-            'id_tipo_falta' => $current['id_tipo_falta'],
-            'motivo' => 'Duplicada vigente',
-            'id_usuario_autor' => $this->administratorId,
-            'es_vigente' => true,
-        ]);
+        $updates = array_filter($statements, fn (string $sql) => strpos($sql, 'update "central_riesgo"') === 0);
+        $this->assertCount(1, $updates);
+        $this->assertStringContainsString('"rectificado_en" is null', reset($updates));
     }
 
-    public function test_no_se_repite_el_numero_de_version_de_un_registro(): void
+    public function test_si_falla_la_bitacora_no_se_rectifica_nada(): void
     {
-        $this->rectify($this->recordId)->assertCreated();
-        $current = $this->versionsOf($this->recordId)[1];
+        $this->mock(\App\Services\Security\AuditLogService::class, function ($mock) {
+            $mock->shouldReceive('registrar')->once()->andThrow(new RuntimeException('Falla la bitácora'));
+        });
 
-        $this->expectException(QueryException::class);
+        $this->withoutExceptionHandling();
 
-        DB::table('central_riesgo_version')->insert([
-            'id_cr_estudiante' => $this->recordId,
-            'numero_version' => 2,
-            'id_tipo_falta' => $current['id_tipo_falta'],
-            'motivo' => 'Número repetido',
-            'id_usuario_autor' => $this->administratorId,
-            'es_vigente' => false,
-        ]);
-    }
+        try {
+            $this->rectify($this->recordId);
+            $this->fail('La falla de la bitácora debía propagarse.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Falla la bitácora', $exception->getMessage());
+        }
 
-    public function test_una_version_posterior_a_la_primera_exige_motivo(): void
-    {
-        $this->rectify($this->recordId)->assertCreated();
-
-        $this->expectException(QueryException::class);
-
-        DB::table('central_riesgo_version')->insert([
-            'id_cr_estudiante' => $this->recordId,
-            'numero_version' => 3,
-            'id_tipo_falta' => $this->context['id_tipo_falta'],
-            'motivo' => '   ',
-            'id_usuario_autor' => $this->administratorId,
-            'es_vigente' => false,
-        ]);
+        $this->assertStillActive($this->recordId);
     }
 
     public function test_un_fallo_de_redis_no_deshace_la_rectificacion(): void
@@ -428,9 +334,9 @@ class RectifyRiskRecordTest extends TestCase
         });
         Log::spy();
 
-        $this->rectify($this->recordId)->assertCreated();
+        $this->rectify($this->recordId)->assertOk();
 
-        $this->assertCount(2, $this->versionsOf($this->recordId));
+        $this->assertNotNull($this->recordRow($this->recordId)['rectificado_en']);
         Log::shouldHaveReceived('warning')->once();
     }
 
@@ -440,16 +346,6 @@ class RectifyRiskRecordTest extends TestCase
             $mock->shouldReceive('refreshBackground')->once()->with($this->context['id_estudiante']);
         });
 
-        $this->rectify($this->recordId)->assertCreated();
-    }
-
-    public function test_si_la_rectificacion_falla_no_se_actualizan_los_antecedentes(): void
-    {
-        $this->mock(EntryControlSnapshotService::class, function ($mock) {
-            $mock->shouldReceive('refreshBackground')->never();
-        });
-
-        $this->rectify($this->recordId, ['motivo' => ''])->assertStatus(422);
-        $this->rectify($this->recordId, ['version_base' => 9])->assertStatus(409);
+        $this->rectify($this->recordId)->assertOk();
     }
 }

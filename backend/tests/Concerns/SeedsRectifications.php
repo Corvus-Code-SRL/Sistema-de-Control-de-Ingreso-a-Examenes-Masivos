@@ -16,25 +16,34 @@ trait SeedsRectifications
         return "/api/rectificacion-riesgo/registros/{$recordId}/rectificar";
     }
 
-    /** Pide la rectificación por la API con valores válidos, salvo lo que se indique en $overrides. */
+    /** Pide rectificar por la API con un motivo válido, salvo lo que se indique en $overrides. */
     protected function rectify(int $recordId, array $overrides = []): TestResponse
     {
         return $this->postJson($this->rectifyUrl($recordId), array_merge([
-            'id_tipo_falta' => $this->insertFaultType('Otra falta ' . uniqid()),
-            'descripcion' => 'Descripción corregida.',
-            'motivo' => 'Se corrige tras revisar la evidencia.',
-            'version_base' => 1,
+            'motivo' => 'Se retira tras la reunión: el reporte no tenía sustento.',
         ], $overrides));
     }
 
-    /** @return array<int, array<string, mixed>> versiones del registro, de la más antigua a la más nueva */
-    protected function versionsOf(int $recordId): array
+    /**
+     * Deja un registro ya rectificado sin pasar por la API, para probar lo que lo ignora. El administrador
+     * es el de la prueba salvo que se indique otro.
+     */
+    protected function voidRecord(
+        int $recordId,
+        ?string $adminId = null,
+        string $reason = 'Registro retirado por error de identificación.',
+        string $at = '2026-10-20 15:00:00+00'
+    ): void {
+        DB::table('central_riesgo')->where('id_cr_estudiante', $recordId)->update([
+            'rectificado_en' => $at,
+            'id_usuario_rectificador' => $adminId ?? $this->administratorId,
+            'motivo_rectificacion' => $reason,
+        ]);
+    }
+
+    /** @return array<string, mixed> la fila cruda de central_riesgo, incluidas las columnas de rectificación */
+    protected function recordRow(int $recordId): array
     {
-        return DB::table('central_riesgo_version')
-            ->where('id_cr_estudiante', $recordId)
-            ->orderBy('numero_version')
-            ->get()
-            ->map(fn ($row) => (array) $row)
-            ->all();
+        return (array) DB::table('central_riesgo')->where('id_cr_estudiante', $recordId)->first();
     }
 }

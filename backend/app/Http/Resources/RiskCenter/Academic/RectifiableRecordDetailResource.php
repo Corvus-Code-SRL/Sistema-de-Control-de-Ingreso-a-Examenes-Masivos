@@ -2,16 +2,15 @@
 
 namespace App\Http\Resources\RiskCenter\Academic;
 
-use App\Models\RiskCenterVersion;
+use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Detalle de un registro en la vista de rectificación: lo que no se puede cambiar (estudiante, examen,
- * fecha, evidencia, quien reportó y quien aprobó), lo vigente y el historial completo, la versión más nueva
- * primero. Un registro nunca rectificado muestra su valor original como versión 1 vigente.
+ * Ficha completa de un registro activo para la tarjeta de solo lectura de la vista de rectificación (HU-062):
+ * estudiante, examen, hecho, falta, descripción, evidencia, quien reportó y quien aprobó. Nada de esto se edita.
  *
- * La evidencia solo viaja con su nombre y si está disponible: esta vista no la enlaza.
+ * La evidencia viaja solo con su nombre y si está disponible; el archivo se pide a GET /central-riesgo/{id}/evidencia.
  */
-class RectifiableRecordDetailResource extends RectifiableRecordResource
+class RectifiableRecordDetailResource extends JsonResource
 {
     /** @var array{nombre_archivo: string, tamano_bytes: int|null, disponible: bool}|null */
     private ?array $evidence;
@@ -28,12 +27,16 @@ class RectifiableRecordDetailResource extends RectifiableRecordResource
         $report = $this->studentReport;
         $exam = $report->exam;
         $attempt = $report->entryAttempt;
+        $reviewer = $report->userReviewer;
+        $room = $report->origen === 'EN_CURSO' ? $report->incidentRoom : $attempt?->classroom;
 
-        return array_merge(parent::toArray($request), [
+        return [
+            'id_cr_estudiante' => (int) $this->id_cr_estudiante,
             'estudiante' => [
                 'id_estudiante' => (int) $this->student->id_estudiante,
                 'nombre_completo' => $this->student->nombre_completo,
                 'cod_sis' => $this->student->cod_sis,
+                'ci' => $this->student->ci,
             ],
             'examen' => [
                 'id_examen' => (int) $exam->id_examen,
@@ -42,58 +45,25 @@ class RectifiableRecordDetailResource extends RectifiableRecordResource
                 'carrera' => $exam->career->nombre ?? null,
                 'fecha' => $exam->fecha->toDateString(),
             ],
-            'ambiente' => $attempt === null ? null : [
-                'nro_aula' => $attempt->classroom->nro_aula ?? null,
-                'hora_intento' => $attempt->registrado_en->toIso8601String(),
+            'hecho' => [
+                'fecha_hora' => ($attempt?->registrado_en ?? $report->fecha_reporte)->toIso8601String(),
             ],
-            'descripcion' => $this->effectiveDescription(),
-            'reportante' => [
-                'nombre_completo' => $report->userReporter->nombre_completo,
-                'fecha' => $report->fecha_reporte->toIso8601String(),
-            ],
-            'evidencia' => $this->evidence,
-            'historial' => $this->history(),
-        ]);
-    }
-
-    /** @return array<int, array<string, mixed>> */
-    private function history(): array
-    {
-        if ($this->versions->isEmpty()) {
-            return [$this->originalVersion()];
-        }
-
-        return $this->versions->map(fn (RiskCenterVersion $version) => [
-            'numero_version' => (int) $version->numero_version,
-            'estado' => $version->es_vigente ? 'Vigente' : 'Anterior',
-            'tipo_falta' => [
-                'id_falta' => (int) $version->incidentType->id_falta,
-                'nombre' => $version->incidentType->nombre,
-            ],
-            'descripcion' => $version->descripcion,
-            'motivo' => $version->motivo,
-            'autor' => ['nombre_completo' => $version->author->nombre_completo],
-            'fecha' => $version->fecha_registro->toIso8601String(),
-        ])->all();
-    }
-
-    /** La versión 1 de un registro que nunca se rectificó: los valores del reporte aprobado. */
-    private function originalVersion(): array
-    {
-        $report = $this->studentReport;
-        $author = $report->userReviewer ?? $report->userReporter;
-
-        return [
-            'numero_version' => 1,
-            'estado' => 'Vigente',
+            'ambiente' => $room === null ? null : ['nro_aula' => $room->nro_aula],
             'tipo_falta' => [
                 'id_falta' => (int) $report->incidentType->id_falta,
                 'nombre' => $report->incidentType->nombre,
             ],
             'descripcion' => $report->descripcion,
-            'motivo' => null,
-            'autor' => ['nombre_completo' => $author->nombre_completo],
-            'fecha' => $this->fecha_registro->toIso8601String(),
+            'evidencia' => $this->evidence,
+            'reportante' => [
+                'nombre_completo' => $report->userReporter->nombre_completo,
+                'fecha' => $report->fecha_reporte->toIso8601String(),
+            ],
+            'aprobador' => $reviewer === null ? null : [
+                'nombre_completo' => $reviewer->nombre_completo,
+                'fecha' => $report->fecha_revision->toIso8601String(),
+            ],
+            'fecha_registro' => $this->fecha_registro->toIso8601String(),
         ];
     }
 }

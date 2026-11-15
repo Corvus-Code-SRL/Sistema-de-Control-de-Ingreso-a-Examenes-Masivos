@@ -30,7 +30,7 @@ use Illuminate\Http\Request;
 use App\Exceptions\Incidents\IncidentAlreadyReviewedException;
 use App\Exceptions\Incidents\IncidentOwnershipException;
 use App\Exceptions\Incidents\IncidentReportNotFoundException;
-use App\Exceptions\RiskCenter\RiskRectificationConflictException;
+use App\Exceptions\RiskCenter\RiskRecordAlreadyRectifiedException;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -70,7 +70,7 @@ class Handler extends ExceptionHandler
         IncidentAlreadyReviewedException::class,
         IncidentOwnershipException::class,
         IncidentReportNotFoundException::class,
-        RiskRectificationConflictException::class,
+        RiskRecordAlreadyRectifiedException::class,
     ];
 
     /**
