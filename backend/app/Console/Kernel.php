@@ -28,6 +28,15 @@ class Kernel extends ConsoleKernel
         $schedule->call(function (): void {
             app(FinalizeExpiredExamsJob::class)->handle(app(ExamLifecycleService::class));
         })->name('finalize-expired-exams')->everyMinute()->withoutOverlapping(2);
+
+        // Respaldo diario de la base: solo donde se encendió SCIEM_RESPALDO_DIARIO.
+        if (config('sciem.respaldo.diario')) {
+            $schedule->command('sciem:respaldar')
+                ->name('respaldo-diario')
+                ->dailyAt((string) config('sciem.respaldo.hora', '03:15'))
+                ->timezone((string) config('sciem.zona_horaria', 'America/La_Paz'))
+                ->withoutOverlapping(120);
+        }
     }
 
     /**

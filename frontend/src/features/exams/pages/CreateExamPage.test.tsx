@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
@@ -42,7 +42,7 @@ describe('CreateExamPage — contexto inicial', () => {
     })
     renderPage()
     const subject = await screen.findByRole('combobox', { name: 'Materia *' })
-    await waitFor(() => expect(subject).toHaveTextContent('Bases de Datos I — Sistemas'))
+    await waitFor(() => expect(subject).toHaveTextContent('Bases de Datos I'))
     await userEvent.type(screen.getByLabelText('Nombre del examen *'), 'Parcial')
     fireEvent.change(screen.getByLabelText('Fecha *'), { target: { value: '2099-01-01' } })
     await userEvent.click(screen.getByRole('checkbox', { name: /Aula 691A/ }))
@@ -52,29 +52,26 @@ describe('CreateExamPage — contexto inicial', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Nombre del examen *')).toHaveValue('')
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Materia *' })).toHaveTextContent('Bases de Datos I — Sistemas'))
-    expect(within(screen.getByRole('region', { name: 'Resumen de capacidad del examen' })).getByText('20')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Materia *' })).toHaveTextContent('Bases de Datos I'))
+    expect(screen.getByRole('button', { name: /Grupo 1.*Sistemas/ })).toHaveAttribute('aria-pressed', 'true')
     expect(calls.filter((call) => call.method === 'POST')).toEqual([
       expect.objectContaining({ body: expect.objectContaining({ id_carrera: 1, id_materia: 10, grupos: [100] }) }),
     ])
   })
 
-  it('inicializa carrera, materia y grupo tras cargar las opciones, sin volver a imponerlos', async () => {
+  it('muestra una materia y los grupos registrados en distintas carreras', async () => {
     const { calls } = stub()
     renderPage()
     expect(screen.getByText(/Cargando formulario/)).toBeInTheDocument()
     const subject = await screen.findByRole('combobox', { name: 'Materia *' })
-    await waitFor(() => expect(subject).toHaveTextContent('Bases de Datos I — Sistemas'))
-    expect(within(screen.getByRole('region', { name: 'Resumen de capacidad del examen' })).getByText('20')).toBeInTheDocument()
+    await waitFor(() => expect(subject).toHaveTextContent('Bases de Datos I'))
+    expect(screen.getByRole('button', { name: /Grupo 1.*Sistemas/ })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /Grupo 2.*Informática/ })).toBeEnabled()
     await userEvent.click(subject)
-    await userEvent.click(await screen.findByRole('option', { name: 'Bases de Datos I — Informática' }))
-    expect(subject).toHaveTextContent('Bases de Datos I — Informática')
-    expect(screen.getByRole('button', { name: /Grupo 2/ })).toBeEnabled()
-    expect(screen.queryByRole('button', { name: /Grupo 1/ })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('option', { name: 'Bases de Datos I' })).toHaveLength(1)
+    await userEvent.keyboard('{Escape}')
     await userEvent.click(screen.getByRole('button', { name: /Grupo 2/ }))
-    await userEvent.type(screen.getByLabelText('Nombre del examen *'), 'Otro examen')
-    expect(subject).toHaveTextContent('Bases de Datos I — Informática')
-    expect(within(screen.getByRole('region', { name: 'Resumen de capacidad del examen' })).getByText('30')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Grupo 2.*Informática/ })).toHaveAttribute('aria-pressed', 'true')
     expect(calls).toHaveLength(1)
   })
 
@@ -82,10 +79,10 @@ describe('CreateExamPage — contexto inicial', () => {
     stub()
     renderPage()
     const group = await screen.findByRole('button', { name: /Grupo 1/ })
-    await waitFor(() => expect(within(screen.getByRole('region', { name: 'Resumen de capacidad del examen' })).getByText('20')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('button', { name: /Grupo 1.*Sistemas/ })).toHaveAttribute('aria-pressed', 'true'))
     await userEvent.click(group)
     await userEvent.type(screen.getByLabelText('Nombre del examen *'), 'Parcial')
-    expect(screen.queryByRole('region', { name: 'Resumen de capacidad del examen' })).not.toBeInTheDocument()
+    expect(group).toHaveAttribute('aria-pressed', 'false')
   })
 
   it.each([
@@ -129,7 +126,7 @@ describe('CreateExamPage — contexto inicial', () => {
 
 
   it('quitar el grupo origen antes de crear conserva la selección nueva y abre el detalle sin ese contexto', async () => {
-    const otherGroup = { ...options.grupos[1], id_carrera: 1 }
+    const otherGroup = options.grupos[1]
     const { calls } = mockApiWith(({ url, method }) => {
       if (url.endsWith('/examenes/formulario')) return { body: { data: {
         ...options,
@@ -141,7 +138,7 @@ describe('CreateExamPage — contexto inicial', () => {
       } } }
     })
     renderPage()
-    await waitFor(() => expect(screen.getByRole('region', { name: 'Resumen de capacidad del examen' })).toHaveTextContent('20'))
+    await waitFor(() => expect(screen.getByRole('button', { name: /Grupo 1.*Sistemas/ })).toHaveAttribute('aria-pressed', 'true'))
     await userEvent.click(screen.getByRole('button', { name: /Grupo 2/ }))
     await userEvent.click(screen.getByRole('button', { name: /Grupo 1/ }))
     await userEvent.type(screen.getByLabelText('Nombre del examen *'), 'Parcial')
@@ -150,7 +147,7 @@ describe('CreateExamPage — contexto inicial', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Guardar examen' }))
     expect(await screen.findByRole('link', { name: 'Ver detalle del examen' })).toHaveAttribute('href', '/examenes/77')
     expect(calls.filter((call) => call.method === 'POST')).toEqual([
-      expect.objectContaining({ body: expect.objectContaining({ grupos: [200] }) }),
+      expect.objectContaining({ body: expect.objectContaining({ id_carrera: 2, id_materia: 10, grupos: [200] }) }),
     ])
     expect(calls).toHaveLength(2)
   })

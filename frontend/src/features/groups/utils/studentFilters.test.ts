@@ -50,3 +50,23 @@ describe('isCanonicalStudentFilters', () => {
     expect(isCanonicalStudentFilters(params('q=%20maria'))).toBe(false)
   })
 })
+
+describe('filtro por carrera (HU-021, multicarrera)', () => {
+  it('lee la carrera de la URL', () => {
+    expect(parseStudentFilters(params('carrera=7&page=2'))).toEqual({ q: '', page: 2, carrera: 7 })
+  })
+
+  it.each([['abc'], ['0'], ['-1'], ['2.5'], ['']])('una carrera inválida (%s) se ignora', (value) => {
+    expect(parseStudentFilters(params(`carrera=${value}`))).toEqual({ q: '', page: 1 })
+  })
+
+  it('escribe la carrera y la quita cuando no hay', () => {
+    expect(withStudentFilters(params(''), { q: '', page: 1, carrera: 7 }).toString()).toBe('carrera=7')
+    expect(withStudentFilters(params('carrera=7'), { q: '', page: 1 }).toString()).toBe('')
+  })
+
+  it('una carrera inválida en la URL no es canónica', () => {
+    expect(isCanonicalStudentFilters(params('carrera=abc'))).toBe(false)
+    expect(isCanonicalStudentFilters(params('carrera=7'))).toBe(true)
+  })
+})

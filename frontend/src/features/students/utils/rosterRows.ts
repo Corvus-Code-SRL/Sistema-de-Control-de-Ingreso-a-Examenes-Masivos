@@ -70,6 +70,14 @@ const ERROR_ISSUE: Record<RosterRowError, RosterIssue> = {
     category: 'Duplicado',
     message: 'Código SIS repetido con datos distintos: no se importa ninguna de las filas',
   },
+  missing_career: {
+    category: 'Incompleto',
+    message: 'Falta la carrera: agregue la columna «Carrera» o elija la carrera de esta nómina',
+  },
+  career_not_in_group: {
+    category: 'Otro',
+    message: 'La carrera no corresponde a este grupo',
+  },
 }
 
 /*
@@ -179,4 +187,18 @@ function conflictingMessage(duplicateRows: readonly number[]): string {
 
 function unknownIssue(code: string): RosterIssue {
   return { category: 'Otro', message: `Inconsistencia informada por el servidor (${code})` }
+}
+
+/**
+ * Carrera de la fila para la previsualización. Si no se resolvió, lo que decía el archivo. Si se
+ * tomó de otra inscripción del estudiante, se aclara: el docente no la escribió.
+ */
+export function rowCareerText(row: RosterPreviewRow): string {
+  if (row.carrera) {
+    return row.carrera.origen === 'previous'
+      ? `${row.carrera.nombre} (inscripción anterior)`
+      : row.carrera.nombre
+  }
+
+  return row.carrera_archivo ?? '—'
 }

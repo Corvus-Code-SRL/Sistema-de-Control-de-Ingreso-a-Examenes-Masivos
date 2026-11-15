@@ -295,4 +295,35 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Respaldo y restauración de la base
+    |--------------------------------------------------------------------------
+    |
+    | sciem:respaldar guarda un pg_dump (formato custom, solo el esquema public) en `directorio` y deja
+    | solo los `retencion` más recientes; sciem:restaurar lo vuelve a cargar. Ver
+    | docs/database/respaldo-y-restauracion.md.
+    |
+    | - directorio: dónde se guardan. Vacío = storage/app/respaldos. En producción, una unidad persistente
+    |   fuera de la carpeta del despliegue; nunca dentro de un repositorio de git.
+    | - pg_dump / pg_restore: ruta de los binarios. Su versión debe ser igual o mayor que la del servidor.
+    | - diario: si el planificador ejecuta el respaldo todos los días a la `hora` de La Paz. Apagado por
+    |   defecto: solo se enciende en la máquina que respalda la base (el servidor de producción).
+    | - restaurar_permitido: sciem:restaurar reemplaza los datos y por defecto se niega a ejecutarse. Se
+    |   pone true solo mientras se restaura y se devuelve a false al terminar.
+    | - timeout: segundos máximos de cada pg_dump o pg_restore.
+    |
+    */
+
+    'respaldo' => [
+        'directorio' => env('SCIEM_RESPALDO_DIRECTORIO') ?: storage_path('app/respaldos'),
+        'retencion' => (int) env('SCIEM_RESPALDO_RETENCION', 7),
+        'pg_dump' => env('SCIEM_PG_DUMP', 'pg_dump'),
+        'pg_restore' => env('SCIEM_PG_RESTORE', 'pg_restore'),
+        'diario' => (bool) env('SCIEM_RESPALDO_DIARIO', false),
+        'hora' => env('SCIEM_RESPALDO_HORA', '03:15'),
+        'restaurar_permitido' => (bool) env('SCIEM_RESTAURAR_PERMITIDO', false),
+        'timeout' => (int) env('SCIEM_RESPALDO_TIMEOUT', 1800),
+    ],
+
 ];

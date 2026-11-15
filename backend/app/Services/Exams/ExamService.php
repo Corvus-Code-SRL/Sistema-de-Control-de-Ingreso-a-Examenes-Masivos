@@ -391,7 +391,7 @@ class ExamService
 
         $startsAt = $this->startsAt($data);
 
-        return [
+        $attributes = [
             'nombre_examen'  => $data['nombre_examen'],
             'fecha'          => $data['fecha'],
             'hora_inicio'    => $data['hora_inicio'],
@@ -403,6 +403,12 @@ class ExamService
             'id_carrera'     => (int) $data['id_carrera'],
             'id_materia'     => (int) $data['id_materia'],
         ];
+
+        if (array_key_exists('minutos_apertura', $data)) {
+            $attributes['minutos_apertura'] = (int) $data['minutos_apertura'];
+        }
+
+        return $attributes;
     }
 
     /**

@@ -100,7 +100,17 @@ export interface IncidentType {
   descripcion: string | null
 }
 
+/** Flujo que originó el intento rechazado: decide la ruta del reporte y los avisos de error. */
+export const REPORT_INCIDENT_FLOW = {
+  ENTRY_CONTROL: 'ENTRY_CONTROL',
+  LATE_ENTRY: 'LATE_ENTRY',
+} as const
+
+export type ReportIncidentFlow = typeof REPORT_INCIDENT_FLOW[keyof typeof REPORT_INCIDENT_FLOW]
+
 export interface ReportIncidentContext {
+  /** Sin indicar, el control de ingreso (HU-032); LATE_ENTRY para el ingreso con retraso (HU-037). */
+  flow?: ReportIncidentFlow
   examId: number
   examName: string
   roomId: number
@@ -111,7 +121,7 @@ export interface ReportIncidentContext {
   timeLabel?: string
 }
 
-export interface ExamIncidentContext extends Omit<ReportIncidentContext, 'attemptId' | 'reason'> {
+export interface ExamIncidentContext extends Omit<ReportIncidentContext, 'attemptId' | 'reason' | 'flow'> {
   origin: 'EN_CURSO'
 }
 

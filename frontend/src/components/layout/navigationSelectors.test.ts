@@ -19,6 +19,7 @@ describe('findActiveItem', () => {
     ['/grupos/5', 'teacher-my-groups'],
     ['/grupos/5/editar', 'teacher-my-groups'],
     ['/grupos/5/nomina', 'teacher-my-groups'],
+    ['/cargar-nomina', 'teacher-upload-roster'],
     ['/grupos/5/examenes', 'teacher-my-groups'],
     ['/grupos/5/auxiliares', 'teacher-my-groups'],
     ['/mis-auxiliares', 'teacher-my-assistants'],

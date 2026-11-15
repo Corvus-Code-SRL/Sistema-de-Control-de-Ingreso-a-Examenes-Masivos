@@ -94,11 +94,11 @@ export async function updateGroup(
  */
 export async function getGroupStudents(
   groupId: number,
-  { q, page }: GroupStudentFilters,
+  { q, page, carrera }: GroupStudentFilters,
   signal?: AbortSignal
 ): Promise<GroupStudentsPage> {
   const response = await apiClient<GroupStudentsListResponse>(`/grupos/${groupId}/estudiantes`, {
-    query: { q: q === '' ? undefined : q, page },
+    query: { q: q === '' ? undefined : q, page, id_carrera: carrera },
     signal,
   })
 
@@ -109,6 +109,7 @@ export async function getGroupStudents(
     total: response.meta.total,
     totalPages: Math.max(1, response.meta.last_page),
     enrolledTotal: response.meta.total_inscritos,
+    careerTotals: response.meta.por_carrera ?? [],
   }
 }
 

@@ -89,7 +89,7 @@ describe('menú por capacidades', () => {
         items: [
           ['Materias', '/materias'],
           ['Mis grupos', '/mis-cursos'],
-          ['Cargar nómina de estudiantes', undefined],
+          ['Cargar nómina de estudiantes', '/cargar-nomina'],
           ['Mis auxiliares', '/mis-auxiliares']
         ]
       },

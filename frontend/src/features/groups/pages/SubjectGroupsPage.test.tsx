@@ -185,12 +185,12 @@ describe('SubjectGroupsPage', () => {
     await screen.findByText(/Grupo .* registrado/)
   }
 
-  it('al registrar un grupo del período activo, el aviso ofrece «Cargar nómina» hacia el grupo', async () => {
+  it('al registrar un grupo del período activo, el aviso ofrece «Cargar nómina» con el grupo elegido', async () => {
     await registerGroup(makeGroup({ id_grupo: 321, num_grupo: 'A' }))
 
     const action = screen.getByRole('link', { name: 'Cargar nómina' })
 
-    expect(action).toHaveAttribute('href', '/grupos/321/nomina')
+    expect(action).toHaveAttribute('href', '/cargar-nomina?grupo=321')
   })
 
   it('si el grupo no es del período activo, el aviso no ofrece cargar la nómina', async () => {

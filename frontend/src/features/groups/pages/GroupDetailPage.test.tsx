@@ -286,7 +286,7 @@ describe('GroupDetailPage — paginación (CA-3)', () => {
 })
 
 describe('GroupDetailPage — grupo sin estudiantes (CA-4)', () => {
-  it('lo dice y ofrece «Cargar nómina» hacia la vista de carga', async () => {
+  it('lo dice y remite a la entrada «Cargar nómina de estudiantes» del menú', async () => {
     stubGroupApi({ group: makeGroupWithoutRoster(), students: [] })
 
     renderPage('/grupos/300')
@@ -294,34 +294,24 @@ describe('GroupDetailPage — grupo sin estudiantes (CA-4)', () => {
     expect(await screen.findByText('Este grupo aún no tiene estudiantes')).toBeInTheDocument()
     expect(screen.getByText('Sin inscritos')).toBeInTheDocument()
     expect(screen.getByText('Sin nómina')).toBeInTheDocument()
+    expect(screen.getByText(/Cárguela desde «Cargar nómina de estudiantes»/)).toBeInTheDocument()
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
-
-    const actions = screen.getAllByRole('link', { name: /cargar nómina/i })
-
-    expect(actions.length).toBeGreaterThan(0)
-    actions.forEach((action) => expect(action).toHaveAttribute('href', '/grupos/300/nomina'))
+    // HU-021 es independiente: el detalle del grupo no ofrece su propio botón de carga.
+    expect(screen.queryByRole('link', { name: /cargar nómina/i })).not.toBeInTheDocument()
   })
 })
 
 describe('GroupDetailPage — acciones (CA-5)', () => {
-  it('cada acción lleva a su propia vista del grupo', async () => {
+  it('solo ofrece editar el grupo: nómina, exámenes y auxiliares van por el menú', async () => {
     stubGroupApi({ students: [maria] })
 
     renderPage()
     await loadedTable()
 
-    expect(screen.getByRole('link', { name: /cargar nómina/i })).toHaveAttribute(
-      'href',
-      '/grupos/100/nomina'
-    )
-    expect(screen.getByRole('link', { name: /ver exámenes/i })).toHaveAttribute(
-      'href',
-      '/grupos/100/examenes'
-    )
-    expect(screen.getByRole('link', { name: 'Auxiliares' })).toHaveAttribute(
-      'href',
-      '/grupos/100/auxiliares'
-    )
+    expect(screen.getByRole('link', { name: /editar grupo/i })).toHaveAttribute('href', '/grupos/100/editar')
+    expect(screen.queryByRole('link', { name: /cargar nómina/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /ver exámenes/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Auxiliares' })).not.toBeInTheDocument()
   })
 
   it('«Editar grupo» lleva a la vista de edición del grupo, sin abrir un modal', async () => {
@@ -412,8 +402,6 @@ describe('GroupDetailPage — acciones (CA-5)', () => {
     expect(screen.queryByRole('link', { name: /editar grupo/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /cargar nómina/i })).not.toBeInTheDocument()
     expect(screen.getByText('Este grupo ya no admite cargar la nómina.')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /ver exámenes/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Auxiliares' })).toBeInTheDocument()
   })
 
   it('un grupo inactivo tampoco ofrece editar ni cargar nómina', async () => {

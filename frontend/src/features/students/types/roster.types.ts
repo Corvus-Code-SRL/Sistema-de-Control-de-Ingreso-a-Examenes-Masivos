@@ -22,6 +22,28 @@ export type RosterRowError =
   | 'first_names_too_long'
   | 'duplicate_row_in_file'
   | 'conflicting_duplicate_in_file'
+  | 'missing_career'
+  | 'career_not_in_group'
+
+/**
+ * De dónde salió la carrera de la fila: la columna del archivo, la elegida para toda la nómina,
+ * la que el estudiante ya tenía en otra inscripción o la única carrera del grupo.
+ */
+export type RosterCareerSource = 'file' | 'chosen' | 'previous' | 'only'
+
+export interface RosterRowCareer {
+  id_carrera: number
+  nombre: string
+  origen?: RosterCareerSource | null
+}
+
+/** Una carrera que atiende el grupo (HU-021, multicarrera). */
+export interface RosterGroupCareer {
+  id_carrera: number
+  codigo: string
+  nombre: string
+  principal: boolean
+}
 
 /** Una fila leída del archivo, tal como la clasifica el backend. */
 export interface RosterPreviewRow {
@@ -29,6 +51,10 @@ export interface RosterPreviewRow {
   codigo_sis: string | null
   apellidos: string | null
   nombres: string | null
+  /** Texto de la columna opcional «carrera», tal como vino en el archivo. */
+  carrera_archivo?: string | null
+  /** Carrera con la que el estudiante quedará en el grupo; null si no se pudo resolver. */
+  carrera?: RosterRowCareer | null
   estado: RosterRowState
   errores: RosterRowError[]
 }
@@ -44,6 +70,8 @@ export interface RosterPreviewData {
   total_filas: number
   filas_validas: number
   filas_inconsistentes: number
+  /** Carreras que atiende el grupo; con más de una, cada fila muestra la suya. */
+  carreras_grupo?: RosterGroupCareer[]
   filas: RosterPreviewRow[]
 }
 

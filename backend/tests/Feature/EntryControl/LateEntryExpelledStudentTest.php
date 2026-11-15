@@ -36,6 +36,7 @@ class LateEntryExpelledStudentTest extends TestCase
         $this->postJson($this->lateEntryUrl('verificar'), [
             'cod_sis' => $this->studentColumn($this->secondStudentId, 'cod_sis'),
             'ci' => $this->studentColumn($this->secondStudentId, 'ci'),
+            'id_ambiente' => $this->otraAulaId,
         ])->assertOk()
             ->assertJsonPath('data.autorizado', false)
             ->assertJsonPath('data.veredicto', VerificationService::DUPLICATE)

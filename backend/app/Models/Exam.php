@@ -60,6 +60,7 @@ class Exam extends Model
         'hora_inicio',
         'hora_fin',
         'duracion',
+        'minutos_apertura',
         'normas',
         'id_tipo_examen',
         'id_carrera',
