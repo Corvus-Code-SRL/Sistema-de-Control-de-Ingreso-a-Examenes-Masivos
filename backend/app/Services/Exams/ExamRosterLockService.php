@@ -22,7 +22,19 @@ class ExamRosterLockService
         return DB::table('grupo_examen')
             ->join('examen', 'examen.id_examen', '=', 'grupo_examen.id_examen')
             ->where('grupo_examen.id_grupo', $groupId)
-            ->whereIn('examen.estado', self::LOCKING_STATES)
+            ->where(function ($query): void {
+                $query->whereIn('examen.estado', self::LOCKING_STATES)
+                    ->orWhere(function ($scheduled): void {
+                        $scheduled->where('examen.estado', Exam::PROGRAMADO)
+                            ->whereExists(function ($opened): void {
+                                $opened->selectRaw('1')
+                                    ->from('log')
+                                    ->where('tabla_afectada', 'examen')
+                                    ->where('nuevo_valor->evento', 'APERTURA_CONTROL')
+                                    ->whereRaw("(nuevo_valor->>'id_examen')::integer = examen.id_examen");
+                            });
+                    });
+            })
             ->exists();
     }
 }

@@ -6,6 +6,7 @@ use App\Exceptions\Exams\ExamAssistantNotFoundException;
 use App\Exceptions\Exams\ExamOwnershipException;
 use App\Exceptions\Exams\ExamStateException;
 use App\Models\Exam;
+use App\Services\EntryControl\CloseOrdinaryEntryService;
 use App\Models\ExamAssistant;
 use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\Security\AuditLogService;
@@ -54,7 +55,8 @@ class AssistantClassroomService
 
         return [
             'estado'     => $exam->estado,
-            'editable'   => $exam->estado === Exam::PROGRAMADO,
+            'editable'   => $exam->estado === Exam::PROGRAMADO
+                && ! CloseOrdinaryEntryService::hasOpened((int) $exam->id_examen),
             'classrooms' => $exam->classrooms()->orderBy('nro_aula')->get(),
             'assistants' => $assistants,
         ];
@@ -79,7 +81,7 @@ class AssistantClassroomService
 
             $this->assertOwnedBy($exam, $teacherId);
 
-            if ($exam->estado !== Exam::PROGRAMADO) {
+            if ($exam->estado !== Exam::PROGRAMADO || CloseOrdinaryEntryService::hasOpened((int) $exam->id_examen)) {
                 throw new ExamStateException($this->notEditableMessage($exam->estado));
             }
 

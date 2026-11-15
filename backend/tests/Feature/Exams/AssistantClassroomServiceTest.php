@@ -76,8 +76,8 @@ class AssistantClassroomServiceTest extends TestCase
         $queries = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        // Auxiliares, sus usuarios, sus ambientes y los ambientes del examen.
-        $this->assertLessThanOrEqual(4, $queries);
+        // Auxiliares, usuarios, ambientes y apertura auditada del control.
+        $this->assertLessThanOrEqual(5, $queries);
     }
 
     public function test_repetir_el_mismo_ambiente_no_registra_otra_vez_en_bitacora(): void

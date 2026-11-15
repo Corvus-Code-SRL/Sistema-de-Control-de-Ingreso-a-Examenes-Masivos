@@ -7,6 +7,7 @@ use App\Exceptions\Exams\ExamStateException;
 use App\Exceptions\Exams\ExamWarningsException;
 use App\Models\Classroom;
 use App\Models\Exam;
+use App\Services\EntryControl\CloseOrdinaryEntryService;
 use App\Models\ExamType;
 use App\Models\Group;
 use App\Services\Academic\SubjectCatalogService;
@@ -227,7 +228,7 @@ class ExamService
 
             $this->assertOwnedBy($exam, $teacherId);
 
-            if ($exam->estado !== Exam::PROGRAMADO) {
+            if ($exam->estado !== Exam::PROGRAMADO || CloseOrdinaryEntryService::hasOpened((int) $exam->id_examen)) {
                 throw new ExamStateException($this->notEditableMessage($exam->estado));
             }
 
@@ -350,7 +351,7 @@ class ExamService
 
             $this->assertOwnedBy($exam, $teacherId);
 
-            if ($exam->estado !== Exam::PROGRAMADO) {
+            if ($exam->estado !== Exam::PROGRAMADO || CloseOrdinaryEntryService::hasOpened((int) $exam->id_examen)) {
                 throw new ExamStateException($this->notCancellableMessage($exam->estado));
             }
 
