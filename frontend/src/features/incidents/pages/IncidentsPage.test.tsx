@@ -24,6 +24,7 @@ const pendiente: IncidentReview = {
   intento: null,
   revisor: null,
   en_central_riesgo: false,
+  retirado_de_central_riesgo: false,
 }
 
 function stubList(pendientes: IncidentReview[], revisadas: IncidentReview[] = []) {
@@ -84,5 +85,25 @@ describe('IncidentsPage', () => {
     await user.click(screen.getByRole('tab', { name: /Revisadas/ }))
 
     await waitFor(() => expect(screen.getByRole('tab', { name: /Revisadas/ })).toHaveAttribute('aria-selected', 'true'))
+  })
+
+  it('en Revisadas marca «En Central de Riesgo» o «Retirado de la Central de Riesgo» según el registro', async () => {
+    const enCentral = { ...pendiente, id: 'estudiante-9930', estado: 'APROBADO' as const, en_central_riesgo: true }
+    const retirada = {
+      ...pendiente,
+      id: 'estudiante-9931',
+      estado: 'APROBADO' as const,
+      en_central_riesgo: false,
+      retirado_de_central_riesgo: true,
+    }
+    stubList([pendiente], [enCentral, retirada])
+    renderPage()
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('tab', { name: /Revisadas/ }))
+
+    // Cada incidencia se dibuja dos veces (móvil y escritorio).
+    expect(await screen.findAllByText('En Central de Riesgo')).toHaveLength(2)
+    expect(screen.getAllByText('Retirado de la Central de Riesgo')).toHaveLength(2)
   })
 })
