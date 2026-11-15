@@ -5,16 +5,16 @@ import { renderWithRouter } from '@/test/render'
 import { OpenEntryControlsPage } from './OpenEntryControlsPage'
 
 const exam = {
-  id_examen: 7, nombre_examen: 'Primer parcial', estado: 'PROGRAMADO' as 'PROGRAMADO' | 'EN_INGRESO',
+  id_examen: 7, nombre_examen: 'Primer parcial', estado: 'PROGRAMADO' as 'PROGRAMADO' | 'EN_CURSO',
   fecha: '2026-10-20', hora_inicio: '08:00', materia: 'Bases de Datos I',
   carrera: 'Ingeniería de Sistemas', ambientes: ['691A', '692B'],
   rol_controlador: 'DOCENTE' as const, id_ambiente_asignado: null, ambiente_asignado: null,
   apertura_programada_en: '2026-10-20T07:50:00-04:00', motivo_apertura: null,
-  total: 2, ingresados: 0, pendientes: 2,
+  total: 2, ingresados: 0, pendientes: 2, control_abierto: false,
 }
 
 it('muestra al docente la apertura prevista y el progreso del examen abierto', async () => {
-  mockApiOnce({ body: { data: [{ ...exam, estado: 'EN_INGRESO', ingresados: 1, pendientes: 1 }] } })
+  mockApiOnce({ body: { data: [{ ...exam, estado: 'PROGRAMADO', control_abierto: true, ingresados: 1, pendientes: 1 }] } })
   renderWithRouter(<OpenEntryControlsPage />)
 
   expect(await screen.findByText('Primer parcial')).toBeInTheDocument()
@@ -71,7 +71,7 @@ it('actualiza la lista cuando se abre el ingreso', async () => {
   try {
     await act(async () => { renderWithRouter(<OpenEntryControlsPage />) })
     expect(screen.getByText('Programado')).toBeInTheDocument()
-    apiRoutes[0].body = { data: [{ ...exam, estado: 'EN_INGRESO', ingresados: 1, pendientes: 1 }] }
+    apiRoutes[0].body = { data: [{ ...exam, estado: 'PROGRAMADO', control_abierto: true, ingresados: 1, pendientes: 1 }] }
 
     await act(async () => { await vi.advanceTimersByTimeAsync(15000) })
     expect(screen.getByText('Ingreso abierto')).toBeInTheDocument()

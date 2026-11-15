@@ -10,6 +10,7 @@ export interface EntryContext {
   hora_inicio: string | null
   hora_fin: string | null
   estado: string
+  ingreso_ordinario_cerrado?: boolean
   materia: string | null
   carrera: string | null
   grupos: string[]
@@ -124,7 +125,8 @@ export interface EntryActionInput {
 
 export interface OpenEntryExam {
   id_examen: number
-  estado: 'PROGRAMADO' | 'EN_INGRESO'
+  estado: 'PROGRAMADO' | 'EN_CURSO' | 'EN_INGRESO'
+  control_abierto?: boolean
   nombre_examen: string
   fecha: string | null
   hora_inicio: string | null
