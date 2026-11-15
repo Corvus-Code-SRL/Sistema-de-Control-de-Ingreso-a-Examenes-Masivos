@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\EntryControl\RoomAssignmentService;
 use App\Services\Exams\ExamLifecycleService;
+use App\Services\Incidents\IncidentReviewService;
 use App\Support\RecordStatus;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -182,6 +183,34 @@ class StudentVerificationTest extends TestCase
 
         $this->assertSame(0, DB::table('examen_estudiante')->count());
         $this->assertSame(0, DB::table('intento_ingreso')->count());
+    }
+
+    public function test_reverificar_advierte_reporte_pendiente_hasta_su_revision(): void
+    {
+        $attemptId = $this->postJson($this->url('rechazar-ingreso'), [
+            'id_estudiante' => $this->student->id_estudiante,
+            'id_ambiente' => $this->aulaId,
+            'motivo' => 'IDENTIDAD_DUDOSA',
+        ])->assertCreated()->json('data.id_intento');
+        $reasonId = DB::table('tipo_falta')->insertGetId(['nombre' => 'Identidad dudosa'], 'id_falta');
+        $reportId = $this->postJson($this->url("intentos/{$attemptId}/reporte"), [
+            'id_tipo_falta' => $reasonId,
+            'descripcion' => 'La identidad requiere revisión.',
+        ])->assertCreated()->json('data.id_reporte_est');
+
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.veredicto', 'AUTORIZADO')
+            ->assertJsonPath('data.reporte_pendiente', true);
+        $this->rebuildSnapshot();
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.reporte_pendiente', true);
+
+        app(IncidentReviewService::class)->reject($this->docenteId, "estudiante-{$reportId}", 'No se confirmó la falta.');
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.reporte_pendiente', false);
     }
 
     public function test_sis_de_auxiliar_del_examen_muestra_su_ficha_sin_registrar_intento_ni_ingreso(): void

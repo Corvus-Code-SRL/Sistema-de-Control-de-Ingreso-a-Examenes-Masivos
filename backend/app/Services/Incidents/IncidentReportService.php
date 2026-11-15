@@ -61,7 +61,7 @@ class IncidentReportService
         $evidencePath = null;
 
         try {
-            return DB::transaction(function () use ($examId, $attemptId, $input, $file, $actor, &$evidencePath) {
+            $report = DB::transaction(function () use ($examId, $attemptId, $input, $file, $actor, &$evidencePath) {
                 $exam = Exam::query()->whereKey($examId)->lockForUpdate()->firstOrFail();
                 $this->access->assertCanControl($exam, $actor);
 
@@ -86,6 +86,10 @@ class IncidentReportService
         } catch (Throwable $exception) {
             throw $this->failureAfterCleanup($exception, $evidencePath);
         }
+
+        $this->snapshots->setPendingReport($examId, (int) $report->id_estudiante, (int) $report->id_reporte_est, true);
+
+        return $report;
     }
 
     /**

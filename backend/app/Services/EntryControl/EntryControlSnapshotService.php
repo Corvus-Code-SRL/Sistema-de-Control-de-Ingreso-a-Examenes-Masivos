@@ -44,6 +44,12 @@ class EntryControlSnapshotService
         $membersByStudent = $this->memberships($examId);
         $assignedRooms = self::assignRooms(array_keys($membersByStudent), $rooms);
         $entries = $this->entries($examId);
+        $pendingReports = DB::table('reporte_estudiante')
+            ->where('id_examen', $examId)
+            ->where('origen', 'CONTROL_INGRESO')
+            ->where('estado', 'PENDIENTE')
+            ->get(['id_reporte_est', 'id_estudiante'])
+            ->groupBy('id_estudiante');
         $risks = $this->riskCenter->summariesForSnapshot(array_keys($membersByStudent));
         $career = $this->careerName($exam);
 
@@ -97,6 +103,10 @@ class EntryControlSnapshotService
         $students = $this->students(array_keys($membersByStudent));
         $search = [];
         $values = [$this->key($examId, $token, 'meta') => $meta];
+        foreach ($pendingReports as $studentId => $reports) {
+            $values[$this->key($examId, $token, 'pending-report', (int) $studentId)] =
+                $reports->pluck('id_reporte_est')->map(fn ($id) => (int) $id)->all();
+        }
         foreach ($assistantRecords as $sisHash => $assistant) {
             $values[$this->key($examId, $token, 'assistant', $sisHash)] = $assistant;
         }
@@ -275,6 +285,36 @@ class EntryControlSnapshotService
         $student = $this->cache()->get($this->key($examId, $token, 'student', $studentId));
 
         return is_array($student) ? $student : null;
+    }
+
+    public function hasPendingReport(int $examId, int $studentId): bool
+    {
+        $token = $this->activeTokenOrFail($examId);
+
+        return $this->cache()->get($this->key($examId, $token, 'pending-report', $studentId), []) !== [];
+    }
+
+    public function setPendingReport(int $examId, int $studentId, int $reportId, bool $pending): void
+    {
+        $token = $this->activeToken($examId);
+        if ($token === null) {
+            return;
+        }
+
+        $this->cache()->lock($this->key($examId, $token, 'update-lock'), 5)->block(3, function () use (
+            $examId, $token, $studentId, $reportId, $pending
+        ): void {
+            $key = $this->key($examId, $token, 'pending-report', $studentId);
+            $reports = $this->cache()->get($key, []);
+            $reports = array_values(array_diff($reports, [$reportId]));
+            if ($pending) {
+                $reports[] = $reportId;
+            }
+            $meta = $this->cache()->get($this->key($examId, $token, 'meta'));
+            if (is_array($meta)) {
+                $this->cache()->put($key, $reports, Carbon::parse($meta['expira_en']));
+            }
+        });
     }
 
     public function search(int $examId, User $actor, string $name): array
