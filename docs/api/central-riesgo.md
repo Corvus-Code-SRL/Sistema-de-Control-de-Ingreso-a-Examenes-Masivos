@@ -10,7 +10,7 @@ Convenciones: prefijo `/api`, cabecera `Accept: application/json`, token de Sanc
 | GET | `/api/central-riesgo/{id}` | Detalle de un registro |
 | GET | `/api/central-riesgo/{id}/evidencia` | Archivo de evidencia del registro (autenticado) |
 
-No existe ninguna ruta de escritura (POST, PUT, PATCH, DELETE) bajo `/api/central-riesgo`; `RiskCenterReadOnlyTest` lo vigila. Rectificar un registro es otra historia (HU-062).
+No existe ninguna ruta de escritura (POST, PUT, PATCH, DELETE) bajo `/api/central-riesgo`; `RiskCenterReadOnlyTest` lo vigila. Rectificar un registro es otra historia (HU-062) y tiene su propia API: ver [rectificacion-riesgo.md](rectificacion-riesgo.md). El `tipo_falta` y la `descripcion` que devuelve esta consulta son los de la versión vigente.
 
 ## Quién puede consultar
 
