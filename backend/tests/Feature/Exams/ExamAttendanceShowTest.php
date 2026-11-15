@@ -134,6 +134,10 @@ class ExamAttendanceShowTest extends TestCase
             'id_examen' => $exam->id_examen,
             'estado' => Exam::EN_CURSO,
             'id_ambiente_asignado' => null,
+            'carreras' => [
+                ['id_carrera' => $this->sistemasId, 'nombre' => 'Ingenieria de Sistemas'],
+                ['id_carrera' => $this->informaticaId, 'nombre' => 'Ingenieria Informatica'],
+            ],
             'ambientes' => [['id_ambiente' => $this->aulaId, 'nro_aula' => '691A']],
             'estudiantes' => [
                 [
@@ -143,19 +147,19 @@ class ExamAttendanceShowTest extends TestCase
                     'id_ambiente' => $this->aulaId, 'ambiente' => '691A', 'estado' => 'A_TIEMPO',
                     'hora_ingreso' => '08:00', 'expulsado_en' => null,
                 ],
-                [
-                    'id_estudiante' => $second, 'cod_sis' => $students[1]->cod_sis, 'ci' => null,
-                    'nombre_completo' => 'Estudiante 2 Prueba',
-                    'carrera' => ['id_carrera' => $this->sistemasId, 'nombre' => 'Ingenieria de Sistemas'],
-                    'id_ambiente' => $this->aulaId, 'ambiente' => '691A', 'estado' => 'AUSENTE',
-                    'hora_ingreso' => null, 'expulsado_en' => null,
-                ],
             ],
+            'paginacion' => ['current_page' => 1, 'last_page' => 1, 'per_page' => 20, 'total' => 1],
             'totales' => [
-                'total' => 2, 'pendientes' => 0, 'ausentes' => 1, 'a_tiempo' => 1,
+                'total' => 2, 'registrados' => 1, 'sin_confirmar' => 1,
+                'sin_registro' => 1, 'ausentes' => 0, 'a_tiempo' => 1,
                 'con_retraso' => 0, 'expulsados' => 0, 'no_habilitados' => 0, 'sin_clasificar' => 0,
             ],
         ]]);
+
+        $this->getJson($this->url($exam) . '?vista=sin_registro')->assertOk()
+            ->assertJsonPath('data.estudiantes.0.id_estudiante', $second)
+            ->assertJsonPath('data.estudiantes.0.estado', 'SIN_REGISTRO')
+            ->assertJsonPath('data.estudiantes.0.hora_ingreso', null);
 
         $this->assertSame($originalExam, $exam->fresh()->getAttributes());
         $this->assertEquals(
@@ -165,29 +169,76 @@ class ExamAttendanceShowTest extends TestCase
         $this->assertNull($cache->get($presenceKey));
     }
 
-    public function test_distingue_pendientes_y_ausentes_al_cambiar_de_estado_sin_nomina_cargada(): void
+    public function test_el_inicio_del_examen_no_convierte_a_quien_no_se_registro_en_ausente(): void
     {
         $exam = $this->createExam([], [$this->aulaId]);
         $exam->groups()->attach($this->grupoPropioId);
         $this->travelTo(Carbon::parse($exam->fecha->toDateString() . ' 08:00', config('sciem.zona_horaria')));
         app(RoomAssignmentService::class)->prepare($exam->id_examen);
 
-        $this->getJson($this->url($exam))->assertOk()
-            ->assertJsonPath('data.estudiantes.0.estado', 'PENDIENTE')
-            ->assertJsonPath('data.estudiantes.1.estado', 'PENDIENTE')
+        $this->getJson($this->url($exam))->assertOk()->assertJsonCount(0, 'data.estudiantes');
+        $this->getJson($this->url($exam) . '?vista=sin_registro')->assertOk()
+            ->assertJsonPath('data.estudiantes.0.estado', 'SIN_REGISTRO')
+            ->assertJsonPath('data.estudiantes.1.estado', 'SIN_REGISTRO')
             ->assertJsonPath('data.totales.no_habilitados', 0)
-            ->assertJsonPath('data.totales.pendientes', 2)
+            ->assertJsonPath('data.totales.sin_registro', 2)
             ->assertJsonPath('data.totales.ausentes', 0);
 
         $this->travel(90)->minutes();
         $this->getJson($this->url($exam))->assertStatus(409);
 
         $exam->update(['estado' => Exam::EN_CURSO]);
+        [$first, $second] = $this->studentIds();
+        DB::table('solicitud_ingreso_retraso')->insert([
+            [
+                'id_examen' => $exam->id_examen, 'id_estudiante' => $first, 'id_ambiente' => $this->aulaId,
+                'estado' => 'PENDIENTE', 'id_usuario_solicitante' => $this->mariaId,
+                'solicitado_en' => now(), 'id_usuario_resolutor' => null, 'resuelto_en' => null,
+            ],
+            [
+                'id_examen' => $exam->id_examen, 'id_estudiante' => $second, 'id_ambiente' => $this->aulaId,
+                'estado' => 'AUTORIZADA', 'id_usuario_solicitante' => $this->mariaId,
+                'solicitado_en' => now(), 'id_usuario_resolutor' => $this->docenteId, 'resuelto_en' => now(),
+            ],
+        ]);
+        $this->getJson($this->url($exam))->assertOk()->assertJsonCount(0, 'data.estudiantes');
+        $this->getJson($this->url($exam) . '?vista=sin_registro')->assertOk()
+            ->assertJsonPath('data.estudiantes.0.estado', 'SIN_REGISTRO')
+            ->assertJsonPath('data.estudiantes.1.estado', 'SIN_REGISTRO')
+            ->assertJsonPath('data.totales.ausentes', 0)
+            ->assertJsonPath('data.totales.sin_registro', 2);
+
+        $this->recordEntry($exam, $second, StudentExam::CON_RETRASO, $this->aulaId, '09:32');
         $this->getJson($this->url($exam))->assertOk()
-            ->assertJsonPath('data.estudiantes.0.estado', 'AUSENTE')
-            ->assertJsonPath('data.estudiantes.1.estado', 'AUSENTE')
-            ->assertJsonPath('data.totales.ausentes', 2)
-            ->assertJsonPath('data.totales.pendientes', 0);
+            ->assertJsonPath('data.estudiantes.0.estado', 'CON_RETRASO')
+            ->assertJsonPath('data.estudiantes.0.hora_ingreso', '09:32')
+            ->assertJsonPath('data.totales.con_retraso', 1)
+            ->assertJsonPath('data.totales.sin_registro', 1);
+    }
+
+    public function test_pagina_y_busca_en_todo_el_exam_en_orden_estable_con_totales_globales(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::EN_CURSO]);
+        $exam->groups()->attach($this->grupoPropioId);
+        $this->enrollStudents($this->grupoPropioId, 19);
+        $ids = $this->studentIds();
+        $last = $ids[20];
+        DB::table('estudiante')->where('id_estudiante', $last)->update(['nombre' => 'María', 'apellido_paterno' => 'Núñez']);
+
+        $url = $this->url($exam) . '?vista=sin_registro';
+        $this->getJson($url)->assertOk()->assertJsonCount(20, 'data.estudiantes')
+            ->assertJsonPath('data.estudiantes.0.id_estudiante', $ids[0])
+            ->assertJsonPath('data.paginacion', ['current_page' => 1, 'last_page' => 2, 'per_page' => 20, 'total' => 21]);
+
+        $this->getJson($url . '&page=2')->assertOk()->assertJsonCount(1, 'data.estudiantes')
+            ->assertJsonPath('data.estudiantes.0.id_estudiante', $last)
+            ->assertJsonPath('data.totales.sin_registro', 21);
+
+        $this->getJson($url . '&q=nunez%20maria&page=2')->assertOk()->assertJsonCount(1, 'data.estudiantes')
+            ->assertJsonPath('data.estudiantes.0.id_estudiante', $last)
+            ->assertJsonPath('data.paginacion.current_page', 1)
+            ->assertJsonPath('data.paginacion.total', 1)
+            ->assertJsonPath('data.totales.total', 21);
     }
 
     public function test_una_marca_individual_no_acredita_que_se_cargo_la_nomina_de_habilitados(): void
@@ -197,9 +248,9 @@ class ExamAttendanceShowTest extends TestCase
         [$first] = $this->studentIds();
         $this->recordEntry($exam, $first, StudentExam::NO_INGRESO, null, null, 'NO_HABILITADO');
 
-        $this->getJson($this->url($exam))->assertOk()
-            ->assertJsonPath('data.estudiantes.0.estado', 'AUSENTE')
-            ->assertJsonPath('data.totales.ausentes', 2)
+        $this->getJson($this->url($exam) . '?vista=sin_registro')->assertOk()
+            ->assertJsonPath('data.estudiantes.0.estado', 'SIN_REGISTRO')
+            ->assertJsonPath('data.totales.sin_registro', 2)
             ->assertJsonPath('data.totales.no_habilitados', 0)
             ->assertJsonPath('data.totales.sin_clasificar', 0);
     }
@@ -216,22 +267,22 @@ class ExamAttendanceShowTest extends TestCase
         // Simula un valor ajeno al contrato dentro de la transacción reversible de la prueba.
         DB::statement("ALTER TYPE estado_ingreso RENAME VALUE 'NO_INGRESO' TO 'ESTADO_LEGADO'");
 
-        $this->getJson($this->url($exam))->assertOk()
+        $this->getJson($this->url($exam) . '?vista=sin_registro')->assertOk()
             ->assertJsonPath('data.estudiantes.0.estado', 'SIN_CLASIFICAR')
-            ->assertJsonPath('data.estudiantes.1.estado', 'PENDIENTE')
+            ->assertJsonPath('data.estudiantes.1.estado', 'SIN_REGISTRO')
             ->assertJsonPath('data.totales.total', 2)
             ->assertJsonPath('data.totales.sin_clasificar', 1)
-            ->assertJsonPath('data.totales.pendientes', 1)
+            ->assertJsonPath('data.totales.sin_registro', 1)
             ->assertJsonPath('data.totales.ausentes', 0);
 
         $exam->update(['estado' => Exam::EN_CURSO]);
-        $this->getJson($this->url($exam))->assertOk()
+        $this->getJson($this->url($exam) . '?vista=sin_registro')->assertOk()
             ->assertJsonPath('data.estudiantes.0.estado', 'SIN_CLASIFICAR')
-            ->assertJsonPath('data.estudiantes.1.estado', 'AUSENTE')
+            ->assertJsonPath('data.estudiantes.1.estado', 'SIN_REGISTRO')
             ->assertJsonPath('data.totales.total', 2)
             ->assertJsonPath('data.totales.sin_clasificar', 1)
-            ->assertJsonPath('data.totales.pendientes', 0)
-            ->assertJsonPath('data.totales.ausentes', 1);
+            ->assertJsonPath('data.totales.sin_registro', 1)
+            ->assertJsonPath('data.totales.ausentes', 0);
     }
 
     public function test_el_ci_se_entrega_a_cada_perfil_autorizado_y_puede_ser_nulo(): void
@@ -246,7 +297,7 @@ class ExamAttendanceShowTest extends TestCase
 
         foreach ([$this->docenteId, $this->otroDocenteId] as $teacherId) {
             $this->actAsTeacher($teacherId);
-            $this->getJson($this->url($exam))->assertOk()
+            $this->getJson($this->url($exam) . '?vista=sin_registro')->assertOk()
                 ->assertJsonPath('data.estudiantes.0.ci', $ci)
                 ->assertJson(fn (AssertableJson $json) => $json
                     ->has('data.estudiantes.1.ci')
@@ -255,7 +306,7 @@ class ExamAttendanceShowTest extends TestCase
 
         $this->assignRole($this->mariaId, Role::AUXILIAR);
         $this->actAsUserId($this->mariaId);
-        $this->getJson($this->url($exam))->assertOk()
+        $this->getJson($this->url($exam) . '?vista=sin_registro')->assertOk()
             ->assertJsonCount(2, 'data.estudiantes')
             ->assertJsonPath('data.estudiantes.0.ci', $ci)
             ->assertJson(fn (AssertableJson $json) => $json
@@ -271,10 +322,10 @@ class ExamAttendanceShowTest extends TestCase
         $this->assignRole($this->mariaId, Role::AUXILIAR);
         $this->actAsUserId($this->mariaId);
 
-        $this->getJson($this->url($exam))->assertOk()
+        $this->getJson($this->url($exam) . '?vista=sin_registro')->assertOk()
             ->assertJsonCount(1, 'data.estudiantes')
             ->assertJsonPath('data.estudiantes.0.id_estudiante', $second)
-            ->assertJsonPath('data.totales.ausentes', 1);
+            ->assertJsonPath('data.totales.sin_registro', 1);
 
         $this->recordEntry($exam, $first, StudentExam::CON_RETRASO, $this->otraAulaId, '08:20');
         $this->recordEntry($exam, $second, StudentExam::INGRESO, $this->aulaId, '08:05');
@@ -287,6 +338,11 @@ class ExamAttendanceShowTest extends TestCase
             'q' => $ciByStudent[$second],
         ]);
         $this->getJson($this->url($exam) . '?' . $query)->assertOk()
+            ->assertJsonCount(0, 'data.estudiantes')
+            ->assertJsonPath('data.paginacion.total', 0)
+            ->assertJsonPath('data.totales.total', 1);
+
+        $this->getJson($this->url($exam) . '?ambiente=' . $this->aulaId)->assertOk()
             ->assertJsonPath('data.id_ambiente_asignado', $this->otraAulaId)
             ->assertJsonPath('data.ambientes', [['id_ambiente' => $this->otraAulaId, 'nro_aula' => '692B']])
             ->assertJsonCount(1, 'data.estudiantes')
@@ -311,12 +367,15 @@ class ExamAttendanceShowTest extends TestCase
 
         $this->getJson($this->url($exam))->assertOk()
             ->assertJsonPath('data.estudiantes.0.estado', 'EXPULSADO')
+            ->assertJsonPath('data.estudiantes.0.hora_ingreso', '08:20')
             ->assertJsonPath('data.estudiantes.0.expulsado_en', '2026-11-14T12:30:00+00:00')
-            ->assertJsonPath('data.estudiantes.1.id_estudiante', $second)
-            ->assertJsonPath('data.estudiantes.1.id_ambiente', null)
             ->assertJsonPath('data.totales.total', 2)
             ->assertJsonPath('data.totales.expulsados', 1)
             ->assertJsonPath('data.totales.con_retraso', 0);
+
+        $this->getJson($this->url($exam) . '?vista=sin_registro')->assertOk()
+            ->assertJsonPath('data.estudiantes.0.id_estudiante', $second)
+            ->assertJsonPath('data.estudiantes.0.id_ambiente', null);
     }
 
     public function test_no_infiere_carrera_si_la_inscripcion_del_grupo_multicarrera_no_la_indica(): void
@@ -338,7 +397,7 @@ class ExamAttendanceShowTest extends TestCase
         DB::table('grupo_estudiante')->where('id_grupo', $this->grupoPropioId)
             ->where('id_estudiante', $first)->update(['id_carrera' => $this->informaticaId]);
 
-        $this->getJson($this->url($exam))->assertOk()
+        $this->getJson($this->url($exam) . '?vista=sin_registro')->assertOk()
             ->assertJsonPath('data.estudiantes.0.carrera.id_carrera', $this->informaticaId)
             ->assertJsonPath('data.estudiantes.1.carrera', null)
             ->assertJsonPath('data.totales.total', 2);
@@ -359,7 +418,7 @@ class ExamAttendanceShowTest extends TestCase
 
         $this->inviteCollaborator($exam, $this->docenteId, 'ACEPTADA', 2);
         $this->inviteCollaborator($exam, $this->docenteId, 'PENDIENTE');
-        $this->getJson($this->url($exam))->assertOk()
+        $this->getJson($this->url($exam) . '?vista=sin_registro')->assertOk()
             ->assertJsonCount(2, 'data.ambientes')->assertJsonCount(2, 'data.estudiantes');
         $catalog = $this->getJson('/api/examenes/estudiantes-ingresados')->assertOk()->json('data');
         $this->assertContains($exam->id_examen, array_column($catalog, 'id_examen'));

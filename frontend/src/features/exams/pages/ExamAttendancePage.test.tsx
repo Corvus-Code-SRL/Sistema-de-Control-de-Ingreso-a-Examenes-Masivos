@@ -6,11 +6,12 @@ import { meBody, TOKEN_STORAGE_KEY, type AccountKey } from '@/test/authFixtures'
 import { mockApiWith } from '@/test/http'
 import { renderApp } from '@/test/renderApp'
 import { openAllSections } from '@/test/sidebar'
+import { normalizeSearch } from '@/lib/text'
 import { EXAM_ATTENDANCE_PATH } from '../utils/paths'
 import type { ExamAttendanceDetail, ExamAttendanceExam } from '../types/examAttendance.types'
 import { EXAM_STATUS } from '../types/exams.types'
 
-const title = 'Estudiantes ingresados'
+const title = 'Estado de ingreso de estudiantes'
 const emptyTitle = 'No tiene exámenes con ingreso abierto ni en curso'
 const exams: ExamAttendanceExam[] = [
   {
@@ -42,6 +43,7 @@ const attendance: ExamAttendanceDetail = {
   estado: EXAM_STATUS.EN_CURSO,
   id_ambiente_asignado: null,
   ambientes: [{ id_ambiente: 3, nro_aula: '691A' }, { id_ambiente: 4, nro_aula: '692B' }],
+  carreras: [{ id_carrera: 2, nombre: 'Sistemas' }, { id_carrera: 5, nombre: 'Informática' }],
   estudiantes: [
     {
       id_estudiante: 10, nombre_completo: 'María Núñez', cod_sis: '202400010', ci: '4567891',
@@ -51,16 +53,34 @@ const attendance: ExamAttendanceDetail = {
     {
       id_estudiante: 11, nombre_completo: 'José Flores', cod_sis: '202400011', ci: null,
       carrera: { id_carrera: 5, nombre: 'Informática' }, id_ambiente: 4, ambiente: '692B',
-      estado: 'SIN_CLASIFICAR', hora_ingreso: null, expulsado_en: null,
+      estado: 'CON_RETRASO', hora_ingreso: '08:15', expulsado_en: null,
     },
   ],
-  totales: { total: 2, pendientes: 0, ausentes: 0, a_tiempo: 1, con_retraso: 0,
-    expulsados: 0, no_habilitados: 0, sin_clasificar: 1 },
+  paginacion: { current_page: 1, last_page: 1, per_page: 20, total: 2 },
+  totales: { total: 2, registrados: 2, sin_confirmar: 0, sin_registro: 0, ausentes: 0, a_tiempo: 1, con_retraso: 1,
+    expulsados: 0, no_habilitados: 0, sin_clasificar: 0 },
 }
 
 const emptyAttendance: ExamAttendanceDetail = {
-  ...attendance, id_examen: 8, estudiantes: [],
-  totales: { ...attendance.totales, total: 0, a_tiempo: 0, sin_clasificar: 0 },
+  ...attendance, id_examen: 8, estudiantes: [], carreras: [],
+  paginacion: { ...attendance.paginacion, total: 0 },
+  totales: { ...attendance.totales, total: 0, registrados: 0, a_tiempo: 0, con_retraso: 0 },
+}
+
+function detailPath(url: string) {
+  return /\/examenes\/(\d+)\/estudiantes-ingresados$/.exec(new URL(url).pathname)
+}
+
+function respondWithStudents(detail: ExamAttendanceDetail, query: URLSearchParams) {
+  const search = normalizeSearch(query.get('q') ?? '').split(/\s+/).filter(Boolean)
+  const students = detail.estudiantes.filter((student) => {
+    const identity = normalizeSearch([student.nombre_completo, student.cod_sis, student.ci].join(' '))
+    return search.every((word) => identity.includes(word))
+      && (!query.has('carrera') || query.get('carrera') === String(student.carrera?.id_carrera))
+      && (!query.has('estado') || query.get('estado') === student.estado)
+      && (!query.has('ambiente') || query.get('ambiente') === String(student.id_ambiente))
+  })
+  return { body: { data: { ...detail, estudiantes: students, paginacion: { ...detail.paginacion, total: students.length } } } }
 }
 
 type Session = AccountKey | 'invitado'
@@ -69,7 +89,9 @@ type ApiResponse = { status?: number; body: unknown; headers?: Record<string, st
 function stubCatalog(
   session: Session,
   catalog = vi.fn<() => ApiResponse>(() => ({ body: { data: [] } })),
-  detail = vi.fn<(id: number) => ApiResponse>((id) => ({ body: { data: id === 7 ? attendance : emptyAttendance } }))
+  detail: (id: number, query: URLSearchParams) => ApiResponse = (id, query) => respondWithStudents(
+    id === 7 ? attendance : emptyAttendance, query
+  ),
 ) {
   window.localStorage.setItem(TOKEN_STORAGE_KEY, 'token-asistencia')
   const { calls } = mockApiWith(({ url }) => {
@@ -78,14 +100,14 @@ function stubCatalog(
       if (session === 'invitado') me.data.rol.nombre_rol = 'Invitado'
       return { body: me }
     }
-    const match = /\/examenes\/(\d+)\/estudiantes-ingresados$/.exec(url)
-    if (match) return detail(Number(match[1]))
+    const match = detailPath(url)
+    if (match) return detail(Number(match[1]), new URL(url).searchParams)
     if (url.endsWith(EXAM_ATTENDANCE_PATH)) return catalog()
     return { body: { data: [], meta: { total_pendientes: 0 } } }
   })
   return {
     catalogCalls: () => calls.filter(({ url }) => url.endsWith(EXAM_ATTENDANCE_PATH)),
-    detailCalls: () => calls.filter(({ url }) => /\/examenes\/\d+\/estudiantes-ingresados$/.test(url)),
+    detailCalls: () => calls.filter(({ url }) => detailPath(url)),
   }
 }
 
@@ -222,18 +244,19 @@ describe('HU-066: nómina del examen', () => {
     expect(within(table).getByRole('cell', { name: '4567891' })).toBeVisible()
     expect(within(table).getByRole('cell', { name: '08:00' })).toBeVisible()
     expect(within(table).queryByText('José Flores')).not.toBeInTheDocument()
-    expect(screen.getByText('1 de 2 estudiantes')).toBeVisible()
+    expect(screen.getByText('Mostrando 1–1 de 1 estudiantes')).toBeVisible()
     const totals = screen.getByLabelText('Totales de asistencia')
     expect(within(totals).getByText('Total de estudiantes').nextElementSibling).toHaveTextContent('2')
-    expect(within(totals).getByText('Sin clasificar').nextElementSibling).toHaveTextContent('1')
+    expect(within(totals).getByText('Con retraso').nextElementSibling).toHaveTextContent('1')
 
     await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }))
-    expect(within(table).getByText('José Flores')).toBeVisible()
+    expect(await screen.findByRole('cell', { name: 'José Flores' })).toBeVisible()
     expect([...currentFilters()]).toEqual([['examen', '7']])
     await user.click(screen.getByRole('button', { name: 'Volver en el historial' }))
-    expect(within(table).queryByText('José Flores')).not.toBeInTheDocument()
+    expect(await screen.findByRole('cell', { name: 'María Núñez' })).toBeVisible()
+    expect(screen.queryByRole('cell', { name: 'José Flores' })).not.toBeInTheDocument()
     expect(currentFilters().get('estado')).toBe('A_TIEMPO')
-    expect(detailCalls()).toHaveLength(1)
+    expect(detailCalls()).toHaveLength(3)
   })
 
   it('busca por nombre, SIS y CI y escribe los filtros elegidos en la URL', async () => {
@@ -245,37 +268,39 @@ describe('HU-066: nómina del examen', () => {
     for (const term of ['nunez maria', '202400010', '4567891']) {
       await user.clear(search)
       await user.type(search, term)
-      expect(screen.getByRole('cell', { name: 'María Núñez' })).toBeVisible()
+      expect(await screen.findByRole('cell', { name: 'María Núñez' })).toBeVisible()
       expect(screen.queryByRole('cell', { name: 'José Flores' })).not.toBeInTheDocument()
       expect(currentFilters().get('q')).toBe(term)
     }
     await user.clear(search)
     for (const [field, option, key, value] of [
       ['Carrera', 'Informática', 'carrera', '5'],
-      ['Estado', 'Sin clasificar', 'estado', 'SIN_CLASIFICAR'],
+      ['Estado', 'Con retraso', 'estado', 'CON_RETRASO'],
       ['Ambiente', '692B', 'ambiente', '4'],
     ]) {
       await user.click(screen.getByRole('combobox', { name: field }))
       await user.click(screen.getByRole('option', { name: option }))
       expect(currentFilters().get(key)).toBe(value)
-      expect(screen.getByRole('cell', { name: 'José Flores' })).toBeVisible()
+      expect(await screen.findByRole('cell', { name: 'José Flores' })).toBeVisible()
     }
     await user.type(search, 'sin coincidencias')
-    expect(screen.getByText('No hay estudiantes que coincidan con los filtros')).toBeVisible()
-    expect(detailCalls()).toHaveLength(1)
+    expect(await screen.findByText('No hay estudiantes que coincidan con los filtros')).toBeVisible()
+    const requests = detailCalls()
+    expect(new URL(requests[requests.length - 1].url).searchParams.get('q')).toBe('sin coincidencias')
   })
 
   it('muestra y busca el CI autorizado del auxiliar sin aplicar un ambiente ajeno de la URL', async () => {
     const student = attendance.estudiantes[0]
     const detail: ExamAttendanceDetail = { ...attendance, id_ambiente_asignado: 3, ambientes: [attendance.ambientes[0]],
-      estudiantes: [student], totales: { ...attendance.totales, total: 1, sin_clasificar: 0 } }
+      carreras: [attendance.carreras[0]], estudiantes: [student],
+      totales: { ...attendance.totales, total: 1, registrados: 1, con_retraso: 0 } }
     const catalogWithStaleRoom = vi.fn(() => ({ body: { data: [{ ...exams[0], ambiente: attendance.ambientes[1] }] } }))
-    const { detailCalls } = stubCatalog('auxiliar', catalogWithStaleRoom, vi.fn(() => ({ body: { data: detail } })))
+    const { detailCalls } = stubCatalog('auxiliar', catalogWithStaleRoom, (_, query) => respondWithStudents(detail, query))
     const respond = globalThis.fetch
     let release!: () => void
     const pending = new Promise<void>((resolve) => { release = resolve })
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input).endsWith('/examenes/7/estudiantes-ingresados')) await pending
+      if (detailPath(String(input))?.[1] === '7') await pending
       return respond(input, init)
     })
     renderApp(`${EXAM_ATTENDANCE_PATH}?examen=7&ambiente=4`)
@@ -295,13 +320,12 @@ describe('HU-066: nómina del examen', () => {
     for (const term of [student.ci!, 'nunez maria', student.cod_sis]) {
       await user.clear(search)
       await user.type(search, term)
-      expect(within(table).getByText('María Núñez')).toBeVisible()
+      expect(await screen.findByRole('cell', { name: 'María Núñez' })).toBeVisible()
     }
     await user.clear(search)
     await user.type(search, attendance.estudiantes[1].cod_sis)
-    expect(screen.getByText('No hay estudiantes que coincidan con los filtros')).toBeVisible()
-    expect(detailCalls()).toHaveLength(1)
-    expect(detailCalls()[0].url).toMatch(/\/examenes\/7\/estudiantes-ingresados$/)
+    expect(await screen.findByText('No hay estudiantes que coincidan con los filtros')).toBeVisible()
+    expect(detailCalls().every(({ url }) => !new URL(url).searchParams.has('ambiente'))).toBe(true)
   })
 
   it('conserva el ambiente del catálogo para el docente cuando el detalle no tiene ambiente asignado', async () => {
@@ -319,7 +343,7 @@ describe('HU-066: nómina del examen', () => {
     let release!: () => void
     const pending = new Promise<void>((resolve) => { release = resolve })
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input).endsWith('/examenes/7/estudiantes-ingresados')) {
+      if (detailPath(String(input))?.[1] === '7') {
         signal = init?.signal
         await pending
       }
@@ -331,7 +355,7 @@ describe('HU-066: nómina del examen', () => {
     await user.click(screen.getByRole('combobox', { name: 'Examen' }))
     await user.click(screen.getByRole('option', { name: /Segundo parcial/ }))
     expect(signal?.aborted).toBe(true)
-    expect(await screen.findByText('No hay estudiantes disponibles para este examen')).toBeVisible()
+    expect(await screen.findByText('Todavía no se registraron estudiantes en este examen')).toBeVisible()
     expect([...currentFilters()]).toEqual([['examen', '8']])
     await act(async () => { release(); await pending })
     expect(screen.queryByText('María Núñez')).not.toBeInTheDocument()
@@ -384,31 +408,87 @@ describe('HU-066: nómina del examen', () => {
     expect(screen.getByRole('combobox', { name: 'Examen' })).toHaveTextContent('Seleccione un examen')
     expect(detailCalls()).toHaveLength(0)
   })
+
+  it('muestra primero los registrados y consulta sin registro por páginas manteniendo los totales', async () => {
+    const pendingStudent = { ...attendance.estudiantes[1], estado: 'SIN_REGISTRO' as const, hora_ingreso: null }
+    const totals = { ...emptyAttendance.totales, total: 21, sin_confirmar: 21, sin_registro: 21 }
+    const pageOne = Array.from({ length: 20 }, (_, index) => ({
+      ...pendingStudent, id_estudiante: index + 20, nombre_completo: `Estudiante ${index + 1}`,
+    }))
+    const { detailCalls } = stubCatalog('docente', catalog(), (_, query) => {
+      const withoutRecord = query.get('vista') === 'sin_registro'
+      const page = Number(query.get('page') ?? 1)
+      const students = query.has('q') || page === 2 ? [pendingStudent] : pageOne
+      return { body: { data: {
+        ...attendance, totales: totals, estudiantes: withoutRecord ? students : [],
+        paginacion: { current_page: page, last_page: withoutRecord && !query.has('q') ? 2 : 1,
+          per_page: 20, total: withoutRecord ? (query.has('q') ? 1 : 21) : 0 },
+      } } }
+    })
+    renderApp(`${EXAM_ATTENDANCE_PATH}?examen=7`, <LocationControls />)
+    const user = userEvent.setup()
+
+    expect(await screen.findByText('Todavía no se registraron estudiantes en este examen')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Sin registro / Ausentes (21)' }))
+    expect(await screen.findByRole('columnheader', { name: 'Hora de registro' })).toBeVisible()
+    expect(screen.getAllByRole('row')).toHaveLength(21)
+    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+    expect(await screen.findByRole('cell', { name: 'José Flores' })).toBeVisible()
+    expect(currentFilters().get('page')).toBe('2')
+    expect(screen.getByText('Página 2 de 2')).toBeVisible()
+
+    await user.type(screen.getByRole('searchbox'), 'flores')
+    expect(await screen.findByText('Página 1 de 1')).toBeVisible()
+    expect(currentFilters().has('page')).toBe(false)
+    const filtered = detailCalls().find(({ url }) => new URL(url).searchParams.get('q') === 'flores')
+    expect(filtered).toBeDefined()
+    expect(new URL(filtered!.url).searchParams.get('vista')).toBe('sin_registro')
+    expect(within(screen.getByLabelText('Totales de asistencia')).getByText('Total de estudiantes').nextElementSibling)
+      .toHaveTextContent('21')
+  })
 })
 
 describe('HU-066: actualización automática', () => {
   const catalog = () => vi.fn(() => ({ body: { data: exams } }))
   const route = `${EXAM_ATTENDANCE_PATH}?examen=7`
 
+  it('renueva la página actual sin restablecer la vista ni la búsqueda', async () => {
+    const { detailCalls } = stubCatalog('docente', catalog(), () => ({ body: { data: {
+      ...emptyAttendance, id_examen: 7,
+      paginacion: { current_page: 2, last_page: 2, per_page: 20, total: 21 },
+    } } }))
+    vi.useFakeTimers()
+    renderApp(`${route}&vista=sin_registro&q=nunez&page=2`, <LocationControls />)
+
+    await advance(0)
+    await advance(5000)
+    expect(detailCalls()).toHaveLength(2)
+    expect(detailCalls()[1].url).toBe(detailCalls()[0].url)
+    expect(currentFilters().get('page')).toBe('2')
+    expect(currentFilters().get('vista')).toBe('sin_registro')
+  })
+
   it('refresca después de cinco segundos y conserva filtros, CI y alcance del auxiliar', async () => {
-    const first = { ...attendance.estudiantes[0], estado: 'PENDIENTE' as const, hora_ingreso: null }
     const initial: ExamAttendanceDetail = {
       ...attendance, estado: EXAM_STATUS.EN_INGRESO, id_ambiente_asignado: 3,
-      ambientes: [attendance.ambientes[0]], estudiantes: [first],
-      totales: { ...attendance.totales, total: 1, pendientes: 1, a_tiempo: 0, sin_clasificar: 0 },
+      ambientes: [attendance.ambientes[0]], carreras: [attendance.carreras[0]], estudiantes: [],
+      paginacion: { ...attendance.paginacion, total: 0 },
+      totales: { ...attendance.totales, total: 1, registrados: 0, sin_confirmar: 1, sin_registro: 1,
+        a_tiempo: 0, con_retraso: 0 },
     }
     const execute = vi.fn<(id: number) => ApiResponse>()
       .mockReturnValueOnce({ body: { data: initial } })
       .mockReturnValue({ body: { data: {
         ...initial, estado: EXAM_STATUS.EN_CURSO, estudiantes: [attendance.estudiantes[0]],
-        totales: { ...initial.totales, pendientes: 0, a_tiempo: 1 },
+        paginacion: { ...initial.paginacion, total: 1 },
+        totales: { ...initial.totales, registrados: 1, sin_confirmar: 0, sin_registro: 0, a_tiempo: 1 },
       } } })
     stubCatalog('auxiliar', catalog(), execute)
     vi.useFakeTimers()
     const app = renderApp(`${route}&q=4567891&ambiente=4`, <LocationControls />)
 
     await advance(0)
-    expect(screen.getByRole('cell', { name: '4567891' })).toBeVisible()
+    expect(screen.getByText('Todavía no se registraron estudiantes en este examen')).toBeVisible()
     expect(screen.getByText('En ingreso')).toBeVisible()
     expect(screen.queryByRole('combobox', { name: 'Ambiente' })).not.toBeInTheDocument()
     await advance(4999)
@@ -416,6 +496,7 @@ describe('HU-066: actualización automática', () => {
     await advance(1)
     expect(execute).toHaveBeenCalledTimes(2)
     expect(within(screen.getByRole('main')).getByText('En curso')).toBeVisible()
+    expect(screen.getByRole('cell', { name: '4567891' })).toBeVisible()
     expect(screen.getByRole('cell', { name: '08:00' })).toBeVisible()
     expect(screen.getByRole('searchbox', { name: 'Nombre, SIS o CI' })).toHaveValue('4567891')
     expect(currentFilters().get('ambiente')).toBe('4')
@@ -465,9 +546,9 @@ describe('HU-066: actualización automática', () => {
     expect(currentFilters().get('examen')).toBe('8')
     expect(currentFilters().get('q')).toBeNull()
     await advance(44999)
-    expect(execute.mock.calls).toEqual([[7]])
+    expect(execute.mock.calls.map(([id]) => id)).toEqual([7])
     await advance(1)
-    expect(execute.mock.calls).toEqual([[7], [8]])
+    expect(execute.mock.calls.map(([id]) => id)).toEqual([7, 8])
   })
 
   it.each([403, 404, 409, 503])('limpia la nómina y detiene el ciclo al recibir %s', async (status) => {

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { ClipboardList } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -12,13 +13,15 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { useCurrentUser } from '@/features/auth'
 import { useAsyncResource } from '@/hooks/useAsyncResource'
-import { clearAttendanceFilters, ExamAttendanceRoster } from '../components/ExamAttendanceRoster'
+import { ExamAttendanceRoster } from '../components/ExamAttendanceRoster'
 import { ExamStatusBadge } from '../components/ExamStatusBadge'
 import { useExamAttendanceDetail } from '../hooks/useExamAttendanceDetail'
 import { examsService } from '../services/examsService'
 import type { ExamAttendanceExam } from '../types/examAttendance.types'
+import { attendanceQuery, clearAttendanceFilters } from '../utils/attendanceFilters'
 
-const TITLE = 'Estudiantes ingresados'
+const TITLE = 'Estado de ingreso de estudiantes'
+const SUBTITLE = 'Consulta los estudiantes registrados, verifica quiénes están pendientes de registro y revisa su estado durante el examen.'
 const SELECT_ID = 'attendance-exam'
 const examDate = new Intl.DateTimeFormat('es-BO', { dateStyle: 'medium', timeZone: 'UTC' })
 
@@ -39,6 +42,7 @@ export function ExamAttendancePage() {
     setParams((current) => {
       const next = new URLSearchParams(current)
       clearAttendanceFilters(next)
+      next.delete('vista')
       if (examId) next.set('examen', examId)
       else next.delete('examen')
       return next
@@ -47,7 +51,7 @@ export function ExamAttendancePage() {
 
   return (
     <AppShell mobileTitle={TITLE} breadcrumbs={[{ label: 'Exámenes' }, { label: TITLE }]}>
-      <PageHeader title={TITLE} />
+      <PageHeader title={TITLE} subtitle={SUBTITLE} />
 
       {status === 'loading' && <LoadingState rows={2} label="Cargando exámenes disponibles" />}
       {status === 'error' && error && <ErrorState error={error} onRetry={error.isForbidden ? undefined : reload} />}
@@ -89,6 +93,10 @@ export function ExamAttendancePage() {
               <p>Seleccione un examen del catálogo.</p>
             </StatePanel>
           )}
+          {!selectedId && (
+            <EmptyState icon={ClipboardList} title="Seleccione un examen"
+              description="Elija un examen para consultar el estado de sus estudiantes." />
+          )}
         </>
       )}
     </AppShell>
@@ -97,10 +105,23 @@ export function ExamAttendancePage() {
 
 function SelectedAttendance({ exam, onRefreshExams }: { exam: ExamAttendanceExam; onRefreshExams: () => void }) {
   const { area } = useCurrentUser()
-  const { data, error, pollNotice, reload } = useExamAttendanceDetail(exam.id_examen)
+  const [params, setParams] = useSearchParams()
+  const { data, isUpdating, error, pollNotice, reload } = useExamAttendanceDetail(
+    exam.id_examen, attendanceQuery(params, area !== 'auxiliar')
+  )
   const unavailable = error !== null && (error.status === 409 || error.isNotFound)
   const detailRoom = data?.ambientes.find((room) => room.id_ambiente === data.id_ambiente_asignado)?.nro_aula
   const assignedRoom = area === 'auxiliar' ? detailRoom : detailRoom ?? exam.ambiente?.nro_aula
+
+  useEffect(() => {
+    if (!data || isUpdating || !params.has('page') || Number(params.get('page')) === data.paginacion.current_page) return
+    setParams((current) => {
+      const next = new URLSearchParams(current)
+      if (data.paginacion.current_page === 1) next.delete('page')
+      else next.set('page', String(data.paginacion.current_page))
+      return next
+    }, { replace: true })
+  }, [data, isUpdating, params, setParams])
 
   return (
     <>
@@ -136,7 +157,7 @@ function SelectedAttendance({ exam, onRefreshExams }: { exam: ExamAttendanceExam
           {error.isForbidden && <Button variant="outline" onClick={onRefreshExams}>Actualizar exámenes</Button>}
         </>
       )}
-      {data && <ExamAttendanceRoster detail={data} />}
+      {data && <ExamAttendanceRoster detail={data} isUpdating={isUpdating} />}
     </>
   )
 }

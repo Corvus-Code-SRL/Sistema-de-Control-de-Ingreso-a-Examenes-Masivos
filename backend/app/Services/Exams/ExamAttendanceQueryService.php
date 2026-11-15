@@ -11,10 +11,11 @@ use App\Models\StudentExam;
 use App\Models\User;
 use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\Security\UserRoleService;
+use App\Support\Database\AccentInsensitiveSearch;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Collection as BaseCollection;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 
 /** Catálogo y detalle de asistencia de exámenes académicos. */
@@ -22,8 +23,9 @@ class ExamAttendanceQueryService
 {
     private const CANDIDATE_STATES = [Exam::EN_CURSO, Exam::EN_INGRESO];
     private const ACCEPTED_INVITATION = 'ACEPTADA';
+    private const PER_PAGE = 20;
     private const STATUS_TOTALS = [
-        'PENDIENTE' => 'pendientes',
+        'SIN_REGISTRO' => 'sin_registro',
         'AUSENTE' => 'ausentes',
         'A_TIEMPO' => 'a_tiempo',
         'CON_RETRASO' => 'con_retraso',
@@ -70,7 +72,7 @@ class ExamAttendanceQueryService
         ]);
     }
 
-    public function show(int $examId, User $actor): array
+    public function show(int $examId, User $actor, array $filters = []): array
     {
         $isTeacher = $this->canConsultAllRooms($actor);
         $exam = $this->accessibleExams($actor, $isTeacher)->find($examId);
@@ -96,39 +98,50 @@ class ExamAttendanceQueryService
             'capacidad' => (int) $room->capacidad,
         ])->values();
 
-        $students = $this->attendanceRows($examId, $rooms->all());
+        $scope = DB::query()->fromSub($this->attendanceRows($examId, $rooms->all()), 'asistencia');
 
         if ($classroom !== null) {
             $roomId = (int) $classroom->id_ambiente;
-            $students = $students->whereStrict('id_ambiente', $roomId)->values();
+            $scope->where('id_ambiente', $roomId);
             $rooms = $rooms->whereStrict('id_ambiente', $roomId)->values();
         }
 
-        $totals = array_fill_keys(array_values(self::STATUS_TOTALS), 0);
-        foreach ($students as $student) {
-            $student->estado = $this->attendanceStatus($student, $exam->estado);
-            $totals[self::STATUS_TOTALS[$student->estado]]++;
-        }
+        $totals = $this->attendanceTotals($scope);
+        $careers = (clone $scope)->whereNotNull('id_carrera')->distinct()
+            ->orderBy('id_carrera')->get(['id_carrera', 'carrera']);
+
+        $rows = $this->applyFilters($scope, $filters, $classroom === null && $rooms->count() > 1);
+        $total = $rows->count();
+        $lastPage = max(1, (int) ceil($total / self::PER_PAGE));
+        $page = min((int) ($filters['page'] ?? 1), $lastPage);
 
         return [
             'exam' => $exam,
             'classroom' => $classroom,
             'rooms' => $rooms,
-            'students' => $students,
-            // HU-028 aún no registra la carga de una nómina de habilitados para el examen.
-            'totals' => ['total' => $students->count(), 'no_habilitados' => 0] + $totals,
+            'careers' => $careers,
+            'students' => $rows->orderBy('id_estudiante')->forPage($page, self::PER_PAGE)->get(),
+            'totals' => $totals,
+            'pagination' => [
+                'current_page' => $page, 'last_page' => $lastPage, 'per_page' => self::PER_PAGE, 'total' => $total,
+            ],
         ];
     }
 
-    private function attendanceRows(int $examId, array $rooms): BaseCollection
+    private function attendanceRows(int $examId, array $rooms): QueryBuilder
     {
         // Se usa el grupo canónico de la nómina, con el respaldo multicarrera del grupo.
-        $careerId = 'COALESCE(ge.id_carrera, CASE WHEN '
-            . '(SELECT count(*) FROM grupo_oferta WHERE grupo_oferta.id_grupo = g.id_grupo) <= 1 '
+        $careerId = 'COALESCE(ge.id_carrera, CASE WHEN NOT EXISTS '
+            . '(SELECT 1 FROM grupo_oferta go WHERE go.id_grupo = g.id_grupo AND go.id_carrera <> g.id_carrera) '
             . 'THEN g.id_carrera END)';
+        $confirmed = 'ee.hora_ingreso IS NOT NULL AND ee.estado_ingreso::text IN (?, ?)';
+        $roster = $this->participants->expected($examId);
 
-        $roster = DB::query()
-            ->fromSub($this->participants->expected($examId), 'nomina')
+        if ($rooms !== []) {
+            $roster->selectRaw('row_number() OVER (ORDER BY estudiante.id_estudiante) AS posicion');
+        }
+
+        $rows = DB::query()->fromSub($roster, 'nomina')
             ->join('grupo as g', 'g.id_grupo', '=', 'nomina.id_grupo')
             ->join('grupo_estudiante as ge', static function ($join): void {
                 $join->on('ge.id_grupo', '=', 'nomina.id_grupo')
@@ -143,33 +156,83 @@ class ExamAttendanceQueryService
                 'nomina.id_estudiante', 'nomina.cod_sis', 'nomina.ci',
                 'nomina.nombre', 'nomina.apellido_paterno', 'nomina.apellido_materno',
                 'c.id_carrera', 'c.nombre as carrera',
-                'ee.id_estudiante as id_registro_asistencia', 'ee.estado_ingreso', 'ee.hora_ingreso',
-                'ee.id_ambiente', 'ee.expulsado_en',
+                'ee.expulsado_en',
             ])
-            ->orderBy('nomina.id_estudiante')
-            ->get();
+            ->selectRaw("CASE WHEN $confirmed THEN 1 ELSE 0 END AS registrado", [
+                StudentExam::INGRESO, StudentExam::CON_RETRASO,
+            ])
+            ->selectRaw("CASE WHEN ($confirmed) OR ee.expulsado_en IS NOT NULL THEN ee.hora_ingreso END AS hora_ingreso", [
+                StudentExam::INGRESO, StudentExam::CON_RETRASO,
+            ])
+            // HU-032 aún no expone un cierre confirmado e independiente del horario del examen.
+            ->selectRaw("CASE
+                WHEN ee.expulsado_en IS NOT NULL THEN 'EXPULSADO'
+                WHEN ee.hora_ingreso IS NOT NULL AND ee.estado_ingreso::text = ? THEN 'A_TIEMPO'
+                WHEN ee.hora_ingreso IS NOT NULL AND ee.estado_ingreso::text = ? THEN 'CON_RETRASO'
+                WHEN ee.id_estudiante IS NULL THEN 'SIN_REGISTRO'
+                WHEN ee.estado_ingreso::text = ? AND ee.hora_ingreso IS NULL THEN 'SIN_REGISTRO'
+                ELSE 'SIN_CLASIFICAR'
+            END AS estado", [StudentExam::INGRESO, StudentExam::CON_RETRASO, StudentExam::NO_INGRESO]);
 
-        $assignedRooms = EntryControlSnapshotService::assignRooms($roster->pluck('id_estudiante')->all(), $rooms);
+        if ($rooms === []) {
+            return $rows->addSelect('ee.id_ambiente');
+        }
 
-        return $roster->each(static function (object $student) use ($assignedRooms): void {
-            $student->id_ambiente = $student->id_ambiente === null
-                ? ($assignedRooms[$student->id_estudiante]['id_ambiente'] ?? null)
-                : (int) $student->id_ambiente;
-        });
+        // Igual que assignRooms: posiciones por ID de estudiante y tramos acumulados por ID de aula.
+        $bounds = [];
+        $position = 0;
+        foreach ($rooms as $room) {
+            $end = $position + $room['capacidad'];
+            $bounds[] = [
+                'id_ambiente' => $room['id_ambiente'],
+                'desde' => $position,
+                'hasta' => $end,
+            ];
+            $position = $end;
+        }
+        $roomRanges = DB::query()->select('*')->fromRaw(
+            'jsonb_to_recordset(CAST(? AS jsonb)) AS rango(id_ambiente integer, desde bigint, hasta bigint)',
+            [json_encode($bounds, JSON_THROW_ON_ERROR)]
+        );
+
+        return $rows->leftJoinSub($roomRanges, 'aula', static function ($join): void {
+            $join->on('nomina.posicion', '>', 'aula.desde')->on('nomina.posicion', '<=', 'aula.hasta');
+        })->selectRaw('COALESCE(ee.id_ambiente, aula.id_ambiente) AS id_ambiente');
     }
 
-    private function attendanceStatus(object $student, string $examState): string
+    private function attendanceTotals(QueryBuilder $scope): array
     {
-        return match (true) {
-            $student->expulsado_en !== null => 'EXPULSADO',
-            $student->estado_ingreso === StudentExam::INGRESO => 'A_TIEMPO',
-            $student->estado_ingreso === StudentExam::CON_RETRASO => StudentExam::CON_RETRASO,
-            $student->id_registro_asistencia === null,
-            $student->estado_ingreso === StudentExam::NO_INGRESO => $examState === Exam::EN_INGRESO
-                ? 'PENDIENTE'
-                : 'AUSENTE',
-            default => 'SIN_CLASIFICAR',
-        };
+        // HU-028 aún no registra una lista de habilitados comprobable para este examen.
+        $totals = ['total' => 0, 'registrados' => 0, 'sin_confirmar' => 0, 'no_habilitados' => 0]
+            + array_fill_keys(array_values(self::STATUS_TOTALS), 0);
+        $counts = (clone $scope)->select('estado', 'registrado')->selectRaw('count(*) AS cantidad')
+            ->groupBy('estado', 'registrado')->get();
+        foreach ($counts as $count) {
+            $total = (int) $count->cantidad;
+            $totals['total'] += $total;
+            $totals[$count->registrado ? 'registrados' : 'sin_confirmar'] += $total;
+            $totals[self::STATUS_TOTALS[$count->estado]] += $total;
+        }
+
+        return $totals;
+    }
+
+    private function applyFilters(QueryBuilder $scope, array $filters, bool $canFilterRoom): QueryBuilder
+    {
+        $rows = (clone $scope)->where('registrado', ($filters['vista'] ?? 'registrados') === 'sin_registro' ? 0 : 1);
+        foreach (['carrera' => 'id_carrera', 'estado' => 'estado', 'ambiente' => 'id_ambiente'] as $param => $column) {
+            if (isset($filters[$param]) && ($param !== 'ambiente' || $canFilterRoom)) {
+                $rows->where($column, $filters[$param]);
+            }
+        }
+
+        $identity = "concat_ws(' ', nombre, apellido_paterno, apellido_materno, cod_sis, ci)";
+        $terms = preg_split('/\s+/u', AccentInsensitiveSearch::normalize($filters['q'] ?? ''), -1, PREG_SPLIT_NO_EMPTY);
+        foreach ($terms ?: [] as $term) {
+            $rows->whereRaw(AccentInsensitiveSearch::condition($identity), [AccentInsensitiveSearch::pattern($term)]);
+        }
+
+        return $rows;
     }
 
     private function canConsultAllRooms(User $actor): bool

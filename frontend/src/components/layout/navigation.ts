@@ -322,7 +322,7 @@ export const NAVIGATION: readonly NavSection[] = [
       },
       {
         id: 'teacher-exam-attendance',
-        label: 'Estudiantes ingresados',
+        label: 'Estado de ingreso de estudiantes',
         icon: ClipboardList,
         capability: 'asistencia.consultar',
         to: '/examenes/estudiantes-ingresados'
@@ -459,7 +459,7 @@ export const NAVIGATION: readonly NavSection[] = [
       },
       {
         id: 'assistant-exam-attendance',
-        label: 'Estudiantes ingresados',
+        label: 'Estado de ingreso de estudiantes',
         icon: ClipboardList,
         capability: 'asistencia.consultar',
         to: '/examenes/estudiantes-ingresados'

@@ -30,9 +30,9 @@ export const examsService = {
     return response.data;
   },
 
-  async getAttendance(examId: number, signal?: AbortSignal): Promise<ExamAttendanceDetail> {
+  async getAttendance(examId: number, query: string, signal?: AbortSignal): Promise<ExamAttendanceDetail> {
     const response = await apiClient<DataResponse<ExamAttendanceDetail>>(
-      `/examenes/${examId}/estudiantes-ingresados`, { signal }
+      `/examenes/${examId}/estudiantes-ingresados`, { query: Object.fromEntries(new URLSearchParams(query)), signal }
     );
     return response.data;
   },

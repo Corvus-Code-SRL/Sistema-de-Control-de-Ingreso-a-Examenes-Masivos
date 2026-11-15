@@ -18,6 +18,10 @@ class ExamAttendanceDetailResource extends JsonResource
             'id_examen' => (int) $exam->id_examen,
             'estado' => $exam->estado,
             'id_ambiente_asignado' => $classroom === null ? null : (int) $classroom->id_ambiente,
+            'carreras' => $this->resource['careers']->map(static fn (object $career): array => [
+                'id_carrera' => (int) $career->id_carrera,
+                'nombre' => $career->carrera,
+            ])->all(),
             'ambientes' => $this->resource['rooms']->map(static fn (array $room): array => [
                 'id_ambiente' => $room['id_ambiente'],
                 'nro_aula' => $room['nro_aula'],
@@ -33,13 +37,14 @@ class ExamAttendanceDetailResource extends JsonResource
                     'id_carrera' => (int) $student->id_carrera,
                     'nombre' => $student->carrera,
                 ],
-                'id_ambiente' => $student->id_ambiente,
+                'id_ambiente' => $student->id_ambiente === null ? null : (int) $student->id_ambiente,
                 'ambiente' => $roomNames->get($student->id_ambiente),
                 'estado' => $student->estado,
                 'hora_ingreso' => $student->hora_ingreso === null ? null : substr($student->hora_ingreso, 0, 5),
                 'expulsado_en' => $student->expulsado_en === null
                     ? null : Carbon::parse($student->expulsado_en)->utc()->toIso8601String(),
             ])->all(),
+            'paginacion' => $this->resource['pagination'],
             'totales' => $this->resource['totals'],
         ];
     }

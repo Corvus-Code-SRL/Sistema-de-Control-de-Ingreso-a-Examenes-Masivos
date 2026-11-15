@@ -8,15 +8,19 @@ export interface ExamAttendanceExam extends Pick<Exam, 'id_examen' | 'nombre_exa
   ambiente: Pick<Classroom, 'id_ambiente' | 'nro_aula'> | null
 }
 
-export type AttendanceStatus =
-  | 'PENDIENTE' | 'AUSENTE' | 'A_TIEMPO' | 'CON_RETRASO' | 'EXPULSADO' | 'NO_HABILITADO' | 'SIN_CLASIFICAR'
+export const ATTENDANCE_STATUSES = [
+  'SIN_REGISTRO', 'AUSENTE', 'A_TIEMPO', 'CON_RETRASO', 'EXPULSADO', 'NO_HABILITADO', 'SIN_CLASIFICAR',
+] as const
+
+export type AttendanceStatus = typeof ATTENDANCE_STATUSES[number]
+export type AttendanceCareer = { id_carrera: number; nombre: string }
 
 export interface ExamAttendanceStudent {
   id_estudiante: number
   nombre_completo: string
   cod_sis: string
   ci: string | null
-  carrera: { id_carrera: number; nombre: string } | null
+  carrera: AttendanceCareer | null
   id_ambiente: number | null
   ambiente: string | null
   estado: AttendanceStatus
@@ -29,10 +33,14 @@ export interface ExamAttendanceDetail {
   estado: ExamAttendanceExam['estado']
   id_ambiente_asignado: number | null
   ambientes: NonNullable<ExamAttendanceExam['ambiente']>[]
+  carreras: AttendanceCareer[]
   estudiantes: ExamAttendanceStudent[]
+  paginacion: { current_page: number; last_page: number; per_page: number; total: number }
   totales: {
     total: number
-    pendientes: number
+    registrados: number
+    sin_confirmar: number
+    sin_registro: number
     ausentes: number
     a_tiempo: number
     con_retraso: number

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth, type SessionUser } from '@/features/auth'
 import { ApiError } from '@/lib/api-client'
 import { throttleNotice } from '@/lib/throttle'
@@ -7,13 +7,17 @@ import type { ExamAttendanceDetail } from '../types/examAttendance.types'
 import { EXAM_STATUS } from '../types/exams.types'
 
 const POLL_INTERVAL_MS = 5000
+const SEARCH_DELAY_MS = 300
 const MAX_TIMEOUT_MS = 2 ** 31 - 1
 // El limitador del detalle se comparte entre exámenes de una misma sesión.
 const retryDeadline = new WeakMap<SessionUser, number>()
 
-export function useExamAttendanceDetail(examId: number) {
+export function useExamAttendanceDetail(examId: number, query: string) {
   const { usuario } = useAuth()
-  const [data, setData] = useState<ExamAttendanceDetail | null>(null)
+  const [snapshot, setSnapshot] = useState<{
+    query: string; detail: ExamAttendanceDetail; actor: SessionUser | null
+  } | null>(null)
+  const previousSearch = useRef(new URLSearchParams(query).get('q'))
   const [error, setError] = useState<ApiError | null>(null)
   const [pollNotice, setPollNotice] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -23,7 +27,9 @@ export function useExamAttendanceDetail(examId: number) {
     const controller = new AbortController()
     let timer: ReturnType<typeof setTimeout> | undefined
     let localDeadline = 0
-    setData(null)
+    const search = new URLSearchParams(query).get('q')
+    const searchChanged = previousSearch.current !== search
+    previousSearch.current = search
     setError(null)
     setPollNotice(null)
 
@@ -41,7 +47,7 @@ export function useExamAttendanceDetail(examId: number) {
       }
 
       try {
-        const detail = await examsService.getAttendance(examId, controller.signal)
+        const detail = await examsService.getAttendance(examId, query, controller.signal)
         if (controller.signal.aborted) return
 
         if (detail.estado !== EXAM_STATUS.EN_INGRESO && detail.estado !== EXAM_STATUS.EN_CURSO) {
@@ -49,7 +55,7 @@ export function useExamAttendanceDetail(examId: number) {
         }
 
         setPollNotice(null)
-        setData(detail)
+        setSnapshot({ query, detail, actor: usuario })
         schedule(POLL_INTERVAL_MS)
       } catch (cause) {
         if (controller.signal.aborted) return
@@ -65,17 +71,23 @@ export function useExamAttendanceDetail(examId: number) {
         }
 
         setPollNotice(null)
-        setData(null)
+        setSnapshot(null)
         setError(failure)
       }
     }
 
-    void refresh()
+    if (searchChanged) schedule(SEARCH_DELAY_MS)
+    else void refresh()
     return () => {
       clearTimeout(timer)
       controller.abort()
     }
-  }, [examId, usuario, attempt])
+  }, [examId, usuario, query, attempt])
 
-  return { data, error, pollNotice, reload }
+  const current = snapshot?.actor === usuario && snapshot.detail.id_examen === examId ? snapshot : null
+  return {
+    data: current?.detail ?? null,
+    isUpdating: current !== null && current.query !== query,
+    error, pollNotice, reload,
+  }
 }
