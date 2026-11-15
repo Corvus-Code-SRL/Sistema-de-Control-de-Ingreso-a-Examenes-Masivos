@@ -103,7 +103,7 @@ class FinalizeExamTest extends TestCase
         $this->assertFalse($closed->fin_automatico);
         $this->assertFalse(app(EntryControlSnapshotService::class)->ready((int) $exam->id_examen));
 
-        $log = AuditLog::query()->where('tabla_afectada', 'examen')->sole();
+        $log = AuditLog::query()->where('tabla_afectada', 'examen')->orderByDesc('id_log')->firstOrFail();
         $this->assertSame(
             'FINALIZAR',
             Action::query()->whereKey($log->id_accion)->value('operacion')

@@ -74,11 +74,11 @@ class ExamHistoryTest extends TestCase
         $this->getJson('/api/historial/examenes/' . $scheduled->id_examen)->assertNotFound();
     }
 
-    public function test_muestra_inicio_real_manual_registrado_por_hu_038(): void
+    public function test_muestra_inicio_real_programado_registrado_por_hu_038(): void
     {
-        $exam = $this->createExam(['estado' => Exam::EN_INGRESO]);
-
-        $this->postJson('/api/examenes/' . $exam->id_examen . '/iniciar')->assertOk();
+        $exam = $this->createExam(['estado' => Exam::PROGRAMADO]);
+        $startsAt = app(\App\Services\Exams\ExamTimingService::class)->startsAt($exam);
+        app(\App\Services\Exams\ExamLifecycleService::class)->startExpired($startsAt);
         $this->postJson('/api/examenes/' . $exam->id_examen . '/finalizar')->assertOk();
 
         $startedAt = $exam->fresh()->inicio_real_en;
@@ -86,12 +86,12 @@ class ExamHistoryTest extends TestCase
         $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)
             ->assertOk()
             ->assertJsonPath('data.inicio_real_en', $startedAt->toIso8601String())
-            ->assertJsonPath('data.inicio_automatico', false);
+            ->assertJsonPath('data.inicio_automatico', true);
 
         $starts = collect($summary->json('data.linea_tiempo'))->where('tipo', 'inicio')->values();
         $this->assertCount(1, $starts);
         $this->assertSame('Examen iniciado', $starts[0]['descripcion']);
-        $this->assertSame('Ana Rojas', $starts[0]['detalle']);
+        $this->assertSame('Automático', $starts[0]['detalle']);
         $this->assertSame(
             $startedAt->setTimezone(config('sciem.zona_horaria'))->format('Y-m-d H:i:s'),
             $starts[0]['fecha_hora']
