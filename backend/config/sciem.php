@@ -145,7 +145,6 @@ return [
         'report_assistant' => [Role::DOCENTE],
         'special_cases'    => [Role::DOCENTE],
         'invite_teachers'  => [Role::DOCENTE],
-        'exceptional_students' => [Role::DOCENTE],
         'audit_log'        => [Role::ADMINISTRADOR],
     ],
 

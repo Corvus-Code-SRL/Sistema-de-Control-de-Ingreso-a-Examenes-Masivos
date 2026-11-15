@@ -97,7 +97,6 @@ describe('capacidades del Invitado y del Docente', () => {
       'auxiliares.reportar',
       'casos-especiales.gestionar',
       'docentes.invitar',
-      'estudiantes-excepcionales.registrar',
       'administracion.gestionar',
       'asignaciones.consultar',
     ] as const) {
@@ -117,7 +116,6 @@ describe('capacidades del Invitado y del Docente', () => {
       'auxiliares.reportar',
       'casos-especiales.gestionar',
       'docentes.invitar',
-      'estudiantes-excepcionales.registrar',
       'riesgo.consultar',
     ] as const) {
       expect(hasCapability('Docente', capability)).toBe(true)
