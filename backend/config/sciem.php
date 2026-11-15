@@ -292,9 +292,9 @@ return [
             'inicio_real_en' => 'Inicio real',
             'ip' => 'Dirección IP',
             'motivo' => 'Motivo',
-            'numero_version' => 'Número de versión',
-            'id_tipo_falta' => 'Tipo de falta',
-            'descripcion' => 'Descripción',
+            'rectificado_en' => 'Fecha de rectificación',
+            'id_usuario_rectificador' => 'Administrador que rectificó',
+            'motivo_rectificacion' => 'Motivo de la rectificación',
         ],
 
         'campos_ocultos' => [
