@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Exams\FinalReportRequest;
 use App\Http\Resources\Exams\FinalReportResource;
 use App\Models\Exam;
+use App\Services\Exams\FinalReportExcelService;
 use App\Services\Exams\FinalReportPdfService;
 use App\Services\Exams\FinalReportService;
 use App\Support\ApiResponse;
@@ -22,15 +23,19 @@ class FinalReportController extends Controller
 
     private FinalReportPdfService $pdfService;
 
+    private FinalReportExcelService $excelService;
+
     private CurrentUser $currentUser;
 
     public function __construct(
         FinalReportService $reportService,
         FinalReportPdfService $pdfService,
+        FinalReportExcelService $excelService,
         CurrentUser $currentUser
     ) {
         $this->reportService = $reportService;
         $this->pdfService = $pdfService;
+        $this->excelService = $excelService;
         $this->currentUser = $currentUser;
     }
 
@@ -51,6 +56,18 @@ class FinalReportController extends Controller
         return response($pdf['contenido'], 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="' . $pdf['nombre_archivo'] . '"',
+        ]);
+    }
+
+    /** GET /api/examenes/{exam}/reporte-final/excel */
+    public function excel(FinalReportRequest $request, Exam $exam): Response
+    {
+        $report = $this->reportService->build($exam, $this->currentUser->teacherId());
+        $excel = $this->excelService->render($report);
+
+        return response($excel['contenido'], 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="' . $excel['nombre_archivo'] . '"',
         ]);
     }
 }
