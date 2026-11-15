@@ -16,7 +16,7 @@ interface Props {
 export function EntryExamCard({ context, status, stale = false, roomId, onRoomChange, roomDisabled = false, ended = false }: Props) {
   const room = context.ambientes.find((item) => item.id_ambiente === roomId)
   const isAssistant = context.rol_controlador === 'AUXILIAR'
-  const isOpen = context.estado === 'EN_INGRESO' && !ended
+  const isOpen = status !== null && !ended
 
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm" aria-label="Examen y progreso">
@@ -34,7 +34,7 @@ export function EntryExamCard({ context, status, stale = false, roomId, onRoomCh
           {room && <span className="flex items-center gap-1.5"><MapPin className="size-4" aria-hidden="true" />{room.nro_aula}</span>}
         </div>
       </div>
-      {context.estado === 'EN_INGRESO' && <div className="grid gap-5 px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-center sm:px-6">
+      {status && <div className="grid gap-5 px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-center sm:px-6">
         <div>
           <div className="flex items-baseline gap-2">
             <span className="sciem-tnum text-3xl font-semibold text-brand-deep">{status?.ingresados ?? '—'}</span>

@@ -102,7 +102,7 @@ export function useEntryStatus(examId: number) {
     try {
       const nextContext = await entryControlService.context(examId)
       setContext(nextContext)
-      if (nextContext.estado === 'EN_INGRESO' || nextContext.estado === 'PROGRAMADO') {
+      if (!nextContext.ingreso_ordinario_cerrado && (nextContext.estado === 'PROGRAMADO' || nextContext.estado === 'EN_INGRESO' || nextContext.estado === 'EN_CURSO')) {
         await refresh(true)
       } else {
         version.current = undefined
@@ -126,44 +126,23 @@ export function useEntryStatus(examId: number) {
   }, [load])
 
   useEffect(() => {
-    if (context?.estado !== 'EN_INGRESO' || ended) return
+    if (!context || context.ingreso_ordinario_cerrado || ended) return
 
     let active = true
-    let timer: number
-    const poll = async () => {
-      if (!document.hidden) await refresh()
-      if (active && !endedRef.current) timer = window.setTimeout(poll, pollDelay)
-    }
-    timer = window.setTimeout(poll, pollDelay)
-
-    return () => { active = false; window.clearTimeout(timer) }
-  }, [context?.estado, ended, pollDelay, refresh])
-
-  useEffect(() => {
-    if (context?.estado !== 'PROGRAMADO' || ended) return
-
-    let active = true
-    let checking = false
     const timer = window.setInterval(async () => {
-      if (document.hidden || checking) return
-      checking = true
+      if (document.hidden || inFlight.current) return
       try {
         const nextContext = await entryControlService.context(examId)
-        if (active) {
-          if (nextContext.estado !== 'PROGRAMADO') setContext(nextContext)
-          if (nextContext.estado === 'EN_INGRESO' || nextContext.estado === 'PROGRAMADO') {
-            await refresh(true)
-          }
-        }
+        if (!active) return
+        setContext(nextContext)
+        if (!nextContext.ingreso_ordinario_cerrado) await refresh()
       } catch {
-        // El siguiente ciclo vuelve a consultar; el botón Actualizar sigue disponible.
-      } finally {
-        checking = false
+        // La siguiente consulta reintenta; el botón Actualizar sigue disponible.
       }
-    }, 15000)
+    }, pollDelay)
 
     return () => { active = false; window.clearInterval(timer) }
-  }, [context?.estado, ended, examId, refresh])
+  }, [context?.ingreso_ordinario_cerrado, context?.estado, ended, examId, pollDelay, refresh])
 
   return { context, status, openingFailure, loading, error, statusError, lastUpdatedAt, ended, refresh, reload: load }
 }
