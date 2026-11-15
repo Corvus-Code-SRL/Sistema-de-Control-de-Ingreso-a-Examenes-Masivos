@@ -10,7 +10,25 @@ Convenciones: prefijo `/api`, cabecera `Accept: application/json`, token de Sanc
 | GET | `/api/central-riesgo/{id}` | Detalle de un registro |
 | GET | `/api/central-riesgo/{id}/evidencia` | Archivo de evidencia del registro (autenticado) |
 
-No existe ninguna ruta de escritura (POST, PUT, PATCH, DELETE) bajo `/api/central-riesgo`; `RiskCenterReadOnlyTest` lo vigila. Rectificar un registro es otra historia (HU-062) y tiene su propia API: ver [rectificacion-riesgo.md](rectificacion-riesgo.md). El `tipo_falta` y la `descripcion` que devuelve esta consulta son los de la versión vigente.
+No existe ninguna ruta de escritura (POST, PUT, PATCH, DELETE) bajo `/api/central-riesgo`; `RiskCenterReadOnlyTest` lo vigila. Rectificar (anular) un registro es otra historia (HU-062) y tiene su propia API: ver [rectificacion-riesgo.md](rectificacion-riesgo.md). Esta consulta **solo ve registros activos**: un registro rectificado ya no está en la Central (ver la sección siguiente).
+
+## Alcance: solo registros activos
+
+Un registro **rectificado** (HU-062) fue retirado de la Central por un administrador y **ya no cuenta como antecedente**. La fila sigue en `central_riesgo` (nunca se borra) pero con `rectificado_en` lleno, y toda lectura de la Central la ignora:
+
+| Dónde | Qué pasa con un registro rectificado |
+|---|---|
+| Listado, búsqueda y filtro por tipo (`GET /api/central-riesgo`) | No aparece; `meta.total` no lo cuenta. Un estudiante con todos sus registros rectificados no aparece |
+| Detalle (`GET /api/central-riesgo/{id}`) | **404** |
+| Evidencia (`GET /api/central-riesgo/{id}/evidencia`) | **404**, aunque el archivo exista |
+| Aviso del control de ingreso (`summaryForStudent`, `summariesForSnapshot`, ingreso tardío y snapshot abierto) | No lo cuenta; el aviso desaparece al rectificar |
+| Reporte de intentos ajenos (HU-063) | No marca al estudiante «en la Central» ni lo cuenta en `total_en_central_riesgo` |
+| Revisión de incidencias (HU-045) | El reporte aprobado muestra «Retirado de la Central de Riesgo» (`retirado_de_central_riesgo: true`, `en_central_riesgo: false`) |
+| Historial del examen | La incidencia aprobada dice «Aprobada · retirada de la Central de Riesgo» |
+
+Las respuestas de HU-046 conservan sus claves: no llevan ningún dato de rectificación.
+
+**Cómo se garantiza.** El modelo `RiskCenter` aplica el scope global `ActiveRiskRecordScope` (`whereNull('rectificado_en')`), así que toda consulta Eloquent y toda relación (`Student::riskCenters()`, `StudentReport::riskCenter()`) devuelve solo activos. Las consultas SQL directas (`DB::table('central_riesgo')`, joins) no pasan por el scope y filtran `rectificado_en IS NULL` a mano. Solo el módulo de rectificación y el aviso de HU-045 piden rectificados, con `RiskCenter::withVoided()` o la relación `StudentReport::voidedRiskCenter()`. Un test de arquitectura (`CentralRiesgoReadersIgnoreRectifiedTest`) falla si un archivo nuevo nombra la tabla sin estar en su lista o sin filtrar.
 
 ## Quién puede consultar
 
@@ -99,7 +117,7 @@ Devuelve, en **una sola consulta**:
 
 ```php
 [
-    'total' => 2,                       // registros del estudiante en la central
+    'total' => 2,                       // registros activos del estudiante en la central
     'latest' => [                       // el más reciente; null si total = 0
         'id_cr_estudiante' => 9945,
         'tipo_falta' => ['id_falta' => 3, 'nombre' => 'Material no permitido'],
@@ -108,14 +126,14 @@ Devuelve, en **una sola consulta**:
 ]
 ```
 
-Sin registros (o con un estudiante inexistente) devuelve `['total' => 0, 'latest' => null]`. «El más reciente» es el de mayor `fecha_registro` y, a igualdad, el de mayor `id_cr_estudiante`.
+Sin registros activos (o con un estudiante inexistente) devuelve `['total' => 0, 'latest' => null]`. «El más reciente» es el de mayor `fecha_registro` y, a igualdad, el de mayor `id_cr_estudiante`.
 
 Con esto el controlador (Auxiliar o Docente) ve un **aviso que no bloquea el ingreso**:
 
 - `total = 1`: «Este estudiante tiene un registro en la Central de Riesgo», con el tipo de falta y la fecha.
 - `total > 1`: «Este estudiante tiene N registros en la Central de Riesgo», con el último registro.
 
-La redacción y la vista del aviso son del control de ingreso; este módulo solo entrega los datos.
+Los registros rectificados no cuentan. La redacción y la vista del aviso son del control de ingreso; este módulo solo entrega los datos.
 
 ## Nota para HU-042 (guardar evidencias nuevas)
 
