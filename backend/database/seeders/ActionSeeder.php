@@ -50,6 +50,11 @@ class ActionSeeder extends Seeder
                 'tipo_operacion' => 'UPDATE',
                 'descripcion' => 'Retiro de un estudiante durante el examen',
             ],
+            [
+                'operacion' => 'REGISTRAR_ESTUDIANTE_EXCEPCIONAL',
+                'tipo_operacion' => 'INSERT',
+                'descripcion' => 'Registro de un estudiante excepcional en un grupo',
+            ],
         ];
 
         foreach ($acciones as $accion) {

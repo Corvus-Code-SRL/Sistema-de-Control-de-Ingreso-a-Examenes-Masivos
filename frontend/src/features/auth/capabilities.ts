@@ -28,6 +28,7 @@ export type AccessFeature =
   | 'report_assistant'
   | 'special_cases'
   | 'invite_teachers'
+  | 'exceptional_students'
   | 'audit_log'
 
 /**
@@ -45,6 +46,7 @@ export const ACCESS_BY_FEATURE: Record<AccessFeature, readonly RoleName[]> = {
   report_assistant: ['Docente'],
   special_cases: ['Docente'],
   invite_teachers: ['Docente'],
+  exceptional_students: ['Docente'],
   audit_log: ['Administrador'],
 }
 
@@ -63,6 +65,7 @@ const CAPABILITIES_BY_FEATURE = {
   report_assistant: ['auxiliares.reportar'],
   special_cases: ['casos-especiales.gestionar'],
   invite_teachers: ['docentes.invitar'],
+  exceptional_students: ['estudiantes-excepcionales.registrar'],
   audit_log: ['bitacora.consultar'],
 } as const
 

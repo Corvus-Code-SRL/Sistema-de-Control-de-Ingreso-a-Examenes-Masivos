@@ -12,6 +12,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id_estudiante
  * @property \Carbon\Carbon $fecha_inscripcion
  * @property string $estado
+ * @property int|null $id_carrera
+ * @property bool $es_excepcional
+ * @property string|null $motivo_excepcional
  */
 class GroupStudent extends Pivot
 {
@@ -24,6 +27,7 @@ class GroupStudent extends Pivot
         'id_grupo' => 'int',
         'id_estudiante' => 'int',
         'fecha_inscripcion' => 'date',
+        'es_excepcional' => 'bool',
     ];
 
     protected $fillable = [
@@ -31,6 +35,9 @@ class GroupStudent extends Pivot
         'id_estudiante',
         'fecha_inscripcion',
         'estado',
+        'id_carrera',
+        'es_excepcional',
+        'motivo_excepcional',
     ];
 
     public function group(): BelongsTo

@@ -1779,3 +1779,17 @@ ALTER TABLE public.examen DROP CONSTRAINT chk_examen_minutos_apertura;
 
 ALTER TABLE public.examen
     ADD CONSTRAINT chk_examen_minutos_apertura CHECK (minutos_apertura >= 0);
+
+-- Versión 14: estudiante excepcional en el grupo (HU-023)
+--             (2026_11_08_000000_add_exceptional_to_grupo_estudiante)
+--   * grupo_estudiante.es_excepcional: marca «Excepcional» (false por defecto).
+--   * grupo_estudiante.motivo_excepcional: motivo del registro excepcional; obligatorio con la marca.
+
+ALTER TABLE public.grupo_estudiante
+    ADD COLUMN es_excepcional boolean NOT NULL DEFAULT false,
+    ADD COLUMN motivo_excepcional varchar(255),
+    ADD CONSTRAINT chk_grupo_estudiante_excepcional_motivo
+        CHECK (
+            NOT es_excepcional
+            OR (motivo_excepcional IS NOT NULL AND btrim(motivo_excepcional) <> '')
+        );

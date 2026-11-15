@@ -145,6 +145,7 @@ return [
         'report_assistant' => [Role::DOCENTE],
         'special_cases'    => [Role::DOCENTE],
         'invite_teachers'  => [Role::DOCENTE],
+        'exceptional_students' => [Role::DOCENTE],
         'audit_log'        => [Role::ADMINISTRADOR],
     ],
 
@@ -265,6 +266,7 @@ return [
             'RECHAZAR_INGRESO_RETRASO' => 'Rechazar ingreso con retraso',
             'REGISTRAR_INGRESO_RETRASO' => 'Registrar ingreso con retraso',
             'EXPULSAR_ESTUDIANTE' => 'Retirar estudiante',
+            'REGISTRAR_ESTUDIANTE_EXCEPCIONAL' => 'Registrar estudiante excepcional',
             'CAMBIAR_AMBIENTE' => 'Cambiar ambiente',
             'OBSERVAR_IDENTIDAD' => 'Observar identidad',
         ],
