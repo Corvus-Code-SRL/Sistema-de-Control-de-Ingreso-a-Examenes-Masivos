@@ -10,7 +10,7 @@ import type { EntryContext, Verification } from '../types/entry-control.types'
 
 const context: EntryContext = {
   id_examen: 7, nombre_examen: 'Primer parcial', fecha: '2026-09-29',
-  hora_inicio: '08:00', hora_fin: '10:00', estado: 'EN_INGRESO',
+  hora_inicio: '08:00', hora_fin: '10:00', estado: 'EN_INGRESO', ingreso_ordinario_cerrado: false,
   materia: 'Bases de Datos I', carrera: 'Ing. de Sistemas', grupos: ['1'],
   rol_controlador: 'AUXILIAR', id_ambiente_asignado: 5,
   ambientes: [{ id_ambiente: 5, nro_aula: '691A' }, { id_ambiente: 6, nro_aula: '692B' }],
@@ -35,6 +35,29 @@ function routes(verdict: Verification = allowed, examContext = context): Paramet
 }
 
 describe('EntryControlPage', () => {
+  it('conserva el ambiente elegido por el docente al actualizar el control', async () => {
+    const teacherContext: EntryContext = {
+      ...context, rol_controlador: 'DOCENTE', id_ambiente_asignado: null,
+    }
+    const { calls } = mockApiWith(({ url }) => {
+      if (url.endsWith('/contexto')) return { body: { data: { ...teacherContext } } }
+      if (url.endsWith('/estado')) return { body: { data: status } }
+      return undefined
+    })
+    const user = userEvent.setup()
+    renderWithRouter(<EntryControlPage />, {
+      route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso',
+    })
+
+    const selector = await screen.findByRole('combobox', { name: 'Ambiente de control' })
+    await user.click(selector)
+    await user.click(screen.getByRole('option', { name: '692B' }))
+    expect(selector).toHaveTextContent('692B')
+
+    await user.click(screen.getByRole('button', { name: 'Actualizar' }))
+    await waitFor(() => expect(calls.filter(({ url }) => url.endsWith('/contexto'))).toHaveLength(2))
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Ambiente de control' })).toHaveTextContent('692B'))
+  })
   it('muestra desde cuándo están desactualizados los datos si se corta la red', async () => {
     mockApi(routes())
     const firstFetch = globalThis.fetch
@@ -491,7 +514,7 @@ describe('EntryControlPage', () => {
   })
 
   it('permite al creador consultar un examen programado sin intentar verificar', async () => {
-    mockApi(routes(allowed, { ...context, rol_controlador: 'DOCENTE', estado: 'PROGRAMADO' }))
+    mockApi(routes(allowed, { ...context, rol_controlador: 'DOCENTE', estado: 'PROGRAMADO', ingreso_ordinario_cerrado: false }))
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
 
     expect(await screen.findByText(/El control de ingreso no está abierto/)).toBeInTheDocument()
@@ -501,7 +524,7 @@ describe('EntryControlPage', () => {
   })
 
   it('muestra el formulario cuando el examen se abre automáticamente', async () => {
-    const apiRoutes = routes(allowed, { ...context, estado: 'PROGRAMADO' })
+    const apiRoutes = routes(allowed, { ...context, estado: 'PROGRAMADO', ingreso_ordinario_cerrado: false })
     mockApi(apiRoutes)
     const hidden = Object.getOwnPropertyDescriptor(document, 'hidden')
     Object.defineProperty(document, 'hidden', { configurable: true, value: false })
@@ -529,7 +552,7 @@ describe('EntryControlPage', () => {
     ['SIN_AMBIENTES', 'El examen no tiene ambientes asignados.'],
     ['CAPACIDAD_INSUFICIENTE', 'Capacidad 1 menor que la nómina de 2.'],
   ])('muestra el motivo %s en lugar del aviso genérico', async (codigo, mensaje) => {
-    const apiRoutes = routes(allowed, { ...context, estado: 'PROGRAMADO' })
+    const apiRoutes = routes(allowed, { ...context, estado: 'PROGRAMADO', ingreso_ordinario_cerrado: false })
     apiRoutes[1].body = { data: { estado: 'PROGRAMADO', motivo_apertura: { codigo, mensaje } } }
     mockApi(apiRoutes)
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
@@ -541,7 +564,7 @@ describe('EntryControlPage', () => {
   })
 
   it('actualiza el motivo durante la espera y lo retira cuando abre', async () => {
-    const apiRoutes = routes(allowed, { ...context, estado: 'PROGRAMADO' })
+    const apiRoutes = routes(allowed, { ...context, estado: 'PROGRAMADO', ingreso_ordinario_cerrado: false })
     mockApi(apiRoutes)
     const hidden = Object.getOwnPropertyDescriptor(document, 'hidden')
     Object.defineProperty(document, 'hidden', { configurable: true, value: false })
@@ -577,7 +600,7 @@ describe('EntryControlPage', () => {
   })
 
   it('permite reintentar la consulta del motivo sin mostrar errores técnicos', async () => {
-    const apiRoutes = routes(allowed, { ...context, estado: 'PROGRAMADO' })
+    const apiRoutes = routes(allowed, { ...context, estado: 'PROGRAMADO', ingreso_ordinario_cerrado: false })
     apiRoutes[1].status = 500
     apiRoutes[1].body = { message: 'SQLSTATE[42703]: columna inexistente' }
     mockApi(apiRoutes)
@@ -644,7 +667,7 @@ describe('EntryControlPage', () => {
     expect(screen.getAllByText('Primer parcial').length).toBeGreaterThan(0)
   })
 
-  it('HU-038 permite cancelar la confirmación sin iniciar el examen', async () => {
+  it('permite cancelar el cierre del ingreso ordinario', async () => {
     const docenteContext: EntryContext = {
       ...context,
       rol_controlador: 'DOCENTE',
@@ -661,11 +684,11 @@ describe('EntryControlPage', () => {
     })
 
     await user.click(
-      await screen.findByRole('button', { name: 'Iniciar examen' })
+      await screen.findByRole('button', { name: 'Cerrar ingreso ordinario' })
     )
 
     const dialog = screen.getByRole('dialog', {
-      name: '¿Iniciar el examen?',
+      name: '¿Cerrar el ingreso ordinario?',
     })
 
     expect(within(dialog).getByText('Ingresados')).toBeInTheDocument()
@@ -676,22 +699,22 @@ describe('EntryControlPage', () => {
     )
 
     expect(
-      screen.queryByRole('dialog', { name: '¿Iniciar el examen?' })
+      screen.queryByRole('dialog', { name: '¿Cerrar el ingreso ordinario?' })
     ).not.toBeInTheDocument()
 
-    // El examen sigue En ingreso: el control sigue abierto y se puede iniciar.
+    // El ingreso ordinario sigue abierto.
     expect(screen.getByText('Ingreso abierto')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Iniciar examen' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cerrar ingreso ordinario' })).toBeInTheDocument()
     expect(screen.queryByText('El examen ya inició')).not.toBeInTheDocument()
 
     expect(
       vi.mocked(fetch).mock.calls.some(
-        ([url]) => String(url).endsWith('/iniciar')
+        ([url]) => String(url).endsWith('/cerrar-ingreso-ordinario')
       )
     ).toBe(false)
   })
 
-  it('HU-038 inicia el examen y navega a En curso', async () => {
+  it('cierra el ingreso ordinario y navega a retrasos', async () => {
     const docenteContext: EntryContext = {
       ...context,
       rol_controlador: 'DOCENTE',
@@ -701,13 +724,10 @@ describe('EntryControlPage', () => {
     mockApi([
       ...routes(allowed, docenteContext),
       {
-        matches: (url) => url.endsWith('/examenes/7/iniciar'),
+        matches: (url) => url.endsWith('/control-ingreso/examenes/7/cerrar-ingreso-ordinario'),
         body: {
           data: {
-            id_examen: 7,
-            estado: 'EN_CURSO',
-            inicio_real_en: '2026-10-28T08:25:00-04:00',
-            inicio_automatico: false,
+            ingreso_ordinario_cerrado: true,
           },
         },
       },
@@ -723,41 +743,41 @@ describe('EntryControlPage', () => {
             element={<EntryControlPage />}
           />
           <Route
-            path="/examenes/:examId/en-curso"
-            element={<p>Vista En curso abierta</p>}
+            path="/examenes/:examId/retrasos"
+            element={<p>Vista de retrasos abierta</p>}
           />
         </Routes>
       </MemoryRouter>
     )
 
     await user.click(
-      await screen.findByRole('button', { name: 'Iniciar examen' })
+      await screen.findByRole('button', { name: 'Cerrar ingreso ordinario' })
     )
 
     const dialog = screen.getByRole('dialog', {
-      name: '¿Iniciar el examen?',
+      name: '¿Cerrar el ingreso ordinario?',
     })
 
     await user.click(
-      within(dialog).getByRole('button', { name: 'Iniciar examen' })
+      within(dialog).getByRole('button', { name: 'Cerrar ingreso ordinario' })
     )
 
     expect(
-      await screen.findByText('Vista En curso abierta')
+      await screen.findByText('Vista de retrasos abierta')
     ).toBeInTheDocument()
 
     expect(
       vi.mocked(fetch).mock.calls.some(
         ([url, options]) =>
-          String(url).endsWith('/examenes/7/iniciar') &&
+          String(url).endsWith('/control-ingreso/examenes/7/cerrar-ingreso-ordinario') &&
           (options as RequestInit | undefined)?.method === 'POST'
       )
     ).toBe(true)
   })
 
-  it('HU-038 avisa cuando el examen ya inició en otra sesión', async () => {
+  it('avisa cuando el ingreso ordinario terminó en otra sesión', async () => {
     mockApi([
-      ...routes().filter(
+      ...routes(allowed, { ...context, ingreso_ordinario_cerrado: true }).filter(
         (route) => !route.matches('/api/control-ingreso/examenes/7/estado')
       ),
       {
@@ -767,7 +787,7 @@ describe('EntryControlPage', () => {
       },
       {
         matches: (url) => url.endsWith('/examenes/7/en-curso'),
-        body: { data: { estado: 'EN_CURSO' } },
+        body: { data: { estado: 'EN_CURSO', ingreso_ordinario_cerrado: true } },
       },
     ])
 
@@ -777,11 +797,11 @@ describe('EntryControlPage', () => {
     })
 
     expect(
-      await screen.findByText('El examen ya inició')
+      await screen.findByText('El ingreso ordinario terminó')
     ).toBeInTheDocument()
 
     expect(
-      screen.getByRole('button', { name: 'Ir a En curso' })
+      screen.getByRole('button', { name: 'Ir a ingreso con retraso' })
     ).toBeInTheDocument()
 
     expect(
@@ -789,7 +809,7 @@ describe('EntryControlPage', () => {
     ).not.toBeInTheDocument()
 
     expect(
-      screen.queryByRole('button', { name: 'Iniciar examen' })
+      screen.queryByRole('button', { name: 'Cerrar ingreso ordinario' })
     ).not.toBeInTheDocument()
   })
 })

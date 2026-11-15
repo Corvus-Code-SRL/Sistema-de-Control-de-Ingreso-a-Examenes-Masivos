@@ -15,8 +15,8 @@ import { VerificationResult } from '../components/VerificationResult'
 import { useEntryStatus } from '../hooks/useEntryStatus'
 import { useStudentVerification } from '../hooks/useStudentVerification'
 import { ApiError } from '@/lib/api-client'
-import { examsService } from '@/features/exams/services/examsService'
-import { examInProgressService } from '@/features/exams/services/examInProgressService'
+import { entryControlService } from '../services/entryControlService'
+import { lateEntryPath } from '../paths'
 
 import {
   Dialog,
@@ -55,9 +55,8 @@ function EntryControlContent({ examId }: { examId: number }) {
   const [starting, setStarting] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
 
-  const [afterEntryPhase, setAfterEntryPhase] = useState<
-    'EN_CURSO' | 'FINALIZADO' | null
-  >(null)
+  const finalized = context?.estado === 'FINALIZADO'
+  const ordinaryClosed = context?.ingreso_ordinario_cerrado === true && !finalized
   const verification = useStudentVerification(examId, roomId, () => {
     void refresh(true)
     setRejectionsVersion((value) => value + 1)
@@ -65,44 +64,26 @@ function EntryControlContent({ examId }: { examId: number }) {
 
   useEffect(() => {
     if (!context) return
-    setRoomId(context.id_ambiente_asignado ?? context.ambientes[0]?.id_ambiente ?? null)
+    setRoomId((selected) => {
+      if (context.id_ambiente_asignado !== null) return context.id_ambiente_asignado
+      if (selected !== null && context.ambientes.some((room) => room.id_ambiente === selected)) return selected
+      return context.ambientes[0]?.id_ambiente ?? null
+    })
   }, [context])
 
   const open =
-    context?.estado === 'EN_INGRESO' &&
+    status !== null &&
+    !ordinaryClosed &&
+    !finalized &&
     !ended &&
-    !error &&
-    afterEntryPhase === null
+    !error
 
-  const canStart =
+  const canCloseOrdinary =
     open &&
     context?.rol_controlador === 'DOCENTE' &&
     status !== null &&
     statusError === null
 
-  useEffect(() => {
-    const alreadyStarted =
-      context?.estado === 'EN_CURSO' ||
-      context?.estado === 'FINALIZADO'
-
-    if (!ended && !error && !alreadyStarted) return
-
-    const controller = new AbortController()
-
-    void examInProgressService
-      .get(examId, controller.signal)
-      .then((exam) => {
-        if (!controller.signal.aborted) {
-          setAfterEntryPhase(exam.estado)
-        }
-      })
-      .catch(() => {
-        // El control pudo cerrarse por otra causa.
-        // No afirmamos que inició sin confirmarlo.
-      })
-
-    return () => controller.abort()
-  }, [examId, ended, error, context?.estado])
   const hasRoom = roomId !== null && context?.ambientes.some((room) => room.id_ambiente === roomId)
 
   useEffect(() => { setReportContext(null); setRejectionCount(null) }, [roomId])
@@ -130,18 +111,18 @@ function EntryControlContent({ examId }: { examId: number }) {
     setRejectionsVersion((value) => value + 1)
   }
 
-  async function startExam() {
-    if (!canStart || starting) return
+  async function closeOrdinary() {
+    if (!canCloseOrdinary || starting) return
 
     setStarting(true)
     setStartError(null)
 
     try {
-      await examsService.startExam(examId)
+      await entryControlService.closeOrdinary(examId)
 
       setStartDialogOpen(false)
 
-      navigate(`/examenes/${examId}/en-curso`, {
+      navigate(lateEntryPath(examId), {
         replace: true,
       })
     } catch (cause) {
@@ -152,7 +133,7 @@ function EntryControlContent({ examId }: { examId: number }) {
         setStartError(
           cause instanceof Error
             ? cause.message
-            : 'No se pudo iniciar el examen.'
+            : 'No se pudo cerrar el ingreso ordinario.'
         )
       }
     } finally {
@@ -166,7 +147,7 @@ function EntryControlContent({ examId }: { examId: number }) {
       <Button type="button" variant="outline" size="sm" onClick={() => { setRejectionsVersion((value) => value + 1); void reload() }} disabled={!context}><RefreshCw className="size-4" />Actualizar</Button>
     </div>
 
-    {canStart && (
+    {canCloseOrdinary && (
       <Button
         type="button"
         onClick={() => {
@@ -174,19 +155,19 @@ function EntryControlContent({ examId }: { examId: number }) {
           setStartDialogOpen(true)
         }}
       >
-        Iniciar examen
+        Cerrar ingreso ordinario
       </Button>
     )}
 
-    {afterEntryPhase && (
+    {(ordinaryClosed || finalized) && (
       <div
         role="status"
         className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ok/30 bg-ok-soft p-4"
       >
         <div>
           <p className="font-semibold text-ok-fg">
-            {afterEntryPhase === 'EN_CURSO'
-              ? 'El examen ya inició'
+            {ordinaryClosed
+              ? 'El ingreso ordinario terminó'
               : 'El examen ha finalizado'}
           </p>
 
@@ -198,26 +179,26 @@ function EntryControlContent({ examId }: { examId: number }) {
         <Button
           type="button"
           onClick={() =>
-            navigate(`/examenes/${examId}/en-curso`)
+            navigate(ordinaryClosed ? lateEntryPath(examId) : `/examenes/${examId}/en-curso`)
           }
         >
-          Ir a En curso
+          {ordinaryClosed ? 'Ir a ingreso con retraso' : 'Ver examen'}
         </Button>
       </div>
     )}
 
     {loading && <div role="status" className="rounded-xl border bg-card p-8 text-sm text-muted-foreground">Cargando examen y estado del ingreso…</div>}
-    {!loading && error && !afterEntryPhase && <div role="alert" className="rounded-xl border border-danger/30 bg-danger-soft p-5"><p className="font-medium text-danger-fg">Datos sin actualizar desde {timeLabel(lastUpdatedAt ?? Date.now())}</p><p className="mt-1 text-sm">No se pudo abrir el control de ingreso. {error}</p><Button variant="outline" className="mt-4" onClick={() => { setRejectionsVersion((value) => value + 1); void reload() }}>Reintentar</Button></div>}
+    {!loading && error && !(ordinaryClosed || finalized) && <div role="alert" className="rounded-xl border border-danger/30 bg-danger-soft p-5"><p className="font-medium text-danger-fg">Datos sin actualizar desde {timeLabel(lastUpdatedAt ?? Date.now())}</p><p className="mt-1 text-sm">No se pudo abrir el control de ingreso. {error}</p><Button variant="outline" className="mt-4" onClick={() => { setRejectionsVersion((value) => value + 1); void reload() }}>Reintentar</Button></div>}
 
     {!loading && context && <>
-      {!afterEntryPhase && (
+      {!(ordinaryClosed || finalized) && (
         <div className={verification.result && !ended ? 'hidden lg:block' : ''}>
           <EntryExamCard
             context={context} status={status} stale={statusError !== null} roomId={roomId} roomDisabled={verification.busy !== null || ended || reportContext !== null} ended={ended} onRoomChange={(id) => { setRoomId(id); verification.reset() }}
           />
         </div>
       )}
-      {!open && !afterEntryPhase && <div role="status" className="rounded-lg border border-warn-border bg-warn-soft p-4 text-sm text-warn-fg">{ended ? 'El control de ingreso ha terminado.' : openingFailure?.mensaje ?? `El control de ingreso no está abierto. Estado del examen: ${context.estado.replace(/_/g, ' ')}.`}</div>}
+      {!open && !(ordinaryClosed || finalized) && <div role="status" className="rounded-lg border border-warn-border bg-warn-soft p-4 text-sm text-warn-fg">{ended ? 'El control de ingreso ha terminado.' : openingFailure?.mensaje ?? `El control de ingreso no está abierto. Estado del examen: ${context.estado.replace(/_/g, ' ')}.`}</div>}
       {!hasRoom && !openingFailure && <div role="alert" className="rounded-lg border border-danger/30 bg-danger-soft p-4 text-sm text-danger-fg">No hay un ambiente de control asignado. Solicite al docente que asigne uno.</div>}
       {statusError && <div role="alert" className="rounded-lg border border-warn-border bg-warn-soft p-3 text-sm text-warn-fg">Datos sin actualizar desde {timeLabel(lastUpdatedAt ?? Date.now())}. {statusError}</div>}
       {verification.notice && <div role="status" className="flex items-center justify-between gap-2 rounded-lg border border-ok/30 bg-ok-soft p-3 text-sm font-medium text-ok-fg"><span>{verification.notice}</span><button type="button" onClick={() => verification.setNotice(null)} aria-label="Cerrar aviso" className="px-2">×</button></div>}
@@ -264,12 +245,11 @@ function EntryControlContent({ examId }: { examId: number }) {
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>¿Iniciar el examen?</DialogTitle>
+          <DialogTitle>¿Cerrar el ingreso ordinario?</DialogTitle>
 
           <DialogDescription>
-            Al iniciar el examen se cerrará el control de ingreso
-            normal. Los ingresos posteriores se gestionarán
-            según las reglas de ingreso con retraso.
+            Al cerrar el ingreso ordinario se habilitará el registro
+            con retraso. La hora de inicio del examen no cambia.
           </DialogDescription>
         </DialogHeader>
 
@@ -311,10 +291,10 @@ function EntryControlContent({ examId }: { examId: number }) {
 
           <Button
             type="button"
-            disabled={starting || !canStart}
-            onClick={() => void startExam()}
+            disabled={starting || !canCloseOrdinary}
+            onClick={() => void closeOrdinary()}
           >
-            {starting ? 'Iniciando…' : 'Iniciar examen'}
+            {starting ? 'Cerrando…' : 'Cerrar ingreso ordinario'}
           </Button>
         </DialogFooter>
       </DialogContent>
