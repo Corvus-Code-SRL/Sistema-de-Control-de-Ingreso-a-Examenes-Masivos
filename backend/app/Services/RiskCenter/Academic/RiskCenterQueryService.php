@@ -13,7 +13,10 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
  * Consulta de solo lectura de la Central de Riesgo de estudiantes: una fila por reporte aprobado.
  *
  * El registro es institucional: no se filtra por docente ni por examen. No hay operaciones de
- * escritura; la rectificación es otra historia.
+ * escritura; la rectificación (HU-062) vive en RiskCenterRectificationService.
+ *
+ * Todo lo que se lee aquí usa la versión vigente del registro: el tipo de falta y la descripción
+ * rectificados si los hay, o los del reporte original si nunca se rectificó (versión 1 perezosa).
  */
 class RiskCenterQueryService
 {
@@ -23,6 +26,13 @@ class RiskCenterQueryService
     private const MAX_TERMS = 5;
 
     /** Nombre completo tal como lo lee una persona, para que «jose perez» encuentre «José Luis Pérez». */
+    /** Tipo de falta vigente de `central_riesgo` sin importar si se rectificó (subconsultas correlacionadas). */
+    private const CURRENT_FAULT_TYPE = 'COALESCE('
+        . '(SELECT v.id_tipo_falta FROM central_riesgo_version v '
+        . 'WHERE v.id_cr_estudiante = central_riesgo.id_cr_estudiante AND v.es_vigente), '
+        . '(SELECT re.id_tipo_falta FROM reporte_estudiante re '
+        . 'WHERE re.id_reporte_est = central_riesgo.id_reporte_est))';
+
     private const FULL_NAME = "CONCAT_WS(' ', estudiante.nombre, estudiante.apellido_paterno, "
         . "estudiante.apellido_materno)";
 
@@ -33,12 +43,17 @@ class RiskCenterQueryService
     public function paginate(?string $search, ?int $faultTypeId, int $page, int $perPage): LengthAwarePaginator
     {
         $query = RiskCenter::query()
-            ->with(['student', 'studentReport.incidentType', 'studentReport.exam.subject'])
+            ->with([
+                'student',
+                'studentReport.incidentType',
+                'studentReport.exam.subject',
+                'currentVersion.incidentType',
+            ])
             ->orderByDesc('fecha_registro')
             ->orderByDesc('id_cr_estudiante');
 
         if ($faultTypeId !== null) {
-            $query->whereHas('studentReport', fn (Builder $report) => $report->where('id_tipo_falta', $faultTypeId));
+            $query->whereRaw(self::CURRENT_FAULT_TYPE . ' = ?', [$faultTypeId]);
         }
 
         $terms = $this->searchTerms($search);
@@ -72,6 +87,7 @@ class RiskCenterQueryService
                     'studentReport.entryAttempt.classroom',
                     'studentReport.userReporter',
                     'studentReport.userReviewer',
+                    'currentVersion.incidentType',
                 ])
                 ->find($id);
 
@@ -101,7 +117,16 @@ class RiskCenterQueryService
     {
         $latest = RiskCenter::query()
             ->join('reporte_estudiante', 'reporte_estudiante.id_reporte_est', '=', 'central_riesgo.id_reporte_est')
-            ->join('tipo_falta', 'tipo_falta.id_falta', '=', 'reporte_estudiante.id_tipo_falta')
+            ->leftJoin('central_riesgo_version as vigente', function ($join) {
+                $join->on('vigente.id_cr_estudiante', '=', 'central_riesgo.id_cr_estudiante')
+                    ->where('vigente.es_vigente', '=', true);
+            })
+            ->join(
+                'tipo_falta',
+                'tipo_falta.id_falta',
+                '=',
+                DB::raw('COALESCE(vigente.id_tipo_falta, reporte_estudiante.id_tipo_falta)')
+            )
             ->where('central_riesgo.id_estudiante', $studentId)
             ->select('central_riesgo.*', 'tipo_falta.id_falta', 'tipo_falta.nombre as tipo_falta_nombre')
             ->selectRaw('count(*) over () as total')
@@ -152,7 +177,11 @@ class RiskCenterQueryService
 
         $rows = DB::table('central_riesgo as cr')
             ->join('reporte_estudiante as re', 're.id_reporte_est', '=', 'cr.id_reporte_est')
-            ->join('tipo_falta as tf', 'tf.id_falta', '=', 're.id_tipo_falta')
+            ->leftJoin('central_riesgo_version as vigente', function ($join) {
+                $join->on('vigente.id_cr_estudiante', '=', 'cr.id_cr_estudiante')
+                    ->where('vigente.es_vigente', '=', true);
+            })
+            ->join('tipo_falta as tf', 'tf.id_falta', '=', DB::raw('COALESCE(vigente.id_tipo_falta, re.id_tipo_falta)'))
             ->whereIn('cr.id_estudiante', $studentIds)
             ->orderBy('cr.id_estudiante')
             ->orderByDesc('cr.fecha_registro')

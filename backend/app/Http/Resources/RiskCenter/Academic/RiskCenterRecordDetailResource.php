@@ -37,8 +37,8 @@ class RiskCenterRecordDetailResource extends JsonResource
                 'cod_sis' => $this->student->cod_sis,
             ],
             'tipo_falta' => [
-                'id_falta' => (int) $report->incidentType->id_falta,
-                'nombre' => $report->incidentType->nombre,
+                'id_falta' => (int) $this->effectiveIncidentType()->id_falta,
+                'nombre' => $this->effectiveIncidentType()->nombre,
             ],
             'examen' => [
                 'id_examen' => (int) $exam->id_examen,
@@ -51,7 +51,7 @@ class RiskCenterRecordDetailResource extends JsonResource
                 'nro_aula' => $attempt->classroom->nro_aula ?? null,
                 'hora_intento' => $attempt->registrado_en->toIso8601String(),
             ],
-            'descripcion' => $report->descripcion,
+            'descripcion' => $this->effectiveDescription(),
             'reportante' => [
                 'nombre_completo' => $report->userReporter->nombre_completo,
                 'fecha' => $report->fecha_reporte->toIso8601String(),

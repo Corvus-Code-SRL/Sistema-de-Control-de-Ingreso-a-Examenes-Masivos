@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Mapea public.central_riesgo.
@@ -42,5 +44,35 @@ class RiskCenter extends Model
     public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class, 'id_estudiante', 'id_estudiante');
+    }
+
+    /** Versiones de rectificación; vacía mientras el registro no se haya rectificado (HU-062). */
+    public function versions(): HasMany
+    {
+        return $this->hasMany(RiskCenterVersion::class, 'id_cr_estudiante', 'id_cr_estudiante');
+    }
+
+    /**
+     * Tipo de falta vigente: el de la versión vigente o, si nunca se rectificó, el del reporte.
+     * Requiere cargar las relaciones.
+     */
+    public function effectiveIncidentType(): IncidentType
+    {
+        return $this->currentVersion !== null
+            ? $this->currentVersion->incidentType
+            : $this->studentReport->incidentType;
+    }
+
+    public function effectiveDescription(): ?string
+    {
+        return $this->currentVersion !== null
+            ? $this->currentVersion->descripcion
+            : $this->studentReport->descripcion;
+    }
+
+    public function currentVersion(): HasOne
+    {
+        return $this->hasOne(RiskCenterVersion::class, 'id_cr_estudiante', 'id_cr_estudiante')
+            ->where('es_vigente', true);
     }
 }

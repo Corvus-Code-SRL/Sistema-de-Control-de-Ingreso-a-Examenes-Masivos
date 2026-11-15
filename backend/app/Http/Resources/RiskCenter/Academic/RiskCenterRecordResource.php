@@ -20,8 +20,8 @@ class RiskCenterRecordResource extends JsonResource
                 'cod_sis' => $this->student->cod_sis,
             ],
             'tipo_falta' => [
-                'id_falta' => (int) $report->incidentType->id_falta,
-                'nombre' => $report->incidentType->nombre,
+                'id_falta' => (int) $this->effectiveIncidentType()->id_falta,
+                'nombre' => $this->effectiveIncidentType()->nombre,
             ],
             'examen' => [
                 'id_examen' => (int) $exam->id_examen,
