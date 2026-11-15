@@ -15,13 +15,18 @@ import { openAllSections } from '@/test/sidebar'
 /**
  * Las áreas salen del rol de la sesión. Sin sesión, toda ruta protegida redirige al login.
  */
-function stubBackend(session: AccountKey | null) {
+function stubBackend(session: AccountKey | 'invitado' | null) {
   if (session) {
     window.localStorage.setItem(TOKEN_STORAGE_KEY, 'tok')
   }
 
   return mockApiWith(({ url }) => {
     if (url.endsWith('/auth/yo')) {
+      if (session === 'invitado') {
+        const body = meBody('docente')
+        body.data.rol = { id_rol: 4, nombre_rol: 'Invitado' }
+        return { body }
+      }
       return session ? { body: meBody(session) } : { status: 401, body: { message: 'Unauthenticated.' } }
     }
 
@@ -199,6 +204,38 @@ describe('AppRouter — control de ingreso por área', () => {
     expect(
       screen.queryByRole('heading', { name: 'Control de ingreso' })
     ).not.toBeInTheDocument()
+  })
+})
+
+describe('AppRouter — Controlar tiempo del examen (HU-038)', () => {
+  const route = '/examenes/controlar-tiempo'
+  const title = 'Controlar tiempo del examen'
+
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  it.each(['docente', 'invitado'] as const)('permite abrir la ruta a %s', async (account) => {
+    stubBackend(account)
+
+    const app = renderApp(route)
+
+    expect(await screen.findByRole('heading', { name: title })).toBeInTheDocument()
+    expect(app.pathname).toBe(route)
+  })
+
+  it.each([
+    ['auxiliar', '/mis-examenes'],
+    ['administrador', '/cuentas/nueva'],
+    [null, '/login'],
+  ] as const)('redirige la sesión %s fuera de la ruta', async (account, destination) => {
+    const backend = stubBackend(account)
+
+    const app = renderApp(route)
+
+    await waitFor(() => expect(app.pathname).toBe(destination))
+    expect(screen.queryByRole('heading', { name: title })).not.toBeInTheDocument()
+    expect(backend.calls.some(({ url }) => url.endsWith('/examenes') && !url.endsWith('/auxiliar/examenes'))).toBe(false)
   })
 })
 

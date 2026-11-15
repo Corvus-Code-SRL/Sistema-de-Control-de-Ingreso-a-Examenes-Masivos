@@ -28,6 +28,7 @@ import {
   EditExamPage,
   ExamDetailPage,
   ExamInProgressPage,
+  ExamTimerPage,
   ExamsPage,
   FinalReportPage,
   InProgressExamsPage,
@@ -159,6 +160,11 @@ function DocenteRoutes() {
         <Route
           path="/examenes/:examId/control-ingreso"
           element={guarded('ingreso.operar', <EntryControlPage />)}
+        />
+
+        <Route
+          path="/examenes/controlar-tiempo"
+          element={guarded('examenes.gestionar', <ExamTimerPage />)}
         />
 
         <Route
