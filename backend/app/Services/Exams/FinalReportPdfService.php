@@ -38,6 +38,10 @@ class FinalReportPdfService
     /**
      * Un examen masivo agota los 128 MB habituales de PHP dentro de dompdf. El ajuste dura lo que
      * la petición: no se restaura porque PHP no admite bajar el límite por debajo de lo ya usado.
+     *
+     * El tiempo solo se amplía si PHP tiene un límite menor al necesario. En consola el límite es 0
+     * (sin tope): llamar a set_time_limit ahí lo fijaría en 120 s para todo el proceso, y la suite
+     * completa de pruebas, que corre en un solo proceso, se cortaría a los 120 s.
      */
     private function allowHeavyGeneration(): void
     {
@@ -47,7 +51,11 @@ class FinalReportPdfService
             ini_set('memory_limit', self::MEMORY_LIMIT);
         }
 
-        set_time_limit(self::TIME_LIMIT_SECONDS);
+        $maxExecutionTime = (int) ini_get('max_execution_time');
+
+        if ($maxExecutionTime !== 0 && $maxExecutionTime < self::TIME_LIMIT_SECONDS) {
+            set_time_limit(self::TIME_LIMIT_SECONDS);
+        }
     }
 
     private function toBytes(string $value): int

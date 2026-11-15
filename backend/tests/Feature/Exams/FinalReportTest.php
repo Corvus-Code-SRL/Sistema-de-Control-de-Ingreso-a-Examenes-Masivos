@@ -8,6 +8,8 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\SeedsExamCatalog;
 use Tests\TestCase;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 
 /**
  * Reporte final del examen (HU-051): cabecera, asistencia por grupo, estudiantes,
@@ -332,5 +334,77 @@ class FinalReportTest extends TestCase
         $reflection->setAccessible(true);
 
         return $reflection->invokeArgs($object, $arguments);
+    }
+
+    public function test_docente_descarga_el_excel_con_las_mismas_cifras_del_reporte(): void
+    {
+        $exam = $this->finishedExam(['nombre_examen' => 'Parcial final']);
+
+        $response = $this->get($this->url($exam) . '/excel')->assertOk();
+
+        $this->assertSame(
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            $response->headers->get('Content-Type')
+        );
+        $this->assertStringContainsString(
+            'reporte-final-parcial-final-' . $exam->fecha->toDateString() . '.xlsx',
+            $response->headers->get('Content-Disposition')
+        );
+
+        $spreadsheet = $this->loadSpreadsheet($response->getContent());
+
+        $this->assertSame(['Resumen', 'Estudiantes', 'Incidencias'], $spreadsheet->getSheetNames());
+
+        $rows = $spreadsheet->getSheetByName('Resumen')->toArray();
+        $total = collect($rows)->first(fn ($row) => $row[0] === 'Total');
+        $this->assertEquals(['Total', 2, 1, 0, 1], array_slice($total, 0, 5));
+
+        $this->assertSame(3, $spreadsheet->getSheetByName('Estudiantes')->getHighestRow());
+        $this->assertSame(
+            'No se registraron incidencias en este examen',
+            $spreadsheet->getSheetByName('Incidencias')->getCell('A2')->getValue()
+        );
+    }
+
+    public function test_un_texto_que_empieza_con_igual_no_se_guarda_como_formula_en_el_excel(): void
+    {
+        $exam = $this->finishedExam();
+        $studentId = $this->groupStudentIds()[0];
+        DB::table('estudiante')->where('id_estudiante', $studentId)->update(['nombre' => '=1+1']);
+
+        $response = $this->get($this->url($exam) . '/excel')->assertOk();
+
+        $sheet = $this->loadSpreadsheet($response->getContent())->getSheetByName('Estudiantes');
+        $found = false;
+
+        foreach ([2, 3] as $row) {
+            $cell = $sheet->getCell('B' . $row);
+
+            if (str_starts_with((string) $cell->getValue(), '=1+1')) {
+                $found = true;
+                $this->assertFalse($cell->isFormula());
+            }
+        }
+
+        $this->assertTrue($found);
+    }
+
+    public function test_no_se_descarga_el_excel_de_un_examen_en_curso(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::EN_CURSO], [$this->aulaId]);
+
+        $this->getJson($this->url($exam) . '/excel')->assertForbidden();
+    }
+
+    private function loadSpreadsheet(string $content): Spreadsheet
+    {
+        $path = tempnam(sys_get_temp_dir(), 'reporte');
+        file_put_contents($path, $content);
+
+        try {
+            return IOFactory::createReader('Xlsx')->load($path);
+        } finally {
+            @unlink($path);
+        }
     }
 }
