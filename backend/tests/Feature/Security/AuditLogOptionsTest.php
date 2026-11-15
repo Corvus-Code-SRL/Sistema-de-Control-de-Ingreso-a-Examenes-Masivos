@@ -22,13 +22,14 @@ class AuditLogOptionsTest extends TestCase
         $this->prepareAuditLog();
     }
 
-    public function test_ofrece_las_22_acciones_del_catalogo_con_su_etiqueta(): void
+    public function test_ofrece_las_23_acciones_del_catalogo_con_su_etiqueta(): void
     {
         $actions = collect($this->getJson('/api/bitacora/opciones')->assertOk()->json('data.acciones'));
 
-        $this->assertCount(22, $actions);
+        $this->assertCount(23, $actions);
         $this->assertSame('Modificar', $actions->firstWhere('codigo', 'MODIFICAR')['etiqueta']);
         $this->assertSame('Retirar estudiante', $actions->firstWhere('codigo', 'EXPULSAR_ESTUDIANTE')['etiqueta']);
+        $this->assertSame('Rectificar registro', $actions->firstWhere('codigo', 'RECTIFICAR_REGISTRO')['etiqueta']);
     }
 
     public function test_deshabilitar_y_habilitar_siguen_en_el_selector_aunque_nadie_los_escriba_aun(): void
@@ -57,19 +58,19 @@ class AuditLogOptionsTest extends TestCase
         $this->assertSame($sorted, $labels);
     }
 
-    public function test_los_modulos_salen_en_orden_y_otros_va_al_final_sin_central_de_riesgo(): void
+    public function test_los_modulos_salen_en_orden_y_otros_va_al_final(): void
     {
         $modules = $this->getJson('/api/bitacora/opciones')->assertOk()->json('data.modulos');
         $keys = array_column($modules, 'clave');
 
         $this->assertSame(
             ['cuentas', 'roles', 'grupos', 'catalogo', 'ambientes', 'examenes', 'auxiliares', 'ingreso',
-                'incidencias', 'situaciones', 'otros'],
+                'incidencias', 'situaciones', 'central_riesgo', 'otros'],
             $keys
         );
         $this->assertSame('Exámenes', $modules[5]['etiqueta']);
+        $this->assertSame('Central de riesgo', $modules[10]['etiqueta']);
         $this->assertSame('Otros', end($modules)['etiqueta']);
-        $this->assertStringNotContainsString('riesgo', strtolower(json_encode($modules)));
     }
 
     public function test_una_accion_desconocida_del_catalogo_se_ofrece_con_su_codigo(): void
