@@ -60,6 +60,7 @@ export interface Verification {
   ambiente_asignado: EntryRoom | null
   antecedentes: { total: number; latest: { tipo_falta: string; fecha_registro: string } | null }
   ingreso_previo: PreviousEntry | null
+  reporte_pendiente?: boolean
 }
 
 /** Textos de las acciones del resultado de verificación según el flujo que lo usa. */
