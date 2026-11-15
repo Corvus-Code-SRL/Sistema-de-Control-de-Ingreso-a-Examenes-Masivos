@@ -1,26 +1,18 @@
 import { mockApiWith, type RecordedRequest } from '@/test/http'
 import type {
-  RecordVersion,
   RectifiableRecord,
   RectifiableRecordDetail,
   RectifiableStudent,
-  RectificationFaultType,
+  RectifiedRecord,
 } from '@/features/risk-center/academic/types/riskRectification.types'
 
 /**
  * Datos y servidor de mentira de la rectificación de la Central de Riesgo (HU-062).
  *
- * El servidor imita al real: busca por código SIS, carnet o nombre sin tildes, lista los registros del
- * estudiante, y al rectificar crea una versión nueva (la anterior pasa a «Anterior») o responde 409 si la
- * versión base ya no es la vigente.
+ * El servidor imita al real: busca por código SIS, carnet o nombre sin tildes, separa los registros activos de
+ * los rectificados, responde 404 al abrir uno ya rectificado y, al rectificar, lo marca como retirado
+ * (200) o responde 409 si ya lo estaba.
  */
-
-export const rectificationTypes: RectificationFaultType[] = [
-  { id_falta: 1, nombre: 'Copia en examen', descripcion: null },
-  { id_falta: 2, nombre: 'Suplantación de identidad', descripcion: null },
-  { id_falta: 3, nombre: 'Material no permitido', descripcion: null },
-  { id_falta: 4, nombre: 'Conducta indebida', descripcion: null },
-]
 
 export const mariaPerez: RectifiableStudent = {
   id_estudiante: 9700,
@@ -55,108 +47,87 @@ export const allStudents = [mariaPerez, luisPerez, carlaCondori, danielRojas]
 export const ADMIN_NAME = 'Administrador del Sistema'
 export const RECTIFIED_AT = '2026-11-14T15:30:00+00:00'
 
-const type = (id: number) => rectificationTypes.find((candidate) => candidate.id_falta === id)!
+/** El motivo del registro que ya viene rectificado en los datos iniciales. */
+export const VOIDED_REASON = 'Se confundió a la estudiante: el reporte correspondía a otra persona.'
 
-function baseDetail(
-  student: RectifiableStudent,
-  id: number,
-  registeredAt: string,
-  exam: string
-): Omit<RectifiableRecordDetail, 'historial' | 'tipo_falta' | 'descripcion' | 'estado' | 'numero_rectificaciones' | 'ultima_rectificacion' | 'version_vigente'> {
-  return {
-    id_cr_estudiante: id,
-    fecha_registro: registeredAt,
-    examen: { id_examen: id + 200, nombre: exam, materia: 'Cálculo I', fecha: '2026-09-10', carrera: 'Ing. de Sistemas' },
-    aprobador: { nombre_completo: 'Marcelo Quiroga Andrade', fecha: registeredAt },
-    estudiante: { id_estudiante: student.id_estudiante, nombre_completo: student.nombre_completo, cod_sis: student.cod_sis },
-    ambiente: null,
-    reportante: { nombre_completo: 'Daniela Ferrufino Soliz', fecha: registeredAt },
-    evidencia: null,
-  }
-}
+const APPROVER = { nombre_completo: 'Marcelo Quiroga Andrade' }
 
-/** El registro 9961 de Carla ya fue rectificado una vez; el 9962 es original; María tiene el 9963. */
-export function initialDetails(): RectifiableRecordDetail[] {
-  const rectified: RectifiableRecordDetail = {
-    ...baseDetail(carlaCondori, 9961, '2026-09-11T19:00:00+00:00', '1er Parcial'),
-    tipo_falta: type(1),
-    descripcion: 'El material contenía las respuestas.',
-    estado: 'Rectificado',
-    numero_rectificaciones: 1,
-    ultima_rectificacion: '2026-10-05T14:00:00+00:00',
-    version_vigente: 2,
-    historial: [
-      {
-        numero_version: 2,
-        estado: 'Vigente',
-        tipo_falta: type(1),
-        descripcion: 'El material contenía las respuestas.',
-        motivo: 'La evidencia confirma que se trataba de copia.',
-        autor: { nombre_completo: ADMIN_NAME },
-        fecha: '2026-10-05T14:00:00+00:00',
-      },
-      {
-        numero_version: 1,
-        estado: 'Anterior',
-        tipo_falta: type(3),
-        descripcion: 'Tenía material impreso.',
-        motivo: null,
-        autor: { nombre_completo: 'Marcelo Quiroga Andrade' },
-        fecha: '2026-09-11T19:00:00+00:00',
-      },
-    ],
-  }
-
-  return [rectified, original(carlaCondori, 9962, '2026-09-22T14:00:00+00:00', '2do Parcial', 4), original(mariaPerez, 9963, '2026-09-12T13:00:00+00:00', '1er Parcial', 1)]
-}
-
-function original(
+function detail(
   student: RectifiableStudent,
   id: number,
   registeredAt: string,
   exam: string,
-  typeId: number
+  faultId: number,
+  faultName: string,
+  overrides: Partial<RectifiableRecordDetail> = {}
 ): RectifiableRecordDetail {
-  const description = `Descripción original del registro ${id}.`
-
   return {
-    ...baseDetail(student, id, registeredAt, exam),
-    tipo_falta: type(typeId),
-    descripcion: description,
-    estado: 'Original',
-    numero_rectificaciones: 0,
-    ultima_rectificacion: null,
-    version_vigente: 1,
-    historial: [
-      {
-        numero_version: 1,
-        estado: 'Vigente',
-        tipo_falta: type(typeId),
-        descripcion: description,
-        motivo: null,
-        autor: { nombre_completo: 'Marcelo Quiroga Andrade' },
-        fecha: registeredAt,
-      },
-    ],
+    id_cr_estudiante: id,
+    estudiante: student,
+    examen: { id_examen: id + 200, nombre: exam, materia: 'Cálculo I', fecha: '2026-09-10', carrera: 'Ing. de Sistemas' },
+    hecho: { fecha_hora: '2026-09-10T12:12:00+00:00' },
+    ambiente: { nro_aula: '691A' },
+    tipo_falta: { id_falta: faultId, nombre: faultName },
+    descripcion: `Descripción del registro ${id}.`,
+    evidencia: null,
+    reportante: { nombre_completo: 'Daniela Ferrufino Soliz', fecha: '2026-09-10T12:40:00+00:00' },
+    aprobador: { ...APPROVER, fecha: registeredAt },
+    fecha_registro: registeredAt,
+    ...overrides,
   }
 }
 
-function toSummary(detail: RectifiableRecordDetail): RectifiableRecord {
-  return {
-    id_cr_estudiante: detail.id_cr_estudiante,
-    fecha_registro: detail.fecha_registro,
-    examen: {
-      id_examen: detail.examen.id_examen,
-      nombre: detail.examen.nombre,
-      materia: detail.examen.materia,
-      fecha: detail.examen.fecha,
+export interface StubbedRecord {
+  detail: RectifiableRecordDetail
+  rectificacion: RectifiedRecord['rectificacion'] | null
+}
+
+/**
+ * Carla: el 9961 ya está rectificado, y el 9962 y el 9964 siguen activos. María tiene el 9963 activo; Luis
+ * y Daniel no tienen registros.
+ */
+export function initialRecords(): StubbedRecord[] {
+  return [
+    {
+      detail: detail(carlaCondori, 9961, '2026-09-11T19:00:00+00:00', '1er Parcial', 3, 'Material no permitido'),
+      rectificacion: {
+        fecha: '2026-10-05T14:00:00+00:00',
+        administrador: { nombre_completo: ADMIN_NAME },
+        motivo: VOIDED_REASON,
+      },
     },
-    tipo_falta: detail.tipo_falta,
-    aprobador: detail.aprobador,
-    estado: detail.estado,
-    numero_rectificaciones: detail.numero_rectificaciones,
-    ultima_rectificacion: detail.ultima_rectificacion,
-    version_vigente: detail.version_vigente,
+    {
+      detail: detail(carlaCondori, 9962, '2026-09-22T14:00:00+00:00', '2do Parcial', 4, 'Conducta indebida', {
+        evidencia: { nombre_archivo: 'foto-aula.png', tamano_bytes: 2048, disponible: true },
+      }),
+      rectificacion: null,
+    },
+    {
+      detail: detail(carlaCondori, 9964, '2026-10-01T15:30:00+00:00', '3er Parcial', 1, 'Copia en examen', {
+        ambiente: null,
+        descripcion: null,
+      }),
+      rectificacion: null,
+    },
+    {
+      detail: detail(mariaPerez, 9963, '2026-09-12T13:00:00+00:00', '1er Parcial', 1, 'Copia en examen'),
+      rectificacion: null,
+    },
+  ]
+}
+
+function toSummary(record: RectifiableRecordDetail): RectifiableRecord {
+  return {
+    id_cr_estudiante: record.id_cr_estudiante,
+    fecha_registro: record.fecha_registro,
+    examen: {
+      id_examen: record.examen.id_examen,
+      nombre: record.examen.nombre,
+      materia: record.examen.materia,
+      fecha: record.examen.fecha,
+    },
+    tipo_falta: record.tipo_falta,
+    aprobador: record.aprobador,
   }
 }
 
@@ -171,31 +142,25 @@ interface StubOptions {
   /** Fuerza la marca «hay más coincidencias». */
   hasMore?: boolean
   searchFail?: boolean
-  typesFail?: boolean
   /** Otra persona rectificó antes: toda rectificación responde 409. */
   conflict?: boolean
 }
 
 export interface RectificationApi {
   calls: RecordedRequest[]
-  details: Map<number, RectifiableRecordDetail>
-  /** Cuerpos de los POST de rectificación recibidos. */
+  records: Map<number, StubbedRecord>
+  /** Los POST de rectificación recibidos. */
   posts: () => RecordedRequest[]
 }
 
 export function stubRectificationApi(options: StubOptions = {}): RectificationApi {
   const students = options.students ?? allStudents
-  const details = new Map(initialDetails().map((detail) => [detail.id_cr_estudiante, detail]))
+  const records = new Map(initialRecords().map((record) => [record.detail.id_cr_estudiante, record]))
+  const notFound = { status: 404, body: { message: 'No existe el registro de la Central de Riesgo indicado.' } }
 
   const api = mockApiWith((request) => {
     const url = new URL(request.url)
     const path = url.pathname.replace(/^.*\/api/, '')
-
-    if (path === '/rectificacion-riesgo/tipos-falta') {
-      return options.typesFail
-        ? { status: 500, body: { message: 'No se pudo cargar el catálogo.' } }
-        : { body: { data: rectificationTypes } }
-    }
 
     if (path === '/rectificacion-riesgo/estudiantes') {
       if (options.searchFail) return { status: 500, body: { message: 'No se pudo buscar estudiantes.' } }
@@ -213,68 +178,52 @@ export function stubRectificationApi(options: StubOptions = {}): RectificationAp
       return { body: { data: found, meta: { limite: 10, hay_mas: options.hasMore ?? false } } }
     }
 
-    const records = path.match(/^\/rectificacion-riesgo\/estudiantes\/(\d+)\/registros$/)
+    const studentRecords = path.match(/^\/rectificacion-riesgo\/estudiantes\/(\d+)\/registros$/)
 
-    if (records) {
-      const student = students.find((candidate) => candidate.id_estudiante === Number(records[1]))
+    if (studentRecords) {
+      const student = students.find((candidate) => candidate.id_estudiante === Number(studentRecords[1]))
 
       if (!student) return { status: 404, body: { message: 'No existe el estudiante indicado.' } }
 
-      const rows = [...details.values()]
-        .filter((detail) => detail.estudiante.id_estudiante === student.id_estudiante)
-        .sort((left, right) => right.fecha_registro.localeCompare(left.fecha_registro))
-        .map(toSummary)
+      const own = [...records.values()].filter((record) => record.detail.estudiante.id_estudiante === student.id_estudiante)
+      const active = own
+        .filter((record) => record.rectificacion === null)
+        .sort((left, right) => right.detail.fecha_registro.localeCompare(left.detail.fecha_registro))
+        .map((record) => toSummary(record.detail))
+      const rectified = own
+        .filter((record) => record.rectificacion !== null)
+        .sort((left, right) => right.rectificacion!.fecha.localeCompare(left.rectificacion!.fecha))
+        .map((record): RectifiedRecord => ({ ...toSummary(record.detail), rectificacion: record.rectificacion! }))
 
-      return { body: { data: { estudiante: student, registros: rows } } }
+      return { body: { data: { estudiante: student, registros: active, rectificados: rectified } } }
     }
 
     const rectify = path.match(/^\/rectificacion-riesgo\/registros\/(\d+)\/rectificar$/)
 
     if (rectify && request.method === 'POST') {
-      const detail = details.get(Number(rectify[1]))
-      const body = request.body as { id_tipo_falta: number; descripcion: string | null; motivo: string; version_base: number }
+      const record = records.get(Number(rectify[1]))
 
-      if (!detail) return { status: 404, body: { message: 'No existe el registro de la Central de Riesgo indicado.' } }
+      if (!record) return notFound
 
-      if (options.conflict || body.version_base !== detail.version_vigente) {
-        return {
-          status: 409,
-          body: { message: 'El registro fue rectificado mientras usted lo editaba. Recargue para ver la versión vigente.' },
-        }
+      if (options.conflict || record.rectificacion !== null) {
+        return { status: 409, body: { message: 'Este registro ya fue rectificado y ya no está en la Central de Riesgo.' } }
       }
 
-      const next: RecordVersion = {
-        numero_version: detail.version_vigente + 1,
-        estado: 'Vigente',
-        tipo_falta: type(body.id_tipo_falta),
-        descripcion: body.descripcion,
-        motivo: body.motivo,
-        autor: { nombre_completo: ADMIN_NAME },
+      record.rectificacion = {
         fecha: RECTIFIED_AT,
+        administrador: { nombre_completo: ADMIN_NAME },
+        motivo: (request.body as { motivo: string }).motivo,
       }
-      const updated: RectifiableRecordDetail = {
-        ...detail,
-        tipo_falta: next.tipo_falta,
-        descripcion: next.descripcion,
-        estado: 'Rectificado',
-        numero_rectificaciones: detail.numero_rectificaciones + 1,
-        ultima_rectificacion: RECTIFIED_AT,
-        version_vigente: next.numero_version,
-        historial: [next, ...detail.historial.map((version): RecordVersion => ({ ...version, estado: 'Anterior' }))],
-      }
-      details.set(updated.id_cr_estudiante, updated)
 
-      return { status: 201, body: { data: updated } }
+      return { status: 200, body: { data: { ...toSummary(record.detail), rectificacion: record.rectificacion } } }
     }
 
     const show = path.match(/^\/rectificacion-riesgo\/registros\/(\d+)$/)
 
     if (show) {
-      const detail = details.get(Number(show[1]))
+      const record = records.get(Number(show[1]))
 
-      return detail
-        ? { body: { data: detail } }
-        : { status: 404, body: { message: 'No existe el registro de la Central de Riesgo indicado.' } }
+      return record && record.rectificacion === null ? { body: { data: record.detail } } : notFound
     }
 
     return undefined
@@ -282,7 +231,7 @@ export function stubRectificationApi(options: StubOptions = {}): RectificationAp
 
   return {
     calls: api.calls,
-    details,
+    records,
     posts: () => api.calls.filter((call) => call.method === 'POST'),
   }
 }

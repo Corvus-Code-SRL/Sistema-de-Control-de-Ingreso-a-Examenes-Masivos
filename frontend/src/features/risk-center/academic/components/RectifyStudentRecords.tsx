@@ -5,6 +5,7 @@ import { LoadingState } from '@/components/common/LoadingState'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useStudentRecords } from '../hooks/useStudentRecords'
+import { RectifiedRecordList } from './RectifiedRecordList'
 import { RectifyRecordList } from './RectifyRecordList'
 
 interface RectifyStudentRecordsProps {
@@ -13,7 +14,10 @@ interface RectifyStudentRecordsProps {
   onNewSearch: () => void
 }
 
-/** Los registros confirmados de un estudiante, o el aviso de que no tiene ninguno. */
+/**
+ * Los registros activos de un estudiante (los que se pueden rectificar) y, aparte y de solo lectura, los que
+ * ya se rectificaron. Un estudiante sin registros activos muestra el aviso y, si los tiene, sus rectificados.
+ */
 export function RectifyStudentRecords({ studentId, onRectify, onNewSearch }: RectifyStudentRecordsProps) {
   const { records, status, error, reload } = useStudentRecords(studentId)
 
@@ -41,7 +45,7 @@ export function RectifyStudentRecords({ studentId, onRectify, onNewSearch }: Rec
             {records.registros.length === 0 ? (
               <EmptyState
                 icon={ClipboardCheck}
-                title="El estudiante no tiene registros en la Central de Riesgo"
+                title="El estudiante no tiene registros activos en la Central de Riesgo"
                 description="No hay nada que rectificar para este estudiante."
               />
             ) : (
@@ -53,6 +57,19 @@ export function RectifyStudentRecords({ studentId, onRectify, onNewSearch }: Rec
           </>
         )}
       </Card>
+
+      {records !== null && status !== 'error' && records.rectificados.length > 0 && (
+        <Card className="overflow-hidden p-0">
+          <div className="border-b border-border px-5 py-4">
+            <h2 className="sciem-h3">Registros rectificados</h2>
+            <p className="text-sm text-muted-foreground">
+              Ya no figuran en la Central de Riesgo. Solo se consultan: no se pueden reactivar.
+            </p>
+          </div>
+
+          <RectifiedRecordList records={records.rectificados} />
+        </Card>
+      )}
     </div>
   )
 }

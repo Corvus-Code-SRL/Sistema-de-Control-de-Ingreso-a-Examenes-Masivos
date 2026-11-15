@@ -3,13 +3,13 @@ import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderWithRouter } from '@/test/render'
-import { ADMIN_NAME, stubRectificationApi } from '@/test/riskRectificationFixtures'
+import { ADMIN_NAME, VOIDED_REASON, stubRectificationApi } from '@/test/riskRectificationFixtures'
 import { RectifyRiskRecordPage } from './RectifyRiskRecordPage'
 
 function LocationProbe() {
   const { pathname, search } = useLocation()
 
-  return <output data-testid="location">{`${pathname}${search}`}</output>
+  return <div data-testid="location">{`${pathname}${search}`}</div>
 }
 
 function renderPage(route = '/rectificar-registro') {
@@ -24,21 +24,34 @@ function renderPage(route = '/rectificar-registro') {
 
 const location = () => screen.getByTestId('location').textContent
 
-async function search(user: ReturnType<typeof userEvent.setup>, term: string) {
+type User = ReturnType<typeof userEvent.setup>
+
+async function search(user: User, term: string) {
   await user.type(screen.getByLabelText(/código sis, carnet de identidad o nombre/i), term)
   await user.click(screen.getByRole('button', { name: 'Buscar' }))
 }
 
-async function openRecord(user: ReturnType<typeof userEvent.setup>, exam: string) {
+async function openRecord(user: User, exam: string) {
   await user.click(await screen.findByRole('button', { name: new RegExp(`Rectificar registro del examen ${exam}`) }))
 }
 
-async function chooseType(user: ReturnType<typeof userEvent.setup>, name: string) {
-  await user.click(screen.getByRole('combobox', { name: 'Tipo de falta' }))
-  await user.click(await screen.findByRole('option', { name }))
+/** El valor que la ficha muestra bajo una etiqueta. */
+function field(label: string): HTMLElement {
+  return screen.getByText(label, { selector: 'dt' }).nextElementSibling as HTMLElement
 }
 
-const REASON = 'Se confirmó que fue otra falta.'
+async function writeReason(user: User, text = REASON) {
+  await user.type(screen.getByLabelText(/motivo de la rectificación/i), text)
+}
+
+async function review(user: User, text = REASON) {
+  await writeReason(user, text)
+  await user.click(screen.getByRole('button', { name: 'Rectificar registro' }))
+
+  return screen.findByRole('dialog', { name: '¿Rectificar este registro?' })
+}
+
+const REASON = 'Se retira: el reporte no tenía sustento.'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -55,14 +68,14 @@ describe('RectifyRiskRecordPage — búsqueda de estudiantes', () => {
     expect(api.calls).toHaveLength(0)
   })
 
-  it('un código SIS con un solo estudiante abre directo sus registros, del más reciente al más antiguo', async () => {
+  it('un código SIS con un solo estudiante abre directo sus registros activos, del más reciente al más antiguo', async () => {
     const user = userEvent.setup()
     stubRectificationApi()
     renderPage()
 
     await search(user, '202170103')
 
-    const table = await screen.findByRole('table', { name: 'Registros confirmados del estudiante' })
+    const table = await screen.findByRole('table', { name: 'Registros activos del estudiante' })
     const rows = within(table).getAllByRole('row').slice(1)
 
     expect(location()).toBe('/rectificar-registro/9702')
@@ -72,32 +85,79 @@ describe('RectifyRiskRecordPage — búsqueda de estudiantes', () => {
       'Examen',
       'Tipo de falta',
       'Aprobó',
-      'Estado',
       'Acción',
     ])
     expect(rows).toHaveLength(2)
-    expect(within(rows[0]).getByText('22/09/2026')).toBeInTheDocument()
-    expect(within(rows[0]).getByText('2do Parcial')).toBeInTheDocument()
-    expect(within(rows[0]).getByText('Conducta indebida')).toBeInTheDocument()
+    expect(within(rows[0]).getByText('01/10/2026')).toBeInTheDocument()
+    expect(within(rows[0]).getByText('3er Parcial')).toBeInTheDocument()
+    expect(within(rows[0]).getByText('Copia en examen')).toBeInTheDocument()
     expect(within(rows[0]).getByText('Marcelo Quiroga Andrade')).toBeInTheDocument()
-    expect(within(rows[1]).getByText('11/09/2026')).toBeInTheDocument()
-    expect(within(rows[0]).getByRole('button', { name: /rectificar/i })).toBeInTheDocument()
-    expect(within(rows[1]).getByRole('button', { name: /rectificar/i })).toBeInTheDocument()
+    expect(within(rows[1]).getByText('22/09/2026')).toBeInTheDocument()
+    expect(within(rows[1]).getByText('Conducta indebida')).toBeInTheDocument()
   })
 
-  it('cada registro muestra su estado: «Original» o «Rectificado» con cuántas veces y la fecha de la última', async () => {
+  it('cada registro activo tiene su botón verde «Rectificar», grande y con icono', async () => {
     const user = userEvent.setup()
     stubRectificationApi()
     renderPage()
 
     await search(user, '202170103')
 
-    const rows = within(await screen.findByRole('table')).getAllByRole('row').slice(1)
+    const rows = within(await screen.findByRole('table', { name: 'Registros activos del estudiante' }))
+      .getAllByRole('row')
+      .slice(1)
 
-    expect(within(rows[0]).getByText('Original')).toBeInTheDocument()
-    expect(within(rows[0]).queryByText(/rectificaci/i)).not.toBeInTheDocument()
-    expect(within(rows[1]).getByText('Rectificado')).toBeInTheDocument()
-    expect(within(rows[1]).getByText('1 rectificación · última 05/10/2026')).toBeInTheDocument()
+    for (const row of rows) {
+      const button = within(row).getByRole('button', { name: /^Rectificar registro del examen/ })
+
+      expect(button).toHaveTextContent('Rectificar')
+      expect(button).toHaveAttribute('data-variant', 'success')
+      expect(button).toHaveAttribute('data-size', 'xl')
+      expect(button).toHaveClass('bg-ok', 'text-primary-foreground', 'hover:bg-ok-fg', 'h-11')
+      expect(button.querySelector('svg')).not.toBeNull()
+    }
+  })
+
+  it('no muestra insignias «Original» o «Rectificado» ni contadores de rectificaciones', async () => {
+    const user = userEvent.setup()
+    stubRectificationApi()
+    renderPage()
+
+    await search(user, '202170103')
+    await screen.findByRole('table', { name: 'Registros activos del estudiante' })
+
+    expect(screen.queryByText('Original')).not.toBeInTheDocument()
+    expect(screen.queryByText('Rectificado')).not.toBeInTheDocument()
+    expect(screen.queryByText(/\d+ rectificaci/i)).not.toBeInTheDocument()
+  })
+
+  it('el registro ya rectificado sale de la lista activa y se muestra aparte, solo de lectura, con fecha, administrador y motivo', async () => {
+    const user = userEvent.setup()
+    stubRectificationApi()
+    renderPage()
+
+    await search(user, '202170103')
+
+    const active = await screen.findByRole('table', { name: 'Registros activos del estudiante' })
+    const rectified = screen.getByRole('table', { name: 'Registros rectificados del estudiante' })
+    const rows = within(rectified).getAllByRole('row').slice(1)
+
+    expect(screen.getByRole('heading', { name: 'Registros rectificados' })).toBeInTheDocument()
+    expect(within(active).queryByText('Material no permitido')).not.toBeInTheDocument()
+    expect(within(rectified).getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+      'Fecha del registro',
+      'Examen',
+      'Tipo de falta',
+      'Rectificado el',
+      'Administrador',
+      'Motivo',
+    ])
+    expect(rows).toHaveLength(1)
+    expect(within(rows[0]).getByText('Material no permitido')).toBeInTheDocument()
+    expect(within(rows[0]).getByText('05/10/2026')).toBeInTheDocument()
+    expect(within(rows[0]).getByText(ADMIN_NAME)).toBeInTheDocument()
+    expect(within(rows[0]).getByText(VOIDED_REASON)).toBeInTheDocument()
+    expect(within(rectified).queryByRole('button')).not.toBeInTheDocument()
   })
 
   it('busca por carnet de identidad', async () => {
@@ -156,16 +216,19 @@ describe('RectifyRiskRecordPage — búsqueda de estudiantes', () => {
     expect(await screen.findByText('No se encontró ningún estudiante con ese dato')).toBeInTheDocument()
   })
 
-  it('un estudiante sin registros avisa «El estudiante no tiene registros en la Central de Riesgo»', async () => {
+  it('un estudiante sin registros activos lo avisa y no ofrece rectificar', async () => {
     const user = userEvent.setup()
     stubRectificationApi()
     renderPage()
 
     await search(user, '202170104')
 
-    expect(await screen.findByText('El estudiante no tiene registros en la Central de Riesgo')).toBeInTheDocument()
+    expect(
+      await screen.findByText('El estudiante no tiene registros activos en la Central de Riesgo')
+    ).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Daniel Rojas Mendoza' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /rectificar/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Registros rectificados' })).not.toBeInTheDocument()
   })
 
   it('un nombre de menos de tres letras no se envía y explica el mínimo', async () => {
@@ -218,233 +281,73 @@ describe('RectifyRiskRecordPage — búsqueda de estudiantes', () => {
     expect(screen.getByLabelText(/código sis, carnet de identidad o nombre/i)).toBeInTheDocument()
   })
 
-  it('no ofrece ningún control para eliminar o borrar', async () => {
+  it('no ofrece ningún control para eliminar, borrar ni reactivar', async () => {
     stubRectificationApi()
     renderPage('/rectificar-registro/9702')
 
-    await screen.findByRole('table')
+    await screen.findByRole('table', { name: 'Registros activos del estudiante' })
 
-    expect(screen.queryByRole('button', { name: /eliminar|borrar|quitar/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /eliminar|borrar|quitar|reactivar|restaurar/i })).not.toBeInTheDocument()
   })
 })
 
-describe('RectifyRiskRecordPage — formulario y confirmación en dos pasos', () => {
-  it('abre el formulario con el estudiante, el examen y las fechas bloqueados y el tipo y la descripción vigentes', async () => {
+describe('RectifyRiskRecordPage — ficha del registro', () => {
+  it('al pulsar «Rectificar» abre arriba la ficha completa del registro, de solo lectura', async () => {
     const user = userEvent.setup()
     stubRectificationApi()
     renderPage('/rectificar-registro/9702')
 
     await openRecord(user, '2do Parcial')
 
+    expect(await screen.findByRole('heading', { name: 'Registro de la Central de Riesgo' })).toBeInTheDocument()
     expect(location()).toBe('/rectificar-registro/9702?registro=9962')
-    expect(await screen.findByRole('form', { name: 'Rectificar registro' })).toBeInTheDocument()
-    expect(screen.getByText('Carla Condori Vega (202170103)')).toBeInTheDocument()
-    expect(screen.getByText('2do Parcial · Cálculo I')).toBeInTheDocument()
-    expect(screen.getByText('10/09/2026')).toBeInTheDocument()
-    expect(screen.getByText('22/09/2026')).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: 'Tipo de falta' })).toHaveTextContent('Conducta indebida')
-    expect(screen.getByLabelText('Descripción')).toHaveValue('Descripción original del registro 9962.')
-    expect(screen.getByLabelText(/motivo de la rectificación/i)).toHaveValue('')
+    expect(field('Estudiante')).toHaveTextContent('Carla Condori Vega')
+    expect(field('Código SIS')).toHaveTextContent('202170103')
+    expect(field('Carnet de identidad')).toHaveTextContent('7400103')
+    expect(field('Examen')).toHaveTextContent('2do Parcial')
+    expect(field('Materia')).toHaveTextContent('Cálculo I')
+    expect(field('Fecha del examen')).toHaveTextContent('10/09/2026')
+    expect(field('Fecha y hora del hecho')).toHaveTextContent('10/09/2026 · 08:12')
+    expect(field('Aula')).toHaveTextContent('Aula 691A')
+    expect(field('Tipo de falta')).toHaveTextContent('Conducta indebida')
+    expect(field('Descripción')).toHaveTextContent('Descripción del registro 9962.')
+    expect(field('Reportó')).toHaveTextContent('Daniela Ferrufino Soliz · 10/9 08:40')
+    expect(field('Aprobó')).toHaveTextContent('Marcelo Quiroga Andrade · 22/9 10:00')
+    expect(field('Ingresó a la Central')).toHaveTextContent('22/09/2026')
+    expect(within(field('Evidencia')).getByRole('button', { name: 'foto-aula.png' })).toBeInTheDocument()
   })
 
-  it('sin motivo muestra «El motivo es obligatorio» y no abre la confirmación', async () => {
-    const user = userEvent.setup()
-    const api = stubRectificationApi()
-    renderPage('/rectificar-registro/9702?registro=9962')
+  it('un registro sin aula, descripción ni evidencia lo indica', async () => {
+    stubRectificationApi()
+    renderPage('/rectificar-registro/9702?registro=9964')
 
-    await screen.findByRole('form', { name: 'Rectificar registro' })
-    await chooseType(user, 'Copia en examen')
-    await user.click(screen.getByRole('button', { name: 'Rectificar' }))
+    await screen.findByRole('heading', { name: 'Registro de la Central de Riesgo' })
 
-    expect(screen.getByText('El motivo es obligatorio')).toBeInTheDocument()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(api.posts()).toHaveLength(0)
+    expect(screen.queryByText('Aula', { selector: 'dt' })).not.toBeInTheDocument()
+    expect(field('Descripción')).toHaveTextContent('Sin descripción')
+    expect(field('Evidencia')).toHaveTextContent('Sin evidencia')
   })
 
-  it('un motivo de menos de diez caracteres se rechaza', async () => {
-    const user = userEvent.setup()
+  it('la ficha va arriba y el motivo debajo; solo el motivo se puede escribir', async () => {
     stubRectificationApi()
     renderPage('/rectificar-registro/9702?registro=9962')
 
-    await screen.findByRole('form', { name: 'Rectificar registro' })
-    await chooseType(user, 'Copia en examen')
-    await user.type(screen.getByLabelText(/motivo de la rectificación/i), 'corto')
-    await user.click(screen.getByRole('button', { name: 'Rectificar' }))
+    const card = (await screen.findByRole('heading', { name: 'Registro de la Central de Riesgo' })).closest('div')!
+    const form = screen.getByRole('form', { name: 'Rectificar registro' })
 
-    expect(screen.getByText('El motivo debe tener al menos 10 caracteres.')).toBeInTheDocument()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(card.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(form).getAllByRole('textbox').map((control) => control.id)).toEqual(['rectify-reason'])
+    expect(within(form).queryByRole('combobox')).not.toBeInTheDocument()
+    expect(within(form).getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
+    expect(within(form).getByRole('button', { name: 'Rectificar registro' })).toBeInTheDocument()
   })
 
-  it('si no cambia ni el tipo ni la descripción lo rechaza sin consultar al servidor', async () => {
-    const user = userEvent.setup()
-    const api = stubRectificationApi()
-    renderPage('/rectificar-registro/9702?registro=9962')
-
-    await screen.findByRole('form', { name: 'Rectificar registro' })
-    await user.type(screen.getByLabelText(/motivo de la rectificación/i), REASON)
-    await user.click(screen.getByRole('button', { name: 'Rectificar' }))
-
-    expect(screen.getByText(/No hay cambios: modifique el tipo de falta o la descripción/)).toBeInTheDocument()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(api.posts()).toHaveLength(0)
-  })
-
-  it('«Rectificar» no guarda: abre la confirmación con lo anterior, lo nuevo y el motivo', async () => {
-    const user = userEvent.setup()
-    const api = stubRectificationApi()
-    renderPage('/rectificar-registro/9702?registro=9962')
-
-    await screen.findByRole('form', { name: 'Rectificar registro' })
-    await chooseType(user, 'Copia en examen')
-    await user.clear(screen.getByLabelText('Descripción'))
-    await user.type(screen.getByLabelText('Descripción'), 'Descripción corregida.')
-    await user.type(screen.getByLabelText(/motivo de la rectificación/i), REASON)
-    await user.click(screen.getByRole('button', { name: 'Rectificar' }))
-
-    const dialog = await screen.findByRole('dialog', { name: '¿Confirmar la rectificación?' })
-
-    expect(within(dialog).getByText('Conducta indebida')).toBeInTheDocument()
-    expect(within(dialog).getByText('Copia en examen')).toBeInTheDocument()
-    expect(within(dialog).getByText('Descripción original del registro 9962.')).toBeInTheDocument()
-    expect(within(dialog).getByText('Descripción corregida.')).toBeInTheDocument()
-    expect(within(dialog).getByText(REASON)).toBeInTheDocument()
-    expect(api.posts()).toHaveLength(0)
-  })
-
-  it('cancelar en el diálogo no guarda nada y deja el formulario como estaba', async () => {
-    const user = userEvent.setup()
-    const api = stubRectificationApi()
-    renderPage('/rectificar-registro/9702?registro=9962')
-
-    await screen.findByRole('form', { name: 'Rectificar registro' })
-    await chooseType(user, 'Copia en examen')
-    await user.type(screen.getByLabelText(/motivo de la rectificación/i), REASON)
-    await user.click(screen.getByRole('button', { name: 'Rectificar' }))
-    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancelar' }))
-
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(api.posts()).toHaveLength(0)
-    expect(screen.getByRole('combobox', { name: 'Tipo de falta' })).toHaveTextContent('Copia en examen')
-    expect(screen.getByLabelText(/motivo de la rectificación/i)).toHaveValue(REASON)
-    expect(api.details.get(9962)?.estado).toBe('Original')
-  })
-
-  it('cancelar en el formulario vuelve a la lista sin guardar nada', async () => {
-    const user = userEvent.setup()
-    const api = stubRectificationApi()
-    renderPage('/rectificar-registro/9702?registro=9962')
-
-    await screen.findByRole('form', { name: 'Rectificar registro' })
-    await chooseType(user, 'Copia en examen')
-    await user.type(screen.getByLabelText(/motivo de la rectificación/i), REASON)
-    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
-
-    expect(await screen.findByRole('table', { name: 'Registros confirmados del estudiante' })).toBeInTheDocument()
-    expect(location()).toBe('/rectificar-registro/9702')
-    expect(api.posts()).toHaveLength(0)
-    expect(within(screen.getAllByRole('row')[1]).getByText('Conducta indebida')).toBeInTheDocument()
-  })
-
-  it('al confirmar envía el cuerpo y muestra la versión nueva «Vigente» y la anterior «Anterior» con su fecha, autor y motivo', async () => {
-    const user = userEvent.setup()
-    const api = stubRectificationApi()
-    renderPage('/rectificar-registro/9702?registro=9962')
-
-    await screen.findByRole('form', { name: 'Rectificar registro' })
-    await chooseType(user, 'Copia en examen')
-    await user.clear(screen.getByLabelText('Descripción'))
-    await user.type(screen.getByLabelText('Descripción'), '  Descripción corregida.  ')
-    await user.type(screen.getByLabelText(/motivo de la rectificación/i), `  ${REASON}  `)
-    await user.click(screen.getByRole('button', { name: 'Rectificar' }))
-    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Confirmar rectificación' }))
-
-    expect(await screen.findByText('Rectificación registrada')).toBeInTheDocument()
-    expect(api.posts()).toHaveLength(1)
-    expect(api.posts()[0].body).toEqual({
-      id_tipo_falta: 1,
-      descripcion: 'Descripción corregida.',
-      motivo: REASON,
-      version_base: 1,
-    })
-
-    const versions = within(screen.getByRole('region', { name: 'Historial de versiones' })).getAllByRole('listitem')
-
-    expect(versions).toHaveLength(2)
-    expect(versions[0]).toHaveAccessibleName('Versión 2, Vigente')
-    expect(within(versions[0]).getByText('Vigente')).toBeInTheDocument()
-    expect(within(versions[0]).getByText(REASON)).toBeInTheDocument()
-    expect(within(versions[0]).getByText(ADMIN_NAME)).toBeInTheDocument()
-    expect(versions[1]).toHaveAccessibleName('Versión 1, Anterior')
-    expect(within(versions[1]).getByText('Anterior')).toBeInTheDocument()
-    expect(within(versions[1]).getByText('Marcelo Quiroga Andrade')).toBeInTheDocument()
-    expect(within(versions[1]).getByText('Descripción original del registro 9962.')).toBeInTheDocument()
-    expect(within(versions[1]).getByText('Conducta indebida')).toBeInTheDocument()
-  })
-
-  it('tras confirmar, al volver a la lista el registro figura como «Rectificado»', async () => {
-    const user = userEvent.setup()
-    stubRectificationApi()
-    renderPage('/rectificar-registro/9702?registro=9962')
-
-    await screen.findByRole('form', { name: 'Rectificar registro' })
-    await chooseType(user, 'Copia en examen')
-    await user.type(screen.getByLabelText(/motivo de la rectificación/i), REASON)
-    await user.click(screen.getByRole('button', { name: 'Rectificar' }))
-    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Confirmar rectificación' }))
-    await screen.findByText('Rectificación registrada')
-    await user.click(screen.getByRole('button', { name: 'Volver a los registros' }))
-
-    const rows = within(await screen.findByRole('table')).getAllByRole('row').slice(1)
-
-    expect(within(rows[0]).getByText('Rectificado')).toBeInTheDocument()
-    expect(within(rows[0]).getByText('Copia en examen')).toBeInTheDocument()
-    expect(within(rows[0]).getByText('1 rectificación · última 14/11/2026')).toBeInTheDocument()
-  })
-
-  it('el historial de un registro ya rectificado va de la versión más nueva a la más antigua', async () => {
+  it('un registro ya rectificado no se puede abrir: muestra el error del servidor', async () => {
     stubRectificationApi()
     renderPage('/rectificar-registro/9702?registro=9961')
 
-    const versions = within(await screen.findByRole('region', { name: 'Historial de versiones' })).getAllByRole(
-      'listitem'
-    )
-
-    expect(versions.map((version) => version.getAttribute('aria-label'))).toEqual([
-      'Versión 2, Vigente',
-      'Versión 1, Anterior',
-    ])
-    expect(within(versions[0]).getByText('La evidencia confirma que se trataba de copia.')).toBeInTheDocument()
-    expect(within(versions[1]).getByText('Registro original, sin rectificación')).toBeInTheDocument()
-    expect(screen.getByText('1 rectificación · última 05/10/2026')).toBeInTheDocument()
-  })
-
-  it('un registro nunca rectificado muestra su valor original como versión 1 vigente', async () => {
-    stubRectificationApi()
-    renderPage('/rectificar-registro/9702?registro=9962')
-
-    const versions = within(await screen.findByRole('region', { name: 'Historial de versiones' })).getAllByRole(
-      'listitem'
-    )
-
-    expect(versions).toHaveLength(1)
-    expect(versions[0]).toHaveAccessibleName('Versión 1, Vigente')
-  })
-
-  it('si otra persona rectificó antes, muestra el conflicto y permite recargar el registro', async () => {
-    const user = userEvent.setup()
-    stubRectificationApi({ conflict: true })
-    renderPage('/rectificar-registro/9702?registro=9962')
-
-    await screen.findByRole('form', { name: 'Rectificar registro' })
-    await chooseType(user, 'Copia en examen')
-    await user.type(screen.getByLabelText(/motivo de la rectificación/i), REASON)
-    await user.click(screen.getByRole('button', { name: 'Rectificar' }))
-    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Confirmar rectificación' }))
-
-    expect(await screen.findByText(/El registro fue rectificado mientras usted lo editaba/)).toBeInTheDocument()
-    expect(screen.queryByText('Rectificación registrada')).not.toBeInTheDocument()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Recargar el registro' })).toBeInTheDocument()
+    expect(await screen.findByText('No existe el registro de la Central de Riesgo indicado.')).toBeInTheDocument()
+    expect(screen.queryByRole('form', { name: 'Rectificar registro' })).not.toBeInTheDocument()
   })
 
   it('un registro inexistente muestra el error del servidor', async () => {
@@ -453,17 +356,177 @@ describe('RectifyRiskRecordPage — formulario y confirmación en dos pasos', ()
 
     expect(await screen.findByText('No existe el registro de la Central de Riesgo indicado.')).toBeInTheDocument()
   })
+})
 
-  it('el formulario ofrece solo el tipo de falta y la descripción para editar', async () => {
+describe('RectifyRiskRecordPage — motivo y confirmación en dos pasos', () => {
+  it('sin motivo muestra «El motivo es obligatorio» y no abre la confirmación', async () => {
+    const user = userEvent.setup()
+    const api = stubRectificationApi()
+    renderPage('/rectificar-registro/9702?registro=9962')
+
+    await screen.findByRole('form', { name: 'Rectificar registro' })
+    await user.click(screen.getByRole('button', { name: 'Rectificar registro' }))
+
+    expect(screen.getByText('El motivo es obligatorio')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(api.posts()).toHaveLength(0)
+  })
+
+  it('un motivo de espacios cuenta como vacío', async () => {
+    const user = userEvent.setup()
     stubRectificationApi()
     renderPage('/rectificar-registro/9702?registro=9962')
 
-    const form = await screen.findByRole('form', { name: 'Rectificar registro' })
+    await screen.findByRole('form', { name: 'Rectificar registro' })
+    await writeReason(user, '            ')
+    await user.click(screen.getByRole('button', { name: 'Rectificar registro' }))
 
-    expect(within(form).getAllByRole('textbox').map((field) => field.id)).toEqual([
-      'rectify-description',
-      'rectify-reason',
-    ])
-    expect(within(form).getAllByRole('combobox')).toHaveLength(1)
+    expect(screen.getByText('El motivo es obligatorio')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('un motivo de menos de diez caracteres se rechaza', async () => {
+    const user = userEvent.setup()
+    stubRectificationApi()
+    renderPage('/rectificar-registro/9702?registro=9962')
+
+    await screen.findByRole('form', { name: 'Rectificar registro' })
+    await writeReason(user, 'corto')
+    await user.click(screen.getByRole('button', { name: 'Rectificar registro' }))
+
+    expect(screen.getByText('El motivo debe tener al menos 10 caracteres.')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('«Rectificar registro» no guarda: abre la confirmación que nombra al estudiante y al registro y avisa que no se deshace', async () => {
+    const user = userEvent.setup()
+    const api = stubRectificationApi()
+    renderPage('/rectificar-registro/9702?registro=9962')
+
+    await screen.findByRole('form', { name: 'Rectificar registro' })
+
+    const dialog = await review(user)
+
+    expect(dialog).toHaveTextContent('Carla Condori Vega')
+    expect(dialog).toHaveTextContent('«Conducta indebida»')
+    expect(dialog).toHaveTextContent('«2do Parcial»')
+    expect(dialog).toHaveTextContent('dejará de figurar en la Central')
+    expect(dialog).toHaveTextContent('no se puede deshacer')
+    expect(within(dialog).getByText(REASON)).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Sí, rectificar' })).toBeInTheDocument()
+    expect(api.posts()).toHaveLength(0)
+  })
+
+  it('cancelar en el diálogo no guarda nada y deja el motivo escrito', async () => {
+    const user = userEvent.setup()
+    const api = stubRectificationApi()
+    renderPage('/rectificar-registro/9702?registro=9962')
+
+    await screen.findByRole('form', { name: 'Rectificar registro' })
+    await user.click(within(await review(user)).getByRole('button', { name: 'Cancelar' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(api.posts()).toHaveLength(0)
+    expect(screen.getByLabelText(/motivo de la rectificación/i)).toHaveValue(REASON)
+    expect(api.records.get(9962)?.rectificacion).toBeNull()
+  })
+
+  it('cancelar en el formulario vuelve a la lista sin guardar nada', async () => {
+    const user = userEvent.setup()
+    const api = stubRectificationApi()
+    renderPage('/rectificar-registro/9702?registro=9962')
+
+    await screen.findByRole('form', { name: 'Rectificar registro' })
+    await writeReason(user)
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(await screen.findByRole('table', { name: 'Registros activos del estudiante' })).toBeInTheDocument()
+    expect(location()).toBe('/rectificar-registro/9702')
+    expect(api.posts()).toHaveLength(0)
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('table', { name: 'Registros activos del estudiante' })).getAllByRole('row')).toHaveLength(3)
+  })
+
+  it('«Volver a los registros» también vuelve sin guardar nada', async () => {
+    const user = userEvent.setup()
+    const api = stubRectificationApi()
+    renderPage('/rectificar-registro/9702?registro=9962')
+
+    await screen.findByRole('form', { name: 'Rectificar registro' })
+    await user.click(screen.getByRole('button', { name: 'Volver a los registros' }))
+
+    expect(await screen.findByRole('table', { name: 'Registros activos del estudiante' })).toBeInTheDocument()
+    expect(api.posts()).toHaveLength(0)
+  })
+
+  it('al confirmar envía solo el motivo recortado y avisa que el registro ya no figura en la Central', async () => {
+    const user = userEvent.setup()
+    const api = stubRectificationApi()
+    renderPage('/rectificar-registro/9702?registro=9962')
+
+    await screen.findByRole('form', { name: 'Rectificar registro' })
+    await user.click(within(await review(user, `  ${REASON}  `)).getByRole('button', { name: 'Sí, rectificar' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Registro rectificado: «Conducta indebida» de Carla Condori Vega ya no figura en la Central de Riesgo.'
+    )
+    expect(api.posts()).toHaveLength(1)
+    expect(api.posts()[0].body).toEqual({ motivo: REASON })
+    expect(location()).toBe('/rectificar-registro/9702')
+  })
+
+  it('tras confirmar, el registro sale de la lista activa y aparece en «Registros rectificados» con su fecha, administrador y motivo', async () => {
+    const user = userEvent.setup()
+    stubRectificationApi()
+    renderPage('/rectificar-registro/9702?registro=9962')
+
+    await screen.findByRole('form', { name: 'Rectificar registro' })
+    await user.click(within(await review(user)).getByRole('button', { name: 'Sí, rectificar' }))
+
+    const active = await screen.findByRole('table', { name: 'Registros activos del estudiante' })
+    const activeRows = within(active).getAllByRole('row').slice(1)
+    const rectifiedRows = within(screen.getByRole('table', { name: 'Registros rectificados del estudiante' }))
+      .getAllByRole('row')
+      .slice(1)
+
+    expect(activeRows).toHaveLength(1)
+    expect(within(activeRows[0]).getByText('3er Parcial')).toBeInTheDocument()
+    expect(within(active).queryByText('Conducta indebida')).not.toBeInTheDocument()
+    expect(rectifiedRows).toHaveLength(2)
+    expect(within(rectifiedRows[0]).getByText('Conducta indebida')).toBeInTheDocument()
+    expect(within(rectifiedRows[0]).getByText('14/11/2026')).toBeInTheDocument()
+    expect(within(rectifiedRows[0]).getByText(ADMIN_NAME)).toBeInTheDocument()
+    expect(within(rectifiedRows[0]).getByText(REASON)).toBeInTheDocument()
+    expect(within(rectifiedRows[1]).getByText('Material no permitido')).toBeInTheDocument()
+  })
+
+  it('al rectificar el último registro activo, la lista activa queda vacía y el registro figura como rectificado', async () => {
+    const user = userEvent.setup()
+    stubRectificationApi()
+    renderPage('/rectificar-registro/9700?registro=9963')
+
+    await screen.findByRole('form', { name: 'Rectificar registro' })
+    await user.click(within(await review(user)).getByRole('button', { name: 'Sí, rectificar' }))
+
+    expect(
+      await screen.findByText('El estudiante no tiene registros activos en la Central de Riesgo')
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Registros activos del estudiante' })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('table', { name: 'Registros rectificados del estudiante' })).getAllByRole('row')).toHaveLength(2)
+  })
+
+  it('si el registro ya había sido rectificado, muestra el conflicto, no avisa de éxito y permite volver', async () => {
+    const user = userEvent.setup()
+    stubRectificationApi({ conflict: true })
+    renderPage('/rectificar-registro/9702?registro=9962')
+
+    await screen.findByRole('form', { name: 'Rectificar registro' })
+    await user.click(within(await review(user)).getByRole('button', { name: 'Sí, rectificar' }))
+
+    expect(await screen.findByText('Este registro ya fue rectificado y ya no está en la Central de Riesgo.')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Volver a los registros' }).length).toBeGreaterThan(0)
   })
 })

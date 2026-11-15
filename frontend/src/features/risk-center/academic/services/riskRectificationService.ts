@@ -2,8 +2,8 @@ import { apiClient } from '@/lib/api-client'
 import type {
   RectifiableRecordDetail,
   RectifiableStudent,
-  RectificationFaultType,
   RectificationInput,
+  RectifiedRecord,
   StudentRecords,
   StudentSearchResult,
 } from '../types/riskRectification.types'
@@ -23,6 +23,7 @@ export async function searchRectifiableStudents(
   return { students: response.data, limit: response.meta.limite, hasMore: response.meta.hay_mas }
 }
 
+/** Registros activos y ya rectificados de un estudiante. */
 export async function getStudentRecords(studentId: number, signal?: AbortSignal): Promise<StudentRecords> {
   const response = await apiClient<{ data: StudentRecords }>(`${BASE}/estudiantes/${studentId}/registros`, {
     signal,
@@ -31,6 +32,7 @@ export async function getStudentRecords(studentId: number, signal?: AbortSignal)
   return response.data
 }
 
+/** La ficha de un registro activo; un registro ya rectificado responde 404. */
 export async function getRectifiableRecord(
   recordId: number,
   signal?: AbortSignal
@@ -42,21 +44,12 @@ export async function getRectifiableRecord(
   return response.data
 }
 
-export async function getRectificationFaultTypes(signal?: AbortSignal): Promise<RectificationFaultType[]> {
-  const response = await apiClient<{ data: RectificationFaultType[] }>(`${BASE}/tipos-falta`, { signal })
-
-  return response.data
-}
-
-/** Crea la nueva versión vigente; responde el registro con su historial ya actualizado. */
-export async function rectifyRecord(
-  recordId: number,
-  input: RectificationInput
-): Promise<RectifiableRecordDetail> {
-  const response = await apiClient<{ data: RectifiableRecordDetail }>(
-    `${BASE}/registros/${recordId}/rectificar`,
-    { method: 'POST', body: input }
-  )
+/** Retira el registro de la Central (no se puede deshacer); responde el registro ya rectificado. */
+export async function rectifyRecord(recordId: number, input: RectificationInput): Promise<RectifiedRecord> {
+  const response = await apiClient<{ data: RectifiedRecord }>(`${BASE}/registros/${recordId}/rectificar`, {
+    method: 'POST',
+    body: input,
+  })
 
   return response.data
 }

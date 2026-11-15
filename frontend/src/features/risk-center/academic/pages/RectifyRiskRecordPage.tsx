@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { SearchX } from 'lucide-react'
+import { CheckCircle2, SearchX } from 'lucide-react'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
@@ -11,6 +12,7 @@ import { RectifyStudentMatches } from '../components/RectifyStudentMatches'
 import { RectifyStudentRecords } from '../components/RectifyStudentRecords'
 import { RectifyStudentSearch } from '../components/RectifyStudentSearch'
 import { useRectifiableStudentSearch } from '../hooks/useRectifiableStudentSearch'
+import type { RectifiableRecordDetail } from '../types/riskRectification.types'
 
 const BASE_PATH = '/rectificar-registro'
 
@@ -24,15 +26,18 @@ function idFrom(param: string | null | undefined): number | null {
 /**
  * Rectificar un registro de la Central de Riesgo (HU-062), solo para quien tiene `riesgo.rectificar`.
  *
- * Tres pasos que viven en la URL: buscar al estudiante (`/rectificar-registro`), ver sus registros
+ * Rectificar es retirar de la Central un registro aprobado por error; no se edita nada del registro. Tres
+ * pasos que viven en la URL: buscar al estudiante (`/rectificar-registro`), ver sus registros activos
  * (`/rectificar-registro/:id`) y abrir uno para rectificar (`?registro=`). Si la búsqueda da un solo
- * estudiante se abre directo; si da varios, se elige. Esta vista no usa los endpoints de la consulta (HU-046).
+ * estudiante se abre directo; si da varios, se elige. Al rectificar se vuelve a la lista con un aviso y el
+ * registro pasa a «Registros rectificados».
  */
 export function RectifyRiskRecordPage() {
   const { id: idParam } = useParams<{ id: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const { status, result, error, search, reset } = useRectifiableStudentSearch()
+  const [notice, setNotice] = useState<string | null>(null)
 
   const studentId = idFrom(idParam)
   const recordParam = searchParams.get('registro')
@@ -43,6 +48,8 @@ export function RectifyRiskRecordPage() {
   }
 
   async function handleSearch(term: string) {
+    setNotice(null)
+
     const found = await search(term)
 
     if (found !== null && found.students.length === 1) {
@@ -52,7 +59,15 @@ export function RectifyRiskRecordPage() {
 
   const goToSearch = () => {
     reset()
+    setNotice(null)
     navigate(BASE_PATH)
+  }
+
+  function handleRectified(record: RectifiableRecordDetail) {
+    setNotice(
+      `Registro rectificado: «${record.tipo_falta.nombre}» de ${record.estudiante.nombre_completo} ya no figura en la Central de Riesgo.`
+    )
+    setSearchParams({})
   }
 
   return (
@@ -62,7 +77,7 @@ export function RectifyRiskRecordPage() {
     >
       <PageHeader
         title="Rectificar registro de la central"
-        subtitle="Corrija el tipo de falta o la descripción de un registro confirmado. El original se conserva en el historial."
+        subtitle="Retire de la Central un registro que se aprobó por error. La rectificación no se puede deshacer y queda en la bitácora."
       />
 
       <div className="space-y-4">
@@ -108,15 +123,30 @@ export function RectifyRiskRecordPage() {
         )}
 
         {studentId !== null && recordId === null && (
-          <RectifyStudentRecords
-            studentId={studentId}
-            onRectify={(id) => setSearchParams({ registro: String(id) })}
-            onNewSearch={goToSearch}
-          />
+          <>
+            {notice !== null && (
+              <div
+                role="status"
+                className="flex items-start gap-2 rounded-lg border border-ok-border bg-ok-soft px-3 py-2.5 text-sm font-medium text-ok-fg"
+              >
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <p>{notice}</p>
+              </div>
+            )}
+
+            <RectifyStudentRecords
+              studentId={studentId}
+              onRectify={(id) => {
+                setNotice(null)
+                setSearchParams({ registro: String(id) })
+              }}
+              onNewSearch={goToSearch}
+            />
+          </>
         )}
 
         {studentId !== null && recordId !== null && (
-          <RectifyRecordPanel recordId={recordId} onBack={() => setSearchParams({})} />
+          <RectifyRecordPanel recordId={recordId} onBack={() => setSearchParams({})} onRectified={handleRectified} />
         )}
       </div>
     </AppShell>
