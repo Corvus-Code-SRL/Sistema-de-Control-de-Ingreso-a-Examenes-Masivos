@@ -29,6 +29,8 @@ Route::prefix('control-ingreso')->group(function () {
             ->name('control-ingreso.examenes.confirmar');
         Route::post('/rechazar-ingreso', [StudentEntryController::class, 'reject'])
             ->name('control-ingreso.examenes.rechazar');
+        Route::post('/cerrar-ingreso-ordinario', [EntryControlStatusController::class, 'closeOrdinary'])
+            ->name('control-ingreso.examenes.cerrar-ordinario');
         Route::get('/estado', [EntryControlStatusController::class, 'currentStatus'])
             ->withoutMiddleware('throttle:api')
             ->middleware('throttle:polling')
