@@ -8,7 +8,9 @@ use App\Models\EntryAttempt;
 use App\Models\Exam;
 use App\Models\StudentReport;
 use App\Models\User;
+use App\Services\EntryControl\CloseOrdinaryEntryService;
 use App\Services\EntryControl\EntryAccessService;
+use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\EntryControl\LateEntryAccessService;
 use App\Services\Security\AuditLogService;
 use App\Support\ReportStatus;
@@ -30,17 +32,20 @@ class IncidentReportService
         'El examen no está en curso; ya no se pueden reportar intentos del ingreso con retraso.';
 
     private EntryAccessService $access;
+    private EntryControlSnapshotService $snapshots;
     private LateEntryAccessService $lateEntryAccess;
     private AuditLogService $audit;
     private IncidentEvidenceStorage $evidence;
 
     public function __construct(
         EntryAccessService $access,
+        EntryControlSnapshotService $snapshots,
         LateEntryAccessService $lateEntryAccess,
         AuditLogService $audit,
         IncidentEvidenceStorage $evidence
     ) {
         $this->access = $access;
+        $this->snapshots = $snapshots;
         $this->lateEntryAccess = $lateEntryAccess;
         $this->audit = $audit;
         $this->evidence = $evidence;
@@ -60,7 +65,11 @@ class IncidentReportService
                 $exam = Exam::query()->whereKey($examId)->lockForUpdate()->firstOrFail();
                 $this->access->assertCanControl($exam, $actor);
 
-                if ($exam->estado !== Exam::EN_INGRESO) {
+                $controlOpen = $exam->estado === Exam::EN_INGRESO
+                    || (in_array($exam->estado, [Exam::PROGRAMADO, Exam::EN_CURSO], true)
+                        && $this->snapshots->ready($examId));
+
+                if (! $controlOpen || CloseOrdinaryEntryService::isClosed($examId)) {
                     throw new ExamStateException('El control de ingreso no está abierto.');
                 }
 

@@ -88,6 +88,20 @@ class CreateIncidentReportTest extends TestCase
         $this->assertSame(0, DB::table('central_riesgo')->count());
     }
 
+    public function testReportsDuringOpenControlWithExamInProgress(): void
+    {
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $this->exam->id_examen,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
+        app(RoomAssignmentService::class)->prepare((int) $this->exam->id_examen);
+        $this->exam->update(['estado' => Exam::EN_CURSO]);
+
+        $this->postJson($this->url(), $this->payload())
+            ->assertCreated()
+            ->assertJsonPath('data.id_intento', $this->attemptId);
+    }
+
     public function testAcceptsStudentWhoDoesNotBelongToExam(): void
     {
         $this->assertSame(0, DB::table('grupo_examen')->where('id_examen', $this->exam->id_examen)->count());
