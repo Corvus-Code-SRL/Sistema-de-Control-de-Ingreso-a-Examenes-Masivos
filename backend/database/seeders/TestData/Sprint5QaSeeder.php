@@ -18,17 +18,17 @@ use Illuminate\Support\Facades\DB;
  *
  *     php artisan db:seed --class="Database\Seeders\TestData\Sprint5QaSeeder"
  *
- * Escenarios:
+ * Escenarios (todos con datos ficticios):
  *   - María Pérez Gómez (con tilde) y Luis Perez Soliz (sin tilde) comparten el apellido: buscar «perez»
- *     devuelve a ambos más a José Pérez Mamani, del fixture base. María tiene un registro sin rectificar
- *     y Luis no tiene ninguno.
- *   - Carla Condori Vega tiene dos registros confirmados: uno ya rectificado una vez (de «Material no
- *     permitido» a «Copia en examen», con motivo y autor) y otro sin rectificar.
+ *     devuelve a ambos más a José Pérez Mamani, del fixture base. María tiene un registro activo y Luis
+ *     no tiene ninguno.
+ *   - Carla Condori Vega tiene dos registros activos, listos para rectificar, y uno ya rectificado
+ *     (retirado de la Central por un administrador, con su motivo).
  *   - Daniel Rojas Mendoza no tiene registros: sirve para el mensaje de estudiante sin registros.
  *
- * Volver a correrlo devuelve los escenarios a su estado inicial: se reescriben los reportes y registros de
- * la central, y se borran y recrean las versiones de estos tres registros (si QA los rectificó, se pierden).
- * La bitácora no se toca.
+ * Volver a correrlo devuelve los escenarios a su estado inicial: se reescriben los reportes y los registros
+ * de la central, así que lo que QA haya rectificado en estos tres registros vuelve a quedar activo (no así en
+ * el resto de la Central). La bitácora no se toca.
  *
  * Ids propios en el rango 9000–9999, sin pisar los de TestDataIds ni los de Sprint3QaSeeder.
  */
@@ -41,18 +41,16 @@ class Sprint5QaSeeder extends Seeder
     public const STUDENT_DANIEL_ROJAS = 9703;
 
     // reporte_estudiante.id_reporte_est
-    public const REPORT_CARLA_RECTIFIED = 9950;
-    public const REPORT_CARLA_ORIGINAL = 9951;
+    public const REPORT_CARLA_VOIDED = 9950;
+    public const REPORT_CARLA_ACTIVE_ONE = 9951;
     public const REPORT_MARIA = 9952;
+    public const REPORT_CARLA_ACTIVE_TWO = 9953;
 
     // central_riesgo.id_cr_estudiante
-    public const RECORD_CARLA_RECTIFIED = 9961;
-    public const RECORD_CARLA_ORIGINAL = 9962;
+    public const RECORD_CARLA_VOIDED = 9961;
+    public const RECORD_CARLA_ACTIVE_ONE = 9962;
     public const RECORD_MARIA = 9963;
-
-    // central_riesgo_version.id_version
-    public const VERSION_CARLA_FIRST = 9971;
-    public const VERSION_CARLA_CURRENT = 9972;
+    public const RECORD_CARLA_ACTIVE_TWO = 9964;
 
     private const EXAM_FINISHED = 9807;
 
@@ -68,7 +66,6 @@ class Sprint5QaSeeder extends Seeder
         DB::transaction(function () {
             $this->seedStudents();
             $this->seedRecords();
-            $this->seedRectification();
         });
     }
 
@@ -106,12 +103,15 @@ class Sprint5QaSeeder extends Seeder
         $approved = ReportStatus::APPROVED;
 
         $reports = [
-            $this->report(self::REPORT_CARLA_RECTIFIED, self::STUDENT_CARLA_CONDORI, self::EXAM_FINISHED,
-                $types['Material no permitido'], $assistant, 'Tenía material impreso entre sus útiles.',
+            $this->report(self::REPORT_CARLA_VOIDED, self::STUDENT_CARLA_CONDORI, self::EXAM_FINISHED,
+                $types['Material no permitido'], $assistant, 'Se la confundió con otra estudiante de la fila.',
                 '2026-09-10 08:30:00-04', $approved, '2026-09-11 15:00:00-04', $teacher),
-            $this->report(self::REPORT_CARLA_ORIGINAL, self::STUDENT_CARLA_CONDORI, self::EXAM_ENTRY,
+            $this->report(self::REPORT_CARLA_ACTIVE_ONE, self::STUDENT_CARLA_CONDORI, self::EXAM_ENTRY,
                 $types['Conducta indebida'], $assistant, 'Interrumpió el ingreso de otros estudiantes.',
                 '2026-09-21 09:10:00-04', $approved, '2026-09-22 10:00:00-04', $teacher),
+            $this->report(self::REPORT_CARLA_ACTIVE_TWO, self::STUDENT_CARLA_CONDORI, self::EXAM_FINISHED,
+                $types['Copia en examen'], $assistant, 'Miraba repetidamente la hoja de su compañero.',
+                '2026-09-30 08:50:00-04', $approved, '2026-10-01 11:30:00-04', $teacher),
             $this->report(self::REPORT_MARIA, self::STUDENT_MARIA_PEREZ, self::EXAM_FINISHED,
                 $types['Copia en examen'], $assistant, 'Copiaba respuestas de su compañero.',
                 '2026-09-10 08:45:00-04', $approved, '2026-09-12 09:00:00-04', $teacher),
@@ -119,12 +119,15 @@ class Sprint5QaSeeder extends Seeder
 
         DB::table('reporte_estudiante')->upsert($reports, ['id_reporte_est']);
 
+        // El upsert reescribe también las columnas de rectificación: los activos vuelven a quedar sin rectificar.
         DB::table('central_riesgo')->upsert([
-            $this->record(self::RECORD_CARLA_RECTIFIED, self::REPORT_CARLA_RECTIFIED, self::STUDENT_CARLA_CONDORI,
-                '2026-09-11 15:00:00-04'),
-            $this->record(self::RECORD_CARLA_ORIGINAL, self::REPORT_CARLA_ORIGINAL, self::STUDENT_CARLA_CONDORI,
+            $this->record(self::RECORD_CARLA_VOIDED, self::REPORT_CARLA_VOIDED, self::STUDENT_CARLA_CONDORI,
+                '2026-09-11 15:00:00-04', true),
+            $this->record(self::RECORD_CARLA_ACTIVE_ONE, self::REPORT_CARLA_ACTIVE_ONE, self::STUDENT_CARLA_CONDORI,
                 '2026-09-22 10:00:00-04'),
             $this->record(self::RECORD_MARIA, self::REPORT_MARIA, self::STUDENT_MARIA_PEREZ, '2026-09-12 09:00:00-04'),
+            $this->record(self::RECORD_CARLA_ACTIVE_TWO, self::REPORT_CARLA_ACTIVE_TWO, self::STUDENT_CARLA_CONDORI,
+                '2026-10-01 11:30:00-04'),
         ], ['id_cr_estudiante']);
     }
 
@@ -160,52 +163,18 @@ class Sprint5QaSeeder extends Seeder
     }
 
     /** @return array<string, mixed> */
-    private function record(int $id, int $reportId, int $studentId, string $registeredAt): array
+    private function record(int $id, int $reportId, int $studentId, string $registeredAt, bool $voided = false): array
     {
         return [
             'id_cr_estudiante' => $id,
             'id_reporte_est' => $reportId,
             'id_estudiante' => $studentId,
             'fecha_registro' => $registeredAt,
+            'rectificado_en' => $voided ? '2026-10-05 10:00:00-04' : null,
+            'id_usuario_rectificador' => $voided ? Ids::ADMINISTRATOR : null,
+            'motivo_rectificacion' => $voided
+                ? 'Se confundió a la estudiante: el reporte correspondía a otra persona de la fila.'
+                : null,
         ];
-    }
-
-    /** Deja el registro de Carla rectificado una vez: versión 1 con los valores originales y versión 2 vigente. */
-    private function seedRectification(): void
-    {
-        $types = DB::table('tipo_falta')->pluck('id_falta', 'nombre');
-
-        DB::table('central_riesgo_version')
-            ->whereIn('id_cr_estudiante', [
-                self::RECORD_CARLA_RECTIFIED,
-                self::RECORD_CARLA_ORIGINAL,
-                self::RECORD_MARIA,
-            ])
-            ->delete();
-
-        DB::table('central_riesgo_version')->insert([
-            [
-                'id_version' => self::VERSION_CARLA_FIRST,
-                'id_cr_estudiante' => self::RECORD_CARLA_RECTIFIED,
-                'numero_version' => 1,
-                'id_tipo_falta' => $types['Material no permitido'],
-                'descripcion' => 'Tenía material impreso entre sus útiles.',
-                'motivo' => null,
-                'id_usuario_autor' => Ids::TEACHER_FIXED,
-                'fecha_registro' => '2026-09-11 15:00:00-04',
-                'es_vigente' => false,
-            ],
-            [
-                'id_version' => self::VERSION_CARLA_CURRENT,
-                'id_cr_estudiante' => self::RECORD_CARLA_RECTIFIED,
-                'numero_version' => 2,
-                'id_tipo_falta' => $types['Copia en examen'],
-                'descripcion' => 'El material impreso contenía las respuestas del examen y las copiaba.',
-                'motivo' => 'La evidencia confirma que se trataba de copia y no de material olvidado.',
-                'id_usuario_autor' => Ids::ADMINISTRATOR,
-                'fecha_registro' => '2026-10-05 10:00:00-04',
-                'es_vigente' => true,
-            ],
-        ]);
     }
 }
