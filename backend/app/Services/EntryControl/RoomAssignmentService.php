@@ -20,15 +20,15 @@ class RoomAssignmentService
     }
 
     /**
-     * Valida la capacidad antes de abrir. La nómina queda congelada por el estado
-     * EN_INGRESO; las aulas se calculan cuando se verifica al estudiante.
+     * Valida la capacidad antes de abrir; las aulas se calculan al verificar.
      */
     public function prepare(int $examId): void
     {
         DB::transaction(function () use ($examId): void {
             $exam = Exam::query()->whereKey($examId)->lockForUpdate()->firstOrFail();
 
-            if (! in_array($exam->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO], true)) {
+            if (! in_array($exam->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::EN_CURSO], true)
+                || CloseOrdinaryEntryService::isClosed($examId)) {
                 throw new DomainException('El examen no admite preparación de ambientes.');
             }
 
@@ -68,13 +68,12 @@ class RoomAssignmentService
 
             $token = $this->snapshots->stage($exam);
 
-            if ($exam->estado === Exam::PROGRAMADO) {
-                $exam->update(['estado' => Exam::EN_INGRESO]);
+            if (! CloseOrdinaryEntryService::hasOpened($examId)) {
                 $this->auditLog->registrar(
                     'MODIFICAR',
                     'examen',
-                    ['id_examen' => $exam->id_examen, 'estado' => Exam::PROGRAMADO],
-                    ['id_examen' => $exam->id_examen, 'estado' => Exam::EN_INGRESO, 'evento' => 'APERTURA_CONTROL'],
+                    ['id_examen' => $exam->id_examen],
+                    ['id_examen' => $exam->id_examen, 'evento' => 'APERTURA_CONTROL'],
                     (string) $exam->id_usuario_docente
                 );
             }

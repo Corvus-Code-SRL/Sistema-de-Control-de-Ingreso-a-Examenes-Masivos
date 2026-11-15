@@ -36,9 +36,9 @@ class RoomAssignmentAuditTest extends TestCase
         $this->assertSame('MODIFICAR', Action::query()->whereKey($logs[0]->id_accion)->value('operacion'));
         $this->assertSame('APERTURA_CONTROL', $logs[0]->nuevo_valor['evento']);
         $this->assertSame($this->docenteId, $logs[0]->id_usuario);
-        $this->assertSame(Exam::EN_INGRESO, $exam->fresh()->estado);
+        $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
 
-        // Reintento con el examen ya EN_INGRESO: no duplica la auditoría.
+        // Reintento con el ingreso ya abierto: no duplica la auditoría.
         app(RoomAssignmentService::class)->prepare((int) $exam->id_examen);
         $this->assertSame(1, AuditLog::query()->where('tabla_afectada', 'examen')->count());
     }

@@ -102,7 +102,8 @@ class EntryOpeningFailureTest extends TestCase
 
         $this->setCapacity(2);
         $this->runOpeningJob();
-        $this->assertSame(Exam::EN_INGRESO, $exam->fresh()->estado);
+        $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+        $this->assertTrue(app(RoomAssignmentService::class)->hasPreparedSnapshot((int) $exam->id_examen));
         $this->assertNull(app(EntryOpeningFailureStore::class)->get($exam->id_examen));
         $queries = [];
         DB::listen(function ($query) use (&$queries): void {
@@ -140,7 +141,8 @@ class EntryOpeningFailureTest extends TestCase
 
         $this->setCapacity(2);
         $this->runOpeningJob();
-        $this->assertSame(Exam::EN_INGRESO, $exam->fresh()->estado);
+        $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+        $this->assertTrue(app(RoomAssignmentService::class)->hasPreparedSnapshot((int) $exam->id_examen));
         $this->assertFailure($other, 'SIN_NOMINA', 'El examen no tiene estudiantes en su nómina.');
     }
 
