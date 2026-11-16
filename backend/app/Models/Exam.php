@@ -26,12 +26,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $id_materia
  * @property string $id_usuario_docente
  * @property string $estado
+ * @property \Carbon\Carbon|null $ingreso_abierto_en
+ * @property \Carbon\Carbon|null $ingreso_ordinario_cerrado_en
+ * @property \Carbon\Carbon|null $fin_real_en
  */
 class Exam extends Model
 {
-    /** Valores de public.estado_examen. */
+    /** Valores de public.estado_examen. El valor EN_INGRESO sigue en el enum, pero un CHECK impide usarlo. */
     public const PROGRAMADO = 'PROGRAMADO';
-    public const EN_INGRESO = 'EN_INGRESO';
     public const EN_CURSO   = 'EN_CURSO';
     public const FINALIZADO = 'FINALIZADO';
     public const CANCELADO  = 'CANCELADO';
@@ -39,6 +41,9 @@ class Exam extends Model
     protected $table = 'examen';
     protected $primaryKey = 'id_examen';
     public $timestamps = false;
+
+    // Las fechas con hora se guardan con su desfase explícito: no dependen de la zona de la sesión de BD.
+    protected $dateFormat = 'Y-m-d H:i:sP';
 
     protected $casts = [
         'fecha' => 'date',
@@ -48,9 +53,9 @@ class Exam extends Model
         'id_carrera' => 'integer',
         'id_materia' => 'integer',
         'id_usuario_docente' => 'string',
-        'inicio_real_en' => 'datetime',
+        'ingreso_abierto_en' => 'datetime',
+        'ingreso_ordinario_cerrado_en' => 'datetime',
         'fin_real_en' => 'datetime',
-        'inicio_automatico' => 'boolean',
         'fin_automatico' => 'boolean',
     ];
 
@@ -60,6 +65,7 @@ class Exam extends Model
         'hora_inicio',
         'hora_fin',
         'duracion',
+        'minutos_apertura',
         'normas',
         'id_tipo_examen',
         'id_carrera',

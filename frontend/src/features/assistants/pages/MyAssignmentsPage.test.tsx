@@ -53,7 +53,7 @@ describe('MyAssignmentsPage', () => {
   it('muestra el estado de cada examen vigente', async () => {
     listMyExams.mockResolvedValue([
       assignedExam,
-      { ...assignedExam, id_examen: 9, estado: 'EN_INGRESO' },
+      { ...assignedExam, id_examen: 9, estado: 'PROGRAMADO', control_ingreso_abierto: true },
       { ...assignedExam, id_examen: 10, estado: 'EN_CURSO' },
     ])
 
@@ -63,12 +63,14 @@ describe('MyAssignmentsPage', () => {
     await screen.findAllByText('1er Parcial BD I')
     const [programado, enIngreso, enCurso] = screen.getAllByRole('article')
     expect(within(programado).getByText('Programado')).toBeVisible()
-    expect(within(enIngreso).getByText('Control de ingreso abierto')).toBeVisible()
+    expect(within(enIngreso).getByText('Programado')).toBeVisible()
+    expect(within(enIngreso).getByRole('link', { name: /controlar ingreso/i })).toBeVisible()
+    expect(within(programado).queryByRole('link', { name: /controlar ingreso/i })).not.toBeInTheDocument()
     expect(within(enCurso).getByText('En curso')).toBeVisible()
   })
 
   it('con el ingreso abierto la tarjeta lleva al control de ingreso de ese examen', async () => {
-    listMyExams.mockResolvedValue([{ ...assignedExam, id_examen: 9, estado: 'EN_INGRESO' }])
+    listMyExams.mockResolvedValue([{ ...assignedExam, id_examen: 9, estado: 'PROGRAMADO', control_ingreso_abierto: true }])
 
     renderWithRouter(<MyAssignmentsPage />, { route: '/mis-examenes' })
 

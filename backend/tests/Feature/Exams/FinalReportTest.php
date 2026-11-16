@@ -8,6 +8,8 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\SeedsExamCatalog;
 use Tests\TestCase;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 
 /**
  * Reporte final del examen (HU-051): cabecera, asistencia por grupo, estudiantes,
@@ -35,7 +37,11 @@ class FinalReportTest extends TestCase
     /** Examen finalizado con un estudiante que ingresó a tiempo y otro ausente. */
     private function finishedExam(array $overrides = []): Exam
     {
-        $exam = $this->createExam(array_merge(['estado' => Exam::FINALIZADO], $overrides), [$this->aulaId]);
+        $exam = $this->createExam(array_merge([
+            'estado' => Exam::FINALIZADO,
+            'ingreso_abierto_en' => '2026-10-28 11:30:00+00',
+            'ingreso_ordinario_cerrado_en' => '2026-10-28 12:15:00+00',
+        ], $overrides), [$this->aulaId]);
 
         DB::table('grupo_examen')->insert([
             'id_examen' => $exam->id_examen,
@@ -84,7 +90,8 @@ class FinalReportTest extends TestCase
         $response = $this->getJson($this->url($exam))
             ->assertOk()
             ->assertJsonPath('data.cabecera.nombre_examen', 'Parcial final')
-            ->assertJsonPath('data.cabecera.hora_inicio', '08:00 (programada)')
+            ->assertJsonPath('data.cabecera.hora_inicio', '08:00')
+            ->assertJsonPath('data.cabecera.hora_apertura', '07:30')
             ->assertJsonPath('data.asistencia.totales.inscritos', 2)
             ->assertJsonPath('data.asistencia.totales.a_tiempo', 1)
             ->assertJsonPath('data.asistencia.totales.con_retraso', 0)
@@ -115,7 +122,7 @@ class FinalReportTest extends TestCase
         );
     }
 
-    public function test_encabezado_usa_las_horas_reales_en_hora_de_la_paz(): void
+    public function test_encabezado_usa_la_hora_programada_la_apertura_y_el_fin_real_en_hora_de_la_paz(): void
     {
         $exam = $this->finishedExam();
 
@@ -124,24 +131,31 @@ class FinalReportTest extends TestCase
             'fin_real_en' => '2026-10-28 13:52:00+00',
         ]);
 
+        // inicio_real_en ya no se usa: el inicio es el programado.
         $this->getJson($this->url($exam))
             ->assertOk()
-            ->assertJsonPath('data.cabecera.hora_inicio', '08:14')
+            ->assertJsonPath('data.cabecera.hora_inicio', '08:00')
+            ->assertJsonPath('data.cabecera.hora_apertura', '07:30')
             ->assertJsonPath('data.cabecera.hora_fin', '09:52');
     }
 
-    public function test_si_falta_una_hora_real_muestra_la_programada_con_su_etiqueta(): void
+    public function test_si_falta_el_fin_real_muestra_la_hora_programada_con_su_etiqueta(): void
     {
         $exam = $this->finishedExam();
 
-        DB::table('examen')->where('id_examen', $exam->id_examen)->update([
-            'inicio_real_en' => '2026-10-28 12:14:00+00',
-        ]);
+        $this->getJson($this->url($exam))
+            ->assertOk()
+            ->assertJsonPath('data.cabecera.hora_inicio', '08:00')
+            ->assertJsonPath('data.cabecera.hora_fin', '09:30 (programada)');
+    }
+
+    public function test_sin_apertura_registrada_la_cabecera_no_inventa_la_hora(): void
+    {
+        $exam = $this->finishedExam(['ingreso_abierto_en' => null, 'ingreso_ordinario_cerrado_en' => null]);
 
         $this->getJson($this->url($exam))
             ->assertOk()
-            ->assertJsonPath('data.cabecera.hora_inicio', '08:14')
-            ->assertJsonPath('data.cabecera.hora_fin', '09:30 (programada)');
+            ->assertJsonPath('data.cabecera.hora_apertura', null);
     }
 
     public function test_sin_incidencias_la_lista_viene_vacia(): void
@@ -332,5 +346,77 @@ class FinalReportTest extends TestCase
         $reflection->setAccessible(true);
 
         return $reflection->invokeArgs($object, $arguments);
+    }
+
+    public function test_docente_descarga_el_excel_con_las_mismas_cifras_del_reporte(): void
+    {
+        $exam = $this->finishedExam(['nombre_examen' => 'Parcial final']);
+
+        $response = $this->get($this->url($exam) . '/excel')->assertOk();
+
+        $this->assertSame(
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            $response->headers->get('Content-Type')
+        );
+        $this->assertStringContainsString(
+            'reporte-final-parcial-final-' . $exam->fecha->toDateString() . '.xlsx',
+            $response->headers->get('Content-Disposition')
+        );
+
+        $spreadsheet = $this->loadSpreadsheet($response->getContent());
+
+        $this->assertSame(['Resumen', 'Estudiantes', 'Incidencias'], $spreadsheet->getSheetNames());
+
+        $rows = $spreadsheet->getSheetByName('Resumen')->toArray();
+        $total = collect($rows)->first(fn ($row) => $row[0] === 'Total');
+        $this->assertEquals(['Total', 2, 1, 0, 1], array_slice($total, 0, 5));
+
+        $this->assertSame(3, $spreadsheet->getSheetByName('Estudiantes')->getHighestRow());
+        $this->assertSame(
+            'No se registraron incidencias en este examen',
+            $spreadsheet->getSheetByName('Incidencias')->getCell('A2')->getValue()
+        );
+    }
+
+    public function test_un_texto_que_empieza_con_igual_no_se_guarda_como_formula_en_el_excel(): void
+    {
+        $exam = $this->finishedExam();
+        $studentId = $this->groupStudentIds()[0];
+        DB::table('estudiante')->where('id_estudiante', $studentId)->update(['nombre' => '=1+1']);
+
+        $response = $this->get($this->url($exam) . '/excel')->assertOk();
+
+        $sheet = $this->loadSpreadsheet($response->getContent())->getSheetByName('Estudiantes');
+        $found = false;
+
+        foreach ([2, 3] as $row) {
+            $cell = $sheet->getCell('B' . $row);
+
+            if (str_starts_with((string) $cell->getValue(), '=1+1')) {
+                $found = true;
+                $this->assertFalse($cell->isFormula());
+            }
+        }
+
+        $this->assertTrue($found);
+    }
+
+    public function test_no_se_descarga_el_excel_de_un_examen_en_curso(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::EN_CURSO], [$this->aulaId]);
+
+        $this->getJson($this->url($exam) . '/excel')->assertForbidden();
+    }
+
+    private function loadSpreadsheet(string $content): Spreadsheet
+    {
+        $path = tempnam(sys_get_temp_dir(), 'reporte');
+        file_put_contents($path, $content);
+
+        try {
+            return IOFactory::createReader('Xlsx')->load($path);
+        } finally {
+            @unlink($path);
+        }
     }
 }

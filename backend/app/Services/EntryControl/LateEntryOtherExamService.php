@@ -10,7 +10,7 @@ use Carbon\Carbon;
 
 /**
  * Advertencia del ingreso con retraso (HU-037): el estudiante ya ingresó a otro examen que sigue
- * abierto (EN_INGRESO o EN_CURSO) y cuya hora de fin programada no pasó. No bloquea: quien
+ * abierto (PROGRAMADO o EN_CURSO) y cuya hora de fin programada no pasó. No bloquea: quien
  * controla decide. Un examen anterior que solo espera su cierre automático no cuenta, así dos
  * exámenes seguidos (8:00–10:00 y 10:00–12:00) nunca se advierten.
  */
@@ -52,7 +52,7 @@ class LateEntryOtherExamService
             ->with(['subject', 'teacher'])
             ->whereIn('ee.id_estudiante', array_values(array_unique($studentIds)))
             ->where('examen.id_examen', '<>', $exam->id_examen)
-            ->whereIn('examen.estado', [Exam::EN_INGRESO, Exam::EN_CURSO])
+            ->whereIn('examen.estado', [Exam::PROGRAMADO, Exam::EN_CURSO])
             ->whereIn('ee.estado_ingreso', [StudentExam::INGRESO, StudentExam::CON_RETRASO])
             ->orderBy('ee.hora_ingreso')
             ->get([

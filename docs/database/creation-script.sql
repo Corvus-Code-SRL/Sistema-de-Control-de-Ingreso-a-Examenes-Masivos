@@ -1769,3 +1769,122 @@ ALTER TABLE public.grupo_estudiante
 
 CREATE INDEX idx_grupo_estudiante_carrera
     ON public.grupo_estudiante(id_grupo, id_carrera);
+
+-- Versión 13: apertura del control de ingreso sin tope de base (HU-024)
+--             (2026_11_07_000000_remove_exam_opening_upper_limit)
+--   * examen.minutos_apertura: el CHECK pasa de 0..30 a >= 0. El máximo de negocio (120 min)
+--     lo valida la API (ExamRequest), no la base.
+
+ALTER TABLE public.examen DROP CONSTRAINT chk_examen_minutos_apertura;
+
+ALTER TABLE public.examen
+    ADD CONSTRAINT chk_examen_minutos_apertura CHECK (minutos_apertura >= 0);
+
+-- Versión 14: rectificar un registro de la Central de Riesgo (HU-062)
+--             (2026_11_14_000000_add_rectification_to_central_riesgo)
+--   * Rectificar es anular: un administrador retira de la Central un registro que no correspondía. La fila
+--     de central_riesgo nunca se borra ni se reactiva; se marca con tres columnas que deben estar las tres
+--     vacías (registro activo) o las tres con valor (registro rectificado).
+--   * reporte_estudiante, su evidencia y sus datos de revisión no se modifican.
+--   * Los índices parciales cubren las lecturas de registros activos (consulta HU-046, aviso del control de
+--     ingreso, reporte HU-063). Toda lectura de la Central debe filtrar rectificado_en IS NULL.
+--   * Se registra la acción de bitácora RECTIFICAR_REGISTRO (accion.operacion no es UNIQUE: solo si falta).
+
+ALTER TABLE public.central_riesgo
+    ADD COLUMN rectificado_en          timestamp with time zone,
+    ADD COLUMN id_usuario_rectificador uuid,
+    ADD COLUMN motivo_rectificacion    text;
+
+ALTER TABLE public.central_riesgo
+    ADD CONSTRAINT fk_central_riesgo_rectificador
+        FOREIGN KEY (id_usuario_rectificador) REFERENCES public.usuario(id_usuario);
+
+ALTER TABLE public.central_riesgo
+    ADD CONSTRAINT chk_central_riesgo_rectificacion CHECK (
+        (rectificado_en IS NULL
+            AND id_usuario_rectificador IS NULL
+            AND motivo_rectificacion IS NULL)
+        OR
+        (rectificado_en IS NOT NULL
+            AND id_usuario_rectificador IS NOT NULL
+            AND motivo_rectificacion IS NOT NULL
+            AND length(btrim(motivo_rectificacion)) > 0)
+    );
+
+CREATE INDEX idx_central_riesgo_activo_estudiante
+    ON public.central_riesgo (id_estudiante)
+    WHERE rectificado_en IS NULL;
+
+CREATE INDEX idx_central_riesgo_activo_fecha
+    ON public.central_riesgo (fecha_registro DESC, id_cr_estudiante DESC)
+    WHERE rectificado_en IS NULL;
+
+INSERT INTO public.accion (operacion, tipo_operacion, descripcion)
+SELECT 'RECTIFICAR_REGISTRO', 'UPDATE', 'Rectificación de un registro de la Central de Riesgo'
+WHERE NOT EXISTS (SELECT 1 FROM public.accion WHERE operacion = 'RECTIFICAR_REGISTRO');
+
+-- Versión 15: invitar docentes colaboradores a un examen (HU-026)
+--             (2026_11_16_000000_add_sin_efecto_to_estado_invitacion y
+--              2026_11_16_000001_prepare_invitacion_examen_for_collaborators)
+--   * El enum estado_invitacion suma SIN_EFECTO: la invitación pendiente de un examen que dejó de estar
+--     PROGRAMADO (abrió el control de ingreso, se canceló o terminó). PostgreSQL no usa un valor de enum
+--     nuevo en la misma transacción: en Supabase se corre primero el ALTER TYPE (fuera de transacción) y
+--     después el resto.
+--   * permite_agregar_grupos: si el colaborador, al aceptar, puede sumar sus grupos de la materia al examen
+--     (lo guarda HU-026 y lo hace cumplir HU-027). fecha_sin_efecto: cuándo quedó sin efecto.
+--   * El CHECK de estado admite SIN_EFECTO (sin fecha_respuesta y con fecha_sin_efecto).
+--   * Un docente no se invita a sí mismo ni tiene dos invitaciones vigentes (PENDIENTE o ACEPTADA) al mismo
+--     examen; tras RECHAZADA o SIN_EFECTO se lo puede invitar de nuevo.
+--   * Se registra la acción de bitácora INVITAR_COLABORADOR (accion.operacion no es UNIQUE: solo si falta).
+
+ALTER TYPE public.estado_invitacion ADD VALUE IF NOT EXISTS 'SIN_EFECTO';
+
+ALTER TABLE public.invitacion_examen
+    ADD COLUMN permite_agregar_grupos boolean NOT NULL DEFAULT true,
+    ADD COLUMN fecha_sin_efecto       timestamp with time zone;
+
+ALTER TABLE public.invitacion_examen DROP CONSTRAINT chk_invitacion_examen_estado;
+
+ALTER TABLE public.invitacion_examen
+    ADD CONSTRAINT chk_invitacion_examen_estado CHECK (
+        (estado = 'PENDIENTE'
+            AND fecha_respuesta IS NULL AND fecha_sin_efecto IS NULL)
+        OR
+        (estado IN ('ACEPTADA', 'RECHAZADA')
+            AND fecha_respuesta IS NOT NULL AND fecha_sin_efecto IS NULL)
+        OR
+        (estado = 'SIN_EFECTO'
+            AND fecha_respuesta IS NULL AND fecha_sin_efecto IS NOT NULL)
+    );
+
+ALTER TABLE public.invitacion_examen
+    ADD CONSTRAINT chk_invitacion_examen_no_autoinvitacion
+        CHECK (id_docente_creador <> id_docente_invitado);
+
+CREATE UNIQUE INDEX uq_invitacion_examen_vigente
+    ON public.invitacion_examen (id_examen, id_docente_invitado)
+    WHERE estado IN ('PENDIENTE', 'ACEPTADA');
+
+INSERT INTO public.accion (operacion, tipo_operacion, descripcion)
+SELECT 'INVITAR_COLABORADOR', 'INSERT', 'Invitación de un docente colaborador a un examen'
+WHERE NOT EXISTS (SELECT 1 FROM public.accion WHERE operacion = 'INVITAR_COLABORADOR');
+
+-- Versión 16: estado persistente del control de ingreso (HU-038)
+--             (2026_11_16_000000_add_entry_control_timestamps_to_examen y
+--              2026_11_17_000000_retire_estado_en_ingreso_examen)
+--   * La apertura y el cierre ordinario se consultan en examen; la bitácora conserva el historial.
+--   * La migración rellena estas fechas desde los eventos existentes de la bitácora.
+--   * EN_INGRESO deja de usarse: el valor sigue en el enum estado_examen (PostgreSQL no permite quitarlo),
+--     pero un CHECK impide asignarlo. El control abierto es ingreso_abierto_en NOT NULL con
+--     ingreso_ordinario_cerrado_en NULL y el examen PROGRAMADO o EN_CURSO.
+--   * En una base con datos, la migración pasa los EN_INGRESO a PROGRAMADO (si aún no llega la hora de
+--     inicio) o EN_CURSO, y cierra el ingreso ordinario de los EN_CURSO y FINALIZADO heredados (en develop
+--     iniciar el examen cerraba el control) antes de agregar el CHECK. En una base nueva no hay nada que convertir.
+--   * inicio_real_en e inicio_automatico ya no se escriben; las columnas se conservan.
+
+ALTER TABLE public.examen
+    ADD COLUMN ingreso_abierto_en timestamp with time zone,
+    ADD COLUMN ingreso_ordinario_cerrado_en timestamp with time zone;
+
+ALTER TABLE public.examen
+    ADD CONSTRAINT chk_examen_estado_sin_en_ingreso CHECK (estado <> 'EN_INGRESO');

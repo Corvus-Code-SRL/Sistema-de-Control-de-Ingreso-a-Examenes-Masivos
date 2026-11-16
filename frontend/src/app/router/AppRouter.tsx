@@ -46,7 +46,8 @@ import {
   SubjectGroupsPage,
 } from '@/features/groups'
 import { ClassroomsPage } from '@/features/classrooms'
-import { RiskCenterPage } from '@/features/risk-center/academic'
+import { COLLABORATOR_INVITATIONS_PATH, CollaboratorInvitationsPage } from '@/features/collaborators'
+import { RectifyRiskRecordPage, RiskCenterPage } from '@/features/risk-center/academic'
 import { RosterUploadPage } from '@/features/students'
 import {
   AdminSubjectAssignmentsPage,
@@ -134,6 +135,11 @@ function DocenteRoutes() {
         />
 
         <Route
+          path={COLLABORATOR_INVITATIONS_PATH}
+          element={guarded('docentes.invitar', <CollaboratorInvitationsPage />)}
+        />
+
+        <Route
           path="/examenes/:examId/auxiliares"
           element={guarded('auxiliares.examen', <ExamAssistantsPage />)}
         />
@@ -186,6 +192,10 @@ function DocenteRoutes() {
         <Route
           path="/central-riesgo/:id?"
           element={guarded('riesgo.consultar', <RiskCenterPage />)}
+        />
+        <Route
+          path="/rectificar-registro/:id?"
+          element={guarded('riesgo.rectificar', <RectifyRiskRecordPage />)}
         />
 
         <Route
@@ -275,8 +285,8 @@ function AssignmentsRedirect() {
 /**
  * Rutas de la administración del catálogo institucional.
  *
- * Cuentas, Materias (Asignaciones y Catálogo), Ambientes y la Central de riesgo (solo lectura)
- * tienen pantallas disponibles.
+ * Cuentas, Materias (Asignaciones y Catálogo), Ambientes y la Central de riesgo (consulta y
+ * rectificación) tienen pantallas disponibles.
  * Facultades y carreras permanecen pendientes de sus respectivas historias de usuario.
  */
 function AdministradorRoutes() {
@@ -311,6 +321,10 @@ function AdministradorRoutes() {
         <Route
           path="/central-riesgo/:id?"
           element={guarded('riesgo.consultar', <RiskCenterPage />)}
+        />
+        <Route
+          path="/rectificar-registro/:id?"
+          element={guarded('riesgo.rectificar', <RectifyRiskRecordPage />)}
         />
         <Route
           path="/reportes/intentos"

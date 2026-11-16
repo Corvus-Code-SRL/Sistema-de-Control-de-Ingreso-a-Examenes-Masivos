@@ -2,6 +2,8 @@
 
 namespace App\Http\Resources\Exams;
 
+use App\Services\EntryControl\CloseOrdinaryEntryService;
+use App\Services\Exams\ExamTimingService;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
@@ -18,11 +20,18 @@ class ExamResource extends JsonResource
             'hora_inicio'        => $this->formatTime($this->hora_inicio),
             'hora_fin'           => $this->formatTime($this->hora_fin),
             'duracion'           => $this->duracion,
+            'minutos_apertura'   => $this->minutos_apertura,
             'normas'             => $this->normas,
             'estado'             => $this->estado,
-            'inicio_real_en'     => $this->inicio_real_en ? $this->inicio_real_en->toIso8601String() : null,
+            'inicio_programado'  => $this->fecha && $this->hora_inicio
+                ? app(ExamTimingService::class)->startsAt($this->resource)->toIso8601String()
+                : null,
+            'ingreso_abierto_en' => $this->ingreso_abierto_en ? $this->ingreso_abierto_en->toIso8601String() : null,
+            'ingreso_ordinario_cerrado_en' => $this->ingreso_ordinario_cerrado_en
+                ? $this->ingreso_ordinario_cerrado_en->toIso8601String()
+                : null,
+            'control_ingreso_abierto' => CloseOrdinaryEntryService::isOpen($this->resource),
             'fin_real_en'        => $this->fin_real_en ? $this->fin_real_en->toIso8601String() : null,
-            'inicio_automatico'  => (bool) $this->inicio_automatico,
             'fin_automatico'     => (bool) $this->fin_automatico,
             'id_tipo_examen'     => $this->id_tipo_examen,
             'id_carrera'         => $this->id_carrera,

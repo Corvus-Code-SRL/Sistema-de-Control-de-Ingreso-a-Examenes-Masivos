@@ -8,6 +8,8 @@ use App\Exceptions\Academic\StudentRosterGroupAccessException;
 use App\Exceptions\Academic\StudentRosterPreviewUnavailableException;
 use App\Exceptions\EntryControl\EntryOpeningException;
 use App\Exceptions\EntryControl\LateEntryException;
+use App\Exceptions\Exams\CollaboratorInvitationOwnershipException;
+use App\Exceptions\Exams\DuplicateInvitationException;
 use App\Exceptions\Exams\ExamAssistantNotFoundException;
 use App\Exceptions\Exams\ExamOwnershipException;
 use App\Exceptions\Exams\ExamStateException;
@@ -30,6 +32,7 @@ use Illuminate\Http\Request;
 use App\Exceptions\Incidents\IncidentAlreadyReviewedException;
 use App\Exceptions\Incidents\IncidentOwnershipException;
 use App\Exceptions\Incidents\IncidentReportNotFoundException;
+use App\Exceptions\RiskCenter\RiskRecordAlreadyRectifiedException;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -52,6 +55,8 @@ class Handler extends ExceptionHandler
         StudentRosterPreviewUnavailableException::class,
         EntryOpeningException::class,
         LateEntryException::class,
+        CollaboratorInvitationOwnershipException::class,
+        DuplicateInvitationException::class,
         ExamAssistantNotFoundException::class,
         ExamOwnershipException::class,
         ExamStateException::class,
@@ -69,6 +74,7 @@ class Handler extends ExceptionHandler
         IncidentAlreadyReviewedException::class,
         IncidentOwnershipException::class,
         IncidentReportNotFoundException::class,
+        RiskRecordAlreadyRectifiedException::class,
     ];
 
     /**

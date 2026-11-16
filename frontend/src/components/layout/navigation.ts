@@ -173,7 +173,9 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'admin-risk-rectify',
         label: 'Rectificar registro de la central',
         icon: FilePenLine,
-        capability: 'administracion.gestionar'
+        capability: 'riesgo.rectificar',
+        to: '/rectificar-registro',
+        matches: ['/rectificar-registro/:id']
       }
     ]
   },
@@ -288,7 +290,8 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'teacher-invite-collaborators',
         label: 'Invitar docentes colaboradores',
         icon: UserRoundPlus,
-        capability: 'docentes.invitar'
+        capability: 'docentes.invitar',
+        to: '/colaboradores/invitar'
       },
       {
         id: 'teacher-exam-invitations',

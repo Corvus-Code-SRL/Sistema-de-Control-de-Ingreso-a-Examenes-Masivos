@@ -67,8 +67,8 @@ describe('useInProgressExams', () => {
         hora_fin: '12:00', estado: 'EN_CURSO', materia: 'Química', ambiente: null, ambiente_por_defecto: false,
       },
       {
-        id_examen: 12, nombre_examen: 'En ingreso', fecha: '2026-10-29', hora_inicio: '10:00',
-        hora_fin: '12:00', estado: 'EN_INGRESO', materia: 'Física',
+        id_examen: 12, nombre_examen: 'Ingreso abierto', fecha: '2026-10-29', hora_inicio: '10:00',
+        hora_fin: '12:00', estado: 'PROGRAMADO', materia: 'Física',
         ambiente: { id_ambiente: 2, nro_aula: '691B', capacidad: 40 }, ambiente_por_defecto: false,
       },
     ])

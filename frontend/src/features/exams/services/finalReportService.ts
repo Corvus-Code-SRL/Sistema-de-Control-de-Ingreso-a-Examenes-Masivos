@@ -5,8 +5,8 @@ interface DataResponse<T> {
   data: T
 }
 
-/** Generar el PDF tarda más que una consulta normal, que espera 15 s. */
-const PDF_TIMEOUT_MS = 60_000
+/** Generar el PDF o el Excel tarda más que una consulta normal, que espera 15 s. */
+const DOWNLOAD_TIMEOUT_MS = 60_000
 
 export const finalReportService = {
   async getFinalReport(examId: number, signal?: AbortSignal): Promise<FinalReport> {
@@ -20,7 +20,15 @@ export const finalReportService = {
   async downloadPdf(examId: number, signal?: AbortSignal): Promise<Blob> {
     return apiClient<Blob>(`/examenes/${examId}/reporte-final/pdf`, {
       responseType: 'blob',
-      timeoutMs: PDF_TIMEOUT_MS,
+      timeoutMs: DOWNLOAD_TIMEOUT_MS,
+      signal
+    })
+  },
+
+  async downloadExcel(examId: number, signal?: AbortSignal): Promise<Blob> {
+    return apiClient<Blob>(`/examenes/${examId}/reporte-final/excel`, {
+      responseType: 'blob',
+      timeoutMs: DOWNLOAD_TIMEOUT_MS,
       signal
     })
   }

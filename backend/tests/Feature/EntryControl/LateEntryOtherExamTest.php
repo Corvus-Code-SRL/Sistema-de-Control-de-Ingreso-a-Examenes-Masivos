@@ -17,7 +17,7 @@ use Tests\Concerns\SeedsLateEntryExam;
 use Tests\TestCase;
 
 /**
- * HU-037: si el estudiante ya ingresó a otro examen abierto (EN_INGRESO o EN_CURSO) cuyo fin
+ * HU-037: si el estudiante ya ingresó a otro examen abierto (PROGRAMADO con el control abierto o EN_CURSO) cuyo fin
  * programado no pasó, se advierte y quien controla decide: sin confirmación responde 409 con la
  * advertencia; con confirmación continúa y la bitácora lo registra.
  */
@@ -66,6 +66,7 @@ class LateEntryOtherExamTest extends TestCase
     {
         return $this->postJson($this->lateEntryUrl('verificar'), [
             'cod_sis' => $this->studentColumn($this->secondStudentId, 'cod_sis'),
+            'id_ambiente' => $this->otraAulaId,
         ]);
     }
 
@@ -298,7 +299,7 @@ class LateEntryOtherExamTest extends TestCase
     public function test_un_examen_en_ingreso_tambien_se_advierte(): void
     {
         $this->enterOtherExam();
-        DB::table('examen')->where('id_examen', $this->otherExam->id_examen)->update(['estado' => Exam::EN_INGRESO]);
+        $this->putExamInState((int) $this->otherExam->id_examen, 'INGRESO_ABIERTO');
         $this->actAsTeacher($this->docenteId);
 
         $this->register()->assertStatus(409)->assertJsonPath('veredicto', LateEntryException::OTHER_EXAM);

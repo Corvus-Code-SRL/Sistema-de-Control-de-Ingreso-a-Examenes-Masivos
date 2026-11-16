@@ -110,7 +110,7 @@ export function ExamDetailPage() {
   }, [load])
 
   const handleCancelExam = async () => {
-    if (!exam || exam.estado !== 'PROGRAMADO') return
+    if (!exam || exam.estado !== 'PROGRAMADO' || exam.ingreso_abierto_en) return
 
     setCancelling(true)
     setCancelError(null)
@@ -130,7 +130,7 @@ export function ExamDetailPage() {
     }
   }
 
-  const isProgramado = exam?.estado === 'PROGRAMADO'
+  const isProgramado = exam?.estado === 'PROGRAMADO' && !exam.ingreso_abierto_en
   const groups = exam?.grupos ?? []
   const classrooms = exam?.ambientes ?? []
 
@@ -187,7 +187,7 @@ export function ExamDetailPage() {
         title={exam?.nombre_examen ?? 'Detalle del examen'}
         backTo={backTo}
         backLabel={backLabel}
-        subtitle={exam && <ExamStatusBadge status={exam.estado} />}
+        subtitle={exam && <ExamStatusBadge status={exam.estado} entryOpen={exam.control_ingreso_abierto} />}
         actions={
           exam && isProgramado ? (
             <div className="flex flex-wrap items-center gap-2">
@@ -210,7 +210,7 @@ export function ExamDetailPage() {
                 Cancelar examen
               </Button>
             </div>
-          ) : exam?.estado === 'EN_INGRESO' ? (
+          ) : exam?.estado === 'PROGRAMADO' && exam.control_ingreso_abierto ? (
             <Button
               type="button"
               onClick={() => navigate(`/examenes/${id}/control-ingreso`)}
@@ -219,12 +219,24 @@ export function ExamDetailPage() {
               Controlar ingreso
             </Button>
           ) : exam?.estado === 'EN_CURSO' ? (
-            <Button
-              type="button"
-              onClick={() => navigate(`/examenes/${id}/en-curso`)}
-            >
-              Ver examen en curso
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              {exam.control_ingreso_abierto && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate(`/examenes/${id}/control-ingreso`)}
+                >
+                  <DoorOpen className="size-4" aria-hidden="true" />
+                  Controlar ingreso
+                </Button>
+              )}
+              <Button
+                type="button"
+                onClick={() => navigate(`/examenes/${id}/en-curso`)}
+              >
+                Ver examen en curso
+              </Button>
+            </div>
           ) : exam?.estado === 'FINALIZADO' ? (
             <Button
               type="button"
@@ -247,12 +259,12 @@ export function ExamDetailPage() {
 
       {!loading && !loadError && exam && (
         <div className="mx-auto max-w-5xl space-y-6">
-          {exam.estado !== 'PROGRAMADO' && (
+          {!isProgramado && (
             <div
               role="status"
               className="rounded-xl border border-border-soft bg-surface p-4 text-sm text-muted-foreground"
             >
-              {examLockedMessage(exam.estado)}
+              {examLockedMessage(exam.estado, Boolean(exam.ingreso_abierto_en))}
             </div>
           )}
 

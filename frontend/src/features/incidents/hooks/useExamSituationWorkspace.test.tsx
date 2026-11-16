@@ -33,14 +33,14 @@ describe('Actualización compartida de situaciones', () => {
     expect(request).toHaveBeenCalledTimes(3)
   })
 
-  it('sigue consultando mientras el examen está en ingreso', async () => {
+  it('sigue consultando mientras el ingreso está abierto', async () => {
     const request = vi.spyOn(examSituationService, 'context').mockResolvedValue({
-      data: { ...workspace, examen: { ...workspace.examen, estado: 'EN_INGRESO' } },
+      data: { ...workspace, examen: { ...workspace.examen, estado: 'PROGRAMADO' } },
     })
     const { result } = renderHook(() => useExamSituationWorkspace(10, undefined, '', 1))
     await flush()
     await advance(10000)
-    expect(result.current.data?.examen.estado).toBe('EN_INGRESO')
+    expect(result.current.data?.examen.estado).toBe('PROGRAMADO')
     expect(request).toHaveBeenCalledTimes(3)
   })
 

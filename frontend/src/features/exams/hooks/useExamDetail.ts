@@ -46,6 +46,7 @@ export function useExamDetail(examId: number) {
         fecha: data.fecha,
         hora_inicio: data.hora_inicio.slice(0, 5),
         duracion: data.duracion,
+        minutos_apertura: data.minutos_apertura ?? 10,
         ambientes: (data.ambientes ?? []).map((room) => room.id_ambiente),
         grupos: (data.grupos ?? []).map((group) => group.id_grupo),
         normas: data.normas ?? '',
@@ -72,18 +73,17 @@ export function useExamDetail(examId: number) {
     if (!formData.materia) return []
     return options.grupos.filter(
       (group) =>
-        group.id_carrera === formData.materia?.id_carrera &&
-        group.id_materia === formData.materia.id_materia
+        group.id_materia === formData.materia?.id_materia
     )
   }, [formData.materia, options.grupos])
 
   const selectedSubject = options.materias.find(
     (subject) =>
-      subject.id_carrera === formData.materia?.id_carrera &&
       subject.id_materia === formData.materia?.id_materia
   )
 
-  const isProgramado = exam?.estado === 'PROGRAMADO'
+  // Con el control de ingreso abierto el examen sigue PROGRAMADO, pero ya no admite cambios.
+  const isProgramado = exam?.estado === 'PROGRAMADO' && !exam.ingreso_abierto_en
 
   const toggleGroup = useCallback(
     (groupId: number) => {
@@ -118,6 +118,7 @@ export function useExamDetail(examId: number) {
         fecha: formData.fecha,
         hora_inicio: formData.hora_inicio,
         duracion: Number(formData.duracion),
+        minutos_apertura: formData.minutos_apertura ?? 10,
         ambientes: formData.ambientes,
         normas: formData.normas || undefined,
         confirmar_advertencias: confirmWarnings || undefined,

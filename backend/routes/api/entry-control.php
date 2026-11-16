@@ -20,6 +20,8 @@ Route::prefix('control-ingreso')->group(function () {
             ->where('intento', '[0-9]{1,9}')
             ->name('control-ingreso.intentos.reporte.store');
         Route::get('/contexto', [EntryControlStatusController::class, 'context'])
+            ->withoutMiddleware('throttle:api')
+            ->middleware('throttle:polling')
             ->name('control-ingreso.examenes.contexto');
         Route::get('/buscar', [StudentVerificationController::class, 'search'])
             ->name('control-ingreso.examenes.buscar');
@@ -29,6 +31,8 @@ Route::prefix('control-ingreso')->group(function () {
             ->name('control-ingreso.examenes.confirmar');
         Route::post('/rechazar-ingreso', [StudentEntryController::class, 'reject'])
             ->name('control-ingreso.examenes.rechazar');
+        Route::post('/cerrar-ingreso-ordinario', [EntryControlStatusController::class, 'closeOrdinary'])
+            ->name('control-ingreso.examenes.cerrar-ordinario');
         Route::get('/estado', [EntryControlStatusController::class, 'currentStatus'])
             ->withoutMiddleware('throttle:api')
             ->middleware('throttle:polling')
@@ -54,6 +58,11 @@ Route::prefix('control-ingreso')->group(function () {
                 ->name('control-ingreso.examenes.retrasos.solicitudes.rechazar');
             Route::post('/registrar', [LateEntryController::class, 'register'])
                 ->name('control-ingreso.examenes.retrasos.registrar');
+            Route::post('/rechazar', [LateEntryController::class, 'rejectAttempt'])
+                ->name('control-ingreso.examenes.retrasos.rechazar');
+            Route::post('/intentos/{intento}/reporte', [IncidentReportController::class, 'storeLateEntry'])
+                ->where('intento', '[0-9]{1,9}')
+                ->name('control-ingreso.examenes.retrasos.intentos.reporte.store');
         });
     });
 });

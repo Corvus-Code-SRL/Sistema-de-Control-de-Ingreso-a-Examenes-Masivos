@@ -6,7 +6,7 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Listado de exámenes del docente. `vista=programados` pide solo los que siguen vigentes:
- * PROGRAMADO o EN_INGRESO, del período activo, del más próximo al más lejano.
+ * PROGRAMADO, del período activo, del más próximo al más lejano.
  */
 class IndexExamRequest extends FormRequest
 {

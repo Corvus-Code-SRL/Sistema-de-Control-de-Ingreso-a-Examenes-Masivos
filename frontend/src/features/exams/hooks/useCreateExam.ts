@@ -55,8 +55,7 @@ export function useCreateExam(onSuccess?: (exam: Exam) => void, initialGroupId?:
 
     return options.grupos.filter(
       (group) =>
-        group.id_carrera === formData.materia?.id_carrera &&
-        group.id_materia === formData.materia.id_materia
+        group.id_materia === formData.materia?.id_materia
     )
   }, [formData.materia, options.grupos])
 
@@ -90,7 +89,6 @@ export function useCreateExam(onSuccess?: (exam: Exam) => void, initialGroupId?:
         const previous = formData.materia
         const next = fields.materia
         const changed =
-          previous?.id_carrera !== next?.id_carrera ||
           previous?.id_materia !== next?.id_materia
 
         setFields(changed ? { ...fields, grupos: [] } : fields)
@@ -128,7 +126,7 @@ export function useCreateExam(onSuccess?: (exam: Exam) => void, initialGroupId?:
 
     const validation = validateForm()
 
-    if (!validation.isValid || !formData.materia) {
+    if (!validation.isValid || !formData.materia || selectedGroups.length === 0) {
       setSubmitError(
         'Por favor complete todos los campos obligatorios del formulario.'
       )
@@ -144,12 +142,13 @@ export function useCreateExam(onSuccess?: (exam: Exam) => void, initialGroupId?:
     try {
       const exam = await examsService.createExam({
         nombre_examen: formData.nombre_examen,
-        id_carrera: formData.materia.id_carrera,
+        id_carrera: selectedGroups[0].id_carrera,
         id_materia: formData.materia.id_materia,
         categoria: formData.categoria,
         fecha: formData.fecha,
         hora_inicio: formData.hora_inicio,
         duracion: Number(formData.duracion),
+        minutos_apertura: formData.minutos_apertura ?? 10,
         ambientes: formData.ambientes,
         grupos: formData.grupos,
         normas: formData.normas || undefined,

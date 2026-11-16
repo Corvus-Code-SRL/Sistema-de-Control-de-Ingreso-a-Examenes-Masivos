@@ -15,14 +15,20 @@ use Illuminate\Support\Facades\DB;
 class ExamRosterLockService
 {
     /** Estados de examen que congelan la nómina de sus grupos. */
-    private const LOCKING_STATES = [Exam::EN_INGRESO, Exam::EN_CURSO];
+    private const LOCKING_STATES = [Exam::EN_CURSO];
 
     public function isLocked(int $groupId): bool
     {
         return DB::table('grupo_examen')
             ->join('examen', 'examen.id_examen', '=', 'grupo_examen.id_examen')
             ->where('grupo_examen.id_grupo', $groupId)
-            ->whereIn('examen.estado', self::LOCKING_STATES)
+            ->where(function ($query): void {
+                $query->whereIn('examen.estado', self::LOCKING_STATES)
+                    ->orWhere(function ($scheduled): void {
+                        $scheduled->where('examen.estado', Exam::PROGRAMADO)
+                            ->whereNotNull('examen.ingreso_abierto_en');
+                    });
+            })
             ->exists();
     }
 }

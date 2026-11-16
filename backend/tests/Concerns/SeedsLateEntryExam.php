@@ -10,7 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Examen EN_CURSO para el ingreso con retraso (HU-037): dos ambientes de capacidad 1, así
+ * Examen EN_CURSO con el ingreso ordinario cerrado para el ingreso con retraso (HU-037): dos ambientes de capacidad 1, así
  * el primer estudiante de la nómina corresponde a 691A y el segundo a 692B, y un auxiliar
  * habilitado en cada ambiente.
  */
@@ -32,7 +32,10 @@ trait SeedsLateEntryExam
     {
         $this->seedExamCatalog();
 
-        $this->exam = $this->createExam(['estado' => Exam::EN_CURSO], [$this->aulaId, $this->otraAulaId]);
+        $this->exam = $this->createExam(
+            array_merge(['estado' => Exam::EN_CURSO], $this->entryOpen(true)),
+            [$this->aulaId, $this->otraAulaId]
+        );
         DB::table('grupo_examen')->insert([
             'id_examen' => $this->exam->id_examen,
             'id_grupo' => $this->grupoPropioId,

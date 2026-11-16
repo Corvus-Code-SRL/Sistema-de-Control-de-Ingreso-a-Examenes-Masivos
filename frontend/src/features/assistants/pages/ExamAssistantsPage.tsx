@@ -8,6 +8,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ApiError } from '@/lib/api-client'
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,11 @@ type Candidate = Pick<
 >
 
 function errorMessage(error: unknown): string {
+  if (error instanceof ApiError && error.isValidation) {
+    const detail = Object.values(error.errors).flat()[0]
+    if (detail) return detail
+  }
+
   return error instanceof Error
     ? error.message
     : 'No se pudo completar la operación.'

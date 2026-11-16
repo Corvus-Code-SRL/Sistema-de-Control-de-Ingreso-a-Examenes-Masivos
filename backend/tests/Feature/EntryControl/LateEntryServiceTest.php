@@ -50,7 +50,10 @@ class LateEntryServiceTest extends TestCase
         parent::setUp();
         $this->seedExamCatalog();
 
-        $this->exam = $this->createExam(['estado' => Exam::EN_CURSO], [$this->aulaId, $this->otraAulaId]);
+        $this->exam = $this->createExam(
+            array_merge(['estado' => Exam::EN_CURSO], $this->entryOpen(true)),
+            [$this->aulaId, $this->otraAulaId]
+        );
         DB::table('grupo_examen')->insert([
             'id_examen' => $this->exam->id_examen,
             'id_grupo' => $this->grupoPropioId,
@@ -331,6 +334,7 @@ class LateEntryServiceTest extends TestCase
     {
         $result = $this->service->verify($this->exam, [
             'cod_sis' => ' ' . $this->sisOf($this->firstStudentId) . ' ',
+            'id_ambiente' => $this->aulaId,
         ], $this->teacher);
 
         $this->assertSame(VerificationService::AUTHORIZED, $result['verificacion']['veredicto']);
@@ -344,12 +348,17 @@ class LateEntryServiceTest extends TestCase
         $forTeacher = $this->service->verify($this->exam, [
             'cod_sis' => $this->sisOf($this->secondStudentId),
             'ci' => $this->ciOf($this->secondStudentId),
+            'id_ambiente' => $this->aulaId,
         ], $this->teacher);
         $forAssistant = $this->service->verify($this->exam, [
             'cod_sis' => $this->sisOf($this->firstStudentId),
             'id_ambiente' => $this->otraAulaId,
         ], $this->assistantB);
-        $unknown = $this->service->verify($this->exam, ['cod_sis' => '999999999'], $this->teacher);
+        $unknown = $this->service->verify(
+            $this->exam,
+            ['cod_sis' => '999999999', 'id_ambiente' => $this->aulaId],
+            $this->teacher
+        );
 
         $this->assertSame(VerificationService::AUTHORIZED, $forTeacher['verificacion']['veredicto']);
         $this->assertSame('692B', $forTeacher['verificacion']['ambiente_asignado']['nro_aula']);
@@ -357,7 +366,10 @@ class LateEntryServiceTest extends TestCase
         $this->assertSame(VerificationService::WRONG_ROOM, $forAssistant['verificacion']['veredicto']);
         $this->assertSame('Corresponde al ambiente 691A', $forAssistant['verificacion']['motivo']);
         $this->assertNull($forAssistant['solicitud_pendiente']);
-        $this->assertSame(app(VerificationService::class)->notFoundResult(), $unknown['verificacion']);
+        // El resultado de HU-032 más el intento negativo que ahora queda registrado.
+        $notFound = app(VerificationService::class)->notFoundResult();
+        $this->assertSame($notFound, array_intersect_key($unknown['verificacion'], $notFound));
+        $this->assertIsInt($unknown['verificacion']['id_intento']);
         $this->assertSame(VerificationService::NOT_FOUND_MESSAGE, $unknown['verificacion']['motivo']);
     }
 
@@ -428,13 +440,13 @@ class LateEntryServiceTest extends TestCase
     {
         $request = $this->requestSecondStudent();
 
-        foreach ([Exam::EN_INGRESO, Exam::FINALIZADO] as $state) {
+        foreach ([Exam::PROGRAMADO, Exam::FINALIZADO] as $state) {
             $this->setExamState($state);
             $conflict = LateEntryException::EXAM_NOT_IN_PROGRESS;
 
             $this->assertLateEntryError($conflict, 409, fn () => $this->service->verify(
                 $this->exam,
-                ['cod_sis' => $this->sisOf($this->firstStudentId)],
+                ['cod_sis' => $this->sisOf($this->firstStudentId), 'id_ambiente' => $this->aulaId],
                 $this->teacher
             ));
             $this->assertLateEntryError($conflict, 409, fn () => $this->service->request($this->exam, [
@@ -675,7 +687,7 @@ class LateEntryServiceTest extends TestCase
         $this->setExamState(Exam::FINALIZADO);
         $this->assertCount(2, $queries->list($this->exam, $this->teacher)['solicitudes']);
 
-        $this->setExamState(Exam::EN_INGRESO);
+        $this->setExamState(Exam::PROGRAMADO);
         $this->expectException(ExamStateException::class);
         $queries->list($this->exam, $this->teacher);
     }

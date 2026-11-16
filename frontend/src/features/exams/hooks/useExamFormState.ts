@@ -10,6 +10,7 @@ function emptyForm(): CreateExamFormData {
     fecha: localToday(),
     hora_inicio: '08:00',
     duracion: 90,
+    minutos_apertura: 10,
     ambientes: [],
     grupos: [],
     normas: '',

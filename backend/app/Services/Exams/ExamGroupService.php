@@ -5,6 +5,7 @@ namespace App\Services\Exams;
 use App\Exceptions\Exams\ExamOwnershipException;
 use App\Exceptions\Exams\ExamStateException;
 use App\Models\Exam;
+use App\Services\EntryControl\CloseOrdinaryEntryService;
 use App\Models\Group;
 use App\Services\Academic\SubjectCatalogService;
 use App\Support\RecordStatus;
@@ -126,7 +127,7 @@ class ExamGroupService
             throw new ExamOwnershipException();
         }
 
-        if ($exam->estado !== Exam::PROGRAMADO) {
+        if ($exam->estado !== Exam::PROGRAMADO || CloseOrdinaryEntryService::hasOpened((int) $exam->id_examen)) {
             throw new ExamStateException(
                 'Los grupos solo pueden modificarse mientras el examen está programado.'
             );
@@ -156,14 +157,13 @@ class ExamGroupService
             $isValid = (string) $group->id_usuario_docente === $teacherId
                 && (int) $group->id_gestion_periodo === $activePeriodId
                 && $group->estado === RecordStatus::ACTIVE
-                && (int) $group->id_carrera === (int) $exam->id_carrera
                 && (int) $group->id_materia === (int) $exam->id_materia;
 
             if (! $isValid) {
                 throw ValidationException::withMessages([
                     'grupos' => [
                         'Todos los grupos deben ser propios, activos, del periodo vigente '
-                        . 'y del mismo par materia-carrera del examen.',
+                        . 'y de la misma materia del examen.',
                     ],
                 ]);
             }

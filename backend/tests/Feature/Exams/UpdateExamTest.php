@@ -72,6 +72,34 @@ class UpdateExamTest extends TestCase
         );
     }
 
+    public function test_actualiza_la_apertura_sin_perder_el_valor_si_no_se_envia(): void
+    {
+        $exam = $this->createExam(['minutos_apertura' => 25], [$this->aulaId]);
+
+        $this->putJson($this->url($exam), $this->validPayload())
+            ->assertOk()
+            ->assertJsonPath('data.minutos_apertura', 25);
+
+        $this->putJson($this->url($exam), $this->validPayload([
+            'minutos_apertura' => 5,
+        ]))->assertOk()->assertJsonPath('data.minutos_apertura', 5);
+    }
+
+    public function test_rechaza_una_apertura_mayor_a_120_minutos_al_editar(): void
+    {
+        $exam = $this->createExam(['minutos_apertura' => 25], [$this->aulaId]);
+
+        foreach ([121, 2147483648] as $value) {
+            $this->putJson($this->url($exam), $this->validPayload(['minutos_apertura' => $value]))
+                ->assertUnprocessable()
+                ->assertJsonPath('errors.minutos_apertura.0', 'Los minutos de apertura no pueden superar 120.');
+        }
+
+        $this->assertSame(25, (int) $exam->fresh()->minutos_apertura);
+        $this->putJson($this->url($exam), $this->validPayload(['minutos_apertura' => 120]))
+            ->assertOk()->assertJsonPath('data.minutos_apertura', 120);
+    }
+
     /**
      * Descubierto en HU-09: quitar del examen un ambiente que ya tenía un auxiliar
      * asignado violaba la FK compuesta examen_auxiliar → examen_ambiente (500).
@@ -179,10 +207,13 @@ class UpdateExamTest extends TestCase
         $this->assertDatabaseHas('examen', ['id_examen' => $exam->id_examen, 'id_carrera' => $this->sistemasId]);
     }
 
-    public function test_criterio_11_desde_en_ingreso_la_informacion_general_queda_bloqueada(): void
+    public function test_criterio_11_desde_que_abre_el_control_la_informacion_general_queda_bloqueada(): void
     {
-        foreach ([Exam::EN_INGRESO, Exam::EN_CURSO, Exam::FINALIZADO] as $status) {
-            $exam = $this->createExam(['nombre_examen' => "Examen {$status}", 'estado' => $status], [$this->aulaId]);
+        foreach (['INGRESO_ABIERTO', Exam::EN_CURSO, Exam::FINALIZADO] as $status) {
+            $exam = $this->createExam(
+                array_merge(['nombre_examen' => "Examen {$status}"], $this->examStateAttributes($status)),
+                [$this->aulaId]
+            );
 
             $this->putJson($this->url($exam), $this->validPayload([
                 'nombre_examen' => 'Cambiado',
@@ -205,7 +236,7 @@ class UpdateExamTest extends TestCase
                 'duracion'      => 90,
                 'id_carrera'    => $this->sistemasId,
                 'id_materia'    => $this->calculoId,
-                'estado'        => $status,
+                'estado'        => $exam->estado,
             ]);
         }
     }
@@ -289,10 +320,7 @@ class UpdateExamTest extends TestCase
     public function test_modificacion_rechazada_no_genera_bitacora(): void
     {
         $exam = $this->createExam(
-            [
-                'nombre_examen' => 'Primer parcial',
-                'estado' => Exam::EN_INGRESO,
-            ],
+            array_merge(['nombre_examen' => 'Primer parcial'], $this->examStateAttributes('INGRESO_ABIERTO')),
             [$this->aulaId]
         );
 

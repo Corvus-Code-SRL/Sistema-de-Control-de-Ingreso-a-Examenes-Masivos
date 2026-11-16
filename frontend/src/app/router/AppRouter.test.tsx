@@ -433,4 +433,40 @@ describe('AppRouter — Central de Riesgo por área', () => {
     await openAllSections(user, await screen.findByRole('navigation', { name: 'Navegación principal' }))
     expect(screen.getByRole('link', { name: 'Consultar central' })).toHaveAttribute('href', '/central-riesgo')
   })
+
+  it('un Administrador abre «Rectificar registro de la central» desde el menú', async () => {
+    const user = userEvent.setup()
+    stubRiskCenter('administrador')
+    const app = renderApp('/cuentas')
+
+    await openAllSections(user, await screen.findByRole('navigation', { name: 'Navegación principal' }))
+    await user.click(screen.getByRole('link', { name: 'Rectificar registro de la central' }))
+
+    expect(await screen.findByRole('heading', { name: 'Rectificar registro de la central' })).toBeInTheDocument()
+    expect(app.pathname).toBe('/rectificar-registro')
+    expect(screen.getByLabelText(/código sis, carnet de identidad o nombre/i)).toBeInTheDocument()
+  })
+
+  it('quien solo consulta la Central no ve la entrada y, por enlace directo, recibe el aviso de permiso', async () => {
+    const user = userEvent.setup()
+    stubRiskCenter('docente')
+    const app = renderApp('/rectificar-registro')
+
+    expect(await screen.findByText('No tiene permiso para ver esta sección.')).toBeInTheDocument()
+    expect(app.pathname).toBe('/rectificar-registro')
+    expect(screen.queryByLabelText(/código sis, carnet de identidad o nombre/i)).not.toBeInTheDocument()
+
+    await openAllSections(user, await screen.findByRole('navigation', { name: 'Navegación principal' }))
+    expect(screen.queryByRole('link', { name: 'Rectificar registro de la central' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Rectificar registro de la central')).not.toBeInTheDocument()
+  })
+
+  it('el Docente sigue consultando la Central aunque no pueda rectificar', async () => {
+    stubRiskCenter('docente')
+
+    renderApp('/central-riesgo')
+
+    expect(await screen.findByRole('heading', { name: 'Central de Riesgo' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /rectificar/i })).not.toBeInTheDocument()
+  })
 })

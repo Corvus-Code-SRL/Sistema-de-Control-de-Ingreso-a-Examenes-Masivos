@@ -277,10 +277,21 @@ class LateEntryRequestTest extends TestCase
 
     public function test_un_examen_que_no_inicio_no_lista_solicitudes(): void
     {
-        $this->setLateEntryExamState(Exam::EN_INGRESO);
+        $this->setLateEntryExamState(Exam::PROGRAMADO);
         $this->actAsTeacher($this->docenteId);
 
         $this->getJson($this->lateEntryUrl('solicitudes'))->assertStatus(409);
+    }
+
+    public function test_con_el_ingreso_ordinario_abierto_no_lista_solicitudes(): void
+    {
+        DB::table('examen')->where('id_examen', $this->exam->id_examen)
+            ->update(['ingreso_ordinario_cerrado_en' => null]);
+        $this->actAsTeacher($this->docenteId);
+
+        $this->getJson($this->lateEntryUrl('solicitudes'))
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'El ingreso ordinario sigue abierto. Registre el ingreso desde Control de ingreso.');
     }
 
     public function test_permisos_de_cada_rol(): void
@@ -312,7 +323,7 @@ class LateEntryRequestTest extends TestCase
     public function test_una_solicitud_de_otro_examen_no_existe_en_este(): void
     {
         $requestId = $this->requestSecondStudent();
-        $otherExam = $this->createExam(['estado' => Exam::EN_CURSO], [$this->aulaId]);
+        $otherExam = $this->createExam(array_merge(['estado' => Exam::EN_CURSO], $this->entryOpen(true)), [$this->aulaId]);
 
         $this->actAsTeacher($this->docenteId);
         $this->postJson($this->lateEntryUrl("solicitudes/{$requestId}/autorizar", $otherExam))->assertNotFound();

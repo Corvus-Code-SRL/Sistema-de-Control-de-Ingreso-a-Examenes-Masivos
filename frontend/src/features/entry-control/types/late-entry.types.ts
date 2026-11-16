@@ -1,4 +1,4 @@
-import type { EntryContext, EntryRoom, Verification } from './entry-control.types'
+import type { EntryContext, EntryRoom, RejectionReason, Verification } from './entry-control.types'
 
 /** Quién controla el examen: decide si el ingreso con retraso se solicita o se registra. */
 export type ControllerRole = EntryContext['rol_controlador']
@@ -16,7 +16,10 @@ export const LATE_ENTRY_REQUEST_STATUS = {
   RECHAZADA: 'RECHAZADA',
 } as const satisfies Record<LateEntryRequestStatus, LateEntryRequestStatus>
 
-/** Veredictos de la verificación, los mismos del control de ingreso (HU-032). */
+/**
+ * Veredictos de la verificación, los mismos del control de ingreso (HU-032). RECHAZADO_MANUAL lo
+ * pone el cliente cuando quien controla rechaza un resultado que autorizaba.
+ */
 export type VerificationVerdict =
   | 'AUTORIZADO'
   | 'NO_ENCONTRADO'
@@ -27,6 +30,7 @@ export type VerificationVerdict =
   | 'DUPLICADO'
   | 'AULA_NO_ASIGNADA'
   | 'AULA_INCORRECTA'
+  | 'RECHAZADO_MANUAL'
 
 /**
  * Ingreso del estudiante en otro examen abierto cuyo fin programado no pasó. No bloquea: quien
@@ -74,8 +78,8 @@ export interface LateEntryRegistration {
 export interface LateEntryVerificationInput {
   cod_sis: string
   ci?: string
-  /** Solo el auxiliar: su ambiente de control. */
-  id_ambiente?: number
+  /** Ambiente de control: el del auxiliar o el que elige el docente. Un resultado negativo deja ahí el intento. */
+  id_ambiente: number
 }
 
 export interface LateEntryActionInput {
@@ -84,4 +88,13 @@ export interface LateEntryActionInput {
   id_ambiente: number
   /** Continuar pese a la advertencia de otro examen. */
   confirmar_otro_examen?: true
+}
+
+/** Rechazo manual de un estudiante verificado, con los motivos del control de ingreso (HU-032). */
+export interface LateEntryRejectInput {
+  id_estudiante: number
+  ci?: string
+  id_ambiente: number
+  motivo: RejectionReason
+  observacion?: string
 }

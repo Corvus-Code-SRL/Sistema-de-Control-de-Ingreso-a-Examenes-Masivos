@@ -42,11 +42,16 @@ class ListExamsTest extends TestCase
 
     public function test_expone_el_estado_de_cada_examen(): void
     {
-        $this->createExam(['estado' => Exam::EN_INGRESO]);
+        $this->createExam($this->examStateAttributes('INGRESO_ABIERTO'));
 
-        $this->getJson('/api/examenes')
+        $response = $this->getJson('/api/examenes')
             ->assertOk()
-            ->assertJsonPath('data.0.estado', Exam::EN_INGRESO);
+            ->assertJsonPath('data.0.estado', Exam::PROGRAMADO)
+            ->assertJsonPath('data.0.control_ingreso_abierto', true)
+            ->assertJsonPath('data.0.ingreso_ordinario_cerrado_en', null);
+
+        $this->assertArrayNotHasKey('inicio_real_en', $response->json('data.0'));
+        $this->assertArrayNotHasKey('inicio_automatico', $response->json('data.0'));
     }
 
     public function test_una_lista_vacia_responde_data_vacio(): void
@@ -69,10 +74,13 @@ class ListExamsTest extends TestCase
 
     /* ------------------------------ ?vista=programados (HU-024) ------------------------------ */
 
-    public function test_la_vista_programados_solo_trae_programado_y_en_ingreso(): void
+    public function test_la_vista_programados_solo_trae_programado_con_o_sin_el_ingreso_abierto(): void
     {
         $programado = $this->linkedExam(['nombre_examen' => 'Programado', 'estado' => Exam::PROGRAMADO, 'fecha' => $this->futureDate(3)]);
-        $enIngreso = $this->linkedExam(['nombre_examen' => 'En ingreso', 'estado' => Exam::EN_INGRESO, 'fecha' => $this->futureDate(1)]);
+        $enIngreso = $this->linkedExam(array_merge(
+            ['nombre_examen' => 'Ingreso abierto', 'fecha' => $this->futureDate(1)],
+            $this->examStateAttributes('INGRESO_ABIERTO')
+        ));
         $this->linkedExam(['nombre_examen' => 'En curso', 'estado' => Exam::EN_CURSO]);
         $this->linkedExam(['nombre_examen' => 'Finalizado', 'estado' => Exam::FINALIZADO]);
         $this->linkedExam(['nombre_examen' => 'Cancelado', 'estado' => Exam::CANCELADO]);

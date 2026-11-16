@@ -63,6 +63,19 @@ trait SeedsAssistantManagement
         return $user->id_usuario;
     }
 
+    /**
+     * Atributos de estado de un examen. 'INGRESO_ABIERTO' es un examen PROGRAMADO con el control de
+     * ingreso abierto, que reemplaza al antiguo estado EN_INGRESO.
+     *
+     * @return array<string, mixed>
+     */
+    protected function assistantExamState(string $state): array
+    {
+        return $state === 'INGRESO_ABIERTO'
+            ? ['estado' => Exam::PROGRAMADO, 'ingreso_abierto_en' => now('UTC')->subMinutes(10)->format('Y-m-d H:i:sP')]
+            : ['estado' => $state];
+    }
+
     /** @param array<int, int> $groupIds */
     protected function createExamLinkedTo(
         array $groupIds,
@@ -87,8 +100,12 @@ trait SeedsAssistantManagement
             'id_carrera' => $this->sistemasId,
             'id_materia' => $this->calculoId,
             'id_usuario_docente' => $teacherId ?? $this->docenteId,
-            'estado' => $state,
+            'estado' => $this->assistantExamState($state)['estado'],
         ]);
+
+        if ($state === 'INGRESO_ABIERTO') {
+            $exam->forceFill(['ingreso_abierto_en' => $this->assistantExamState($state)['ingreso_abierto_en']])->save();
+        }
 
         foreach ($groupIds as $groupId) {
             DB::table('grupo_examen')->insert(['id_grupo' => $groupId, 'id_examen' => $exam->id_examen]);

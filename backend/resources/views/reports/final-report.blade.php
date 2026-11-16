@@ -25,7 +25,8 @@
         <tr><td>Materia:</td><td>{{ $c['materia'] ?? '—' }}</td></tr>
         <tr><td>Docente:</td><td>{{ $c['docente'] ?? '—' }}</td></tr>
         <tr><td>Fecha del examen:</td><td>{{ \Carbon\Carbon::parse($c['fecha'])->format('d/m/Y') }}</td></tr>
-        <tr><td>Hora de inicio:</td><td>{{ $c['hora_inicio'] ?? '—' }}</td></tr>
+        <tr><td>Hora de inicio programada:</td><td>{{ $c['hora_inicio'] ?? '—' }}</td></tr>
+        <tr><td>Apertura del control:</td><td>{{ $c['hora_apertura'] ?? '—' }}</td></tr>
         <tr><td>Hora de fin:</td><td>{{ $c['hora_fin'] ?? '—' }}</td></tr>
         <tr><td>Reporte generado:</td><td>{{ \Carbon\Carbon::parse($c['generado_en'])->format('d/m/Y H:i') }}</td></tr>
     </table>

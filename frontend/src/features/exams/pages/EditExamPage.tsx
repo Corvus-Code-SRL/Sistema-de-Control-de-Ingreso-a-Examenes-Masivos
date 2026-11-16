@@ -19,6 +19,7 @@ import {
 import { AlertTriangle, Ban, DoorOpen, Loader2, Save, ShieldAlert } from 'lucide-react';
 import { useExamDetail } from '../hooks/useExamDetail';
 import { ExamForm } from '../components/ExamForm';
+import { ExamAmbientesForm } from '../components/ExamAmbientesForm';
 import { AssignGroupsForm } from '../components/AssignGroupsForm';
 import { ExamStatusBadge } from '../components/ExamStatusBadge';
 import { validateExamForm, validateGroupsStep } from '../utils/examValidators';
@@ -27,7 +28,7 @@ import { examLockedMessage } from '../utils/examLockedMessage';
 /**
  * Detalle de un examen: edición de su información general, gestión de grupos
  * y cancelación mientras está PROGRAMADO (HU-24 criterios 10-12, HU-25
- * criterio 7). Desde EN_INGRESO todo se muestra de solo lectura (criterio 8).
+ * criterio 7). Desde que se abre el control de ingreso todo se muestra de solo lectura (criterio 8).
  */
 export function EditExamPage() {
   const navigate = useNavigate();
@@ -119,7 +120,7 @@ export function EditExamPage() {
         title={`Editar: ${exam?.nombre_examen ?? 'Examen'}`}
         backTo={backTo}
         backLabel="Volver al detalle"
-        subtitle={exam && <ExamStatusBadge status={exam.estado} />}
+        subtitle={exam && <ExamStatusBadge status={exam.estado} entryOpen={exam.control_ingreso_abierto} />}
         actions={
           exam && (
             isProgramado ? (
@@ -132,7 +133,7 @@ export function EditExamPage() {
                 <Ban className="size-4" aria-hidden="true" />
                 Cancelar examen
               </Button>
-            ) : exam.estado === 'EN_INGRESO' ? (
+            ) : exam.control_ingreso_abierto ? (
               <Button onClick={() => navigate(`/examenes/${id}/control-ingreso`)}>
                 <DoorOpen className="size-4" />
                 Controlar ingreso
@@ -151,7 +152,7 @@ export function EditExamPage() {
           {!isProgramado ? (
             <div className="rounded-xl border bg-card p-6 shadow-xs space-y-4">
               <h2 className="sciem-h3">Información general</h2>
-              <p className="text-sm text-muted-foreground">{examLockedMessage(exam.estado)}</p>
+              <p className="text-sm text-muted-foreground">{examLockedMessage(exam.estado, Boolean(exam.ingreso_abierto_en))}</p>
               <dl className="grid grid-cols-1 gap-x-8 gap-y-3 text-sm md:grid-cols-2">
                 <div>
                   <dt className="font-medium">Materia</dt>
@@ -184,9 +185,13 @@ export function EditExamPage() {
               <ExamForm
                 formData={formData}
                 subjects={options.materias}
-                classrooms={options.ambientes}
                 errors={infoValidation.errors}
-                warnings={{}}
+                updateFormData={updateFormData}
+              />
+              <ExamAmbientesForm
+                classrooms={options.ambientes}
+                selectedRoomIds={formData.ambientes}
+                error={infoValidation.errors.ambientes}
                 updateFormData={updateFormData}
               />
 
@@ -236,6 +241,7 @@ export function EditExamPage() {
               <AssignGroupsForm
                 selectedSubject={selectedSubject}
                 availableGroups={subjectGroups}
+                subjects={options.materias}
                 selectedGroupIds={formData.grupos}
                 errors={{}}
                 onToggleGroup={toggleGroup}
