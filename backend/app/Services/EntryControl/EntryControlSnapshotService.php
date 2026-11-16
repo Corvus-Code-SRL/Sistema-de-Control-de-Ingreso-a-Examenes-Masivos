@@ -635,6 +635,7 @@ class EntryControlSnapshotService
             'apellido_materno' => $student->apellido_materno,
             'grupo' => $group,
             'estado_habilitacion' => $entry['estado_habilitacion'] ?? null,
+            'observacion' => $entry['observacion'] ?? null,
             'ambiente_asignado' => $assignedRoom,
             'antecedentes' => $risk,
             'ingreso_previo' => $entry['ingreso_previo'] ?? null,
@@ -643,18 +644,49 @@ class EntryControlSnapshotService
 
     private function entries(int $examId, ?int $studentId = null): array
     {
-        return DB::table('examen_estudiante as ee')
-            ->join('estudiante as est', 'est.id_estudiante', '=', 'ee.id_estudiante')
+        // Un estudiante puede estar en varios grupos del examen. Tomamos el
+        // de menor id_grupo (misma semántica que memberships() y expected()).
+        // distinctOn() no existe en el Query Builder de Laravel 8, así que
+        // lo resolvemos con una subquery de MIN(id_grupo) por estudiante.
+        $minGroupPerStudent = DB::table('grupo_estudiante as gs2')
+            ->join('grupo_examen as gx2', 'gx2.id_grupo', '=', 'gs2.id_grupo')
+            ->where('gx2.id_examen', $examId)
+            ->groupBy('gs2.id_estudiante')
+            ->selectRaw('gs2.id_estudiante, MIN(gs2.id_grupo) AS id_grupo');
+
+        return DB::table('grupo_estudiante as gs')
+            ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
+            ->join('estudiante as est', 'est.id_estudiante', '=', 'gs.id_estudiante')
+            ->joinSub($minGroupPerStudent, 'mg', function ($join): void {
+                $join->on('mg.id_estudiante', '=', 'gs.id_estudiante')
+                    ->on('mg.id_grupo', '=', 'gs.id_grupo');
+            })
+            ->leftJoin('examen_estudiante as ee', function ($join) use ($examId): void {
+                $join->on('ee.id_estudiante', '=', 'gs.id_estudiante')
+                    ->where('ee.id_examen', '=', $examId);
+            })
             ->leftJoin('ambiente as a', 'a.id_ambiente', '=', 'ee.id_ambiente')
             ->leftJoin('usuario as u', 'u.id_usuario', '=', 'ee.id_usuario_controlador')
-            ->where('ee.id_examen', $examId)
-            ->when($studentId !== null, fn ($query) => $query->where('ee.id_estudiante', $studentId))
+            ->where('gx.id_examen', $examId)
+            ->when($studentId !== null, fn ($query) => $query->where('gs.id_estudiante', $studentId))
+            ->orderBy('gs.id_estudiante')
             ->get([
-                'ee.id_estudiante', 'ee.estado_habilitacion', 'ee.estado_ingreso',
-                'ee.hora_ingreso', 'ee.registrado_en', 'ee.id_ambiente', 'a.nro_aula',
-                'est.cod_sis', 'est.nombre', 'est.apellido_paterno', 'est.apellido_materno',
-                'u.nombre as controlador_nombre', 'u.apellido_paterno as controlador_apellido',
-            ])->mapWithKeys(function ($entry): array {
+                'gs.id_estudiante',
+                DB::raw("COALESCE(ee.estado_habilitacion, 'HABILITADO') as estado_habilitacion"),
+                'ee.observacion',
+                DB::raw("COALESCE(ee.estado_ingreso, 'NO_INGRESO') as estado_ingreso"),
+                'ee.hora_ingreso',
+                'ee.registrado_en',
+                'ee.id_ambiente',
+                'a.nro_aula',
+                'est.cod_sis',
+                'est.nombre',
+                'est.apellido_paterno',
+                'est.apellido_materno',
+                'u.nombre as controlador_nombre',
+                'u.apellido_paterno as controlador_apellido',
+            ])
+            ->mapWithKeys(function ($entry): array {
                 $realEntry = in_array($entry->estado_ingreso, ['INGRESO', 'CON_RETRASO'], true);
                 $previous = $realEntry ? [
                     'registrado_en' => $entry->registrado_en,
@@ -668,6 +700,7 @@ class EntryControlSnapshotService
 
                 return [(int) $entry->id_estudiante => [
                     'estado_habilitacion' => $entry->estado_habilitacion,
+                    'observacion' => $entry->observacion,
                     'ingreso_previo' => $previous,
                     'reciente' => $realEntry ? [
                         'id_estudiante' => (int) $entry->id_estudiante,
