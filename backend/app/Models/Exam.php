@@ -48,6 +48,8 @@ class Exam extends Model
         'id_carrera' => 'integer',
         'id_materia' => 'integer',
         'id_usuario_docente' => 'string',
+        'ingreso_abierto_en' => 'datetime',
+        'ingreso_ordinario_cerrado_en' => 'datetime',
         'inicio_real_en' => 'datetime',
         'fin_real_en' => 'datetime',
         'inicio_automatico' => 'boolean',

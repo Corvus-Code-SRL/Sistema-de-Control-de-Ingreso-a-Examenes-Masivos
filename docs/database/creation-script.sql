@@ -1822,3 +1822,12 @@ CREATE INDEX idx_central_riesgo_activo_fecha
 INSERT INTO public.accion (operacion, tipo_operacion, descripcion)
 SELECT 'RECTIFICAR_REGISTRO', 'UPDATE', 'Rectificación de un registro de la Central de Riesgo'
 WHERE NOT EXISTS (SELECT 1 FROM public.accion WHERE operacion = 'RECTIFICAR_REGISTRO');
+
+-- Versión 15: estado persistente del control de ingreso (HU-038)
+--             (2026_11_16_000000_add_entry_control_timestamps_to_examen)
+--   * La apertura y el cierre ordinario se consultan en examen; la bitácora conserva el historial.
+--   * La migración rellena estas fechas desde los eventos existentes de la bitácora.
+
+ALTER TABLE public.examen
+    ADD COLUMN ingreso_abierto_en timestamp with time zone,
+    ADD COLUMN ingreso_ordinario_cerrado_en timestamp with time zone;
