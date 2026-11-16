@@ -2,16 +2,22 @@ import { Check, Lock } from 'lucide-react'
 
 /**
  * Lo que podrá hacer como colaborador y lo que queda para el docente responsable (CA-6). Solo lectura.
- * [PENDIENTE] Lista propuesta en el mockup; falta validarla con la ingeniera.
+ * Refleja lo que el backend permite al colaborador (ExamCollaboratorService): control de ingreso, retrasos,
+ * situaciones, examen en curso, reporte final e historial del examen.
  */
 const CAN = [
-  'Ver el examen y la lista de sus estudiantes',
-  'Controlar el ingreso en la puerta',
-  'Registrar retrasos, situaciones e incidencias de sus estudiantes',
-  'Ver el reporte final de sus grupos',
+  'Controlar el ingreso en la puerta, en cualquier ambiente',
+  'Registrar retrasos, situaciones e incidencias del examen',
+  'Ver el examen en curso',
+  'Ver el reporte final y el historial del examen',
 ]
 
-const OWNER_ONLY = ['Editar o cancelar el examen', 'Invitar a otros docentes', 'Iniciar y terminar el examen']
+const OWNER_ONLY = [
+  'Editar o cancelar el examen',
+  'Asignar grupos y auxiliares',
+  'Invitar a otros docentes',
+  'Iniciar y terminar el examen',
+]
 
 export function CollaboratorPrivileges() {
   return (

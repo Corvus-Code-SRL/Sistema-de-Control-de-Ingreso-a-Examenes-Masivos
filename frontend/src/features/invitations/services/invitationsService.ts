@@ -20,19 +20,19 @@ export async function getInvitation(id: number, signal?: AbortSignal): Promise<I
   return response.data
 }
 
-/** Acepta sumando los grupos elegidos. 409 si el examen ya no está «Programado». */
+/**
+ * Acepta sumando los grupos elegidos (lista vacía si la invitación no permite grupos o no tiene ninguno que
+ * sumar). 409 si el examen ya no está «Programado»; 422 con `errors.grupos` si un grupo no se puede sumar.
+ */
 export async function acceptInvitation(id: number, groupIds: number[]): Promise<InvitationDetail> {
   const response = await apiPost<InvitationDetailResponse>(`/invitaciones/${id}/aceptar`, { grupos: groupIds })
 
   return response.data
 }
 
-/** Rechaza; el motivo es opcional. 409 si ya no se puede responder. */
-export async function rejectInvitation(id: number, reason: string): Promise<InvitationDetail> {
-  const motivo = reason.trim()
-  const response = await apiPost<InvitationDetailResponse>(`/invitaciones/${id}/rechazar`, {
-    motivo: motivo === '' ? null : motivo,
-  })
+/** Rechaza, sin motivo (la invitación no lo guarda). 409 si ya no se puede responder. */
+export async function rejectInvitation(id: number): Promise<InvitationDetail> {
+  const response = await apiPost<InvitationDetailResponse>(`/invitaciones/${id}/rechazar`, {})
 
   return response.data
 }

@@ -8,6 +8,7 @@ import {
   firstPartial,
   rejected,
   stubInvitationsBackend,
+  withoutGroups,
 } from '@/test/invitationFixtures'
 import { renderWithRouter } from '@/test/render'
 import { INVITATIONS_CHANGED_EVENT } from '../hooks/usePendingInvitationsCount'
@@ -95,7 +96,7 @@ describe('InvitationsPage — bandeja (CA-1, CA-2)', () => {
 })
 
 describe('InvitationsPage — detalle (CA-3, CA-4, CA-6)', () => {
-  it('muestra examen, materia, fecha y hora, ambientes, quién invita y su mensaje', async () => {
+  it('muestra examen, materia, fecha y hora, ambientes y quién invita', async () => {
     const user = userEvent.setup()
     stubInvitationsBackend([firstPartial])
     renderPage()
@@ -107,7 +108,6 @@ describe('InvitationsPage — detalle (CA-3, CA-4, CA-6)', () => {
     expect(screen.getByText('Aula 691A (30) · Aula 691B (30)')).toBeInTheDocument()
     expect(screen.getByText('Grupo 2 · Grupo 5 (55 estudiantes)')).toBeInTheDocument()
     expect(screen.getByText(/Invita Marcelo Quiroga Andrade \(docente responsable\) · enviada el 20\/10 08:12/)).toBeInTheDocument()
-    expect(screen.getByText(/Tomemos el 1er parcial juntos/)).toBeInTheDocument()
   })
 
   it('ofrece solo sus grupos de la materia; un grupo sin nómina no se puede marcar', async () => {
@@ -131,7 +131,9 @@ describe('InvitationsPage — detalle (CA-3, CA-4, CA-6)', () => {
     renderPage()
     await openInvitation(user, /1er Parcial/)
 
-    expect(within(screen.getByRole('list', { name: 'Podrá' })).getByText('Controlar el ingreso en la puerta')).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('list', { name: 'Podrá' })).getByText('Controlar el ingreso en la puerta, en cualquier ambiente')
+    ).toBeInTheDocument()
     expect(
       within(screen.getByRole('list', { name: 'Solo el docente responsable' })).getByText('Editar o cancelar el examen')
     ).toBeInTheDocument()
@@ -231,8 +233,43 @@ describe('InvitationsPage — aceptar (CA-5, CA-7, CA-9)', () => {
   })
 })
 
+describe('InvitationsPage — invitación que no permite sumar grupos', () => {
+  it('no ofrece grupos y acepta sin ellos', async () => {
+    const user = userEvent.setup()
+    const backend = stubInvitationsBackend([withoutGroups])
+    renderPage()
+    await openInvitation(user, /2do Parcial/)
+
+    expect(screen.getByText('Marcelo no permite sumar grupos: colaborará con los grupos que ya tiene el examen.')).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Aceptar invitación' }))
+    const dialog = await screen.findByRole('dialog', { name: '¿Aceptar la invitación?' })
+    expect(dialog).toHaveTextContent('Será docente colaborador del 2do Parcial de Cálculo I, sin sumar grupos.')
+    expect(within(dialog).queryByText('Los ambientes no alcanzan')).not.toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Aceptar invitación' }))
+
+    await waitFor(() => expect(backend.calls.find((call) => call.method === 'POST')?.body).toEqual({ grupos: [] }))
+    expect(await screen.findByText('Ya es docente colaborador del 2do Parcial. Marcelo verá «Aceptada».')).toBeInTheDocument()
+  })
+
+  it('si no tiene grupos que sumar también acepta sin ellos', async () => {
+    const user = userEvent.setup()
+    const noOwnGroups = { ...firstPartial, mis_grupos: [] }
+    const backend = stubInvitationsBackend([noOwnGroups])
+    renderPage()
+    await openInvitation(user, /1er Parcial/)
+
+    expect(screen.getByText('No tiene grupos de Cálculo I en el período vigente.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Aceptar invitación' }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Aceptar invitación' }))
+
+    await waitFor(() => expect(backend.calls.find((call) => call.method === 'POST')?.body).toEqual({ grupos: [] }))
+  })
+})
+
 describe('InvitationsPage — rechazar y vencida (CA-8, CA-10)', () => {
-  it('rechazar con motivo opcional la pasa a «Cerradas»', async () => {
+  it('rechazar la pasa a «Cerradas» sin pedir motivo', async () => {
     const user = userEvent.setup()
     const backend = stubInvitationsBackend([firstPartial])
     renderPage()
@@ -241,27 +278,30 @@ describe('InvitationsPage — rechazar y vencida (CA-8, CA-10)', () => {
     await user.click(screen.getByRole('button', { name: 'Rechazar' }))
     const dialog = await screen.findByRole('dialog', { name: '¿Rechazar la invitación?' })
     expect(dialog).toHaveTextContent('Marcelo verá «Rechazada» y el examen no cambia.')
-    await user.type(within(dialog).getByLabelText('Motivo (opcional)'), 'Tengo otro examen.')
+    expect(within(dialog).queryByRole('textbox')).not.toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Rechazar invitación' }))
 
     const post = backend.calls.find((call) => call.method === 'POST')
     expect(post?.url).toMatch(/\/invitaciones\/11\/rechazar$/)
-    expect(post?.body).toEqual({ motivo: 'Tengo otro examen.' })
+    expect(post?.body).toEqual({})
     expect(await screen.findByText('Invitación rechazada')).toBeInTheDocument()
     expect(await screen.findByText('No tiene invitaciones pendientes')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /Cerradas/ })).toHaveTextContent('1')
   })
 
-  it('el motivo puede quedar vacío', async () => {
+  it('si el examen ya abrió el control (409) al rechazar, lo explica', async () => {
     const user = userEvent.setup()
-    const backend = stubInvitationsBackend([firstPartial])
+    stubInvitationsBackend([firstPartial], {
+      rejectResponse: { status: 409, body: { message: 'La invitación ya fue respondida o quedó sin efecto.' } },
+    })
     renderPage()
     await openInvitation(user, /1er Parcial/)
 
     await user.click(screen.getByRole('button', { name: 'Rechazar' }))
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Rechazar invitación' }))
 
-    await waitFor(() => expect(backend.calls.find((call) => call.method === 'POST')?.body).toEqual({ motivo: null }))
+    expect(await screen.findByText('La invitación ya no se puede responder')).toBeInTheDocument()
+    expect(screen.getByText('La invitación ya fue respondida o quedó sin efecto.')).toBeInTheDocument()
   })
 
   it('una vencida se ve sin «Aceptar» ni «Rechazar»', async () => {
@@ -282,7 +322,7 @@ describe('InvitationsPage — rechazar y vencida (CA-8, CA-10)', () => {
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   })
 
-  it('una rechazada muestra su motivo y no se puede responder de nuevo', async () => {
+  it('una rechazada muestra cuándo se rechazó y no se puede responder de nuevo', async () => {
     const user = userEvent.setup()
     stubInvitationsBackend([rejected])
     renderPage()
@@ -291,7 +331,7 @@ describe('InvitationsPage — rechazar y vencida (CA-8, CA-10)', () => {
     await user.click(screen.getByRole('tab', { name: /Cerradas/ }))
     await openInvitation(user, /Recuperatorio/)
 
-    expect(screen.getByText('Tengo otro examen a la misma hora.')).toBeInTheDocument()
+    expect(screen.getByText(/Rechazada el 21\/10 09:00/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument()
   })
 })

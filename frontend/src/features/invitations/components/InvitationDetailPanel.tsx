@@ -83,6 +83,10 @@ interface ContentProps {
 
 function InvitationDetailContent({ invitation, onResponded, onBack }: ContentProps) {
   const pending = canRespond(invitation.estado)
+  const allowsGroups = invitation.permite_agregar_grupos
+  const hasSelectable = invitation.mis_grupos.some((group) => group.seleccionable)
+  // Hay que elegir al menos un grupo solo si la invitación lo permite y tiene alguno que sumar.
+  const requiresGroup = allowsGroups && hasSelectable
   const [selectedIds, setSelectedIds] = useState<number[]>(() =>
     pending ? [] : invitation.mis_grupos.filter((group) => group.sumado).map((group) => group.id_grupo)
   )
@@ -104,7 +108,7 @@ function InvitationDetailContent({ invitation, onResponded, onBack }: ContentPro
   }
 
   function handleAcceptClick() {
-    if (selectedGroups.length === 0) {
+    if (requiresGroup && selectedGroups.length === 0) {
       setGroupError(NO_GROUP_MESSAGE)
       return
     }
@@ -113,19 +117,23 @@ function InvitationDetailContent({ invitation, onResponded, onBack }: ContentPro
   }
 
   async function handleAccept() {
-    await acceptInvitation(invitation.id_invitacion, selectedIds)
+    const groupIds = allowsGroups ? selectedIds : []
+    await acceptInvitation(invitation.id_invitacion, groupIds)
     setAcceptOpen(false)
     onResponded({
       kind: 'accepted',
       title: 'Invitación aceptada',
-      description: `${capitalize(joinGroups(selectedGroups))} ya ${
-        selectedGroups.length === 1 ? 'forma' : 'forman'
-      } parte del ${examen.nombre_examen}. ${owner} verá «Aceptada».`,
+      description:
+        groupIds.length === 0
+          ? `Ya es docente colaborador del ${examen.nombre_examen}. ${owner} verá «Aceptada».`
+          : `${capitalize(joinGroups(selectedGroups))} ya ${
+              selectedGroups.length === 1 ? 'forma' : 'forman'
+            } parte del ${examen.nombre_examen}. ${owner} verá «Aceptada».`,
     })
   }
 
-  async function handleReject(reason: string) {
-    await rejectInvitation(invitation.id_invitacion, reason)
+  async function handleReject() {
+    await rejectInvitation(invitation.id_invitacion)
     setRejectOpen(false)
     onResponded({
       kind: 'rejected',
@@ -182,12 +190,6 @@ function InvitationDetailContent({ invitation, onResponded, onBack }: ContentPro
             )}
           </dl>
 
-          {invitation.mensaje && (
-            <div className="rounded-lg border border-border bg-sunken px-3.5 py-3 text-sm">
-              <b>Mensaje de {owner}:</b> «{invitation.mensaje}»
-            </div>
-          )}
-
           {invitation.estado === 'SIN_EFECTO' ? (
             <div role="status" className="flex items-start gap-2.5 rounded-lg border border-border bg-sunken px-3 py-2.5">
               <Clock className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -200,6 +202,12 @@ function InvitationDetailContent({ invitation, onResponded, onBack }: ContentPro
                 </p>
               </div>
             </div>
+          ) : !allowsGroups ? (
+            <p role="note" className="rounded-lg border border-border bg-sunken px-3 py-2.5 text-sm">
+              {pending
+                ? `${owner} no permite sumar grupos: colaborará con los grupos que ya tiene el examen.`
+                : 'Colabora con los grupos que ya tiene el examen.'}
+            </p>
           ) : (
             <MyGroups
               invitation={invitation}
@@ -208,12 +216,6 @@ function InvitationDetailContent({ invitation, onResponded, onBack }: ContentPro
               error={groupError}
               onToggle={toggle}
             />
-          )}
-
-          {invitation.estado === 'RECHAZADA' && invitation.motivo_rechazo && (
-            <p className="text-sm">
-              <span className="text-muted-foreground">Motivo del rechazo:</span> {invitation.motivo_rechazo}
-            </p>
           )}
 
           {invitation.estado !== 'SIN_EFECTO' && <CollaboratorPrivileges />}
@@ -229,7 +231,7 @@ function InvitationDetailContent({ invitation, onResponded, onBack }: ContentPro
               <span className="flex-1" />
               <Button onClick={handleAcceptClick}>
                 <Check className="size-4" />
-                Aceptar con {plural(selectedGroups.length, 'grupo', 'grupos')}
+                {requiresGroup ? `Aceptar con ${plural(selectedGroups.length, 'grupo', 'grupos')}` : 'Aceptar invitación'}
               </Button>
             </>
           ) : (

@@ -16,6 +16,8 @@ export const firstPartial: InvitationDetail = {
   estado: 'PENDIENTE',
   fecha_invitacion: '2026-10-20T12:12:00+00:00',
   fecha_respuesta: null,
+  fecha_sin_efecto: null,
+  permite_agregar_grupos: true,
   examen: {
     id_examen: 501,
     nombre_examen: '1er Parcial',
@@ -27,9 +29,6 @@ export const firstPartial: InvitationDetail = {
     hora_fin: '11:30:00',
   },
   invitante: { nombre_completo: 'Marcelo Quiroga Andrade' },
-  mensaje: 'Tomemos el 1er parcial juntos en el bloque 691.',
-  motivo_rechazo: null,
-  fecha_sin_efecto: null,
   ambientes: [
     { id_ambiente: 1, nro_aula: '691A', capacidad: 30 },
     { id_ambiente: 2, nro_aula: '691B', capacidad: 30 },
@@ -51,7 +50,14 @@ export const finalExam: InvitationDetail = {
   fecha_invitacion: '2026-10-19T14:00:00+00:00',
   examen: { ...firstPartial.examen, id_examen: 502, nombre_examen: 'Examen final', fecha: '2026-11-13', hora_inicio: '08:15:00' },
   invitante: { nombre_completo: 'Rosario Salazar Vega' },
-  mensaje: null,
+}
+
+/** Invitación que no permite sumar grupos: se acepta sin ellos. */
+export const withoutGroups: InvitationDetail = {
+  ...firstPartial,
+  id_invitacion: 15,
+  permite_agregar_grupos: false,
+  examen: { ...firstPartial.examen, id_examen: 505, nombre_examen: '2do Parcial', fecha: '2026-11-20' },
 }
 
 export const expired: InvitationDetail = {
@@ -70,7 +76,6 @@ export const rejected: InvitationDetail = {
   fecha_respuesta: '2026-10-21T13:00:00+00:00',
   examen: { ...firstPartial.examen, id_examen: 504, nombre_examen: 'Recuperatorio' },
   invitante: { nombre_completo: 'Gustavo Rocha Pinto' },
-  motivo_rechazo: 'Tengo otro examen a la misma hora.',
 }
 
 export function accepted(invitation: InvitationDetail, groupIds: number[]): InvitationDetail {
@@ -83,9 +88,27 @@ export function accepted(invitation: InvitationDetail, groupIds: number[]): Invi
 }
 
 export function summaryOf(invitation: InvitationDetail): InvitationSummary {
-  const { id_invitacion, estado, fecha_invitacion, fecha_respuesta, examen, invitante } = invitation
+  const {
+    id_invitacion,
+    estado,
+    fecha_invitacion,
+    fecha_respuesta,
+    fecha_sin_efecto,
+    permite_agregar_grupos,
+    examen,
+    invitante,
+  } = invitation
 
-  return { id_invitacion, estado, fecha_invitacion, fecha_respuesta, examen, invitante }
+  return {
+    id_invitacion,
+    estado,
+    fecha_invitacion,
+    fecha_respuesta,
+    fecha_sin_efecto,
+    permite_agregar_grupos,
+    examen,
+    invitante,
+  }
 }
 
 const TAB_STATES: Record<InvitationTab, InvitationState[]> = {
@@ -162,7 +185,6 @@ export function stubInvitationsBackend(
         ...invitation,
         estado: 'RECHAZADA',
         fecha_respuesta: '2026-10-20T12:45:00+00:00',
-        motivo_rechazo: (body as { motivo: string | null }).motivo,
       }
       store.set(id, next)
 

@@ -2,23 +2,19 @@ import { useState } from 'react'
 import { X, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { firstName } from '../lib/invitationFormat'
 import type { InvitationDetail } from '../types/invitation.types'
 import { isConflict, responseErrorMessage } from './responseError'
-
-export const REJECT_REASON_MAX = 500
 
 interface RejectInvitationDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   invitation: InvitationDetail
-  onConfirm: (reason: string) => Promise<void>
+  onConfirm: () => Promise<void>
   onConflict: (message: string) => void
 }
 
-/** Rechazar con motivo opcional (CA-8). El examen no cambia. */
+/** Rechazar (CA-8). El examen no cambia. No se pide motivo: la invitación no lo guarda. */
 export function RejectInvitationDialog({
   open,
   onOpenChange,
@@ -26,7 +22,6 @@ export function RejectInvitationDialog({
   onConfirm,
   onConflict,
 }: RejectInvitationDialogProps) {
-  const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -35,10 +30,9 @@ export function RejectInvitationDialog({
     setSubmitting(true)
 
     try {
-      await onConfirm(reason)
-      setReason('')
+      await onConfirm()
     } catch (cause) {
-      const message = responseErrorMessage(cause, 'motivo', 'No se pudo rechazar la invitación. Intente de nuevo.')
+      const message = responseErrorMessage(cause, 'id_invitacion', 'No se pudo rechazar la invitación. Intente de nuevo.')
 
       if (isConflict(cause)) {
         onConflict(message)
@@ -68,20 +62,6 @@ export function RejectInvitationDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="reject-invitation-reason">Motivo (opcional)</Label>
-            <Textarea
-              id="reject-invitation-reason"
-              value={reason}
-              onChange={(event) => {
-                setReason(event.target.value)
-                if (error) setError(null)
-              }}
-              maxLength={REJECT_REASON_MAX}
-              aria-invalid={error ? true : undefined}
-              className="resize-none"
-            />
-          </div>
           <p className="text-sm text-muted-foreground">
             {firstName(invitation.invitante.nombre_completo)} verá «Rechazada» y el examen no cambia.
           </p>

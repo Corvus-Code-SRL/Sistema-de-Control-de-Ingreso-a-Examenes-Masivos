@@ -69,17 +69,24 @@ export function AcceptInvitationDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <p className="text-sm">
-            Sumará{' '}
-            {groups.map((group, index) => (
-              <span key={group.id_grupo}>
-                {index > 0 && (index === groups.length - 1 ? ' y ' : ', ')}
-                el <b>{groupLabel(group)}</b> ({group.inscritos})
-              </span>
-            ))}{' '}
-            al {invitation.examen.nombre_examen} de {invitation.examen.materia}. El examen pasará de{' '}
-            {capacity.current} a {plural(capacity.after, 'estudiante', 'estudiantes')}.
-          </p>
+          {groups.length === 0 ? (
+            <p className="text-sm">
+              Será docente colaborador del {invitation.examen.nombre_examen} de {invitation.examen.materia}, sin sumar
+              grupos. El examen sigue con {plural(capacity.current, 'estudiante', 'estudiantes')}.
+            </p>
+          ) : (
+            <p className="text-sm">
+              Sumará{' '}
+              {groups.map((group, index) => (
+                <span key={group.id_grupo}>
+                  {index > 0 && (index === groups.length - 1 ? ' y ' : ', ')}
+                  el <b>{groupLabel(group)}</b> ({group.inscritos})
+                </span>
+              ))}{' '}
+              al {invitation.examen.nombre_examen} de {invitation.examen.materia}. El examen pasará de{' '}
+              {capacity.current} a {plural(capacity.after, 'estudiante', 'estudiantes')}.
+            </p>
+          )}
 
           {capacity.exceeds && (
             <div

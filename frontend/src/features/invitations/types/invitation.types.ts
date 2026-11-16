@@ -35,6 +35,10 @@ export interface InvitationSummary {
   /** ISO 8601 con desfase (UTC). */
   fecha_invitacion: string
   fecha_respuesta: string | null
+  /** Cuándo la invitación quedó sin efecto (el examen abrió el control de ingreso sin respuesta). */
+  fecha_sin_efecto: string | null
+  /** Si al aceptar puede sumar sus grupos (lo decide quien invita, HU-026). Si es false se acepta sin grupos. */
+  permite_agregar_grupos: boolean
   examen: InvitationExam
   invitante: InvitationPerson
 }
@@ -61,11 +65,8 @@ export interface MyInvitationGroup extends InvitationGroup {
   sumado: boolean
 }
 
+/** La invitación no guarda mensaje ni motivo de rechazo: invitacion_examen no tiene esas columnas. */
 export interface InvitationDetail extends InvitationSummary {
-  mensaje: string | null
-  motivo_rechazo: string | null
-  /** Cuándo abrió el control de ingreso, si la invitación quedó sin efecto. */
-  fecha_sin_efecto: string | null
   ambientes: InvitationRoom[]
   grupos_examen: InvitationGroup[]
   mis_grupos: MyInvitationGroup[]
