@@ -26,7 +26,6 @@ const scheduled: Exam = {
   id_usuario_docente: 'docente',
   materia: { id_materia: 1, nombre: 'Álgebra Lineal', codigo: 'MAT101' },
 }
-const inEntry: Exam = { ...scheduled, id_examen: 8, nombre_examen: 'Segundo Parcial', estado: 'EN_INGRESO' }
 const inProgress: Exam = { ...scheduled, id_examen: 9, nombre_examen: 'Recuperatorio', estado: 'EN_CURSO', duracion: 8 }
 const finished: Exam = { ...scheduled, id_examen: 10, nombre_examen: 'Examen finalizado', estado: 'FINALIZADO' }
 const cancelled: Exam = { ...scheduled, id_examen: 11, nombre_examen: 'Examen cancelado', estado: 'CANCELADO' }
@@ -71,15 +70,14 @@ describe('HU-038 — Controlar tiempo del examen', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('ofrece los tres estados operativos y muestra los datos del examen elegido', async () => {
-    listExams([scheduled, inEntry, inProgress, finished, cancelled])
+  it('solo ofrece exámenes programados y en curso y muestra los datos del examen elegido', async () => {
+    listExams([scheduled, inProgress, finished, cancelled])
     const user = userEvent.setup()
     renderWithRouter(<ExamTimerPage />)
 
     expect(screen.queryByRole('timer')).not.toBeInTheDocument()
     await openExamList(user)
-    expect(screen.getAllByRole('option')).toHaveLength(3)
-    expect(screen.getByRole('option', { name: /Segundo Parcial/ })).toBeInTheDocument()
+    expect(screen.getAllByRole('option')).toHaveLength(2)
     expect(screen.getByRole('option', { name: /Recuperatorio/ })).toBeInTheDocument()
     await user.click(screen.getByRole('option', { name: /Primer Parcial/ }))
 
@@ -123,13 +121,13 @@ describe('HU-038 — Controlar tiempo del examen', () => {
 
     now += 600_000
     act(() => vi.advanceTimersByTime(1_000))
-    expect(display).toHaveTextContent('00:00:00')
-    expect(screen.getByRole('status')).toHaveTextContent('Tiempo cumplido.')
+    expect(display).toHaveTextContent(/^00:00$/)
+    expect(screen.getByRole('status')).toHaveTextContent(/^Tiempo agotado$/)
     expect(screen.getByText('Programado', { exact: true })).toBeInTheDocument()
 
     now += 60_000
     act(() => vi.advanceTimersByTime(60_000))
-    expect(display).toHaveTextContent('00:00:00')
+    expect(display).toHaveTextContent(/^00:00$/)
     expect(backend.calls.map(({ method, url }) => [method, url.endsWith('/examenes')])).toEqual([['GET', true]])
   })
 

@@ -17,7 +17,6 @@ const TITLE = 'Controlar tiempo del examen'
 const WARNING_SECONDS = 10 * 60
 const AVAILABLE_STATES: ReadonlySet<ExamStatus> = new Set([
   EXAM_STATUS.PROGRAMADO,
-  EXAM_STATUS.EN_INGRESO,
   EXAM_STATUS.EN_CURSO,
 ])
 
@@ -26,6 +25,8 @@ function formatDate(value: string) {
 }
 
 function formatCountdown(seconds: number) {
+  if (seconds === 0) return '00:00'
+
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
 
@@ -58,7 +59,7 @@ function ExamCountdown({ exam }: { exam: Exam }) {
 
   const started = deadline !== null
   const notice = started && remaining <= WARNING_SECONDS
-    ? (remaining === 0 ? 'Tiempo cumplido.' : 'Quedan 10 minutos o menos.')
+    ? (remaining === 0 ? 'Tiempo agotado' : 'Quedan 10 minutos o menos.')
     : null
 
   return (
@@ -136,7 +137,7 @@ export function ExamTimerPage() {
         <EmptyState
           icon={Clock}
           title="No tiene exámenes disponibles"
-          description="Aquí aparecerán sus exámenes programados, en ingreso y en curso."
+          description="Aquí aparecerán sus exámenes programados y en curso."
         />
       )}
 
