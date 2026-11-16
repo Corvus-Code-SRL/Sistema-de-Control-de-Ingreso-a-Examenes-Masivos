@@ -210,6 +210,7 @@ class ExamLifecycleService
         $exam->fin_real_en = $finishedAt;
         $exam->fin_automatico = $automatic;
         $exam->save();
+        app(ExamInvitationExpiryService::class)->voidPendingForExam((int) $exam->id_examen);
 
         $newValues = ['id_examen' => $exam->id_examen, 'estado' => Exam::FINALIZADO];
         if ($automatic) {

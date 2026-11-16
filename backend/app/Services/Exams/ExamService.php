@@ -133,9 +133,13 @@ class ExamService
      * El examen no guarda su período: lo da el período de sus grupos. Entra el que tiene al
      * menos un grupo del período activo y también el que aún no tiene grupos asignados, para que
      * un examen recién creado aparezca en la vista antes de vincularle sus grupos.
+     *
+     * @param  array<int, string>  $states  Estados que se incluyen; por omisión PROGRAMADO y EN_INGRESO.
      */
-    public function listScheduledForTeacher(string $teacherId): Collection
-    {
+    public function listScheduledForTeacher(
+        string $teacherId,
+        array $states = [Exam::PROGRAMADO, Exam::EN_INGRESO]
+    ): Collection {
         $this->assertTeacherGiven($teacherId);
 
         $activePeriodId = $this->subjectCatalog->activePeriodId();
@@ -143,7 +147,7 @@ class ExamService
         $exams = Exam::query()
             ->with($this->listRelations())
             ->where('id_usuario_docente', $teacherId)
-            ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_INGRESO])
+            ->whereIn('estado', $states)
             ->where(function (Builder $query) use ($activePeriodId) {
                 $query->whereDoesntHave('groups')
                     ->orWhereHas('groups', function (Builder $groups) use ($activePeriodId) {
@@ -356,6 +360,7 @@ class ExamService
             }
 
             $exam->update(['estado' => Exam::CANCELADO]);
+            app(ExamInvitationExpiryService::class)->voidPendingForExam((int) $exam->id_examen);
 
             $this->auditLog->registrar(
                 'CANCELAR',

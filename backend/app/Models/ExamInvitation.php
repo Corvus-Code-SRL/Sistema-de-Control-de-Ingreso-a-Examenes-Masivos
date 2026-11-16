@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -14,10 +15,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $id_docente_invitado
  * @property \Carbon\Carbon $fecha_invitacion
  * @property \Carbon\Carbon|null $fecha_respuesta
+ * @property \Carbon\Carbon|null $fecha_sin_efecto
  * @property string $estado
+ * @property bool $permite_agregar_grupos
  */
 class ExamInvitation extends Model
 {
+    /** Valores de public.estado_invitacion. */
+    public const PENDIENTE = 'PENDIENTE';
+    public const ACEPTADA = 'ACEPTADA';
+    public const RECHAZADA = 'RECHAZADA';
+    public const SIN_EFECTO = 'SIN_EFECTO';
+
+    /** Estados que impiden volver a invitar al mismo docente al mismo examen. */
+    public const CURRENT_STATES = [self::PENDIENTE, self::ACEPTADA];
+
     protected $table = 'invitacion_examen';
     protected $primaryKey = 'id_invitacion';
     public $timestamps = false;
@@ -28,6 +40,8 @@ class ExamInvitation extends Model
         'id_docente_invitado' => 'string',
         'fecha_invitacion' => 'datetime',
         'fecha_respuesta' => 'datetime',
+        'fecha_sin_efecto' => 'datetime',
+        'permite_agregar_grupos' => 'boolean',
     ];
 
     protected $fillable = [
@@ -36,8 +50,29 @@ class ExamInvitation extends Model
         'id_docente_invitado',
         'fecha_invitacion',
         'fecha_respuesta',
-        'estado'
+        'fecha_sin_efecto',
+        'estado',
+        'permite_agregar_grupos',
     ];
+
+    /** Invitaciones que todavía cuentan: pendientes o aceptadas. */
+    public function scopeCurrent(Builder $query): Builder
+    {
+        return $query->whereIn('invitacion_examen.estado', self::CURRENT_STATES);
+    }
+
+    /**
+     * Estado que se muestra: una invitación PENDIENTE cuyo examen ya no está PROGRAMADO está sin efecto aunque
+     * el ciclo de vida todavía no la haya escrito así. Requiere el examen (se carga si falta).
+     */
+    public function effectiveState(): string
+    {
+        if ($this->estado === self::PENDIENTE && $this->exam->estado !== Exam::PROGRAMADO) {
+            return self::SIN_EFECTO;
+        }
+
+        return $this->estado;
+    }
 
     public function exam(): BelongsTo
     {

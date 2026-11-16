@@ -4,6 +4,7 @@ namespace App\Services\EntryControl;
 
 use App\Exceptions\EntryControl\EntryOpeningException;
 use App\Models\Exam;
+use App\Services\Exams\ExamInvitationExpiryService;
 use App\Services\Security\AuditLogService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -71,6 +72,7 @@ class RoomAssignmentService
             if ($exam->ingreso_abierto_en === null) {
                 $exam->ingreso_abierto_en = now();
                 $exam->save();
+                app(ExamInvitationExpiryService::class)->voidPendingForExam((int) $exam->id_examen);
                 $this->auditLog->registrar(
                     'MODIFICAR',
                     'examen',
