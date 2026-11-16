@@ -75,7 +75,13 @@ describe('EligibleListUploadFlow', () => {
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     await user.upload(input, makeFile())
 
-    await waitFor(() => expect(screen.getByText('202210443')).toBeInTheDocument())
+    // El preview ya no muestra una tabla con el código SIS; muestra 3 cards
+    // con los conteos de coincidentes, no habilitados por no figurar y ajenos.
+    await waitFor(() =>
+      expect(screen.getByText('Coinciden con la nómina')).toBeInTheDocument()
+    )
+    expect(screen.getByText('De la nómina no figuran')).toBeInTheDocument()
+    expect(screen.getByText('No están en la nómina')).toBeInTheDocument()
 
     await user.click(
       await screen.findByRole('combobox', { name: /Motivo para los que no figuran/i })

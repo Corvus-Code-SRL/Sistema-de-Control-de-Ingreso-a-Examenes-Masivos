@@ -37,7 +37,8 @@ describe('EligibleListCurrentTable', () => {
 
     await user.type(screen.getByLabelText(/Buscar por nombre o código SIS/i), 'alvarez')
 
-    expect(screen.getByText('Álvarez Rojas, Camila')).toBeInTheDocument()
+    // El nombre aparece dos veces: en la tabla de escritorio y en la card de móvil.
+    expect(screen.getAllByText('Álvarez Rojas, Camila').length).toBeGreaterThanOrEqual(1)
     expect(screen.queryByText('Mamani Quispe, Diego')).not.toBeInTheDocument()
   })
 
