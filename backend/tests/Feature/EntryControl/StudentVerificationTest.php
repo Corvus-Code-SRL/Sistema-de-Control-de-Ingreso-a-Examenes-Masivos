@@ -1338,7 +1338,7 @@ class StudentVerificationTest extends TestCase
             ->assertJsonPath('data.autorizado', false)
             ->assertJsonPath(
                 'data.motivo',
-                'El estudiante no está habilitado para este examen. Motivo: ASISTENCIA_INSUFICIENTE.'
+                'El estudiante no está habilitado para este examen. Motivo: Asistencia insuficiente.'
             );
 
         $this->assertDatabaseHas('intento_ingreso', [

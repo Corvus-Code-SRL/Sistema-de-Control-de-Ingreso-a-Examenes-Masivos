@@ -238,7 +238,7 @@ class VerificationEvaluateTest extends TestCase
 
         $this->assertSame(VerificationService::NOT_ENABLED, $result['veredicto']);
         $this->assertFalse($result['autorizado']);
-        $this->assertStringContainsString('Motivo: ASISTENCIA_INSUFICIENTE', $result['motivo']);
+        $this->assertStringContainsString('Motivo: Asistencia insuficiente', $result['motivo']);
     }
 
     public function test_estudiante_no_habilitado_con_motivo_otro_muestra_detalle(): void
