@@ -10,7 +10,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Escenarios de QA del Sprint 5. Hoy cubre HU-062 (rectificar un registro de la Central de Riesgo).
+ * Escenarios de QA del Sprint 5. Cubre HU-062 (rectificar un registro de la Central de Riesgo) y HU-023 (registrar un estudiante excepcional).
  *
  * Primero carga TestDataSeeder (cuentas, catálogo, grupos, exámenes y Central de Riesgo base) y después
  * agrega los estudiantes y registros que hacen probable la búsqueda y la rectificación. Se ejecuta a mano,
@@ -25,6 +25,10 @@ use Illuminate\Support\Facades\DB;
  *   - Carla Condori Vega tiene dos registros activos, listos para rectificar, y uno ya rectificado
  *     (retirado de la Central por un administrador, con su motivo).
  *   - Daniel Rojas Mendoza no tiene registros: sirve para el mensaje de estudiante sin registros.
+ *   - HU-023: Esteban Vargas Rivero (SIS 202170105) existe en estudiante pero no esta en ninguna nomina; sirve
+ *     para registrarlo como excepcional y aparece como "Sin carrera registrada". Con el docente 10452: el grupo
+ *     9401 (Calculo SIS 1, examen Programado) lo acepta y el 9407 (Programacion SIS 2, examen En ingreso)
+ *     responde 409. Al volver a correr el seeder se retira a Esteban de los grupos donde QA lo haya registrado.
  *
  * Volver a correrlo devuelve los escenarios a su estado inicial: se reescriben los reportes y los registros
  * de la central, así que lo que QA haya rectificado en estos tres registros vuelve a quedar activo (no así en
@@ -39,6 +43,7 @@ class Sprint5QaSeeder extends Seeder
     public const STUDENT_LUIS_PEREZ = 9701;
     public const STUDENT_CARLA_CONDORI = 9702;
     public const STUDENT_DANIEL_ROJAS = 9703;
+    public const STUDENT_EXCEPTIONAL_CANDIDATE = 9704;
 
     // reporte_estudiante.id_reporte_est
     public const REPORT_CARLA_VOIDED = 9950;
@@ -66,6 +71,7 @@ class Sprint5QaSeeder extends Seeder
         DB::transaction(function () {
             $this->seedStudents();
             $this->seedRecords();
+            $this->seedExceptionalScenario();
         });
     }
 
@@ -176,5 +182,22 @@ class Sprint5QaSeeder extends Seeder
                 ? 'Se confundió a la estudiante: el reporte correspondía a otra persona de la fila.'
                 : null,
         ];
+    }
+
+    /**
+     * HU-023: un estudiante que existe en la tabla estudiante pero no esta en ninguna nomina.
+     * No se le crean inscripciones: se registra desde la pantalla como excepcional.
+     */
+    private function seedExceptionalScenario(): void
+    {
+        DB::table('estudiante')->upsert([
+            $this->student(self::STUDENT_EXCEPTIONAL_CANDIDATE, '202170105', '7400105', 'Esteban', 'Vargas', 'Rivero'),
+        ], ['id_estudiante']);
+
+        // Devuelve el escenario a su estado inicial: quita lo que QA haya registrado como excepcional.
+        DB::table('grupo_estudiante')
+            ->where('id_estudiante', self::STUDENT_EXCEPTIONAL_CANDIDATE)
+            ->where('es_excepcional', true)
+            ->delete();
     }
 }
