@@ -3,13 +3,17 @@ import { ApiError } from '@/lib/api-client'
 import { throttleWaitSeconds } from '@/lib/throttle'
 import { LATE_ENTRY_MESSAGES } from '../components/lateEntryMessages'
 import { lateEntryService } from '../services/lateEntryService'
-import type { StudentMatch } from '../types/entry-control.types'
+import type { CurrentRejectedAttempt, StudentMatch } from '../types/entry-control.types'
 import type {
   LateEntryActionInput, LateEntryRequest, LateEntryVerification, LateEntryVerificationInput,
 } from '../types/late-entry.types'
 import { CI_MAX_LENGTH, digitsOnly, isValidCi, isValidSis, SIS_LENGTH } from '../utils/identificationValidation'
+import { toManualRejection, toRejectedAttempt, withManualRejection, withReported } from '../utils/rejectedAttempt'
 
-type Busy = 'verify' | 'request' | 'register'
+type Busy = 'verify' | 'request' | 'register' | 'reject'
+
+/** Motivo del rechazo manual desde el resultado, el mismo del control de ingreso (HU-032). */
+const MANUAL_REJECTION_REASON = 'DECISION_CONTROLADOR'
 
 /** Ante un 429 (RNF-03) pide esperar, en español, en lugar del texto del servidor. */
 function messageOf(cause: unknown, fallback: string): string {
@@ -20,8 +24,9 @@ function messageOf(cause: unknown, fallback: string): string {
 }
 
 /**
- * Verificación y escritura del ingreso con retraso. `controlRoomId` es el ambiente del auxiliar
- * (lo envía al verificar y al solicitar); el docente no tiene uno y elige el ambiente al registrar.
+ * Verificación y escritura del ingreso con retraso. `controlRoomId` es el ambiente de control: el
+ * del auxiliar o el que elige el docente. Se envía al verificar, y un resultado negativo deja ahí
+ * el intento para poder reportarlo, como en HU-032. El docente elige aparte el ambiente al registrar.
  * Un 409 (examen cerrado, tiempo cumplido, solicitud pendiente, ingreso duplicado u otro examen sin
  * confirmar) avisa con `onConflict` y vuelve a verificar, para que el resultado muestre el estado
  * real del estudiante.
@@ -35,6 +40,7 @@ export function useLateEntryVerification(
   const [ci, setCi] = useState('')
   const [result, setResult] = useState<LateEntryVerification | null>(null)
   const [sentRequest, setSentRequest] = useState<LateEntryRequest | null>(null)
+  const [rejectedAttempt, setRejectedAttempt] = useState<CurrentRejectedAttempt | null>(null)
   const [busy, setBusy] = useState<Busy | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -42,7 +48,13 @@ export function useLateEntryVerification(
   function clearResult() {
     setResult(null)
     setSentRequest(null)
+    setRejectedAttempt(null)
     setError(null)
+  }
+
+  function applyVerdict(verdict: LateEntryVerification, roomId: number) {
+    setResult(verdict)
+    setRejectedAttempt(toRejectedAttempt(verdict, roomId))
   }
 
   function reset() {
@@ -80,15 +92,20 @@ export function useLateEntryVerification(
       setError(LATE_ENTRY_MESSAGES.ciInvalid)
       return null
     }
+    if (controlRoomId === null) {
+      setError(LATE_ENTRY_MESSAGES.controlRoomRequired)
+      return null
+    }
 
-    return { cod_sis: sis, ...(ci ? { ci } : {}), ...(controlRoomId !== null ? { id_ambiente: controlRoomId } : {}) }
+    return { cod_sis: sis, ...(ci ? { ci } : {}), id_ambiente: controlRoomId }
   }
 
   async function refreshVerdict(payload: LateEntryVerificationInput) {
     try {
-      setResult(await lateEntryService.verify(examId, payload))
+      applyVerdict(await lateEntryService.verify(examId, payload), payload.id_ambiente)
     } catch (cause) {
       setResult(null)
+      setRejectedAttempt(null)
       if (cause instanceof ApiError && cause.status === 409) onConflict()
     }
   }
@@ -100,8 +117,9 @@ export function useLateEntryVerification(
     setError(null)
     setNotice(null)
     setSentRequest(null)
+    setRejectedAttempt(null)
     try {
-      setResult(await lateEntryService.verify(examId, payload))
+      applyVerdict(await lateEntryService.verify(examId, payload), payload.id_ambiente)
     } catch (cause) {
       setResult(null)
       setError(messageOf(cause, LATE_ENTRY_MESSAGES.verifyFailed))
@@ -167,8 +185,42 @@ export function useLateEntryVerification(
     }
   }
 
+  /**
+   * Rechazo manual de un resultado que autoriza (con la advertencia de otro examen): registra el
+   * intento y lo devuelve para abrir el reporte, como «Rechazar» en el control de ingreso.
+   */
+  async function reject(): Promise<CurrentRejectedAttempt | null> {
+    const student = result?.autorizado ? result.estudiante : null
+    if (!result || !student || controlRoomId === null) return null
+    setBusy('reject')
+    setError(null)
+    try {
+      const rejected = await lateEntryService.rejectEntry(examId, {
+        id_estudiante: student.id_estudiante,
+        id_ambiente: controlRoomId,
+        ...(ci ? { ci } : {}),
+        motivo: MANUAL_REJECTION_REASON,
+      })
+      const attempt = toManualRejection(rejected, student, controlRoomId)
+      setRejectedAttempt(attempt)
+      setResult(withManualRejection(result, attempt))
+      setNotice(LATE_ENTRY_MESSAGES.attemptRejected)
+      return attempt
+    } catch (cause) {
+      await handleWriteError(cause)
+      return null
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  function markReported(attemptId: number) {
+    setRejectedAttempt((current) => current?.attemptId === attemptId ? { ...current, reported: true } : current)
+    setResult((current) => withReported(current, attemptId))
+  }
+
   return {
-    sis, ci, result, sentRequest, busy, error, notice,
-    changeSis, changeCi, choose, verify, request, register, reset, setNotice,
+    sis, ci, result, sentRequest, rejectedAttempt, busy, error, notice,
+    changeSis, changeCi, choose, verify, request, register, reject, reset, setNotice, markReported,
   }
 }

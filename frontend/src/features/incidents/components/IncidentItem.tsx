@@ -49,6 +49,11 @@ export function IncidentItem({ incident, isSelected, onSelect, showDecision }: I
                 En Central de Riesgo
               </span>
             )}
+            {incident.retirado_de_central_riesgo && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-neutral-soft px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                Retirado de la Central de Riesgo
+              </span>
+            )}
           </>
         ) : (
           <span className="sciem-tnum text-xs text-muted-foreground">{time}</span>

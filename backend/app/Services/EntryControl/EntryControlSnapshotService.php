@@ -110,7 +110,7 @@ class EntryControlSnapshotService
                 $entries[$studentId] ?? null,
                 $assignedRooms[$studentId] ?? null,
                 $risks[$studentId] ?? ['total' => 0, 'latest' => null],
-                $career
+                $group['carrera'] ?? $career
             );
             $fullName = $payload['estudiante']['nombre_completo'];
 
@@ -450,6 +450,61 @@ class EntryControlSnapshotService
         });
     }
 
+    /**
+     * Actualiza los antecedentes de un estudiante en los snapshots activos donde figura (HU-062): una
+     * rectificación de la Central de Riesgo cambia el tipo de falta que se le muestra al controlador.
+     * Conserva la expiración del snapshot y renueva la versión del estado para que los clientes lo relean.
+     * Sin snapshot activo no hace nada: el siguiente se reconstruye desde PostgreSQL.
+     *
+     * @return int cuántos snapshots se actualizaron
+     */
+    public function refreshBackground(int $studentId): int
+    {
+        $examIds = DB::table('grupo_estudiante as gs')
+            ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
+            ->join('examen as e', 'e.id_examen', '=', 'gx.id_examen')
+            ->where('gs.id_estudiante', $studentId)
+            ->where('e.estado', Exam::EN_INGRESO)
+            ->distinct()
+            ->pluck('gx.id_examen');
+
+        $refreshed = 0;
+        foreach ($examIds as $examId) {
+            $examId = (int) $examId;
+            $token = $this->activeToken($examId);
+            if ($token === null) {
+                continue;
+            }
+
+            $this->cache()->lock($this->key($examId, $token, 'update-lock'), 5)->block(3, function () use (
+                $examId, $token, $studentId, &$refreshed
+            ): void {
+                $meta = $this->cache()->get($this->key($examId, $token, 'meta'));
+                $student = $this->studentById($examId, $studentId, $token);
+                if (! is_array($meta) || $student === null) {
+                    return;
+                }
+
+                $student['antecedentes'] = $this->riskCenter->summariesForSnapshot([$studentId])[$studentId]
+                    ?? ['total' => 0, 'latest' => null];
+                $values = [$this->key($examId, $token, 'student', $studentId) => $student];
+
+                $status = $this->cache()->get($this->key($examId, $token, 'status'));
+                if (is_array($status)) {
+                    $status['version'] = (string) Str::uuid();
+                    $values[$this->key($examId, $token, 'status')] = $status;
+                }
+
+                if (! $this->cache()->putMany($values, Carbon::parse($meta['expira_en']))) {
+                    throw new \RuntimeException('No se pudo actualizar los antecedentes en Redis.');
+                }
+                $refreshed++;
+            });
+        }
+
+        return $refreshed;
+    }
+
     private function meta(int $examId): array
     {
         $token = $this->activeTokenOrFail($examId);
@@ -535,7 +590,7 @@ class EntryControlSnapshotService
             $this->entries($examId, $studentId)[$studentId] ?? null,
             $assignedRooms[$studentId] ?? null,
             $this->riskCenter->summariesForSnapshot([$studentId])[$studentId] ?? ['total' => 0, 'latest' => null],
-            $this->careerName($exam)
+            $membersByStudent[$studentId]['carrera'] ?? $this->careerName($exam)
         );
     }
 
@@ -557,17 +612,18 @@ class EntryControlSnapshotService
     /**
      * Grupo de cada estudiante de la nómina: el menor de los grupos del examen en que está inscrito.
      *
-     * @return array<int, array{id_grupo: int, num_grupo: string}>
+     * @return array<int, array{id_grupo: int, num_grupo: string, carrera: string}>
      */
     private function memberships(int $examId): array
     {
         $memberships = DB::table('grupo_estudiante as gs')
             ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
             ->join('grupo as g', 'g.id_grupo', '=', 'gs.id_grupo')
+            ->join('carrera as c', 'c.id_carrera', '=', DB::raw('COALESCE(gs.id_carrera, g.id_carrera)'))
             ->where('gx.id_examen', $examId)
             ->orderBy('gs.id_estudiante')
             ->orderBy('gs.id_grupo')
-            ->get(['gs.id_estudiante', 'gs.id_grupo', 'g.num_grupo']);
+            ->get(['gs.id_estudiante', 'gs.id_grupo', 'g.num_grupo', 'c.nombre as carrera']);
 
         $membersByStudent = [];
         foreach ($memberships as $membership) {
@@ -576,6 +632,7 @@ class EntryControlSnapshotService
                 $membersByStudent[$studentId] = [
                     'id_grupo' => (int) $membership->id_grupo,
                     'num_grupo' => $membership->num_grupo,
+                    'carrera' => $membership->carrera,
                 ];
             }
         }

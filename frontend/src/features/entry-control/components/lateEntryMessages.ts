@@ -44,6 +44,9 @@ export const LATE_ENTRY_MESSAGES = {
   throttled: (seconds: number) => `Muchas consultas seguidas. Intente de nuevo en ${seconds} s.`,
   roomField: 'Ambiente de ingreso',
   roomPlaceholder: 'Seleccione un ambiente',
+  controlRoomField: 'Ambiente de control',
+  controlRoomRequired: 'Seleccione el ambiente de control.',
+  attemptRejected: 'Intento rechazado y registrado.',
   closeNotice: 'Cerrar aviso',
   nextStudent: 'Siguiente estudiante',
   pendingInline: 'Este estudiante tiene una solicitud pendiente. Autorícela o rechácela.',
@@ -79,12 +82,15 @@ export const LATE_ENTRY_STATUS_LABELS: Record<LateEntryRequestStatus, string> = 
   RECHAZADA: 'Rechazada',
 }
 
-/** Acciones del resultado de verificación para el docente, que registra directamente. */
+/**
+ * Acciones del resultado de verificación para el docente, que registra directamente. Un resultado
+ * negativo deja el intento registrado, como en el control de ingreso (HU-032).
+ */
 export const TEACHER_LATE_ENTRY_ACTIONS: VerificationActions = {
   confirmLabel: 'Registrar con retraso',
   busyLabel: 'Registrando…',
   rejectLabel: 'Cancelar',
-  recordsAttempt: false,
+  recordsAttempt: true,
 }
 
 /** Acciones del resultado de verificación para el auxiliar, que solicita la autorización. */
@@ -92,7 +98,7 @@ export const ASSISTANT_LATE_ENTRY_ACTIONS: VerificationActions = {
   confirmLabel: 'Enviar solicitud',
   busyLabel: 'Enviando…',
   rejectLabel: 'Cancelar',
-  recordsAttempt: false,
+  recordsAttempt: true,
 }
 
 /** Con la advertencia de otro examen: el docente registra de todos modos (previa confirmación). */

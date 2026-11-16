@@ -10,7 +10,8 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function mount(roomId: number | null = null, onConflict = vi.fn()) {
+/** Por defecto, el docente verificando desde el ambiente de control 5. */
+function mount(roomId: number | null = 5, onConflict = vi.fn()) {
   return renderHook(() => useLateEntryVerification(7, roomId, onConflict))
 }
 
@@ -49,7 +50,7 @@ describe('useLateEntryVerification', () => {
     expect(hook.result.current.sentRequest?.hora_solicitud).toBe('10:12')
   })
 
-  it('el docente verifica sin ambiente y registra en el que elige', async () => {
+  it('el docente verifica desde su ambiente de control y registra en el que elige', async () => {
     const verify = vi.spyOn(lateEntryService, 'verify').mockResolvedValue(makeLateEntryVerification())
     const register = vi.spyOn(lateEntryService, 'register').mockResolvedValue({
       id_estudiante: 501, estado_ingreso: 'CON_RETRASO', hora_ingreso: '10:30', id_ambiente: 5,
@@ -57,7 +58,7 @@ describe('useLateEntryVerification', () => {
     const hook = mount()
 
     await verifyStudent(hook)
-    expect(verify).toHaveBeenCalledWith(7, { cod_sis: '202301903', ci: '9342145' })
+    expect(verify).toHaveBeenCalledWith(7, { cod_sis: '202301903', ci: '9342145', id_ambiente: 5 })
 
     await act(async () => { await hook.result.current.register(5) })
     expect(register).toHaveBeenCalledWith(7, { id_estudiante: 501, id_ambiente: 5, ci: '9342145' })
@@ -88,7 +89,7 @@ describe('useLateEntryVerification', () => {
       new ApiError(409, 'Existe una solicitud pendiente para este estudiante. Autorícela o rechácela.')
     )
     const onConflict = vi.fn()
-    const hook = mount(null, onConflict)
+    const hook = mount(5, onConflict)
 
     await verifyStudent(hook)
     await act(async () => { await hook.result.current.register(5) })
@@ -118,7 +119,7 @@ describe('useLateEntryVerification', () => {
       new ApiError(409, 'Solo puede registrar ingresos con retraso mientras el examen está en curso.')
     )
     const onConflict = vi.fn()
-    const hook = mount(null, onConflict)
+    const hook = mount(5, onConflict)
 
     await verifyStudent(hook)
 
@@ -142,7 +143,7 @@ describe('useLateEntryVerification', () => {
       new ApiError(429, 'Too Many Attempts.', {}, undefined, { retryAfter: 6 })
     )
     const onConflict = vi.fn()
-    const hook = mount(null, onConflict)
+    const hook = mount(5, onConflict)
 
     await verifyStudent(hook)
 
@@ -163,5 +164,83 @@ describe('useLateEntryVerification', () => {
     expect(hook.result.current.error).toBe(LATE_ENTRY_MESSAGES.throttled(3))
     expect(hook.result.current.result?.autorizado).toBe(true)
     expect(verify).toHaveBeenCalledTimes(1)
+  })
+
+  it('sin ambiente de control no verifica', async () => {
+    const verify = vi.spyOn(lateEntryService, 'verify')
+    const hook = mount(null)
+
+    await verifyStudent(hook)
+
+    expect(hook.result.current.error).toBe(LATE_ENTRY_MESSAGES.controlRoomRequired)
+    expect(verify).not.toHaveBeenCalled()
+  })
+
+  it('un resultado negativo deja el intento listo para reportar en el ambiente de control', async () => {
+    vi.spyOn(lateEntryService, 'verify').mockResolvedValue(makeLateEntryVerification({
+      veredicto: 'CI_NO_COINCIDE', autorizado: false, motivo: 'El CI no coincide con el registrado',
+      id_intento: 91, registrado_en: '2026-10-31T14:20:00Z', reportado: false,
+    }))
+    const hook = mount(6)
+
+    await verifyStudent(hook)
+
+    expect(hook.result.current.rejectedAttempt).toEqual({
+      attemptId: 91, roomId: 6, reason: 'El CI no coincide con el registrado', reported: false,
+      registeredAt: '2026-10-31T14:20:00Z', student: expect.objectContaining({ id_estudiante: 501 }),
+    })
+
+    act(() => hook.result.current.markReported(91))
+    expect(hook.result.current.rejectedAttempt?.reported).toBe(true)
+    expect(hook.result.current.result?.reportado).toBe(true)
+  })
+
+  it('un resultado que autoriza no deja intento', async () => {
+    vi.spyOn(lateEntryService, 'verify').mockResolvedValue(makeLateEntryVerification())
+    const hook = mount()
+
+    await verifyStudent(hook)
+
+    expect(hook.result.current.rejectedAttempt).toBeNull()
+  })
+
+  it('rechazar registra el intento por decisión del controlador y lo devuelve para reportar', async () => {
+    vi.spyOn(lateEntryService, 'verify').mockResolvedValue(makeLateEntryVerification())
+    const rejectEntry = vi.spyOn(lateEntryService, 'rejectEntry').mockResolvedValue({
+      id_intento: 92, registrado: true, motivo: 'DECISION_CONTROLADOR', registrado_en: '2026-10-31T14:25:00Z',
+    })
+    const hook = mount()
+
+    await verifyStudent(hook)
+    let attempt: Awaited<ReturnType<typeof hook.result.current.reject>> = null
+    await act(async () => { attempt = await hook.result.current.reject() })
+
+    expect(rejectEntry).toHaveBeenCalledWith(7, {
+      id_estudiante: 501, id_ambiente: 5, ci: '9342145', motivo: 'DECISION_CONTROLADOR',
+    })
+    expect(attempt).toEqual(hook.result.current.rejectedAttempt)
+    expect(hook.result.current.rejectedAttempt).toMatchObject({
+      attemptId: 92, roomId: 5, reason: 'Rechazo por decisión del controlador', reported: false,
+    })
+    expect(hook.result.current.result).toMatchObject({
+      autorizado: false, veredicto: 'RECHAZADO_MANUAL', id_intento: 92, reportado: false,
+    })
+    expect(hook.result.current.notice).toBe(LATE_ENTRY_MESSAGES.attemptRejected)
+  })
+
+  it('un 409 al rechazar avisa, vuelve a verificar y no devuelve intento', async () => {
+    const verify = vi.spyOn(lateEntryService, 'verify').mockResolvedValue(makeLateEntryVerification())
+    vi.spyOn(lateEntryService, 'rejectEntry').mockRejectedValue(new ApiError(409, 'El estudiante ya registró su ingreso.'))
+    const onConflict = vi.fn()
+    const hook = mount(5, onConflict)
+
+    await verifyStudent(hook)
+    let attempt: Awaited<ReturnType<typeof hook.result.current.reject>> = null
+    await act(async () => { attempt = await hook.result.current.reject() })
+
+    expect(attempt).toBeNull()
+    expect(hook.result.current.error).toBe('El estudiante ya registró su ingreso.')
+    expect(onConflict).toHaveBeenCalledTimes(1)
+    expect(verify).toHaveBeenCalledTimes(2)
   })
 })

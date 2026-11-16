@@ -36,8 +36,20 @@ class EntryAttemptService
             return ['registrado' => false, 'veredicto' => $verdict['veredicto'], 'motivo' => $verdict['motivo']];
         }
 
+        return $this->recordManualRejection((int) $exam->id_examen, $input, $actor, $verdict);
+    }
+
+    /**
+     * Registra el rechazo que decide el controlador sobre un resultado que autorizaba. Quien
+     * llama ya verificó al estudiante; lo usan el control normal y el ingreso con retraso.
+     *
+     * @param array{id_ambiente: int, motivo: string, observacion?: string|null, cod_sis?: string, ci?: string} $input
+     * @return array{id_intento: int, registrado_en: string, registrado: bool, motivo: string}
+     */
+    public function recordManualRejection(int $examId, array $input, User $actor, array $verdict): array
+    {
         $attempt = $this->insert(
-            (int) $exam->id_examen,
+            $examId,
             $input,
             $actor,
             $input['motivo'],

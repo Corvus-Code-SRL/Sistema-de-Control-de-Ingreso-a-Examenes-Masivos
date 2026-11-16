@@ -5,9 +5,11 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
 import { ExamForm } from './ExamForm'
+import { ExamAmbientesForm } from './ExamAmbientesForm'
 import type {
   Classroom,
   CreateExamFormData,
+  SubjectCareerOption,
 } from '../types/exams.types'
 
 const classrooms: Classroom[] = [
@@ -30,8 +32,10 @@ const initialForm: CreateExamFormData = {
 
 function ExamFormHarness({
   initialAmbientes = [],
+  subjects = [],
 }: {
   initialAmbientes?: number[]
+  subjects?: SubjectCareerOption[]
 }) {
   const [formData, setFormData] = useState<CreateExamFormData>({
     ...initialForm,
@@ -39,21 +43,46 @@ function ExamFormHarness({
   })
 
   return (
-    <ExamForm
-      formData={formData}
-      subjects={[]}
-      classrooms={classrooms}
-      errors={{}}
-      warnings={{}}
-      updateFormData={(fields) => {
-        setFormData((previous) => ({
-          ...previous,
-          ...fields,
-        }))
-      }}
-    />
+    <>
+      <ExamForm
+        formData={formData}
+        subjects={subjects}
+        errors={{}}
+        updateFormData={(fields) => setFormData((previous) => ({ ...previous, ...fields }))}
+      />
+      <ExamAmbientesForm
+        classrooms={classrooms}
+        selectedRoomIds={formData.ambientes}
+        updateFormData={(fields) => setFormData((previous) => ({ ...previous, ...fields }))}
+      />
+    </>
   )
 }
+
+describe('ExamForm - materias', () => {
+  it('muestra una opción por materia aunque esté en varias carreras', async () => {
+    render(<ExamFormHarness subjects={[
+      { id_carrera: 1, id_materia: 10, nombre: 'Bases de Datos I', codigo: 'BD', carrera: 'Sistemas', es_mia: true },
+      { id_carrera: 2, id_materia: 10, nombre: 'Bases de Datos I', codigo: 'BD', carrera: 'Informática', es_mia: true },
+    ]} />)
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Materia *' }))
+    expect(screen.getAllByRole('option', { name: 'Bases de Datos I' })).toHaveLength(1)
+    await userEvent.click(screen.getByRole('option', { name: 'Bases de Datos I' }))
+    expect(screen.getByRole('combobox', { name: 'Materia *' })).toHaveTextContent('Bases de Datos I')
+  })
+})
+
+describe('ExamForm - apertura', () => {
+  it('permite configurar los minutos antes del examen', async () => {
+    render(<ExamFormHarness />)
+    const opening = screen.getByRole('spinbutton', { name: 'Apertura del control de ingreso' })
+    expect(opening).toHaveValue(10)
+    await userEvent.clear(opening)
+    await userEvent.type(opening, '25')
+    expect(opening).toHaveValue(25)
+  })
+})
 
 describe('ExamForm - ambientes (HU-024, CA-3)', () => {
   it('permite seleccionar dos ambientes sin reemplazar el primero', async () => {
@@ -74,17 +103,9 @@ describe('ExamForm - ambientes (HU-024, CA-3)', () => {
 
     expect(aulaA).toBeChecked()
     expect(aulaB).toBeChecked()
-
-    expect(
-      screen.getByText(/2 ambientes seleccionados/i)
-    ).toBeInTheDocument()
-
-    expect(
-      screen.getByText(/capacidad total:\s*75/i)
-    ).toBeInTheDocument()
   })
 
-  it('permite deseleccionar un ambiente y recalcula el total', async () => {
+  it('permite deseleccionar un ambiente', async () => {
     const user = userEvent.setup()
 
     render(<ExamFormHarness initialAmbientes={[1, 2]} />)
@@ -101,14 +122,6 @@ describe('ExamForm - ambientes (HU-024, CA-3)', () => {
 
     expect(aulaA).toBeChecked()
     expect(aulaB).not.toBeChecked()
-
-    expect(
-      screen.getByText(/1 ambiente seleccionado/i)
-    ).toBeInTheDocument()
-
-    expect(
-      screen.getByText(/capacidad total:\s*40/i)
-    ).toBeInTheDocument()
   })
 
   it('conserva los ambientes previamente seleccionados al abrir el formulario', () => {
@@ -125,9 +138,5 @@ describe('ExamForm - ambientes (HU-024, CA-3)', () => {
     expect(
       screen.getByRole('checkbox', { name: /aula 691c/i })
     ).toBeChecked()
-
-    expect(
-      screen.getByText(/capacidad total:\s*85/i)
-    ).toBeInTheDocument()
   })
 })

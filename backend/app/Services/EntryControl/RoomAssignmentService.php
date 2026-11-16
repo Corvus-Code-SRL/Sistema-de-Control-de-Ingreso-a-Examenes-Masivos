@@ -4,6 +4,7 @@ namespace App\Services\EntryControl;
 
 use App\Exceptions\EntryControl\EntryOpeningException;
 use App\Models\Exam;
+use App\Services\Exams\ExamInvitationExpiryService;
 use App\Services\Security\AuditLogService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -70,6 +71,7 @@ class RoomAssignmentService
 
             if ($exam->estado === Exam::PROGRAMADO) {
                 $exam->update(['estado' => Exam::EN_INGRESO]);
+                app(ExamInvitationExpiryService::class)->voidPendingForExam((int) $exam->id_examen);
                 $this->auditLog->registrar(
                     'MODIFICAR',
                     'examen',

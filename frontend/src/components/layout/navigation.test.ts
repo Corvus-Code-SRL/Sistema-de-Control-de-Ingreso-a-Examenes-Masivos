@@ -69,7 +69,7 @@ describe('menú por capacidades', () => {
         label: 'Central de riesgo',
         items: [
           ['Consultar central', '/central-riesgo'],
-          ['Rectificar registro de la central', undefined]
+          ['Rectificar registro de la central', '/rectificar-registro']
         ]
       },
       {
@@ -102,7 +102,7 @@ describe('menú por capacidades', () => {
           ['Editar examen', undefined],
           ['Habilitar auxiliar para el examen', undefined],
           ['Cargar nómina de habilitados', undefined],
-          ['Invitar docentes colaboradores', undefined],
+          ['Invitar docentes colaboradores', '/colaboradores/invitar'],
           ['Invitaciones recibidas', '/invitaciones']
         ]
       },
@@ -196,10 +196,19 @@ describe('menú por capacidades', () => {
     expect(sections.map((section) => section.label)).toEqual([
       'Cuentas y roles',
       'Catálogo académico y ambientes',
-      'Central de riesgo',
       'Historial, auditoría y reportes'
     ])
-    expect(sections[2].items.map((item) => item.label)).toEqual(['Rectificar registro de la central'])
+  })
+
+  it('«Rectificar registro de la central» exige riesgo.rectificar, no solo la capacidad de administración', () => {
+    const rectify = (capabilities: Parameters<typeof visibleSections>[0]) =>
+      visibleSections(capabilities)
+        .flatMap((section) => section.items)
+        .some((item) => item.label === 'Rectificar registro de la central')
+
+    expect(rectify(['administracion.gestionar', 'riesgo.consultar'])).toBe(false)
+    expect(rectify(['administracion.gestionar', 'riesgo.rectificar'])).toBe(true)
+    expect(rectify(capabilitiesOf('Docente'))).toBe(false)
   })
 
   it('el Docente no ve secciones del Auxiliar, ni el Auxiliar las del Docente', () => {

@@ -3,7 +3,9 @@ export { InProgressIncidentAction, InProgressIncidentsCount } from './components
 export { IncidentsPage } from './pages/IncidentsPage'
 export { ReportIncidentPage } from './pages/ReportIncidentPage'
 export { ReportIncidentDialog } from './components/ReportIncidentDialog'
-export type { ReportIncidentContext } from './types/incident.types'
+export { REPORT_INCIDENT_FLOW } from './types/incident.types'
+export type { ReportIncidentContext, ReportIncidentFlow } from './types/incident.types'
+export { REPORT_INCIDENT_MESSAGES } from './components/reportIncidentMessages'
 export { usePendingIncidentsCount } from './hooks/usePendingIncidentsCount'
 //De HU-057 Situacion Excepcional
 export { ExamSituationDialog } from './components/ExamSituationDialog'

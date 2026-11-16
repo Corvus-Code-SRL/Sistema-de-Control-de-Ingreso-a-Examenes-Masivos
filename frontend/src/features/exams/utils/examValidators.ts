@@ -2,6 +2,7 @@ import { CreateExamFormData, Group, StepValidationResult } from '../types/exams.
 
 /** Menos de un día: el backend guarda la hora de fin como hora del día. */
 export const MAX_DURATION_MINUTES = 1439;
+export const MAX_OPENING_MINUTES = 120;
 
 function pad(value: number): string {
   return String(value).padStart(2, '0');
@@ -56,6 +57,16 @@ export function validateExamForm(
     errors.duracion = 'La duración debe ser un número entero de minutos, mayor a cero y menor a 24 horas.';
   }
 
+  if (formData.minutos_apertura !== undefined && (
+    !Number.isInteger(formData.minutos_apertura) ||
+    formData.minutos_apertura === null ||
+    formData.minutos_apertura < 0
+  )) {
+    errors.minutos_apertura = 'La apertura debe ser un número entero de minutos no negativo.';
+  } else if (formData.minutos_apertura !== undefined && formData.minutos_apertura > MAX_OPENING_MINUTES) {
+    errors.minutos_apertura = `Los minutos de apertura no pueden superar ${MAX_OPENING_MINUTES}.`;
+  }
+
   if (!formData.ambientes || formData.ambientes.length === 0) {
     errors.ambientes = 'El ambiente es obligatorio. Debe seleccionar un ambiente para el examen.';
   }
@@ -85,7 +96,7 @@ export function validateGroupsStep(
       selectedGroups.length !== formData.grupos.length ||
       selectedGroups.some((group) => !group.tiene_nomina)
     ) {
-      errors.grupos = 'Todos los grupos seleccionados deben pertenecer al par y tener nómina cargada.';
+      errors.grupos = 'Todos los grupos seleccionados deben pertenecer a la materia y tener nómina cargada.';
     }
   }
 

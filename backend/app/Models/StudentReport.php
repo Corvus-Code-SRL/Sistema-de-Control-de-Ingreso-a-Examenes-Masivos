@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\ActiveRiskRecordScope;
 use App\Support\ReportStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -106,10 +107,18 @@ class StudentReport extends Model
         return $this->hasMany(RiskCenter::class, 'id_reporte_est', 'id_reporte_est');
     }
 
-    /** Un reporte puede tener como máximo una entrada en la central (UNIQUE). */
+    /** Un reporte puede tener como máximo una entrada en la central (UNIQUE); solo cuenta si sigue activa. */
     public function riskCenter(): HasOne
     {
         return $this->hasOne(RiskCenter::class, 'id_reporte_est', 'id_reporte_est');
+    }
+
+    /** La entrada de la central de este reporte si fue rectificada (retirada de la Central, HU-062). */
+    public function voidedRiskCenter(): HasOne
+    {
+        return $this->hasOne(RiskCenter::class, 'id_reporte_est', 'id_reporte_est')
+            ->withoutGlobalScope(ActiveRiskRecordScope::class)
+            ->whereNotNull('central_riesgo.rectificado_en');
     }
 
     public function scopePending(Builder $query): Builder
