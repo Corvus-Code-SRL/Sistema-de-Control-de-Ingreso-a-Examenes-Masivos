@@ -3,6 +3,7 @@
 namespace Tests\Feature\Exams;
 
 use App\Models\Exam;
+use App\Services\EntryControl\RoomAssignmentService;
 use App\Services\Security\AuditLogService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -76,7 +77,9 @@ class ExamHistoryTest extends TestCase
 
     public function test_muestra_inicio_real_programado_registrado_por_hu_038(): void
     {
-        $exam = $this->createExam(['estado' => Exam::PROGRAMADO]);
+        $exam = $this->createExam(['estado' => Exam::PROGRAMADO], [$this->aulaId]);
+        DB::table('grupo_examen')->insert(['id_examen' => $exam->id_examen, 'id_grupo' => $this->grupoPropioId]);
+        app(RoomAssignmentService::class)->prepare((int) $exam->id_examen);
         $startsAt = app(\App\Services\Exams\ExamTimingService::class)->startsAt($exam);
         app(\App\Services\Exams\ExamLifecycleService::class)->startExpired($startsAt);
         $this->postJson('/api/examenes/' . $exam->id_examen . '/finalizar')->assertOk();

@@ -3,9 +3,11 @@
 namespace Tests\Feature\Exams;
 
 use App\Models\Exam;
+use App\Services\EntryControl\RoomAssignmentService;
 use App\Services\Exams\ExamLifecycleService;
 use App\Services\Exams\ExamTimingService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Tests\Concerns\SeedsExamCatalog;
 use Tests\TestCase;
 
@@ -20,7 +22,9 @@ class StartExamTest extends TestCase
         $exam = $this->createExam([
             'fecha' => $this->futureDate(),
             'hora_inicio' => '00:05',
-        ])->fresh();
+        ], [$this->aulaId])->fresh();
+        DB::table('grupo_examen')->insert(['id_examen' => $exam->id_examen, 'id_grupo' => $this->grupoPropioId]);
+        app(RoomAssignmentService::class)->prepare((int) $exam->id_examen);
         $timing = app(ExamTimingService::class);
         $openingAt = $timing->opensAt($exam);
         $scheduledEnd = $timing->endsAt($exam);

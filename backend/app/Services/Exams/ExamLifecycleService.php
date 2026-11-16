@@ -5,6 +5,7 @@ namespace App\Services\Exams;
 use App\Exceptions\Exams\ExamOwnershipException;
 use App\Exceptions\Exams\ExamStateException;
 use App\Models\Exam;
+use App\Services\EntryControl\CloseOrdinaryEntryService;
 use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\Security\AuditLogService;
 use Carbon\Carbon;
@@ -55,6 +56,7 @@ class ExamLifecycleService
                             $locked = Exam::query()->whereKey($exam->id_examen)->lockForUpdate()->firstOrFail();
                             if (! in_array($locked->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO], true)
                                 || $locked->duracion === null
+                                || ! CloseOrdinaryEntryService::hasOpened((int) $locked->id_examen)
                                 || $now->lessThan($this->timing->opensAt($locked))
                                 || $this->timing->hasEnded($locked, $now)) {
                                 return false;

@@ -74,6 +74,8 @@ class OpenEntryControlJob implements ShouldQueue
                             'motivo' => $cacheException->getMessage(),
                         ]);
                     }
+                } else {
+                    $failures->forget((int) $exam->id_examen);
                 }
 
                 Log::warning('No se pudo abrir el control de ingreso', [
