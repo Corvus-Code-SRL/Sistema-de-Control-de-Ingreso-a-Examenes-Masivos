@@ -81,19 +81,21 @@ describe('ExamEligibleListPage', () => {
     window.localStorage.clear()
   })
 
-  it('muestra un estado vacío con acción para registrar examen cuando no hay exámenes', async () => {
+ it('muestra un estado vacío sin botón a otra HU cuando no hay exámenes', async () => {
     stubBackend({ exams: () => [] })
 
     renderApp('/examenes/habilitados')
 
     expect(await screen.findByText('Aún no tiene exámenes disponibles')).toBeInTheDocument()
     expect(
-      screen.getByText('Registre un examen para poder habilitar a los estudiantes de sus grupos.')
+      screen.getByText(
+        'Cuando registre un examen, podrá habilitar a los estudiantes de sus grupos desde aquí.'
+      )
     ).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Ir a registrar examen/i })).toHaveAttribute(
-      'href',
-      '/examenes/nuevo'
-    )
+    // Independencia entre HUs: la vista no ofrece un atajo a registrar examen.
+    expect(
+      screen.queryByRole('link', { name: /Ir a registrar examen/i })
+    ).not.toBeInTheDocument()
   })
 
   it('carga exámenes y la lista automáticamente', async () => {
@@ -101,7 +103,7 @@ describe('ExamEligibleListPage', () => {
 
     renderApp('/examenes/habilitados')
 
-    expect(await screen.findByText('Álvarez Rojas, Camila')).toBeInTheDocument()
+    expect(await screen.findAllByLabelText(/Marcar a Álvarez Rojas, Camila/i)).not.toHaveLength(0)
     expect(api.calls.some((c) => c.url.includes('/examenes/12/habilitados'))).toBe(true)
   })
 
@@ -132,9 +134,10 @@ describe('ExamEligibleListPage', () => {
     const user = userEvent.setup()
     renderApp('/examenes/habilitados')
 
-    await screen.findByText('Álvarez Rojas, Camila')
+    await screen.findAllByLabelText(/Marcar a Álvarez Rojas, Camila/i)
 
-    await user.click(screen.getByLabelText(/Marcar a Álvarez Rojas, Camila/i))
+    const [checkbox] = screen.getAllByLabelText(/Marcar a Álvarez Rojas, Camila/i)
+    await user.click(checkbox)
     await user.click(screen.getByRole('button', { name: /No habilitar…/i }))
     await user.click(screen.getByRole('combobox', { name: /Motivo/i }))
     await user.click(screen.getByRole('option', { name: /Asistencia insuficiente/i }))
@@ -167,9 +170,9 @@ describe('ExamEligibleListPage', () => {
     const user = userEvent.setup()
     renderApp('/examenes/habilitados')
 
-    await screen.findByText('Álvarez Rojas, Camila')
+    const [checkbox] = await screen.findAllByLabelText(/Marcar a Álvarez Rojas, Camila/i)
 
-    await user.click(screen.getByLabelText(/Marcar a Álvarez Rojas, Camila/i))
+    await user.click(checkbox)
     await user.click(screen.getByRole('button', { name: /No habilitar…/i }))
     await user.click(screen.getByRole('combobox', { name: /Motivo/i }))
     await user.click(screen.getByRole('option', { name: /Asistencia insuficiente/i }))
@@ -194,6 +197,7 @@ it('muestra el error cuando falla la carga de exámenes', async () => {
   renderApp('/examenes/habilitados')
 
   expect(await screen.findByText('No se pudo cargar la información')).toBeInTheDocument()
+  expect(screen.getByText('Error del servidor')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /Reintentar/i })).toBeInTheDocument()
 })
 
@@ -202,7 +206,7 @@ it('restaura el examen seleccionado desde ?examen=12', async () => {
 
   renderApp('/examenes/habilitados?examen=12')
 
-  expect(await screen.findByText('Álvarez Rojas, Camila')).toBeInTheDocument()
+  expect(await screen.findAllByLabelText(/Marcar a Álvarez Rojas, Camila/i)).not.toHaveLength(0)
   expect(api.calls.some((c) => c.url.includes('/examenes/12/habilitados'))).toBe(true)
 })
 
@@ -227,7 +231,7 @@ it('al cambiar de examen escribe ?examen=<id> en la URL', async () => {
   const user = userEvent.setup()
   renderApp('/examenes/habilitados')
 
-  await screen.findByText('Álvarez Rojas, Camila')
+  await screen.findAllByLabelText(/Marcar a Álvarez Rojas, Camila/i)
 
   await user.click(screen.getByRole('combobox', { name: /Examen/i }))
   await user.click(screen.getByRole('option', { name: /Segundo parcial/i }))

@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import {
-  CalendarPlus,
   CalendarX2,
   CheckCircle2,
   Info,
@@ -174,15 +172,7 @@ export function ExamEligibleListPage() {
           <EmptyState
             icon={CalendarX2}
             title="Aún no tiene exámenes disponibles"
-            description="Registre un examen para poder habilitar a los estudiantes de sus grupos."
-            action={
-              <Button asChild variant="default">
-                <Link to="/examenes/nuevo">
-                  <CalendarPlus aria-hidden="true" />
-                  Ir a registrar examen
-                </Link>
-              </Button>
-            }
+            description="Cuando registre un examen, podrá habilitar a los estudiantes de sus grupos desde aquí."
           />
         </Card>
       </AppShell>
