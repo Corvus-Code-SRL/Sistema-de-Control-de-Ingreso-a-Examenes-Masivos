@@ -110,6 +110,7 @@ class ExamInProgressQueryService
                 'nomina.apellido_paterno',
                 'nomina.apellido_materno',
                 'ee.estado_ingreso',
+                'ee.estado_habilitacion',
                 'ee.hora_ingreso',
                 'ee.id_ambiente',
                 'ee.expulsado_en'
@@ -153,6 +154,8 @@ class ExamInProgressQueryService
                 ]))),
                 'estado_ingreso' =>
                     $student->estado_ingreso ?? 'NO_INGRESO',
+                'estado_habilitacion' =>
+                    $student->estado_habilitacion ?? 'HABILITADO',
                 'hora_ingreso' => $student->hora_ingreso === null
                     ? null
                     : substr($student->hora_ingreso, 0, 5),
@@ -175,6 +178,9 @@ class ExamInProgressQueryService
         foreach ($students as $student) {
             if ($student['expulsado_en'] !== null) {
                 $counts['expulsados']++;
+            } elseif ($student['estado_habilitacion'] === 'NO_HABILITADO') {
+                // No habilitado: no es ausente, no suma a ninguna categoría de asistencia.
+                continue;
             } elseif ($student['estado_ingreso'] === 'INGRESO') {
                 $counts['a_tiempo']++;
             } elseif ($student['estado_ingreso'] === 'CON_RETRASO') {

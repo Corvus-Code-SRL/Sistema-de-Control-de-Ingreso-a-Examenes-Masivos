@@ -270,7 +270,7 @@ class ExamHistoryService
             ->selectRaw("id_examen, count(*) as esperados,
                 count(*) filter (where estado_ingreso = ?) as a_tiempo,
                 count(*) filter (where estado_ingreso = ?) as con_retraso,
-                count(*) filter (where estado_ingreso = ?) as ausentes,
+                count(*) filter (where estado_ingreso = ? and coalesce(estado_habilitacion, 'HABILITADO') <> 'NO_HABILITADO') as ausentes,
                 count(*) filter (where estado_ingreso is null or estado_ingreso not in (?, ?, ?)) as sin_clasificar", [
                 StudentExam::INGRESO,
                 StudentExam::CON_RETRASO,

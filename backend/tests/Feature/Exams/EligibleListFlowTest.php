@@ -80,7 +80,7 @@ class EligibleListFlowTest extends TestCase
         );
 
         $this->assertSame(VerificationService::NOT_ENABLED, $verdict['veredicto']);
-        $this->assertStringContainsString('Motivo: ASISTENCIA_INSUFICIENTE', $verdict['motivo']);
+        $this->assertStringContainsString('Motivo: Asistencia insuficiente', $verdict['motivo']);
     }
 
     public function test_nomina_recargada_despues_de_asignar_aparece_habilitada(): void
@@ -149,5 +149,50 @@ class EligibleListFlowTest extends TestCase
         $excepcional = collect($lista)->firstWhere('id_estudiante', $excepcionalId);
         $this->assertNotNull($excepcional);
         $this->assertSame('HABILITADO', $excepcional['estado_habilitacion']);
+    }
+
+    public function test_no_habilitado_no_cuenta_como_ausente_en_reportes(): void
+    {
+        // Examen con un ambiente y el grupo asignado.
+        $exam = $this->createExam([], [$this->aulaId]);
+        $this->postJson("/api/examenes/{$exam->id_examen}/grupos", [
+            'grupos' => [$this->grupoPropioId],
+        ])->assertOk();
+
+        // Dos estudiantes: uno queda NO_HABILITADO, el otro ingresa.
+        $lista = $this->getJson("/api/examenes/{$exam->id_examen}/habilitados")
+            ->assertOk()
+            ->json('data.estudiantes');
+
+        $noHabilitadoId = (int) $lista[0]['id_estudiante'];
+        $habilitadoId = (int) $lista[1]['id_estudiante'];
+
+        $this->putJson("/api/examenes/{$exam->id_examen}/habilitados", [
+            'cambios' => [[
+                'id_estudiante' => $noHabilitadoId,
+                'estado_habilitacion' => 'NO_HABILITADO',
+                'motivo' => 'ASISTENCIA_INSUFICIENTE',
+            ]],
+        ])->assertOk();
+
+        // Pasar a FINALIZADO directo (la foto congelada conserva las filas).
+        DB::table('examen')->where('id_examen', $exam->id_examen)->update(['estado' => Exam::FINALIZADO]);
+
+        // HU-051 (reporte final).
+        $reporte = app(\App\Services\Exams\FinalReportService::class)
+            ->build($exam->fresh(), $this->docenteId);
+
+        $this->assertSame(0, $reporte['asistencia']['totales']['ausentes']);
+
+        $estudianteNoHabilitado = collect($reporte['estudiantes'])
+            ->firstWhere('cod_sis', $lista[0]['codigo_sis']);
+        $this->assertNotNull($estudianteNoHabilitado);
+        $this->assertSame('No habilitado', $estudianteNoHabilitado['estado']);
+
+        // HU-052 (historial).
+        $historial = app(\App\Services\Exams\ExamHistoryService::class)
+            ->show($exam->fresh(), $this->docenteId);
+
+        $this->assertSame(0, $historial['totales']['ausentes']);
     }
 }
