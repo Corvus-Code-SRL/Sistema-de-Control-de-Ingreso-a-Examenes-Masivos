@@ -27,17 +27,31 @@ class ExamEligibleListPreviewTest extends TestCase
 
     public function test_preview_devuelve_200_con_archivo_valido(): void
     {
-        $exam = $this->examWithOwnRoster(2);
+        // Los 2 estudiantes del seed; sin seedRoster para no duplicar.
+        $exam = $this->createExam();
+        DB::table('grupo_examen')->insertOrIgnore([
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
 
-        $this->previewCsv($exam, ['300000001', '300000002'])
+        $sisCodes = DB::table('estudiante')
+            ->join('grupo_estudiante', 'grupo_estudiante.id_estudiante', '=', 'estudiante.id_estudiante')
+            ->where('grupo_estudiante.id_grupo', $this->grupoPropioId)
+            ->orderBy('estudiante.id_estudiante')
+            ->pluck('estudiante.cod_sis')
+            ->all();
+
+        $this->assertCount(2, $sisCodes);
+
+        $this->previewCsv($exam, $sisCodes)
             ->assertOk()
             ->assertJsonPath('data.total_filas', 2)
             ->assertJsonPath('data.filas_validas', 2)
             ->assertJsonPath('data.filas_inconsistentes', 0)
             ->assertJsonPath('data.faltantes', 0)
-            ->assertJsonPath('data.filas.0.codigo_sis', '300000001')
+            ->assertJsonPath('data.filas.0.codigo_sis', $sisCodes[0])
             ->assertJsonPath('data.filas.0.estado', EligibleListPreviewResult::MATCHED)
-            ->assertJsonPath('data.filas.1.codigo_sis', '300000002')
+            ->assertJsonPath('data.filas.1.codigo_sis', $sisCodes[1])
             ->assertJsonPath('data.filas.1.estado', EligibleListPreviewResult::MATCHED);
     }
 
@@ -107,6 +121,21 @@ class ExamEligibleListPreviewTest extends TestCase
                 'message',
                 'El control de ingreso ya empezó. La lista de habilitados es de solo lectura.'
             );
+    }
+
+    public function test_preview_cuenta_todos_los_faltantes_cuando_hay_varios(): void
+    {
+        $exam = $this->examWithOwnRoster(7);
+
+        $totalNomina = DB::table('grupo_estudiante')
+            ->where('id_grupo', $this->grupoPropioId)
+            ->count();
+
+        $response = $this->previewCsv($exam, ['300000001'])->assertOk();
+
+        // Todos menos 1 son faltantes, sin importar cuántos haya en el seed.
+        $response->assertJsonPath('data.faltantes', $totalNomina - 1);
+        $response->assertJsonPath('data.filas_validas', 1);
     }
 
     /**

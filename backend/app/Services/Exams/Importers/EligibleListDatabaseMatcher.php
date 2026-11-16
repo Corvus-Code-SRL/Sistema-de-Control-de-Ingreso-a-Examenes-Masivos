@@ -117,7 +117,11 @@ class EligibleListDatabaseMatcher
             $query->whereNotIn('estudiante.cod_sis', $normalized);
         }
 
-        return (int) $query->count();
+        // expected() agrupa por estudiante (GROUP BY estudiante.id_estudiante),
+        // así que count() sobre esa consulta devuelve el tamaño del primer
+        // grupo, no el total. Se envuelve en una subconsulta para contar filas
+        // del resultado agrupado.
+        return (int) DB::query()->fromSub($query, 'faltantes')->count();
     }
 
     /**
