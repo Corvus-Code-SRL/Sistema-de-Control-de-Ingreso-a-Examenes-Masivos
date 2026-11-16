@@ -3,11 +3,13 @@
 namespace App\Http\Requests\EntryControl;
 
 /**
- * Verificación por código SIS y CI. El auxiliar envía su ambiente; el docente puede omitirlo
- * porque elige el ambiente al registrar.
+ * Verificación por código SIS y CI desde un ambiente de control: el del auxiliar o el que elige
+ * el docente. Es obligatorio porque un resultado negativo deja el intento en ese ambiente.
  */
 class VerifyLateEntryRequest extends LateEntryManagementRequest
 {
+    public const CONTROL_ROOM_REQUIRED_MESSAGE = 'Seleccione el ambiente de control.';
+
     public function rules(): array
     {
         $entry = (new VerifyStudentRequest())->rules();
@@ -15,7 +17,7 @@ class VerifyLateEntryRequest extends LateEntryManagementRequest
         return [
             'cod_sis' => ['required', 'string', 'regex:/^[0-9]{9}$/'],
             'ci' => $entry['ci'],
-            'id_ambiente' => ['nullable', 'integer', 'min:1', 'max:2147483647'],
+            'id_ambiente' => ['required', 'integer', 'min:1', 'max:2147483647'],
         ];
     }
 
@@ -23,6 +25,7 @@ class VerifyLateEntryRequest extends LateEntryManagementRequest
     {
         return parent::messages() + [
             'cod_sis.required' => 'Ingrese el código SIS del estudiante.',
+            'id_ambiente.required' => self::CONTROL_ROOM_REQUIRED_MESSAGE,
         ];
     }
 }

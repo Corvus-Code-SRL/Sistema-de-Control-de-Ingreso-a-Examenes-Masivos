@@ -58,7 +58,8 @@ class StudentRosterController extends Controller
             $id_grupo,
             $path,
             $file->getClientOriginalExtension(),
-            $teacherId
+            $teacherId,
+            $request->defaultCareerId()
         );
 
         return new StudentRosterPreviewResource(

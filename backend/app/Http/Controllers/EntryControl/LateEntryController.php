@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\EntryControl\AuthorizeLateEntryRequest;
 use App\Http\Requests\EntryControl\IndexLateEntryRequest;
 use App\Http\Requests\EntryControl\RegisterLateEntryRequest;
+use App\Http\Requests\EntryControl\RejectLateEntryRequest;
 use App\Http\Requests\EntryControl\ResolveLateEntryRequest;
 use App\Http\Requests\EntryControl\SearchLateEntryStudentRequest;
 use App\Http\Requests\EntryControl\StoreLateEntryRequestRequest;
 use App\Http\Requests\EntryControl\VerifyLateEntryRequest;
 use App\Http\Resources\EntryControl\LateEntryRegistrationResource;
+use App\Http\Resources\EntryControl\LateEntryRejectionResource;
 use App\Http\Resources\EntryControl\LateEntryRequestResource;
 use App\Http\Resources\EntryControl\LateEntryStudentMatchResource;
 use App\Http\Resources\EntryControl\LateEntryVerificationResource;
@@ -22,7 +24,8 @@ use Illuminate\Http\JsonResponse;
 
 /**
  * Ingreso con retraso de un examen EN_CURSO (HU-037): verificar, solicitar, autorizar,
- * rechazar y registrar directamente. Las reglas viven en LateEntryService.
+ * rechazar, registrar directamente y rechazar el ingreso de un estudiante verificado. Las
+ * reglas viven en LateEntryService.
  */
 class LateEntryController extends Controller
 {
@@ -30,6 +33,7 @@ class LateEntryController extends Controller
     public const APPROVED_MESSAGE = 'Ingreso autorizado.';
     public const REJECTED_MESSAGE = 'Solicitud rechazada.';
     public const REGISTERED_MESSAGE = 'Ingreso con retraso registrado.';
+    public const ATTEMPT_REJECTED_MESSAGE = 'Intento rechazado registrado.';
 
     private LateEntryService $lateEntries;
     private LateEntryQueryService $queries;
@@ -106,6 +110,16 @@ class LateEntryController extends Controller
                 $this->lateEntries->register($examen, $request->validated(), $request->user())
             ),
             self::REGISTERED_MESSAGE
+        );
+    }
+
+    public function rejectAttempt(RejectLateEntryRequest $request, Exam $examen): JsonResponse
+    {
+        return ApiResponse::created(
+            new LateEntryRejectionResource(
+                $this->lateEntries->rejectAttempt($examen, $request->validated(), $request->user())
+            ),
+            self::ATTEMPT_REJECTED_MESSAGE
         );
     }
 }

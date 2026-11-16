@@ -14,7 +14,9 @@ import {
 } from '@/components/ui/select'
 import { useCreateGroup } from '../hooks/useCreateGroup'
 import { usePeriods } from '../hooks/usePeriods'
-import type { GroupMutationResponse } from '../types/group.types'
+import type { GroupCareer, GroupMutationResponse } from '../types/group.types'
+import { careersError } from '../utils/careersError'
+import { AdditionalCareersField } from './AdditionalCareersField'
 
 export interface RegistrarGrupoFormProps {
   careerId: number
@@ -27,6 +29,8 @@ export interface RegistrarGrupoFormProps {
   teacherName: string | null
   onCancel: () => void
   onRegistered: (group: GroupMutationResponse['data']) => void
+  /** Otras carreras que ofertan la materia (HU-021, multicarrera); vacía, no se ofrece elegir. */
+  additionalCareerOptions?: GroupCareer[]
 }
 
 interface FieldErrors {
@@ -42,6 +46,7 @@ export function RegistrarGrupoForm({
   teacherName,
   onCancel,
   onRegistered,
+  additionalCareerOptions = [],
 }: RegistrarGrupoFormProps) {
   const { periods, activePeriodId, isLoading: isLoadingPeriods } = usePeriods()
   const { status, error, submit } = useCreateGroup()
@@ -49,6 +54,7 @@ export function RegistrarGrupoForm({
   const [numGrupo, setNumGrupo] = useState('')
   const [idPeriodo, setIdPeriodo] = useState<number | null>(activePeriodId)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+  const [additionalCareers, setAdditionalCareers] = useState<number[]>([])
 
   useEffect(() => {
     if (idPeriodo === null && activePeriodId !== null) {
@@ -87,6 +93,8 @@ export function RegistrarGrupoForm({
       id_materia: subjectId,
       num_grupo: numGrupo,
       id_periodo: idPeriodo,
+      // Solo se envía si se marcó alguna: el grupo atiende a su carrera por defecto.
+      ...(additionalCareers.length > 0 ? { carreras_adicionales: additionalCareers } : {}),
     })
 
     if (result !== null) {
@@ -103,8 +111,9 @@ export function RegistrarGrupoForm({
 
   const numGrupoError = fieldErrors.num_grupo ?? backendNumGrupoError
   const periodoError = fieldErrors.id_periodo ?? backendPeriodoError
+  const carrerasError = careersError(error)
 
-  const totalErrors = [numGrupoError, periodoError].filter(Boolean).length
+  const totalErrors = [numGrupoError, periodoError, carrerasError].filter(Boolean).length
   const showAlert =
     totalErrors > 0 || backendMateriaError !== undefined || (error !== null && !error.isValidation)
 
@@ -213,6 +222,15 @@ export function RegistrarGrupoForm({
             )}
           </div>
         </div>
+
+        <AdditionalCareersField
+          options={additionalCareerOptions}
+          selected={additionalCareers}
+          onChange={setAdditionalCareers}
+          principalName={subjectCareerLabel.split('·')[1]?.trim() || 'La carrera de la materia'}
+          disabled={isSubmitting}
+          error={carrerasError}
+        />
 
         <div className="flex justify-end gap-2 pt-3 border-t mt-1">
           <Button type="button" variant="secondary" size="sm" disabled={isSubmitting} onClick={onCancel} className="text-xs">

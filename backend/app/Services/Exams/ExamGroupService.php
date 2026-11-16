@@ -156,14 +156,13 @@ class ExamGroupService
             $isValid = (string) $group->id_usuario_docente === $teacherId
                 && (int) $group->id_gestion_periodo === $activePeriodId
                 && $group->estado === RecordStatus::ACTIVE
-                && (int) $group->id_carrera === (int) $exam->id_carrera
                 && (int) $group->id_materia === (int) $exam->id_materia;
 
             if (! $isValid) {
                 throw ValidationException::withMessages([
                     'grupos' => [
                         'Todos los grupos deben ser propios, activos, del periodo vigente '
-                        . 'y del mismo par materia-carrera del examen.',
+                        . 'y de la misma materia del examen.',
                     ],
                 ]);
             }

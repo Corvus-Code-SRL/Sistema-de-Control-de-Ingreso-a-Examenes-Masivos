@@ -46,7 +46,7 @@ import {
   SubjectGroupsPage,
 } from '@/features/groups'
 import { ClassroomsPage } from '@/features/classrooms'
-import { RiskCenterPage } from '@/features/risk-center/academic'
+import { RectifyRiskRecordPage, RiskCenterPage } from '@/features/risk-center/academic'
 import { RosterUploadPage } from '@/features/students'
 import {
   AdminSubjectAssignmentsPage,
@@ -108,9 +108,10 @@ function DocenteRoutes() {
         />
 
         <Route
-          path="/grupos/:idGrupo/nomina"
+          path="/cargar-nomina"
           element={guarded('grupos.gestionar', <RosterUploadPage />)}
         />
+        <Route path="/grupos/:idGrupo/nomina" element={<RosterUploadRedirect />} />
 
         <Route
           path="/cursos/:idGrupo"
@@ -186,6 +187,10 @@ function DocenteRoutes() {
           path="/central-riesgo/:id?"
           element={guarded('riesgo.consultar', <RiskCenterPage />)}
         />
+        <Route
+          path="/rectificar-registro/:id?"
+          element={guarded('riesgo.rectificar', <RectifyRiskRecordPage />)}
+        />
 
         <Route
           path="/reportes/intentos"
@@ -246,6 +251,16 @@ function CourseDetailRedirect() {
 }
 
 /**
+ * La carga de nómina pasó de `/grupos/:idGrupo/nomina` a su propia pantalla, `/cargar-nomina`
+ * (HU-021 independiente); los enlaces viejos la abren con ese grupo elegido.
+ */
+function RosterUploadRedirect() {
+  const { idGrupo = '' } = useParams()
+
+  return <Navigate to={`/cargar-nomina?grupo=${encodeURIComponent(idGrupo)}`} replace />
+}
+
+/**
  * Las URLs anteriores de Materias (`/materias`, `?tab=`, `/materias/asignar`) llevan a la vista de
  * Asignaciones. Solo se conserva `?carrera=`: el resto era de las pestañas y ya no existe.
  */
@@ -264,8 +279,8 @@ function AssignmentsRedirect() {
 /**
  * Rutas de la administración del catálogo institucional.
  *
- * Cuentas, Materias (Asignaciones y Catálogo), Ambientes y la Central de riesgo (solo lectura)
- * tienen pantallas disponibles.
+ * Cuentas, Materias (Asignaciones y Catálogo), Ambientes y la Central de riesgo (consulta y
+ * rectificación) tienen pantallas disponibles.
  * Facultades y carreras permanecen pendientes de sus respectivas historias de usuario.
  */
 function AdministradorRoutes() {
@@ -300,6 +315,10 @@ function AdministradorRoutes() {
         <Route
           path="/central-riesgo/:id?"
           element={guarded('riesgo.consultar', <RiskCenterPage />)}
+        />
+        <Route
+          path="/rectificar-registro/:id?"
+          element={guarded('riesgo.rectificar', <RectifyRiskRecordPage />)}
         />
         <Route
           path="/reportes/intentos"

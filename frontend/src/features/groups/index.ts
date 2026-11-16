@@ -24,6 +24,7 @@ export {
 export type {
   Course,
   Group,
+  GroupCareer,
   GroupDetail,
   GroupDetailMeta,
   GroupDetailResponse,

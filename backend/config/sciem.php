@@ -132,7 +132,8 @@ return [
     | por examen, toma incidencias y opera el ingreso; no consulta la Central de Riesgo, no gestiona
     | auxiliares de grupo, no reporta auxiliares, no acepta casos especiales y, mientras no haya una
     | decisión de producto, no invita a otros docentes. La bitácora (audit_log) la consulta solo el
-    | Administrador.
+    | Administrador. Rectificar un registro de la Central de Riesgo (risk_rectify, HU-062) también es solo
+    | del Administrador: consultar la Central (risk_center) no lo concede.
     |
     */
 
@@ -146,6 +147,7 @@ return [
         'special_cases'    => [Role::DOCENTE],
         'invite_teachers'  => [Role::DOCENTE],
         'audit_log'        => [Role::ADMINISTRADOR],
+        'risk_rectify'     => [Role::ADMINISTRADOR],
     ],
 
     /*
@@ -173,7 +175,7 @@ return [
     |
     | - por_pagina: filas por página (fijo, no lo elige el cliente).
     | - modulos: módulos del filtro, en el orden en que se ofrecen. «otros» no se declara: es todo lo
-    |   que no esté en `tablas`. La Central de Riesgo no figura porque nadie escribe en ella.
+    |   que no esté en `tablas`.
     | - tablas: cada tabla_afectada que hoy se registra, con su módulo, cómo se nombra el registro y
     |   las claves que lo identifican (la primera es la principal). `persona` resuelve esa clave a
     |   «Nombre (SIS)».
@@ -200,6 +202,7 @@ return [
             'ingreso' => 'Control de ingreso',
             'incidencias' => 'Incidencias',
             'situaciones' => 'Situaciones',
+            'central_riesgo' => 'Central de riesgo',
         ],
 
         'tablas' => [
@@ -242,6 +245,10 @@ return [
             'situacion_examen' => [
                 'modulo' => 'situaciones', 'etiqueta' => 'Situación de examen', 'claves' => ['id_situacion'],
             ],
+            'central_riesgo' => [
+                'modulo' => 'central_riesgo', 'etiqueta' => 'Registro de la Central de Riesgo',
+                'claves' => ['id_cr_estudiante'],
+            ],
         ],
 
         'etiquetas_accion' => [
@@ -267,6 +274,7 @@ return [
             'EXPULSAR_ESTUDIANTE' => 'Retirar estudiante',
             'CAMBIAR_AMBIENTE' => 'Cambiar ambiente',
             'OBSERVAR_IDENTIDAD' => 'Observar identidad',
+            'RECTIFICAR_REGISTRO' => 'Rectificar registro',
         ],
 
         'etiquetas_campo' => [
@@ -284,6 +292,9 @@ return [
             'inicio_real_en' => 'Inicio real',
             'ip' => 'Dirección IP',
             'motivo' => 'Motivo',
+            'rectificado_en' => 'Fecha de rectificación',
+            'id_usuario_rectificador' => 'Administrador que rectificó',
+            'motivo_rectificacion' => 'Motivo de la rectificación',
         ],
 
         'campos_ocultos' => [
@@ -293,6 +304,37 @@ return [
             'exactos' => ['evidencia_url', 'evidencia_public_id'],
             'excepciones' => ['debe_cambiar_contrasenia', 'contrasenia_cambiada'],
         ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Respaldo y restauración de la base
+    |--------------------------------------------------------------------------
+    |
+    | sciem:respaldar guarda un pg_dump (formato custom, solo el esquema public) en `directorio` y deja
+    | solo los `retencion` más recientes; sciem:restaurar lo vuelve a cargar. Ver
+    | docs/database/respaldo-y-restauracion.md.
+    |
+    | - directorio: dónde se guardan. Vacío = storage/app/respaldos. En producción, una unidad persistente
+    |   fuera de la carpeta del despliegue; nunca dentro de un repositorio de git.
+    | - pg_dump / pg_restore: ruta de los binarios. Su versión debe ser igual o mayor que la del servidor.
+    | - diario: si el planificador ejecuta el respaldo todos los días a la `hora` de La Paz. Apagado por
+    |   defecto: solo se enciende en la máquina que respalda la base (el servidor de producción).
+    | - restaurar_permitido: sciem:restaurar reemplaza los datos y por defecto se niega a ejecutarse. Se
+    |   pone true solo mientras se restaura y se devuelve a false al terminar.
+    | - timeout: segundos máximos de cada pg_dump o pg_restore.
+    |
+    */
+
+    'respaldo' => [
+        'directorio' => env('SCIEM_RESPALDO_DIRECTORIO') ?: storage_path('app/respaldos'),
+        'retencion' => (int) env('SCIEM_RESPALDO_RETENCION', 7),
+        'pg_dump' => env('SCIEM_PG_DUMP', 'pg_dump'),
+        'pg_restore' => env('SCIEM_PG_RESTORE', 'pg_restore'),
+        'diario' => (bool) env('SCIEM_RESPALDO_DIARIO', false),
+        'hora' => env('SCIEM_RESPALDO_HORA', '03:15'),
+        'restaurar_permitido' => (bool) env('SCIEM_RESTAURAR_PERMITIDO', false),
+        'timeout' => (int) env('SCIEM_RESPALDO_TIMEOUT', 1800),
     ],
 
 ];

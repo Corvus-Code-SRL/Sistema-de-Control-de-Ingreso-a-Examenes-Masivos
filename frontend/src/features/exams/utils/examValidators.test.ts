@@ -25,7 +25,7 @@ describe('validateExamForm', () => {
     expect(validateExamForm(form(), now).isValid).toBe(true)
   })
 
-  it('exige materia como par materia-carrera', () => {
+  it('exige seleccionar una materia', () => {
     expect(validateExamForm(form({ materia: null }), now).errors.materia).toBeDefined()
   })
 
@@ -62,6 +62,17 @@ describe('validateExamForm', () => {
 
   it.each([0, -5, 1.5, 1440, Number.NaN])('rechaza la duración %s', (duracion) => {
     expect(validateExamForm(form({ duracion }), now).errors.duracion).toBeDefined()
+  })
+
+  it('acepta apertura de 0 a 120 minutos y rechaza el resto', () => {
+    expect(validateExamForm(form({ minutos_apertura: 0 }), now).isValid).toBe(true)
+    expect(validateExamForm(form({ minutos_apertura: 120 }), now).isValid).toBe(true)
+    expect(validateExamForm(form({ minutos_apertura: 121 }), now).errors.minutos_apertura).toBe(
+      'Los minutos de apertura no pueden superar 120.',
+    )
+    expect(validateExamForm(form({ minutos_apertura: 2147483648 }), now).errors.minutos_apertura).toBeDefined()
+    expect(validateExamForm(form({ minutos_apertura: null }), now).errors.minutos_apertura).toBeDefined()
+    expect(validateExamForm(form({ minutos_apertura: -1 }), now).errors.minutos_apertura).toBeDefined()
   })
 
   it('acepta duraciones cortas y exámenes que cruzan la medianoche', () => {

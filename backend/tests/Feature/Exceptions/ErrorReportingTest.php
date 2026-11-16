@@ -4,6 +4,7 @@ namespace Tests\Feature\Exceptions;
 
 use App\Exceptions\Academic\ActivePeriodNotConfiguredException;
 use App\Exceptions\Handler;
+use App\Exceptions\Maintenance\DatabaseBackupException;
 use App\Exceptions\Security\DuplicateAccountException;
 use App\Exceptions\Security\SisNoDisponibleException;
 use Illuminate\Contracts\Debug\ExceptionHandler;
@@ -25,10 +26,12 @@ class ErrorReportingTest extends TestCase
     /**
      * Las únicas clases de app/Exceptions que se reportan a propósito: un error de despliegue y el
      * SIS caído (señal operativa). Cualquier otra excepción nueva debe ir en Handler::$dontReport.
+     * También se reporta DatabaseBackupException: un respaldo de la base que falló (señal operativa).
      */
     private const REPORTED = [
         ActivePeriodNotConfiguredException::class,
         SisNoDisponibleException::class,
+        DatabaseBackupException::class,
     ];
 
     public function test_toda_excepcion_de_app_exceptions_figura_en_dont_report_o_en_la_lista_de_reportadas(): void

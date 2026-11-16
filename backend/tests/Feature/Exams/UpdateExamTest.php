@@ -72,6 +72,34 @@ class UpdateExamTest extends TestCase
         );
     }
 
+    public function test_actualiza_la_apertura_sin_perder_el_valor_si_no_se_envia(): void
+    {
+        $exam = $this->createExam(['minutos_apertura' => 25], [$this->aulaId]);
+
+        $this->putJson($this->url($exam), $this->validPayload())
+            ->assertOk()
+            ->assertJsonPath('data.minutos_apertura', 25);
+
+        $this->putJson($this->url($exam), $this->validPayload([
+            'minutos_apertura' => 5,
+        ]))->assertOk()->assertJsonPath('data.minutos_apertura', 5);
+    }
+
+    public function test_rechaza_una_apertura_mayor_a_120_minutos_al_editar(): void
+    {
+        $exam = $this->createExam(['minutos_apertura' => 25], [$this->aulaId]);
+
+        foreach ([121, 2147483648] as $value) {
+            $this->putJson($this->url($exam), $this->validPayload(['minutos_apertura' => $value]))
+                ->assertUnprocessable()
+                ->assertJsonPath('errors.minutos_apertura.0', 'Los minutos de apertura no pueden superar 120.');
+        }
+
+        $this->assertSame(25, (int) $exam->fresh()->minutos_apertura);
+        $this->putJson($this->url($exam), $this->validPayload(['minutos_apertura' => 120]))
+            ->assertOk()->assertJsonPath('data.minutos_apertura', 120);
+    }
+
     /**
      * Descubierto en HU-09: quitar del examen un ambiente que ya tenía un auxiliar
      * asignado violaba la FK compuesta examen_auxiliar → examen_ambiente (500).

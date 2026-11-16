@@ -19,6 +19,8 @@ class ListGroupStudentsRequest extends GroupManagementRequest
             'id_grupo' => ['required', 'integer', 'min:1', 'max:' . self::MAX_ID],
             'q' => ['nullable', 'string', 'max:' . self::MAX_SEARCH_LENGTH],
             'page' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_PAGE],
+            // HU-021 multicarrera: solo los estudiantes de esa carrera; sin valor, todos.
+            'id_carrera' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_ID],
         ];
     }
 
@@ -33,6 +35,7 @@ class ListGroupStudentsRequest extends GroupManagementRequest
         return [
             'q' => 'búsqueda',
             'page' => 'página',
+            'id_carrera' => 'carrera',
         ];
     }
 
@@ -59,5 +62,12 @@ class ListGroupStudentsRequest extends GroupManagementRequest
     public function page(): int
     {
         return (int) ($this->validated()['page'] ?? 1);
+    }
+
+    public function careerId(): ?int
+    {
+        $careerId = $this->validated()['id_carrera'] ?? null;
+
+        return $careerId === null ? null : (int) $careerId;
     }
 }

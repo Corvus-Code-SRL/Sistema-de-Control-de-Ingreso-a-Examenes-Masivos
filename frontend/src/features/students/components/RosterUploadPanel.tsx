@@ -15,6 +15,7 @@ import {
 import {
   groupLabel,
   type Group,
+  type GroupCareer,
 } from '@/features/groups'
 
 import { useRosterUpload } from '../hooks/useRosterUpload'
@@ -27,6 +28,8 @@ interface RosterUploadPanelProps {
   group: Group
   subjectName: string
   onReload: () => void | Promise<unknown>
+  /** Carreras que atiende el grupo (HU-021, multicarrera). */
+  careers?: GroupCareer[]
 }
 
 /**
@@ -36,6 +39,7 @@ export function RosterUploadPanel({
   group,
   subjectName,
   onReload,
+  careers = [],
 }: RosterUploadPanelProps) {
   const upload = useRosterUpload(group.id_grupo)
   const resultReloadedRef = useRef(false)
@@ -85,6 +89,9 @@ export function RosterUploadPanel({
           file={upload.file}
           errorMessage={upload.errorMessage}
           canRetry={upload.canRetry}
+          careers={careers}
+          careerId={upload.careerId}
+          onSelectCareer={upload.selectCareer}
           onSelectFile={upload.selectFile}
           onSubmitPreview={upload.submitPreview}
           onRetry={upload.retry}

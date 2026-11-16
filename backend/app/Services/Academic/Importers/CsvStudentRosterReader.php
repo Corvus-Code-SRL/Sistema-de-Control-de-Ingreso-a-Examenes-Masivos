@@ -13,6 +13,9 @@ class CsvStudentRosterReader implements StudentRosterReader
         'nombres',
     ];
 
+    /** Columna opcional (HU-021 multicarrera): código o nombre de la carrera del estudiante. */
+    private const CAREER_HEADER = 'carrera';
+
     /** Valor por defecto cuando no hay aplicación (pruebas unitarias); el contenedor inyecta la configuración. */
     private const DEFAULT_MAX_ROWS = 2000;
 
@@ -71,7 +74,10 @@ class CsvStudentRosterReader implements StudentRosterReader
                     $this->cellValue(
                         $data,
                         $headerIndexes['nombres']
-                    )
+                    ),
+                    $headerIndexes['carrera'] === null
+                        ? null
+                        : $this->cellValue($data, $headerIndexes['carrera'])
                 );
             }
         } finally {
@@ -143,7 +149,7 @@ class CsvStudentRosterReader implements StudentRosterReader
 
     /**
      * @param array<int, string|null> $header
-     * @return array<string, int>
+     * @return array<string, int|null>
      */
     private function resolveHeaderIndexes(array $header): array
     {
@@ -170,6 +176,7 @@ class CsvStudentRosterReader implements StudentRosterReader
             'estudiante' => $normalizedHeaders['estudiante'],
             'apellidos' => $normalizedHeaders['apellidos'],
             'nombres' => $normalizedHeaders['nombres'],
+            'carrera' => $normalizedHeaders[self::CAREER_HEADER] ?? null,
         ];
     }
 

@@ -14,6 +14,9 @@ use LogicException;
  * bloquea, se clasifican las filas, se insertan los estudiantes nuevos y se inscribe a todos.
  * Ambas inserciones usan ON CONFLICT DO NOTHING, así que repetir una carga o dos cargas
  * simultáneas del mismo estudiante no fallan ni duplican.
+ *
+ * Cada inscripción guarda la carrera con la que el estudiante está en el grupo (HU-021,
+ * multicarrera). Quien ya estaba inscrito conserva la suya: repetir la carga no la cambia.
  */
 class StudentRosterConfirmer
 {
@@ -50,12 +53,18 @@ class StudentRosterConfirmer
 
             $newRows = [];
             $studentIds = [];
+            /** @var array<int, int|null> $careerByStudent */
+            $careerByStudent = [];
+            /** @var array<string, int|null> $careerBySis */
+            $careerBySis = [];
             $alreadyEnrolled = 0;
 
             foreach ($this->matcher->classify($groupId, $analysis) as $match) {
                 switch ($match->status()) {
                     case StudentRosterDatabaseMatch::NEW_STUDENT:
-                        $newRows[] = $match->rowAnalysis()->row();
+                        $row = $match->rowAnalysis()->row();
+                        $newRows[] = $row;
+                        $careerBySis[(string) $row->sisCode()] = $row->careerId();
                         break;
 
                     case StudentRosterDatabaseMatch::EXISTING_STUDENT:
@@ -66,6 +75,7 @@ class StudentRosterConfirmer
                         }
 
                         $studentIds[] = $match->studentId();
+                        $careerByStudent[$match->studentId()] = $match->rowAnalysis()->row()->careerId();
                         break;
 
                     case StudentRosterDatabaseMatch::ALREADY_ENROLLED:
@@ -82,11 +92,15 @@ class StudentRosterConfirmer
             $createdStudents = $this->studentCreator->createMany($newRows);
 
             // Los ids se leen por cod_sis: incluye también a quien otro docente creó entre tanto.
-            $studentIds = array_merge($studentIds, $this->idsOf($newRows));
+            foreach ($this->idsBySis($newRows) as $sisCode => $studentId) {
+                $studentIds[] = $studentId;
+                $careerByStudent[$studentId] = $careerBySis[$sisCode] ?? null;
+            }
 
             $enrolledStudents = $this->enrollStudents(
                 $groupId,
                 array_values(array_unique($studentIds)),
+                $careerByStudent,
                 $enrollmentDate
             );
 
@@ -106,9 +120,9 @@ class StudentRosterConfirmer
     /**
      * @param array<int, StudentRosterRow> $rows
      *
-     * @return array<int, int>
+     * @return array<string, int> id del estudiante por código SIS
      */
-    private function idsOf(array $rows): array
+    private function idsBySis(array $rows): array
     {
         if ($rows === []) {
             return [];
@@ -123,19 +137,21 @@ class StudentRosterConfirmer
 
         return Student::query()
             ->whereIn('cod_sis', $sisCodes)
-            ->pluck('id_estudiante')
-            ->map(static function ($id): int {
-                return (int) $id;
+            ->get(['id_estudiante', 'cod_sis'])
+            ->mapWithKeys(static function (Student $student): array {
+                return [(string) $student->cod_sis => (int) $student->id_estudiante];
             })
             ->all();
     }
 
     /**
      * @param array<int, int> $studentIds
+     * @param array<int, int|null> $careerByStudent
      */
     private function enrollStudents(
         int $groupId,
         array $studentIds,
+        array $careerByStudent,
         string $enrollmentDate
     ): int {
         $enrolled = 0;
@@ -144,12 +160,19 @@ class StudentRosterConfirmer
             $bindings = [];
 
             foreach ($chunk as $studentId) {
-                array_push($bindings, $groupId, $studentId, $enrollmentDate, RecordStatus::ACTIVE);
+                array_push(
+                    $bindings,
+                    $groupId,
+                    $studentId,
+                    $enrollmentDate,
+                    RecordStatus::ACTIVE,
+                    $careerByStudent[$studentId] ?? null
+                );
             }
 
             $enrolled += DB::affectingStatement(
-                'insert into grupo_estudiante (id_grupo, id_estudiante, fecha_inscripcion, estado) values '
-                . implode(', ', array_fill(0, count($chunk), '(?, ?, ?, ?)'))
+                'insert into grupo_estudiante (id_grupo, id_estudiante, fecha_inscripcion, estado, id_carrera) values '
+                . implode(', ', array_fill(0, count($chunk), '(?, ?, ?, ?, ?)'))
                 . ' on conflict (id_grupo, id_estudiante) do nothing',
                 $bindings
             );

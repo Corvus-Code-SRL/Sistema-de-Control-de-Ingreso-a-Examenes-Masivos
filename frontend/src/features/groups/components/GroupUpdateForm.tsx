@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useUpdateGroup } from '../hooks/useUpdateGroup'
-import type { Group, GroupMutationResponse } from '../types/group.types'
+import type { Group, GroupCareer, GroupMutationResponse } from '../types/group.types'
+import { careersError } from '../utils/careersError'
+import { AdditionalCareersField } from './AdditionalCareersField'
 
 export interface ActualizarGrupoFormProps {
   group: Group
@@ -23,6 +25,10 @@ export interface ActualizarGrupoFormProps {
   hideTitle?: boolean
   /** Un examen del grupo está en curso (HU-019, CA-5): se ve, pero no se puede guardar. */
   locked?: boolean
+  /** Carreras que atiende el grupo, la principal incluida (HU-021, multicarrera). */
+  careers?: GroupCareer[]
+  /** Carreras que ofertan la materia y que el grupo todavía no atiende. */
+  availableCareers?: GroupCareer[]
 }
 
 interface FieldErrors {
@@ -38,8 +44,17 @@ export function ActualizarGrupoForm({
   onUpdated,
   hideTitle = false,
   locked = false,
+  careers = [],
+  availableCareers = [],
 }: ActualizarGrupoFormProps) {
   const { status, error, submit } = useUpdateGroup()
+
+  const principal = careers.find((career) => career.principal)
+  const currentAdditional = careers.filter((career) => !career.principal)
+  const careerOptions = [...currentAdditional, ...availableCareers]
+  const [additionalCareers, setAdditionalCareers] = useState<number[]>(() =>
+    currentAdditional.map((career) => career.id_carrera)
+  )
 
   const [numGrupo, setNumGrupo] = useState(group.num_grupo)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
@@ -67,8 +82,11 @@ export function ActualizarGrupoForm({
       return
     }
 
-    // Solo el número es editable: el período del grupo no cambia (HU-006).
-    const result = await submit(group.id_grupo, { num_grupo: numGrupo })
+    // El período del grupo no cambia (HU-006). Las carreras solo viajan si el grupo puede tener varias.
+    const result = await submit(group.id_grupo, {
+      num_grupo: numGrupo,
+      ...(careerOptions.length > 0 ? { carreras_adicionales: additionalCareers } : {}),
+    })
 
     if (result !== null) {
       onUpdated(result)
@@ -79,10 +97,14 @@ export function ActualizarGrupoForm({
   const backendPeriodoError = error?.isValidation ? error.errors.id_periodo?.[0] : undefined
 
   const numGrupoError = fieldErrors.num_grupo ?? backendNumGrupoError
+  const carrerasError = careersError(error)
 
-  const totalErrors = [numGrupoError, backendPeriodoError].filter(Boolean).length
+  const totalErrors = [numGrupoError, backendPeriodoError, carrerasError].filter(Boolean).length
   // Un rechazo que no señala un campo (por ejemplo, el bloqueo por examen) se explica con su mensaje.
-  const hasFieldError = backendNumGrupoError !== undefined || backendPeriodoError !== undefined
+  const hasFieldError =
+    backendNumGrupoError !== undefined ||
+    backendPeriodoError !== undefined ||
+    carrerasError !== undefined
   const showsGeneralError = error !== null && (!error.isValidation || !hasFieldError)
   const generalError = error !== null && showsGeneralError ? error.message : null
   const hasError = totalErrors > 0 || generalError !== null
@@ -175,6 +197,15 @@ export function ActualizarGrupoForm({
             )}
           </div>
         </div>
+
+        <AdditionalCareersField
+          options={careerOptions}
+          selected={additionalCareers}
+          onChange={setAdditionalCareers}
+          principalName={principal?.nombre ?? 'La carrera principal'}
+          disabled={isDisabled}
+          error={carrerasError}
+        />
 
         <div className="flex justify-end gap-2 pt-3 border-t mt-1">
           <Button

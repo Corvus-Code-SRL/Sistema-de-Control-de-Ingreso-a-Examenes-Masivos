@@ -29,12 +29,14 @@ export type AccessFeature =
   | 'special_cases'
   | 'invite_teachers'
   | 'audit_log'
+  | 'risk_rectify'
 
 /**
  * Qué roles ejercen cada función. El Invitado (docente sin código SIS) ejerce la docencia, habilita
  * auxiliares por examen y revisa incidencias; no consulta la Central de Riesgo, no gestiona
  * auxiliares de grupo, no reporta auxiliares, no acepta casos especiales y, hasta que producto lo
- * decida, no invita a otros docentes. La bitácora (`audit_log`) es solo del Administrador.
+ * decida, no invita a otros docentes. La bitácora (`audit_log`) y la rectificación de registros de la
+ * Central de Riesgo (`risk_rectify`) son solo del Administrador: consultar la Central no la concede.
  */
 export const ACCESS_BY_FEATURE: Record<AccessFeature, readonly RoleName[]> = {
   teaching: ['Docente', 'Invitado'],
@@ -46,6 +48,7 @@ export const ACCESS_BY_FEATURE: Record<AccessFeature, readonly RoleName[]> = {
   special_cases: ['Docente'],
   invite_teachers: ['Docente'],
   audit_log: ['Administrador'],
+  risk_rectify: ['Administrador'],
 }
 
 const CAPABILITIES_BY_FEATURE = {
@@ -64,6 +67,7 @@ const CAPABILITIES_BY_FEATURE = {
   special_cases: ['casos-especiales.gestionar'],
   invite_teachers: ['docentes.invitar'],
   audit_log: ['bitacora.consultar'],
+  risk_rectify: ['riesgo.rectificar'],
 } as const
 
 const ROLE_OWN_CAPABILITIES = {

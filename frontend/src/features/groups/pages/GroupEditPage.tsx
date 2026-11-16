@@ -143,6 +143,8 @@ function GroupEditView({ groupId }: { groupId: number }) {
               onUpdated={handleUpdated}
               hideTitle
               locked={detail.meta.edicion_bloqueada}
+              careers={detail.meta.carreras ?? []}
+              availableCareers={detail.meta.carreras_disponibles ?? []}
             />
           </Card>
         </>

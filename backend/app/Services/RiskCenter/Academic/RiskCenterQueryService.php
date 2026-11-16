@@ -13,7 +13,10 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
  * Consulta de solo lectura de la Central de Riesgo de estudiantes: una fila por reporte aprobado.
  *
  * El registro es institucional: no se filtra por docente ni por examen. No hay operaciones de
- * escritura; la rectificación es otra historia.
+ * escritura; la rectificación (HU-062) vive en RiskCenterRectificationService.
+ *
+ * Solo se leen registros activos: el scope global de RiskCenter deja fuera los rectificados (retirados de
+ * la Central). La consulta cruda de summariesForSnapshot no pasa por el scope y los excluye a mano.
  */
 class RiskCenterQueryService
 {
@@ -153,6 +156,7 @@ class RiskCenterQueryService
         $rows = DB::table('central_riesgo as cr')
             ->join('reporte_estudiante as re', 're.id_reporte_est', '=', 'cr.id_reporte_est')
             ->join('tipo_falta as tf', 'tf.id_falta', '=', 're.id_tipo_falta')
+            ->whereNull('cr.rectificado_en')
             ->whereIn('cr.id_estudiante', $studentIds)
             ->orderBy('cr.id_estudiante')
             ->orderByDesc('cr.fecha_registro')

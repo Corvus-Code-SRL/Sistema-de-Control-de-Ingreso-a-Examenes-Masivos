@@ -55,6 +55,11 @@ class ActionSeeder extends Seeder
                 'tipo_operacion' => 'UPDATE',
                 'descripcion' => 'Guardado de cambios en la lista de habilitados de un examen',
             ],
+            [
+                'operacion' => 'RECTIFICAR_REGISTRO',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Rectificación de un registro de la Central de Riesgo',
+            ],
         ];
 
         foreach ($acciones as $accion) {

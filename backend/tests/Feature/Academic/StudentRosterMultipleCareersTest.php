@@ -1,0 +1,445 @@
+<?php
+
+namespace Tests\Feature\Academic;
+
+use App\Support\RecordStatus;
+use Illuminate\Cache\ArrayStore;
+use Illuminate\Cache\Repository;
+use Illuminate\Contracts\Cache\Repository as CacheRepository;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Tests\Concerns\SeedsAcademicCatalog;
+use Tests\TestCase;
+
+/**
+ * HU-021 (multicarrera): una nómina con estudiantes de varias carreras.
+ *
+ * La carrera de cada fila sale de la columna opcional «carrera», de la carrera elegida para todo
+ * el archivo o, si el grupo atiende una sola, de esa. El grupo propio es de Sistemas; en las
+ * pruebas que lo necesitan también atiende a Informática.
+ */
+class StudentRosterMultipleCareersTest extends TestCase
+{
+    use DatabaseTransactions;
+    use SeedsAcademicCatalog;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->app->instance(CacheRepository::class, new Repository(new ArrayStore()));
+        $this->seedAcademicCatalog();
+    }
+
+    public function test_una_nomina_mixta_inscribe_a_cada_estudiante_con_su_carrera(): void
+    {
+        $this->addInformatica();
+
+        $preview = $this->preview(implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres,Carrera',
+            '202400001,ROJAS VACA,ANA,SIS',
+            '202400002,PAZ LUNA,LUIS,Ingeniería Informática',
+            '202400003,MAMANI CRUZ,EVA,ingenieria de sistemas',
+        ]))->assertOk();
+
+        $preview->assertJsonPath('data.filas_validas', 3);
+        $preview->assertJsonPath('data.filas.0.carrera.id_carrera', $this->sistemasId);
+        $preview->assertJsonPath('data.filas.1.carrera.id_carrera', $this->informaticaId);
+        $preview->assertJsonPath('data.filas.1.carrera_archivo', 'Ingeniería Informática');
+        $preview->assertJsonCount(2, 'data.carreras_grupo');
+
+        $this->confirm($preview->json('data.token'))->assertOk();
+
+        $this->assertSame($this->sistemasId, $this->careerOf('202400001'));
+        $this->assertSame($this->informaticaId, $this->careerOf('202400002'));
+        $this->assertSame($this->sistemasId, $this->careerOf('202400003'));
+    }
+
+    public function test_marca_la_fila_con_una_carrera_que_el_grupo_no_atiende(): void
+    {
+        $preview = $this->preview(implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres,Carrera',
+            '202400001,ROJAS VACA,ANA,SIS',
+            '202400002,PAZ LUNA,LUIS,INF',
+        ]))->assertOk();
+
+        $preview->assertJsonPath('data.filas_inconsistentes', 1);
+        $preview->assertJsonPath('data.filas.1.estado', 'inconsistent');
+        $preview->assertJsonPath('data.filas.1.errores', ['career_not_in_group']);
+        $preview->assertJsonPath('data.filas.1.carrera', null);
+    }
+
+    public function test_sin_columna_en_un_grupo_de_varias_carreras_la_fila_queda_sin_carrera(): void
+    {
+        $this->addInformatica();
+
+        $preview = $this->preview(implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres',
+            '202400001,ROJAS VACA,ANA',
+        ]))->assertOk();
+
+        $preview->assertJsonPath('data.filas.0.estado', 'inconsistent');
+        $preview->assertJsonPath('data.filas.0.errores', ['missing_career']);
+    }
+
+    public function test_la_carrera_elegida_completa_las_filas_sin_columna(): void
+    {
+        $this->addInformatica();
+
+        $preview = $this->preview(implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres,Carrera',
+            '202400001,ROJAS VACA,ANA,',
+            '202400002,PAZ LUNA,LUIS,SIS',
+        ]), $this->informaticaId)->assertOk();
+
+        $preview->assertJsonPath('data.filas_validas', 2);
+        $preview->assertJsonPath('data.filas.0.carrera.id_carrera', $this->informaticaId);
+        $preview->assertJsonPath('data.filas.1.carrera.id_carrera', $this->sistemasId);
+
+        $this->confirm($preview->json('data.token'))->assertOk();
+
+        $this->assertSame($this->informaticaId, $this->careerOf('202400001'));
+        $this->assertSame($this->sistemasId, $this->careerOf('202400002'));
+    }
+
+    public function test_rechaza_una_carrera_elegida_que_no_es_del_grupo(): void
+    {
+        $this->preview(implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres',
+            '202400001,ROJAS VACA,ANA',
+        ]), $this->informaticaId)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('id_carrera');
+    }
+
+    public function test_en_un_grupo_de_una_sola_carrera_la_columna_no_hace_falta(): void
+    {
+        $preview = $this->preview(implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres',
+            '202400001,ROJAS VACA,ANA',
+        ]))->assertOk();
+
+        $preview->assertJsonPath('data.filas.0.carrera.id_carrera', $this->sistemasId);
+
+        $this->confirm($preview->json('data.token'))->assertOk();
+
+        $this->assertSame($this->sistemasId, $this->careerOf('202400001'));
+    }
+
+    public function test_si_el_grupo_deja_de_atender_la_carrera_tras_el_preview_esa_fila_no_se_importa(): void
+    {
+        $this->addInformatica();
+
+        $preview = $this->preview(implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres,Carrera',
+            '202400001,ROJAS VACA,ANA,SIS',
+            '202400002,PAZ LUNA,LUIS,INF',
+        ]))->assertOk();
+
+        DB::table('grupo_oferta')
+            ->where('id_grupo', $this->grupoPropioId)
+            ->where('id_carrera', $this->informaticaId)
+            ->delete();
+
+        $this->confirm($preview->json('data.token'))
+            ->assertOk()
+            ->assertJsonPath('data.filas_inconsistentes', 1)
+            ->assertJsonPath('data.estudiantes_inscritos', 1);
+
+        $this->assertSame($this->sistemasId, $this->careerOf('202400001'));
+        $this->assertFalse(DB::table('estudiante')->where('cod_sis', '202400002')->exists());
+    }
+
+    public function test_lee_la_columna_carrera_de_un_xlsx(): void
+    {
+        $this->addInformatica();
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->fromArray([
+            ['Estudiante', 'Apellidos', 'Nombres', 'Carrera'],
+            ['202400001', 'ROJAS VACA', 'ANA', 'INF'],
+        ]);
+        $sheet->getCell('A2')->setValueExplicit('202400001', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+        $path = tempnam(sys_get_temp_dir(), 'sciem_xlsx_');
+        (new Xlsx($spreadsheet))->save($path);
+
+        $response = $this->post(
+            '/api/grupos/' . $this->grupoPropioId . '/nomina/preview',
+            ['archivo' => new UploadedFile($path, 'nomina.xlsx', null, null, true)],
+            ['Accept' => 'application/json']
+        );
+
+        @unlink($path);
+
+        $response->assertOk()->assertJsonPath('data.filas.0.carrera.id_carrera', $this->informaticaId);
+    }
+
+    public function test_la_lista_de_estudiantes_se_filtra_por_carrera(): void
+    {
+        $this->addInformatica();
+        $this->enroll('202400001', $this->sistemasId);
+        $this->enroll('202400002', $this->informaticaId);
+        $this->enroll('202400003', $this->informaticaId);
+
+        $url = '/api/grupos/' . $this->grupoPropioId . '/estudiantes';
+
+        $all = $this->getJson($url)
+            ->assertOk()
+            ->assertJsonCount(3, 'data')
+            ->assertJsonPath('meta.total_inscritos', 3);
+
+        $totals = array_column($all->json('meta.por_carrera'), 'total', 'id_carrera');
+        $this->assertSame([$this->sistemasId => 1, $this->informaticaId => 2], [
+            $this->sistemasId => $totals[$this->sistemasId] ?? null,
+            $this->informaticaId => $totals[$this->informaticaId] ?? null,
+        ]);
+
+        $filtered = $this->getJson($url . '?id_carrera=' . $this->informaticaId)->assertOk();
+
+        $filtered->assertJsonCount(2, 'data');
+        $filtered->assertJsonPath('data.0.carrera.id_carrera', $this->informaticaId);
+        $filtered->assertJsonPath('meta.total_inscritos', 3);
+    }
+
+    public function test_rechaza_un_filtro_de_carrera_no_numerico(): void
+    {
+        $this->getJson('/api/grupos/' . $this->grupoPropioId . '/estudiantes?id_carrera=abc')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('id_carrera');
+    }
+
+    public function test_sin_columna_usa_la_carrera_que_el_estudiante_ya_tiene_en_otro_grupo(): void
+    {
+        $this->addInformatica();
+        $this->enrollIn($this->grupoAjenoId, '202400001', $this->informaticaId, '2026-03-02');
+        $this->enrollIn($this->grupoPeriodoAnteriorId, '202400002', $this->sistemasId, '2025-08-04');
+
+        $preview = $this->preview(implode(PHP_EOL, [
+            'Estudiante,Apellidos,Nombres',
+            '202400001,ROJAS VACA,ANA',
+            '202400002,PAZ LUNA,LUIS',
+            '202400003,MAMANI CRUZ,EVA',
+        ]))->assertOk();
+
+        $preview->assertJsonPath('data.filas_validas', 2)
+            ->assertJsonPath('data.filas.0.carrera.id_carrera', $this->informaticaId)
+            ->assertJsonPath('data.filas.0.carrera.origen', 'previous')
+            ->assertJsonPath('data.filas.1.carrera.id_carrera', $this->sistemasId)
+            ->assertJsonPath('data.filas.1.carrera.origen', 'previous')
+            ->assertJsonPath('data.filas.2.carrera', null)
+            ->assertJsonPath('data.filas.2.errores', ['missing_career']);
+
+        $this->confirm($preview->json('data.token'))->assertOk();
+
+        $this->assertSame($this->informaticaId, $this->careerOf('202400001'));
+        $this->assertSame($this->sistemasId, $this->careerOf('202400002'));
+        $this->assertNull($this->careerOf('202400003'));
+    }
+
+    public function test_usa_la_carrera_de_la_inscripcion_mas_reciente(): void
+    {
+        $this->addInformatica();
+        $this->enrollIn($this->grupoPeriodoAnteriorId, '202400001', $this->sistemasId, '2025-08-04');
+        $this->enrollIn($this->grupoAjenoId, '202400001', $this->informaticaId, '2026-03-02');
+
+        $this->preview("Estudiante,Apellidos,Nombres\n202400001,ROJAS VACA,ANA")
+            ->assertOk()
+            ->assertJsonPath('data.filas.0.carrera.id_carrera', $this->informaticaId);
+    }
+
+    public function test_no_usa_una_carrera_anterior_que_el_grupo_no_atiende(): void
+    {
+        $this->addInformatica();
+        $economia = DB::table('carrera')->insertGetId([
+            'nombre' => 'Economia',
+            'codigo' => 'ECO',
+            'estado' => RecordStatus::ACTIVE,
+            'id_facultad' => $this->facultadId,
+        ], 'id_carrera');
+        $this->enrollIn($this->grupoAjenoId, '202400001', (int) $economia, '2026-03-02');
+
+        $this->preview("Estudiante,Apellidos,Nombres\n202400001,ROJAS VACA,ANA")
+            ->assertOk()
+            ->assertJsonPath('data.filas_validas', 0)
+            ->assertJsonPath('data.filas.0.errores', ['missing_career']);
+    }
+
+    public function test_la_columna_y_la_carrera_elegida_mandan_sobre_la_anterior(): void
+    {
+        $this->addInformatica();
+        $this->enrollIn($this->grupoAjenoId, '202400001', $this->informaticaId, '2026-03-02');
+
+        $this->preview("Estudiante,Apellidos,Nombres,Carrera\n202400001,ROJAS VACA,ANA,SIS")
+            ->assertOk()
+            ->assertJsonPath('data.filas.0.carrera.id_carrera', $this->sistemasId)
+            ->assertJsonPath('data.filas.0.carrera.origen', 'file');
+
+        $this->preview("Estudiante,Apellidos,Nombres\n202400001,ROJAS VACA,ANA", $this->sistemasId)
+            ->assertOk()
+            ->assertJsonPath('data.filas.0.carrera.id_carrera', $this->sistemasId)
+            ->assertJsonPath('data.filas.0.carrera.origen', 'chosen');
+    }
+
+    public function test_en_un_grupo_de_una_sola_carrera_no_busca_la_carrera_anterior(): void
+    {
+        $this->enrollIn($this->grupoAjenoId, '202400001', $this->informaticaId, '2026-03-02');
+
+        $this->preview("Estudiante,Apellidos,Nombres\n202400001,ROJAS VACA,ANA")
+            ->assertOk()
+            ->assertJsonPath('data.filas.0.carrera.id_carrera', $this->sistemasId)
+            ->assertJsonPath('data.filas.0.carrera.origen', 'only');
+    }
+
+    public function test_una_inscripcion_anterior_sin_carrera_cuenta_con_la_principal_de_su_grupo(): void
+    {
+        $this->addInformatica();
+        // Cargada por fuera de la nómina (datos de prueba, scripts): sin id_carrera.
+        $this->enrollIn($this->grupoPeriodoAnteriorId, '202400001', null, '2025-08-04');
+
+        $this->preview("Estudiante,Apellidos,Nombres\n202400001,ROJAS VACA,ANA")
+            ->assertOk()
+            ->assertJsonPath('data.filas.0.carrera.id_carrera', $this->informaticaId)
+            ->assertJsonPath('data.filas.0.carrera.origen', 'previous');
+    }
+
+    public function test_una_inscripcion_anterior_sin_carrera_en_un_grupo_de_varias_carreras_no_se_adivina(): void
+    {
+        $this->addInformatica();
+        // El grupo ajeno también atiende Informática: su inscripción sin carrera es ambigua.
+        $this->addCareerTo($this->grupoAjenoId);
+        $this->enrollIn($this->grupoAjenoId, '202400001', null, '2026-03-02');
+
+        $this->preview("Estudiante,Apellidos,Nombres\n202400001,ROJAS VACA,ANA")
+            ->assertOk()
+            ->assertJsonPath('data.filas.0.carrera', null)
+            ->assertJsonPath('data.filas.0.errores', ['missing_career']);
+    }
+
+    public function test_en_un_grupo_de_una_carrera_la_inscripcion_sin_carrera_cuenta_con_esa(): void
+    {
+        $this->enrollIn($this->grupoPropioId, '202400001', null, '2026-03-02');
+
+        $url = '/api/grupos/' . $this->grupoPropioId . '/estudiantes';
+
+        $this->getJson($url . '?id_carrera=' . $this->sistemasId)
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.carrera.id_carrera', $this->sistemasId)
+            ->assertJsonPath('meta.por_carrera.0.total', 1);
+    }
+
+    public function test_en_un_grupo_de_varias_carreras_la_inscripcion_sin_carrera_no_se_adivina(): void
+    {
+        $this->addInformatica();
+        $this->enrollIn($this->grupoPropioId, '202400001', null, '2026-03-02');
+        $this->enrollIn($this->grupoPropioId, '202400002', $this->informaticaId, '2026-03-02');
+
+        $url = '/api/grupos/' . $this->grupoPropioId . '/estudiantes';
+        $all = $this->getJson($url)->assertOk()->assertJsonCount(2, 'data');
+
+        // Está en «Todas», pero no cuenta en ninguna carrera.
+        $totals = array_column($all->json('meta.por_carrera'), 'total', 'id_carrera');
+        $this->assertNull($totals[$this->sistemasId] ?? null);
+        $this->assertSame(1, $totals[$this->informaticaId] ?? null);
+
+        $this->getJson($url . '?id_carrera=' . $this->sistemasId)
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
+    private function addInformatica(): void
+    {
+        $this->addCareerTo($this->grupoPropioId);
+    }
+
+    /** El grupo (de Sistemas) pasa a atender también Informática. */
+    private function addCareerTo(int $groupId): void
+    {
+        $group = DB::table('grupo')->where('id_grupo', $groupId)->first();
+
+        foreach ([$this->sistemasId, $this->informaticaId] as $careerId) {
+            DB::table('grupo_oferta')->insertOrIgnore([
+                'id_grupo' => $groupId,
+                'id_carrera' => $careerId,
+                'id_materia' => (int) $group->id_materia,
+                'id_gestion_periodo' => (int) $group->id_gestion_periodo,
+            ]);
+        }
+    }
+
+    private function enroll(string $sisCode, int $careerId): void
+    {
+        $studentId = DB::table('estudiante')->insertGetId([
+            'cod_sis' => $sisCode,
+            'nombre' => 'NOMBRE' . $sisCode,
+            'apellido_paterno' => 'APELLIDO' . $sisCode,
+            'estado' => RecordStatus::ACTIVE,
+        ], 'id_estudiante');
+
+        DB::table('grupo_estudiante')->insert([
+            'id_grupo' => $this->grupoPropioId,
+            'id_estudiante' => $studentId,
+            'fecha_inscripcion' => now()->toDateString(),
+            'estado' => RecordStatus::ACTIVE,
+            'id_carrera' => $careerId,
+        ]);
+    }
+
+    /** Inscribe al estudiante (lo crea si no existe) en otro grupo con esa carrera (o sin ella) y fecha. */
+    private function enrollIn(int $groupId, string $sisCode, ?int $careerId, string $date): void
+    {
+        $studentId = DB::table('estudiante')->where('cod_sis', $sisCode)->value('id_estudiante')
+            ?? DB::table('estudiante')->insertGetId([
+                'cod_sis' => $sisCode,
+                'nombre' => 'NOMBRE' . $sisCode,
+                'apellido_paterno' => 'APELLIDO' . $sisCode,
+                'estado' => RecordStatus::ACTIVE,
+            ], 'id_estudiante');
+
+        DB::table('grupo_estudiante')->insert([
+            'id_grupo' => $groupId,
+            'id_estudiante' => $studentId,
+            'fecha_inscripcion' => $date,
+            'estado' => RecordStatus::ACTIVE,
+            'id_carrera' => $careerId,
+        ]);
+    }
+
+    private function careerOf(string $sisCode): ?int
+    {
+        $careerId = DB::table('grupo_estudiante')
+            ->join('estudiante', 'estudiante.id_estudiante', '=', 'grupo_estudiante.id_estudiante')
+            ->where('grupo_estudiante.id_grupo', $this->grupoPropioId)
+            ->where('estudiante.cod_sis', $sisCode)
+            ->value('grupo_estudiante.id_carrera');
+
+        return $careerId === null ? null : (int) $careerId;
+    }
+
+    private function preview(string $csv, ?int $careerId = null)
+    {
+        $data = ['archivo' => UploadedFile::fake()->createWithContent('nomina.csv', $csv)];
+
+        if ($careerId !== null) {
+            $data['id_carrera'] = $careerId;
+        }
+
+        return $this->post(
+            '/api/grupos/' . $this->grupoPropioId . '/nomina/preview',
+            $data,
+            ['Accept' => 'application/json']
+        );
+    }
+
+    private function confirm(?string $token)
+    {
+        return $this->postJson(
+            '/api/grupos/' . $this->grupoPropioId . '/nomina/confirm',
+            ['token' => $token]
+        );
+    }
+}

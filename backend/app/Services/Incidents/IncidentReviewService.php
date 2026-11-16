@@ -276,6 +276,7 @@ class IncidentReviewService
             'entryAttempt.classroom',
             'incidentRoom',
             'riskCenter',
+            'voidedRiskCenter',
         ];
     }
 
@@ -366,6 +367,7 @@ class IncidentReviewService
                 : null,
 
             'en_central_riesgo' => $r->riskCenter !== null,
+            'retirado_de_central_riesgo' => $r->voidedRiskCenter !== null,
         ];
     }
 

@@ -44,12 +44,29 @@ export interface Group {
   periodo: Period
 }
 
+/** Una carrera que atiende un grupo (HU-021, multicarrera). La principal es grupo.id_carrera. */
+export interface GroupCareer {
+  id_carrera: number
+  codigo: string
+  nombre: string
+  principal: boolean
+}
+
+/** Inscritos de una carrera en el grupo. */
+export interface GroupCareerTotal {
+  id_carrera: number
+  nombre: string
+  total: number
+}
+
 export interface SubjectGroupsMeta {
   total: number
   total_mios: number
   id_periodo_activo: number
   /** Docente que actúa; `null` si el backend no lo puede resolver. */
   docente: { nombre_completo: string | null }
+  /** Otras carreras que ofertan la materia: el registro puede sumarlas al grupo. */
+  carreras_materia?: GroupCareer[]
 }
 
 /** Respuesta de `GET /carreras/{id_carrera}/materias/{id_materia}/grupos`. */
@@ -63,6 +80,10 @@ export interface GroupDetailMeta {
   es_periodo_activo: boolean
   /** Un examen del grupo está en ingreso o en curso: el grupo no se puede editar (HU-019). */
   edicion_bloqueada: boolean
+  /** Carreras que atiende el grupo, la principal primero (HU-021, multicarrera). */
+  carreras?: GroupCareer[]
+  /** Carreras que ofertan la materia y que el grupo todavía no atiende. */
+  carreras_disponibles?: GroupCareer[]
 }
 
 /** Respuesta de `GET /grupos/{id_grupo}`. */
@@ -121,6 +142,8 @@ export interface CreateGroupPayload {
   num_grupo: string
   /** Editable por el Docente; si se omite, el backend asigna el período vigente (CA 11). */
   id_periodo?: number
+  /** Otras carreras que el grupo atiende, además de la principal (HU-021, multicarrera). */
+  carreras_adicionales?: number[]
 }
 
 /**
@@ -129,6 +152,8 @@ export interface CreateGroupPayload {
  */
 export interface UpdateGroupPayload {
   num_grupo: string
+  /** Si se envía, reemplaza las carreras adicionales; sin ella, no cambian (HU-021, multicarrera). */
+  carreras_adicionales?: number[]
 }
 
 /**
@@ -165,6 +190,8 @@ export interface GroupStudent {
   apellido_paterno: string
   apellido_materno: string | null
   nombre: string
+  /** Carrera con la que está en el grupo; null solo en inscripciones antiguas. */
+  carrera?: { id_carrera: number; nombre: string | null } | null
 }
 
 /** Respuesta de `GET /grupos/{id_grupo}/estudiantes`. */
@@ -178,18 +205,23 @@ export interface GroupStudentsListResponse {
     total: number
     /** Todas las inscripciones activas, sin la búsqueda: es el total del encabezado. */
     total_inscritos: number
+    /** Inscritos por carrera (HU-021, multicarrera). */
+    por_carrera?: GroupCareerTotal[]
   }
 }
 
 /** Una página de estudiantes más el total de inscritos del grupo. */
 export interface GroupStudentsPage extends Page<GroupStudent> {
   enrolledTotal: number
+  careerTotals?: GroupCareerTotal[]
 }
 
 /** Filtros de la lista de estudiantes; viven en la URL (`?q=`, `?page=`). */
 export interface GroupStudentFilters {
   q: string
   page: number
+  /** Solo los inscritos de esa carrera (`?carrera=`); sin ella, todos. */
+  carrera?: number
 }
 
 /** Datos del listado contextual; este endpoint no carga ambientes ni grupos. */

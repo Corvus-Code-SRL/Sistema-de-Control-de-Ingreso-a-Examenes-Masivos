@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
-import { Download, Printer, ShieldAlert } from 'lucide-react'
+import { Download, FileSpreadsheet, Printer, ShieldAlert } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -15,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useFinalReport } from '../hooks/useFinalReport'
+import { useFinalReportExcel } from '../hooks/useFinalReportExcel'
 import { useFinalReportPdf } from '../hooks/useFinalReportPdf'
 import type { FinalReport } from '../types/finalReport.types'
 
@@ -191,9 +192,10 @@ export function FinalReportPage() {
   const { examId } = useParams<{ examId: string }>()
   const { report, loading, notFound, loadError, reload } = useFinalReport(examId)
   const { download, downloading, downloadError } = useFinalReportPdf(report)
+  const excel = useFinalReportExcel(report)
 
-    const summaryPath = `/historial/${examId}`
-    const breadcrumbs = [
+  const summaryPath = `/historial/${examId}`
+  const breadcrumbs = [
     { label: 'Exámenes' },
     { label: 'Resumen del examen', to: summaryPath },
     { label: 'Reporte final' },
@@ -232,6 +234,15 @@ export function FinalReportPage() {
               <Download className="size-4" />
               {downloading ? 'Descargando…' : 'Descargar PDF'}
             </Button>
+            <Button
+              variant="outline"
+              className="print:hidden"
+              onClick={() => void excel.download()}
+              disabled={!report || excel.downloading}
+            >
+              <FileSpreadsheet className="size-4" />
+              {excel.downloading ? 'Descargando…' : 'Descargar Excel'}
+            </Button>
             <Button className="print:hidden" onClick={() => window.print()} disabled={!report}>
               <Printer className="size-4" />
               Imprimir
@@ -240,9 +251,9 @@ export function FinalReportPage() {
         }
       />
 
-      {downloadError && (
+      {(downloadError || excel.downloadError) && (
         <p role="alert" className="text-sm text-danger-fg print:hidden">
-          {downloadError}
+          {downloadError ?? excel.downloadError}
         </p>
       )}
 

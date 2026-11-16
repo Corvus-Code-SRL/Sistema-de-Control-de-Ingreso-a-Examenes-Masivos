@@ -36,14 +36,24 @@ export function validateRosterFile(file: File): string | null {
   return null
 }
 
-/** Lee el archivo y devuelve la clasificación de sus filas. No persiste nada. */
+/**
+ * Lee el archivo y devuelve la clasificación de sus filas. No persiste nada.
+ *
+ * `careerId` es la carrera de las filas que no traen la columna «carrera» (HU-021, multicarrera);
+ * sin ella, el backend usa la columna o, si el grupo atiende una sola carrera, esa.
+ */
 export async function previewStudentRoster(
   groupId: number,
   file: File,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  careerId?: number | null
 ): Promise<RosterPreviewResponse> {
   const body = new FormData()
   body.append('archivo', file)
+
+  if (careerId !== undefined && careerId !== null) {
+    body.append('id_carrera', String(careerId))
+  }
 
   return apiPost<RosterPreviewResponse>(`/grupos/${groupId}/nomina/preview`, body, { signal })
 }
