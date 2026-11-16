@@ -8,6 +8,6 @@ export const EXAM_SITUATION_MESSAGES = {
 } as const
 
 export const SITUATION_EXAM_STATE_LABELS: Record<SituationExam['estado'], string> = {
-  EN_INGRESO: 'En ingreso',
+  PROGRAMADO: 'Ingreso abierto',
   EN_CURSO: 'En curso',
 }

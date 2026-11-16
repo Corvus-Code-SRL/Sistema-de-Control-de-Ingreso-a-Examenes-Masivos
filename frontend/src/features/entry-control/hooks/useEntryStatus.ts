@@ -104,7 +104,7 @@ export function useEntryStatus(examId: number) {
     try {
       const nextContext = await entryControlService.context(examId)
       setContext(nextContext)
-      if (!nextContext.ingreso_ordinario_cerrado && (nextContext.estado === 'PROGRAMADO' || nextContext.estado === 'EN_INGRESO' || nextContext.estado === 'EN_CURSO')) {
+      if (!nextContext.ingreso_ordinario_cerrado && (nextContext.estado === 'PROGRAMADO' || nextContext.estado === 'EN_CURSO')) {
         await refresh(true)
       } else {
         version.current = undefined

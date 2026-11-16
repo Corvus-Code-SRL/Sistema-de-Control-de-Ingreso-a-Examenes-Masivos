@@ -4,7 +4,7 @@ import type { ExamStatus } from '../types/exams.types'
  * Por qué un examen que ya no está PROGRAMADO se muestra de solo lectura. El texto debe decir el
  * estado real: uno cancelado o finalizado nunca "inició el control de ingreso".
  */
-export function examLockedMessage(status: ExamStatus): string {
+export function examLockedMessage(status: ExamStatus, entryOpened = false): string {
   switch (status) {
     case 'CANCELADO':
       return 'Este examen fue cancelado: ya no admite cambios y no se tomará.'
@@ -12,9 +12,10 @@ export function examLockedMessage(status: ExamStatus): string {
       return 'Este examen ya finalizó: su información general y sus grupos quedaron fijos.'
     case 'EN_CURSO':
       return 'Este examen está en curso: su información general y sus grupos quedaron fijos.'
-    case 'EN_INGRESO':
-      return 'El control de ingreso de este examen ya se inició: la información general y sus grupos quedaron fijos.'
     case 'PROGRAMADO':
+      if (entryOpened) {
+        return 'El control de ingreso de este examen ya se abrió: la información general y sus grupos quedaron fijos.'
+      }
       return 'Este examen está programado: puede modificar su información general y sus grupos.'
   }
 }

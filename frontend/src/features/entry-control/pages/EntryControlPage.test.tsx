@@ -11,7 +11,7 @@ import type { EntryContext, Verification } from '../types/entry-control.types'
 
 const context: EntryContext = {
   id_examen: 7, nombre_examen: 'Primer parcial', fecha: '2026-09-29',
-  hora_inicio: '08:00', hora_fin: '10:00', estado: 'EN_INGRESO', ingreso_ordinario_cerrado: false,
+  hora_inicio: '08:00', hora_fin: '10:00', estado: 'EN_CURSO', ingreso_ordinario_cerrado: false,
   materia: 'Bases de Datos I', carrera: 'Ing. de Sistemas', grupos: ['1'],
   rol_controlador: 'AUXILIAR', id_ambiente_asignado: 5,
   ambientes: [{ id_ambiente: 5, nro_aula: '691A' }, { id_ambiente: 6, nro_aula: '692B' }],
@@ -666,6 +666,27 @@ describe('EntryControlPage', () => {
     await screen.findByText(/Usted controla en/)
 
     expect(screen.getAllByText('Primer parcial').length).toBeGreaterThan(0)
+  })
+
+  it('no ofrece cerrar el ingreso ordinario mientras el examen sigue PROGRAMADO con el control abierto', async () => {
+    const docenteContext: EntryContext = {
+      ...context,
+      rol_controlador: 'DOCENTE',
+      id_ambiente_asignado: null,
+      estado: 'PROGRAMADO',
+    }
+    const apiRoutes = routes(allowed, docenteContext)
+    apiRoutes[1].body = { data: status }
+
+    mockApi(apiRoutes)
+
+    renderWithRouter(<EntryControlPage />, {
+      route: '/examenes/7/control-ingreso',
+      path: '/examenes/:examId/control-ingreso',
+    })
+
+    expect(await screen.findByText('Ingreso abierto')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cerrar ingreso ordinario' })).not.toBeInTheDocument()
   })
 
   it('permite cancelar el cierre del ingreso ordinario', async () => {

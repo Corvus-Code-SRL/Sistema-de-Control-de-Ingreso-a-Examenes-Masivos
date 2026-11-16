@@ -35,7 +35,7 @@ const inProgress: ExamInProgress = {
   id_examen: 7, nombre_examen: 'Parcial', materia: 'Programación', estado: 'EN_CURSO',
   rol_controlador: 'DOCENTE', id_ambiente_asignado: null,
   ambientes: [{ id_ambiente: 5, nro_aula: '691A', capacidad: 100 }],
-  inicio_real_en: '2026-10-30T12:00:00Z', fin_real_en: null, inicio_automatico: false, fin_automatico: false,
+  inicio_programado: '2026-10-30T12:00:00Z', ingreso_abierto_en: null, ingreso_ordinario_cerrado_en: null, fin_real_en: null, fin_automatico: false,
   fin_programado_en: '2026-10-30T14:00:00Z', hora_servidor_en: '2026-10-30T12:31:00Z',
   totales: { a_tiempo: 1, con_retraso: 0, ausentes: 0, presentes: 1, total: 1, incidencias_pendientes: 0, expulsados: 0 },
   incidencias_habilitadas: true,

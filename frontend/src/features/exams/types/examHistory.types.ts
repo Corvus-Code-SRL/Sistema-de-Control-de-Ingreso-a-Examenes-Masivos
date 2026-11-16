@@ -22,11 +22,11 @@ export interface HistorySummary {
   fecha: string
   materia: string | null
   total_estudiantes: number
-  inicio_real_en: string | null
-  inicio_automatico: boolean
+  inicio_programado: string
+  ingreso_abierto_en: string | null
   fin_real_en: string | null
   fin_automatico: boolean
   totales: { a_tiempo: number; con_retraso: number; ausentes: number; sin_clasificar: number; incidencias: number }
-  linea_tiempo: { tipo: 'apertura' | 'inicio' | 'retraso' | 'incidencia' | 'fin'; fecha_hora: string; descripcion: string; detalle: string }[]
+  linea_tiempo: { tipo: 'apertura' | 'cierre_ingreso' | 'inicio' | 'retraso' | 'incidencia' | 'fin'; fecha_hora: string; descripcion: string; detalle: string }[]
   ambientes: { id_ambiente: number; nro_aula: string; presentes: number; auxiliares: string[] }[]
 }

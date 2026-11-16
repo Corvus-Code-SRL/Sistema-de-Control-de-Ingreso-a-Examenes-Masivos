@@ -7,7 +7,7 @@ import { useEntryStatus } from './useEntryStatus'
 
 const context: EntryContext = {
   id_examen: 7, nombre_examen: 'Primer parcial', fecha: '2026-09-29',
-  hora_inicio: '08:00', hora_fin: '10:00', estado: 'EN_INGRESO',
+  hora_inicio: '08:00', hora_fin: '10:00', estado: 'PROGRAMADO',
   materia: 'Bases de Datos I', carrera: 'Ing. de Sistemas', grupos: ['1'],
   rol_controlador: 'DOCENTE', id_ambiente_asignado: 5,
   ambientes: [{ id_ambiente: 5, nro_aula: '691A' }],

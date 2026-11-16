@@ -17,7 +17,7 @@ const originGroup: Group = {
   tiene_nomina: true,
 }
 
-function makeExam(estado: ExamStatus, groups: Group[] = []): Exam {
+function makeExam(estado: ExamStatus, groups: Group[] = [], overrides: Partial<Exam> = {}): Exam {
   return {
     id_examen: 9,
     nombre_examen: 'Segundo parcial',
@@ -36,17 +36,18 @@ function makeExam(estado: ExamStatus, groups: Group[] = []): Exam {
     carrera: { id_carrera: 2, nombre: 'Ingenieria de Sistemas' },
     ambientes: [{ id_ambiente: 5, nro_aula: '691A', capacidad: 40 }],
     grupos: groups,
+    ...overrides,
   }
 }
 
-function mockExam(estado: ExamStatus, groups: Group[] = []) {
+function mockExam(estado: ExamStatus, groups: Group[] = [], overrides: Partial<Exam> = {}) {
   mockApi([
     { matches: (url) => url.endsWith('/examenes/formulario'), body: { data: { materias: [], ambientes: [], grupos: [] } } },
     {
       matches: (url) => url.endsWith('/examenes/9/auxiliares'),
       body: { data: { estado, editable: false, ambientes: [], auxiliares: [] } },
     },
-    { matches: (url) => url.endsWith('/examenes/9'), body: { data: makeExam(estado, groups) } },
+    { matches: (url) => url.endsWith('/examenes/9'), body: { data: makeExam(estado, groups, overrides) } },
   ])
 }
 
@@ -67,7 +68,7 @@ describe('ExamDetailPage: texto de solo lectura (HU-024)', () => {
     await renderDetail()
 
     expect(await screen.findByText(/fue cancelado/i)).toBeInTheDocument()
-    expect(screen.queryByText(/control de ingreso de este examen ya se inició/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/control de ingreso de este examen ya se abrió/i)).not.toBeInTheDocument()
   })
 
   it('un examen finalizado dice que finalizó', async () => {
@@ -75,14 +76,16 @@ describe('ExamDetailPage: texto de solo lectura (HU-024)', () => {
     await renderDetail()
 
     expect(await screen.findByText(/ya finalizó/i)).toBeInTheDocument()
-    expect(screen.queryByText(/control de ingreso de este examen ya se inició/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/control de ingreso de este examen ya se abrió/i)).not.toBeInTheDocument()
   })
 
-  it('un examen en ingreso dice que el control de ingreso ya se inició', async () => {
-    mockExam('EN_INGRESO')
+  it('un examen con el ingreso abierto dice que el control de ingreso ya se abrió', async () => {
+    mockExam('PROGRAMADO', [], { ingreso_abierto_en: '2026-10-20T07:50:00Z', control_ingreso_abierto: true })
     await renderDetail()
 
-    expect(await screen.findByText(/control de ingreso de este examen ya se inició/i)).toBeInTheDocument()
+    expect(await screen.findByText(/control de ingreso de este examen ya se abrió/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /editar examen/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /cancelar examen/i })).not.toBeInTheDocument()
   })
 
   it('un examen en curso dice que está en curso', async () => {
@@ -135,7 +138,6 @@ describe('ExamDetailPage: texto de solo lectura (HU-024)', () => {
   })
 
   it.each([
-    'EN_INGRESO',
     'EN_CURSO',
     'FINALIZADO',
     'CANCELADO',
@@ -155,15 +157,43 @@ describe('ExamDetailPage: texto de solo lectura (HU-024)', () => {
     }
   )
 
-  it('conserva el acceso al control de ingreso', async () => {
-    mockExam('EN_INGRESO')
+  it('un examen PROGRAMADO con el ingreso abierto conserva el acceso al control de ingreso', async () => {
+    mockExam('PROGRAMADO', [], { ingreso_abierto_en: '2026-10-20T07:50:00Z', control_ingreso_abierto: true })
     await renderDetail()
 
     expect(
-      screen.getByRole('button', {
+      await screen.findByRole('button', {
         name: /controlar ingreso/i,
       })
     ).toBeInTheDocument()
+    expect(screen.getByText('Ingreso abierto')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /habilitar auxiliares/i })
+    ).not.toBeInTheDocument()
+  })
+
+  it('un examen PROGRAMADO sin abrir el control no ofrece Controlar ingreso', async () => {
+    mockExam('PROGRAMADO')
+    await renderDetail()
+
+    expect(await screen.findByRole('button', { name: /editar examen/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /controlar ingreso/i })).not.toBeInTheDocument()
+  })
+
+  it('un examen EN_CURSO con el ingreso ordinario abierto ofrece Controlar ingreso y Ver examen en curso', async () => {
+    mockExam('EN_CURSO', [], { ingreso_abierto_en: '2026-10-20T07:50:00Z', control_ingreso_abierto: true })
+    await renderDetail()
+
+    expect(await screen.findByRole('button', { name: /controlar ingreso/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /ver examen en curso/i })).toBeInTheDocument()
+  })
+
+  it('un examen EN_CURSO con el ingreso ordinario cerrado solo ofrece Ver examen en curso', async () => {
+    mockExam('EN_CURSO', [], { ingreso_abierto_en: '2026-10-20T07:50:00Z', ingreso_ordinario_cerrado_en: '2026-10-20T08:20:00Z', control_ingreso_abierto: false })
+    await renderDetail()
+
+    expect(await screen.findByRole('button', { name: /ver examen en curso/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /controlar ingreso/i })).not.toBeInTheDocument()
   })
 
   it('ubica las acciones de auxiliares en su sección', async () => {
@@ -301,7 +331,6 @@ describe('ExamDetailPage — reporte final (HU-051)', () => {
 
   it.each([
     'PROGRAMADO',
-    'EN_INGRESO',
     'EN_CURSO',
     'CANCELADO',
   ] as ExamStatus[])('un examen %s no ofrece Generar reporte', async (estado) => {

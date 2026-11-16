@@ -11,14 +11,13 @@ import type { AssistantExam, AssistantExamStatus } from '../types/assistant.type
 
 const STATUS_LABELS: Record<AssistantExamStatus, { label: string; className: string }> = {
   PROGRAMADO: { label: 'Programado', className: 'bg-ok-soft text-ok-fg' },
-  EN_INGRESO: { label: 'Control de ingreso abierto', className: 'bg-info-soft text-info' },
   EN_CURSO: { label: 'En curso', className: 'bg-info-soft text-info' },
 }
 
 /**
  * Exámenes que controla el auxiliar y el ambiente que el docente le asignó
  * (HU-09, mockup 9.6). Es de solo lectura: el auxiliar nunca elige ni cambia
- * su ambiente. Con el ingreso abierto (EN_INGRESO) cada tarjeta lleva al control de ingreso.
+ * su ambiente. Con el control de ingreso abierto cada tarjeta lleva al control de ingreso.
  */
 export function MyAssignmentsPage() {
   const { status, data, error, reload } = useMyAssistantExams()
@@ -85,7 +84,7 @@ function AssistantExamCard({ exam }: { exam: AssistantExam }) {
         </p>
       )}
 
-      {exam.estado === 'EN_INGRESO' && (
+      {exam.control_ingreso_abierto && (
         <Button asChild size="sm">
           <Link to={`/examenes/${exam.id_examen}/control-ingreso`}>
             <DoorOpen className="size-4" aria-hidden="true" />

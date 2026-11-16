@@ -80,6 +80,7 @@ function EntryControlContent({ examId }: { examId: number }) {
 
   const canCloseOrdinary =
     open &&
+    context?.estado === 'EN_CURSO' &&
     context?.rol_controlador === 'DOCENTE' &&
     status !== null &&
     statusError === null

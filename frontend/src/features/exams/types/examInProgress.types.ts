@@ -46,9 +46,10 @@ export interface ExamInProgress {
     nro_aula: string;
     capacidad: number;
     }[];
-    inicio_real_en: string | null;
+    inicio_programado: string;
+    ingreso_abierto_en: string | null;
+    ingreso_ordinario_cerrado_en: string | null;
     fin_real_en: string | null;
-    inicio_automatico: boolean;
     fin_automatico: boolean;
     fin_programado_en: string;
     hora_servidor_en: string;

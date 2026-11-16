@@ -126,7 +126,7 @@ export interface EntryActionInput {
 
 export interface OpenEntryExam {
   id_examen: number
-  estado: 'PROGRAMADO' | 'EN_CURSO' | 'EN_INGRESO'
+  estado: 'PROGRAMADO' | 'EN_CURSO'
   control_abierto?: boolean
   nombre_examen: string
   fecha: string | null
