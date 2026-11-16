@@ -278,11 +278,8 @@ return [
             'CAMBIAR_AMBIENTE' => 'Cambiar ambiente',
             'OBSERVAR_IDENTIDAD' => 'Observar identidad',
             'RECTIFICAR_REGISTRO' => 'Rectificar registro',
-<<<<<<< HEAD
             'GUARDAR_HABILITADOS' => 'Guardar habilitados',
-=======
             'INVITAR_COLABORADOR' => 'Invitar colaborador',
->>>>>>> cf116f9259f76da7826a63cb0b369ade93ced04b
         ],
 
         'etiquetas_campo' => [
