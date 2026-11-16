@@ -86,6 +86,7 @@ class EntryOpeningFailureTest extends TestCase
         ]))->assertOk();
 
         $this->runOpeningJob();
+        Carbon::setTestNow(Carbon::parse('2026-10-12 10:00:00', config('sciem.zona_horaria')));
         app(ExamLifecycleService::class)->startExpired();
 
         $this->assertNull(app(EntryOpeningFailureStore::class)->get((int) $exam->id_examen));

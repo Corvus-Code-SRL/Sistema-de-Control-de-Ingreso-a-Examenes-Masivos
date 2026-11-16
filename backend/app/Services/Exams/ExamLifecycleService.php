@@ -33,7 +33,7 @@ class ExamLifecycleService
         $this->participants = $participants;
     }
 
-    /** Inicia el examen al abrirse el control, sin cerrarlo. */
+    /** Inicia el examen a la hora programada, sin cerrar el control de ingreso. */
     public function startExpired(?Carbon $now = null): int
     {
         $now = $now ?? Carbon::now(config('sciem.zona_horaria'));
@@ -46,7 +46,7 @@ class ExamLifecycleService
             ->chunkById(100, function ($exams) use ($now, &$started): void {
                 foreach ($exams as $exam) {
                     if ($exam->duracion === null
-                        || $now->lessThan($this->timing->opensAt($exam))
+                        || $now->lessThan($this->timing->startsAt($exam))
                         || $this->timing->hasEnded($exam, $now)) {
                         continue;
                     }
@@ -57,13 +57,13 @@ class ExamLifecycleService
                             if (! in_array($locked->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO], true)
                                 || $locked->duracion === null
                                 || ! CloseOrdinaryEntryService::hasOpened((int) $locked->id_examen)
-                                || $now->lessThan($this->timing->opensAt($locked))
+                                || $now->lessThan($this->timing->startsAt($locked))
                                 || $this->timing->hasEnded($locked, $now)) {
                                 return false;
                             }
 
                             $previousState = $locked->estado;
-                            $startedAt = $this->timing->opensAt($locked)->utc();
+                            $startedAt = $this->timing->startsAt($locked)->utc();
                             $locked->estado = Exam::EN_CURSO;
                             $locked->inicio_real_en = $startedAt;
                             $locked->inicio_automatico = true;

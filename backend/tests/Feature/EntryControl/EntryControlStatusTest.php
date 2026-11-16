@@ -174,7 +174,7 @@ class EntryControlStatusTest extends TestCase
     {
         $this->seedExamCatalog();
 
-        $exam = $this->createExam([], [$this->aulaId]);
+        $exam = $this->createExam([], [$this->aulaId])->fresh();
 
         DB::table('grupo_examen')->insert([
             'id_examen' => $exam->id_examen,
@@ -189,9 +189,12 @@ class EntryControlStatusTest extends TestCase
             ->getJson($url)
             ->assertOk();
 
-        $opensAt = app(\App\Services\Exams\ExamTimingService::class)->opensAt($exam);
-        app(ExamLifecycleService::class)->startExpired($opensAt);
+        $timing = app(\App\Services\Exams\ExamTimingService::class);
+        app(ExamLifecycleService::class)->startExpired($timing->opensAt($exam));
+        $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+        $this->getJson($url)->assertOk();
 
+        app(ExamLifecycleService::class)->startExpired($timing->startsAt($exam));
         $this->assertSame(Exam::EN_CURSO, $exam->fresh()->estado);
         $this->getJson($url)->assertOk();
 
@@ -222,6 +225,8 @@ class EntryControlStatusTest extends TestCase
                 ->assertOk();
 
             app(ExamLifecycleService::class)->startExpired($startsAt->copy()->subMinutes(5));
+            $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+            app(ExamLifecycleService::class)->startExpired($startsAt);
             $this->assertSame(Exam::EN_CURSO, $exam->fresh()->estado);
             $this->getJson("/api/examenes/{$exam->id_examen}/en-curso")->assertOk();
             $this->getJson("/api/control-ingreso/examenes/{$exam->id_examen}/retrasos/solicitudes")

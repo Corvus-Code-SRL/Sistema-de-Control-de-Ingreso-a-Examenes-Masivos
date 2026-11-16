@@ -1257,7 +1257,12 @@ class StudentVerificationTest extends TestCase
             $this->assertTrue(app(EntryControlSnapshotService::class)->ready((int) $exam->id_examen));
             $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
             app(ExamLifecycleService::class)->startExpired();
+            $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+
+            Carbon::setTestNow(Carbon::parse('2026-09-29 12:31:00', config('sciem.zona_horaria')));
+            app(ExamLifecycleService::class)->startExpired();
             $this->assertSame(Exam::EN_CURSO, $exam->fresh()->estado);
+            $this->assertTrue(app(EntryControlSnapshotService::class)->ready((int) $exam->id_examen));
         } finally {
             Carbon::setTestNow();
         }
@@ -1287,7 +1292,12 @@ class StudentVerificationTest extends TestCase
             $this->assertTrue(app(EntryControlSnapshotService::class)->ready((int) $exam->id_examen));
             $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
             app(ExamLifecycleService::class)->startExpired();
+            $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+
+            Carbon::setTestNow(Carbon::parse('2026-09-30 00:30:00', config('sciem.zona_horaria')));
+            app(ExamLifecycleService::class)->startExpired();
             $this->assertSame(Exam::EN_CURSO, $exam->fresh()->estado);
+            $this->assertTrue(app(EntryControlSnapshotService::class)->ready((int) $exam->id_examen));
         } finally {
             Carbon::setTestNow();
         }
