@@ -294,6 +294,13 @@ export const NAVIGATION: readonly NavSection[] = [
         label: 'Invitaciones a otros exámenes',
         icon: MailOpen,
         capability: 'examenes.gestionar'
+      },
+      {
+        id: 'teacher-upload-eligible',
+        label: 'Habilitar estudiantes',
+        icon: UserCheck,
+        capability: 'examenes.gestionar',
+        to: '/examenes/habilitados'
       }
     ]
   },
