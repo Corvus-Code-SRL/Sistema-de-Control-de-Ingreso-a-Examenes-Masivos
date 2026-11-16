@@ -281,12 +281,6 @@ export const NAVIGATION: readonly NavSection[] = [
         capability: 'auxiliares.examen'
       },
       {
-        id: 'teacher-upload-eligible',
-        label: 'Cargar nómina de habilitados',
-        icon: FileUp,
-        capability: 'examenes.gestionar'
-      },
-      {
         id: 'teacher-invite-collaborators',
         label: 'Invitar docentes colaboradores',
         icon: UserRoundPlus,
