@@ -129,7 +129,7 @@ class AssistantGroupRemovalTest extends TestCase
 
         DB::table('examen')
             ->where('id_examen', $this->examId)
-            ->update(['estado' => $state]);
+            ->update($this->assistantExamState($state));
 
         $this->removeFromGroup($this->grupoPropioId)->assertOk();
 
@@ -153,18 +153,20 @@ class AssistantGroupRemovalTest extends TestCase
     public function startedStates(): array
     {
         return [
-            'EN_INGRESO' => [Exam::EN_INGRESO],
+            'INGRESO_ABIERTO' => ['INGRESO_ABIERTO'],
             'EN_CURSO' => [Exam::EN_CURSO],
         ];
     }
 
-    public function test_un_examen_en_ingreso_con_otro_grupo_vinculado_no_bloquea_la_baja(): void
+    public function test_un_examen_con_el_ingreso_abierto_y_otro_grupo_vinculado_no_bloquea_la_baja(): void
     {
         DB::table('grupo_examen')->insert(['id_grupo' => $this->segundoGrupoPropioId, 'id_examen' => $this->examId]);
         $this->putInGroup($this->auxiliarId, $this->grupoPropioId);
         $this->putInGroup($this->auxiliarId, $this->segundoGrupoPropioId);
         $this->enableInExam($this->auxiliarId, $this->examId);
-        DB::table('examen')->where('id_examen', $this->examId)->update(['estado' => Exam::EN_INGRESO]);
+        DB::table('examen')
+            ->where('id_examen', $this->examId)
+            ->update($this->assistantExamState('INGRESO_ABIERTO'));
 
         $this->removeFromGroup($this->grupoPropioId)->assertOk();
 

@@ -113,7 +113,7 @@ class ExamHistoryService
             ->where('l.tabla_afectada', 'examen')
             ->whereRaw("l.nuevo_valor->>'id_examen' = ?", [(string) $exam->id_examen])
             ->where(function ($query) {
-                $query->whereRaw("l.nuevo_valor->>'evento' = ?", ['APERTURA_CONTROL'])
+                $query->whereRaw("l.nuevo_valor->>'evento' = ?", ['CIERRE_INGRESO_ORDINARIO'])
                     ->orWhere(function ($closing) {
                         $closing->where('ac.operacion', 'FINALIZAR')
                             ->whereRaw("l.nuevo_valor->>'estado' = ?", [Exam::FINALIZADO]);
@@ -126,19 +126,44 @@ class ExamHistoryService
 
         $timeline = $transitions->map(function ($log) use ($exam) {
             $after = json_decode($log->nuevo_valor, true) ?? [];
-            $opening = ($after['evento'] ?? null) === 'APERTURA_CONTROL';
+            if (($after['evento'] ?? null) === 'CIERRE_INGRESO_ORDINARIO') {
+                return [
+                    'tipo' => 'cierre_ingreso',
+                    'fecha_hora' => $exam->ingreso_ordinario_cerrado_en?->toIso8601String() ?? $log->fecha_hora,
+                    'descripcion' => 'Cierre del ingreso ordinario',
+                    'detalle' => $log->actor ?: 'Responsable no registrado',
+                ];
+            }
+
             $automatic = $exam->fin_real_en !== null
                 ? $exam->fin_automatico
                 : ($after['tipo_finalizacion'] ?? null) === 'AUTOMATICA';
             return [
-                'tipo' => $opening ? 'apertura' : 'fin',
-                'fecha_hora' => $opening
-                    ? $log->fecha_hora
-                    : ($exam->fin_real_en?->toIso8601String() ?? $log->fecha_hora),
-                'descripcion' => $opening ? 'Se abrió el control de ingreso' : 'Examen terminado',
-                'detalle' => $opening || $automatic ? 'Automático' : ($log->actor ?: 'Responsable no registrado'),
+                'tipo' => 'fin',
+                'fecha_hora' => $exam->fin_real_en?->toIso8601String() ?? $log->fecha_hora,
+                'descripcion' => 'Examen terminado',
+                'detalle' => $automatic ? 'Automático' : ($log->actor ?: 'Responsable no registrado'),
             ];
         });
+        if ($exam->ingreso_abierto_en !== null) {
+            $timeline->push([
+                'tipo' => 'apertura',
+                'fecha_hora' => $exam->ingreso_abierto_en->toIso8601String(),
+                'descripcion' => 'Apertura del control',
+                'detalle' => 'Automático',
+            ]);
+        }
+        $closingLogged = $transitions->contains(
+            fn ($log) => (json_decode($log->nuevo_valor, true)['evento'] ?? null) === 'CIERRE_INGRESO_ORDINARIO'
+        );
+        if ($exam->ingreso_ordinario_cerrado_en !== null && ! $closingLogged) {
+            $timeline->push([
+                'tipo' => 'cierre_ingreso',
+                'fecha_hora' => $exam->ingreso_ordinario_cerrado_en->toIso8601String(),
+                'descripcion' => 'Cierre del ingreso ordinario',
+                'detalle' => 'Al terminar el examen',
+            ]);
+        }
         if ($exam->fin_real_en !== null && ! $transitions->contains('operacion', 'FINALIZAR')) {
             $timeline->push([
                 'tipo' => 'fin',
@@ -171,32 +196,16 @@ class ExamHistoryService
                 . ($report->reportante ? ' · Reportó: ' . $report->reportante : ' · Reportante no registrado'),
         ]));
 
-        $startedAt = $exam->inicio_real_en ?? Carbon::createFromFormat(
+        $scheduledStart = Carbon::createFromFormat(
             'Y-m-d H:i',
             $exam->fecha->format('Y-m-d') . ' ' . substr($exam->hora_inicio, 0, 5),
             config('sciem.zona_horaria')
         );
-        $hasActualStart = $exam->inicio_real_en !== null;
-        $startActor = null;
-        if ($hasActualStart && ! $exam->inicio_automatico) {
-            $startActor = DB::table('log as l')
-                ->join('accion as ac', 'ac.id_accion', '=', 'l.id_accion')
-                ->leftJoin('usuario as actor', 'actor.id_usuario', '=', 'l.id_usuario')
-                ->where('l.tabla_afectada', 'examen')
-                ->where('ac.operacion', 'INICIAR')
-                ->whereRaw("l.nuevo_valor->>'id_examen' = ?", [(string) $exam->id_examen])
-                ->whereRaw("l.nuevo_valor->>'tipo_inicio' = ?", ['MANUAL'])
-                ->orderByDesc('l.fecha_hora')
-                ->selectRaw("TRIM(CONCAT_WS(' ', actor.nombre, actor.apellido_paterno, actor.apellido_materno)) as actor")
-                ->value('actor');
-        }
         $timeline->push([
             'tipo' => 'inicio',
-            'fecha_hora' => $startedAt->toIso8601String(),
-            'descripcion' => $hasActualStart ? 'Examen iniciado' : 'Inicio programado del examen',
-            'detalle' => $hasActualStart
-                ? ($exam->inicio_automatico ? 'Automático' : ($startActor ?: 'Responsable no registrado'))
-                : 'Horario previsto',
+            'fecha_hora' => $scheduledStart->toIso8601String(),
+            'descripcion' => 'Inicio programado del examen',
+            'detalle' => 'Horario previsto',
         ]);
         $timeline = $timeline
             ->sortBy(fn (array $event) => Carbon::parse($event['fecha_hora'])->getTimestamp())
@@ -235,8 +244,8 @@ class ExamHistoryService
             'fecha' => $exam->fecha->format('Y-m-d'),
             'materia' => $exam->subject?->nombre,
             'total_estudiantes' => $counts['esperados'],
-            'inicio_real_en' => $exam->inicio_real_en?->toIso8601String(),
-            'inicio_automatico' => (bool) $exam->inicio_automatico,
+            'inicio_programado' => $scheduledStart->toIso8601String(),
+            'ingreso_abierto_en' => $exam->ingreso_abierto_en?->toIso8601String(),
             'fin_real_en' => $exam->fin_real_en?->toIso8601String(),
             'fin_automatico' => (bool) $exam->fin_automatico,
             'totales' => [

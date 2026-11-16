@@ -74,7 +74,8 @@ class FinalReportService
             'materia' => $exam->subject?->nombre,
             'docente' => $teacher ? trim("{$teacher->nombre} {$teacher->apellido_paterno}") : null,
             'fecha' => $exam->fecha->toDateString(),
-            'hora_inicio' => $this->realOrScheduledTime($exam->inicio_real_en, $exam->hora_inicio, $timezone),
+            'hora_inicio' => $this->shortTime($exam->hora_inicio),
+            'hora_apertura' => $exam->ingreso_abierto_en?->copy()->setTimezone($timezone)->format('H:i'),
             'hora_fin' => $this->realOrScheduledTime($exam->fin_real_en, $exam->hora_fin, $timezone),
             'generado_en' => Carbon::now($timezone)->toIso8601String(),
         ];

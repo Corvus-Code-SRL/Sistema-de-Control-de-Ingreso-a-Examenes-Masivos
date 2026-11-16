@@ -7,7 +7,6 @@ use App\Http\Requests\Exams\CancelExamRequest;
 use App\Http\Requests\Exams\CreateExamRequest;
 use App\Http\Requests\Exams\FinishExamRequest;
 use App\Http\Requests\Exams\IndexExamRequest;
-use App\Http\Requests\Exams\StartExamRequest;
 use App\Http\Requests\Exams\UpdateExamRequest;
 use App\Http\Resources\Exams\ClassroomResource;
 use App\Http\Resources\Exams\ExamResource;
@@ -49,7 +48,7 @@ class ExamController extends Controller
 
     /**
      * GET /api/examenes — los exámenes del docente actual. Con `?vista=programados` (vista
-     * Programados) solo los vigentes: PROGRAMADO o EN_INGRESO del período activo.
+     * Programados) solo los vigentes: PROGRAMADO del período activo.
      */
     public function index(IndexExamRequest $request): JsonResponse
     {
@@ -90,14 +89,6 @@ class ExamController extends Controller
         $exam = $this->examService->cancel($exam, $this->currentUser->teacherId());
 
         return ApiResponse::success(new ExamResource($exam), 'Examen cancelado correctamente.');
-    }
-
-    /** POST /api/examenes/{exam}/iniciar */
-    public function start(StartExamRequest $request, Exam $exam, ExamLifecycleService $lifecycle): JsonResponse
-    {
-        $exam = $lifecycle->startManually($exam, $this->currentUser->teacherId());
-
-        return ApiResponse::success(new ExamResource($exam), 'Examen iniciado correctamente.');
     }
 
     /** POST /api/examenes/{exam}/finalizar */

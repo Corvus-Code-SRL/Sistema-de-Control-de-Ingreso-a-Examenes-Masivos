@@ -11,21 +11,20 @@ class ExamTimingService
     public function startsAt(Exam $exam): Carbon
     {
         return Carbon::createFromFormat(
-            'Y-m-d H:i',
+            '!Y-m-d H:i',
             $exam->fecha->toDateString().' '.substr($exam->hora_inicio, 0, 5),
             config('sciem.zona_horaria')
         );
     }
 
+    public function opensAt(Exam $exam): Carbon
+    {
+        return $this->startsAt($exam)->subMinutes((int) $exam->minutos_apertura);
+    }
+
     public function endsAt(Exam $exam): Carbon
     {
         return $this->startsAt($exam)->addMinutes((int) $exam->duracion);
-    }
-
-    /** Hito de inicio automático: diez minutos después del inicio programado. */
-    public function startsAutomaticallyAt(Exam $exam): Carbon
-    {
-        return $this->startsAt($exam)->addMinutes(10);
     }
 
     public function finishesAutomaticallyAt(Exam $exam): Carbon

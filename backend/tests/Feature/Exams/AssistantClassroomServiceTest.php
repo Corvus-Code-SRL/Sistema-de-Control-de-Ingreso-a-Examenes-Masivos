@@ -76,8 +76,8 @@ class AssistantClassroomServiceTest extends TestCase
         $queries = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        // Auxiliares, sus usuarios, sus ambientes y los ambientes del examen.
-        $this->assertLessThanOrEqual(4, $queries);
+        // Auxiliares, usuarios, ambientes y apertura auditada del control.
+        $this->assertLessThanOrEqual(5, $queries);
     }
 
     public function test_repetir_el_mismo_ambiente_no_registra_otra_vez_en_bitacora(): void
@@ -132,8 +132,8 @@ class AssistantClassroomServiceTest extends TestCase
 
     public function test_bloquea_los_cambios_desde_que_se_abre_el_control_de_ingreso(): void
     {
-        foreach ([Exam::EN_INGRESO, Exam::EN_CURSO, Exam::FINALIZADO, Exam::CANCELADO] as $status) {
-            $exam = $this->examWithAssistants(['estado' => $status], $this->aulaId);
+        foreach (['INGRESO_ABIERTO', Exam::EN_CURSO, Exam::FINALIZADO, Exam::CANCELADO] as $status) {
+            $exam = $this->examWithAssistants($this->examStateAttributes($status), $this->aulaId);
 
             try {
                 $this->service->assign($exam, $this->mariaId, $this->otraAulaId, $this->docenteId);
@@ -162,7 +162,7 @@ class AssistantClassroomServiceTest extends TestCase
         $this->assertCount(0, $this->service->listForAssistant('33333333-3333-4333-8333-000000000099'));
     }
 
-    public function test_el_auxiliar_ve_examenes_en_ingreso_y_en_curso_ordenados_por_hora(): void
+    public function test_el_auxiliar_ve_examenes_con_el_ingreso_abierto_y_en_curso_ordenados_por_hora(): void
     {
         $date = $this->futureDate(5);
         $afternoon = $this->examWithAssistants([
@@ -170,11 +170,10 @@ class AssistantClassroomServiceTest extends TestCase
             'hora_inicio' => '14:00',
             'estado' => Exam::EN_CURSO,
         ]);
-        $morning = $this->examWithAssistants([
+        $morning = $this->examWithAssistants(array_merge([
             'fecha' => $date,
             'hora_inicio' => '08:00',
-            'estado' => Exam::EN_INGRESO,
-        ]);
+        ], $this->examStateAttributes('INGRESO_ABIERTO')));
         $finished = $this->examWithAssistants([
             'fecha' => $date,
             'hora_inicio' => '11:00',

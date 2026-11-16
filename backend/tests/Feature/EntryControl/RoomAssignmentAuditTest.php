@@ -6,6 +6,7 @@ use App\Exceptions\EntryControl\EntryOpeningException;
 use App\Models\Action;
 use App\Models\AuditLog;
 use App\Models\Exam;
+use App\Services\EntryControl\CloseOrdinaryEntryService;
 use App\Services\EntryControl\RoomAssignmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -36,11 +37,27 @@ class RoomAssignmentAuditTest extends TestCase
         $this->assertSame('MODIFICAR', Action::query()->whereKey($logs[0]->id_accion)->value('operacion'));
         $this->assertSame('APERTURA_CONTROL', $logs[0]->nuevo_valor['evento']);
         $this->assertSame($this->docenteId, $logs[0]->id_usuario);
-        $this->assertSame(Exam::EN_INGRESO, $exam->fresh()->estado);
+        $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+        $openedAt = $exam->fresh()->ingreso_abierto_en;
+        $this->assertNotNull($openedAt);
+        $this->assertTrue(CloseOrdinaryEntryService::hasOpened((int) $exam->id_examen));
 
-        // Reintento con el examen ya EN_INGRESO: no duplica la auditoría.
+        // Reintento con el ingreso ya abierto: no duplica la auditoría.
         app(RoomAssignmentService::class)->prepare((int) $exam->id_examen);
         $this->assertSame(1, AuditLog::query()->where('tabla_afectada', 'examen')->count());
+        $this->assertTrue($openedAt->equalTo($exam->fresh()->ingreso_abierto_en));
+    }
+
+    public function test_la_apertura_persiste_aunque_la_bitacora_no_este_disponible(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::PROGRAMADO], [$this->aulaId]);
+        DB::table('grupo_examen')->insert(['id_examen' => $exam->id_examen, 'id_grupo' => $this->grupoPropioId]);
+
+        app(RoomAssignmentService::class)->prepare((int) $exam->id_examen);
+        AuditLog::query()->where('tabla_afectada', 'examen')->delete();
+
+        $this->assertTrue(CloseOrdinaryEntryService::hasOpened((int) $exam->id_examen));
+        $this->assertTrue(app(\App\Services\Exams\ExamRosterLockService::class)->isLocked($this->grupoPropioId));
     }
 
     public function test_una_apertura_fallida_no_deja_auditoria_ni_cambia_el_estado(): void
@@ -59,5 +76,7 @@ class RoomAssignmentAuditTest extends TestCase
         $this->assertTrue($failed, 'la apertura debía fallar por falta de ambientes');
         $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
         $this->assertSame(0, AuditLog::query()->where('tabla_afectada', 'examen')->count());
+        $this->assertNull($exam->fresh()->ingreso_abierto_en);
+        $this->assertFalse(CloseOrdinaryEntryService::hasOpened((int) $exam->id_examen));
     }
 }

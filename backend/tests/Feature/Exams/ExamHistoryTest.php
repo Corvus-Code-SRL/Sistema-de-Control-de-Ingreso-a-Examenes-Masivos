@@ -3,6 +3,7 @@
 namespace Tests\Feature\Exams;
 
 use App\Models\Exam;
+use App\Services\EntryControl\RoomAssignmentService;
 use App\Services\Security\AuditLogService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -23,7 +24,10 @@ class ExamHistoryTest extends TestCase
 
     public function test_lista_y_resumen_solo_de_examenes_finalizados_propios(): void
     {
-        $exam = $this->createExam(['nombre_examen' => 'Parcial propio', 'estado' => Exam::FINALIZADO], [$this->aulaId]);
+        $exam = $this->createExam(
+            array_merge(['nombre_examen' => 'Parcial propio', 'estado' => Exam::FINALIZADO], $this->entryOpen(true)),
+            [$this->aulaId]
+        );
         $foreign = $this->createExam(['estado' => Exam::FINALIZADO, 'id_usuario_docente' => $this->otroDocenteId]);
         $scheduled = $this->createExam(['estado' => Exam::PROGRAMADO]);
         DB::table('grupo_examen')->insert(['id_examen' => $exam->id_examen, 'id_grupo' => $this->grupoPropioId]);
@@ -43,11 +47,6 @@ class ExamHistoryTest extends TestCase
         }
 
         $audit = app(AuditLogService::class);
-        $audit->registrar('MODIFICAR', 'examen', null, [
-            'id_examen' => $exam->id_examen,
-            'estado' => Exam::EN_INGRESO,
-            'evento' => 'APERTURA_CONTROL',
-        ], $this->docenteId);
         $audit->registrar('FINALIZAR', 'examen', null, [
             'id_examen' => $exam->id_examen,
             'estado' => Exam::FINALIZADO,
@@ -63,6 +62,7 @@ class ExamHistoryTest extends TestCase
             ->assertJsonPath('data.ambientes.0.presentes', 1);
         $types = array_column($summary->json('data.linea_tiempo'), 'tipo');
         $this->assertContains('apertura', $types);
+        $this->assertContains('cierre_ingreso', $types);
         $this->assertContains('inicio', $types);
         $this->assertNotContains('ingreso', $types, 'los ingresos puntuales no se listan');
         $this->assertContains('fin', $types);
@@ -74,48 +74,48 @@ class ExamHistoryTest extends TestCase
         $this->getJson('/api/historial/examenes/' . $scheduled->id_examen)->assertNotFound();
     }
 
-    public function test_muestra_inicio_real_manual_registrado_por_hu_038(): void
+    public function test_el_inicio_automatico_no_registra_inicio_real_y_se_muestra_el_horario_programado(): void
     {
-        $exam = $this->createExam(['estado' => Exam::EN_INGRESO]);
-
-        $this->postJson('/api/examenes/' . $exam->id_examen . '/iniciar')->assertOk();
+        $exam = $this->createExam(['estado' => Exam::PROGRAMADO], [$this->aulaId]);
+        DB::table('grupo_examen')->insert(['id_examen' => $exam->id_examen, 'id_grupo' => $this->grupoPropioId]);
+        app(RoomAssignmentService::class)->prepare((int) $exam->id_examen);
+        $startsAt = app(\App\Services\Exams\ExamTimingService::class)->startsAt($exam);
+        app(\App\Services\Exams\ExamLifecycleService::class)->startExpired($startsAt);
         $this->postJson('/api/examenes/' . $exam->id_examen . '/finalizar')->assertOk();
 
-        $startedAt = $exam->fresh()->inicio_real_en;
-        $this->assertNotNull($startedAt);
+        $fresh = $exam->fresh();
+        $this->assertNull($fresh->inicio_real_en);
+        $this->assertNotNull($fresh->ingreso_abierto_en);
+        $this->assertNotNull($fresh->ingreso_ordinario_cerrado_en);
         $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)
             ->assertOk()
-            ->assertJsonPath('data.inicio_real_en', $startedAt->toIso8601String())
-            ->assertJsonPath('data.inicio_automatico', false);
+            ->assertJsonPath('data.ingreso_abierto_en', $fresh->ingreso_abierto_en->toIso8601String());
+        $this->assertArrayNotHasKey('inicio_real_en', $summary->json('data'));
+        $this->assertArrayNotHasKey('inicio_automatico', $summary->json('data'));
 
-        $starts = collect($summary->json('data.linea_tiempo'))->where('tipo', 'inicio')->values();
+        $timeline = collect($summary->json('data.linea_tiempo'));
+        $starts = $timeline->where('tipo', 'inicio')->values();
         $this->assertCount(1, $starts);
-        $this->assertSame('Examen iniciado', $starts[0]['descripcion']);
-        $this->assertSame('Ana Rojas', $starts[0]['detalle']);
-        $this->assertSame(
-            $startedAt->setTimezone(config('sciem.zona_horaria'))->format('Y-m-d H:i:s'),
-            $starts[0]['fecha_hora']
-        );
+        $this->assertSame('Inicio programado del examen', $starts[0]['descripcion']);
+        $this->assertSame('Horario previsto', $starts[0]['detalle']);
+        $this->assertSame('Apertura del control', $timeline->firstWhere('tipo', 'apertura')['descripcion']);
+        $closing = $timeline->firstWhere('tipo', 'cierre_ingreso');
+        $this->assertSame('Cierre del ingreso ordinario', $closing['descripcion']);
+        $this->assertSame('Al terminar el examen', $closing['detalle']);
     }
 
-    public function test_muestra_inicio_real_automatico_sin_duplicar_el_hito(): void
+    public function test_un_inicio_real_antiguo_no_reemplaza_al_horario_programado(): void
     {
         $exam = $this->createExam(['fecha' => '2026-10-28', 'estado' => Exam::FINALIZADO]);
-        $startedAt = Carbon::parse('2026-10-28 08:10:00', config('sciem.zona_horaria'));
-        $exam->forceFill([
-            'inicio_real_en' => $startedAt->copy()->utc(),
-            'inicio_automatico' => true,
-        ])->save();
+        $exam->forceFill(['inicio_real_en' => '2026-10-28 12:10:00+00', 'inicio_automatico' => true])->save();
 
-        $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)
-            ->assertOk()
-            ->assertJsonPath('data.inicio_automatico', true);
+        $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)->assertOk();
+        $this->assertArrayNotHasKey('inicio_real_en', $summary->json('data'));
 
         $starts = collect($summary->json('data.linea_tiempo'))->where('tipo', 'inicio')->values();
         $this->assertCount(1, $starts);
-        $this->assertSame('Examen iniciado', $starts[0]['descripcion']);
-        $this->assertSame('Automático', $starts[0]['detalle']);
-        $this->assertSame('2026-10-28 08:10:00', $starts[0]['fecha_hora']);
+        $this->assertSame('Inicio programado del examen', $starts[0]['descripcion']);
+        $this->assertSame('2026-10-28 08:00:00', $starts[0]['fecha_hora']);
     }
 
     public function test_usa_fin_real_y_tipo_automatico_sin_duplicar_el_cierre(): void
@@ -228,8 +228,8 @@ class ExamHistoryTest extends TestCase
         ], [$this->aulaId]);
         $zone = config('sciem.zona_horaria');
         $exam->forceFill([
-            'inicio_real_en' => Carbon::parse('2026-10-28 08:00:00', $zone)->utc(),
-            'inicio_automatico' => false,
+            'ingreso_abierto_en' => Carbon::parse('2026-10-28 07:30:00', $zone)->utc(),
+            'ingreso_ordinario_cerrado_en' => Carbon::parse('2026-10-28 08:15:00', $zone)->utc(),
             'fin_real_en' => Carbon::parse('2026-10-28 09:30:00', $zone)->utc(),
             'fin_automatico' => false,
         ])->save();
@@ -263,8 +263,7 @@ class ExamHistoryTest extends TestCase
         ]);
         $audit = app(AuditLogService::class);
         foreach ([
-            ['MODIFICAR', '07:30:00', ['evento' => 'APERTURA_CONTROL']],
-            ['INICIAR', '08:00:00', ['tipo_inicio' => 'MANUAL']],
+            ['MODIFICAR', '08:15:00', ['evento' => 'CIERRE_INGRESO_ORDINARIO']],
             ['FINALIZAR', '09:30:00', []],
         ] as [$action, $hour, $extra]) {
             $audit->registrar($action, 'examen', null, array_merge([
@@ -285,15 +284,16 @@ class ExamHistoryTest extends TestCase
             ->assertJsonPath('data.ambientes.0.auxiliares.0', 'Ana Rojas');
         $timeline = $summary->json('data.linea_tiempo');
         $this->assertSame(
-            ['apertura', 'inicio', 'incidencia', 'retraso', 'fin'],
+            ['apertura', 'inicio', 'incidencia', 'cierre_ingreso', 'retraso', 'fin'],
             array_column($timeline, 'tipo')
         );
         $this->assertSame('Automático', $timeline[0]['detalle']);
-        $this->assertSame('Ana Rojas', $timeline[1]['detalle']);
+        $this->assertSame('Horario previsto', $timeline[1]['detalle']);
         $this->assertStringContainsString('Reportó: Ana Rojas', $timeline[2]['detalle']);
-        $this->assertSame('08:20:00', substr($timeline[3]['fecha_hora'], 11));
-        $this->assertSame('Registró: Ana Rojas', $timeline[3]['detalle']);
-        $this->assertSame('Ana Rojas', $timeline[4]['detalle']);
+        $this->assertSame('Ana Rojas', $timeline[3]['detalle']);
+        $this->assertSame('08:20:00', substr($timeline[4]['fecha_hora'], 11));
+        $this->assertSame('Registró: Ana Rojas', $timeline[4]['detalle']);
+        $this->assertSame('Ana Rojas', $timeline[5]['detalle']);
     }
 
     public function test_la_linea_de_tiempo_distingue_la_incidencia_retirada_de_la_central(): void

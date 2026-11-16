@@ -44,6 +44,12 @@ class EntryControlSnapshotService
         $membersByStudent = $this->memberships($examId);
         $assignedRooms = self::assignRooms(array_keys($membersByStudent), $rooms);
         $entries = $this->entries($examId);
+        $pendingReports = DB::table('reporte_estudiante')
+            ->where('id_examen', $examId)
+            ->where('origen', 'CONTROL_INGRESO')
+            ->where('estado', 'PENDIENTE')
+            ->get(['id_reporte_est', 'id_estudiante'])
+            ->groupBy('id_estudiante');
         $risks = $this->riskCenter->summariesForSnapshot(array_keys($membersByStudent));
         $career = $this->careerName($exam);
 
@@ -85,7 +91,6 @@ class EntryControlSnapshotService
 
         $meta = [
             'id_examen' => $examId,
-            'estado' => Exam::EN_INGRESO,
             'carrera' => $career,
             'ambientes' => $rooms,
             'controladores' => $controllers,
@@ -97,6 +102,10 @@ class EntryControlSnapshotService
         $students = $this->students(array_keys($membersByStudent));
         $search = [];
         $values = [$this->key($examId, $token, 'meta') => $meta];
+        foreach ($pendingReports as $studentId => $reports) {
+            $values[$this->key($examId, $token, 'pending-report', (int) $studentId)] =
+                $reports->pluck('id_reporte_est')->map(fn ($id) => (int) $id)->all();
+        }
         foreach ($assistantRecords as $sisHash => $assistant) {
             $values[$this->key($examId, $token, 'assistant', $sisHash)] = $assistant;
         }
@@ -275,6 +284,36 @@ class EntryControlSnapshotService
         $student = $this->cache()->get($this->key($examId, $token, 'student', $studentId));
 
         return is_array($student) ? $student : null;
+    }
+
+    public function hasPendingReport(int $examId, int $studentId): bool
+    {
+        $token = $this->activeTokenOrFail($examId);
+
+        return $this->cache()->get($this->key($examId, $token, 'pending-report', $studentId), []) !== [];
+    }
+
+    public function setPendingReport(int $examId, int $studentId, int $reportId, bool $pending): void
+    {
+        $token = $this->activeToken($examId);
+        if ($token === null) {
+            return;
+        }
+
+        $this->cache()->lock($this->key($examId, $token, 'update-lock'), 5)->block(3, function () use (
+            $examId, $token, $studentId, $reportId, $pending
+        ): void {
+            $key = $this->key($examId, $token, 'pending-report', $studentId);
+            $reports = $this->cache()->get($key, []);
+            $reports = array_values(array_diff($reports, [$reportId]));
+            if ($pending) {
+                $reports[] = $reportId;
+            }
+            $meta = $this->cache()->get($this->key($examId, $token, 'meta'));
+            if (is_array($meta)) {
+                $this->cache()->put($key, $reports, Carbon::parse($meta['expira_en']));
+            }
+        });
     }
 
     public function search(int $examId, User $actor, string $name): array
@@ -460,13 +499,13 @@ class EntryControlSnapshotService
      */
     public function refreshBackground(int $studentId): int
     {
-        $examIds = DB::table('grupo_estudiante as gs')
-            ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
-            ->join('examen as e', 'e.id_examen', '=', 'gx.id_examen')
-            ->where('gs.id_estudiante', $studentId)
-            ->where('e.estado', Exam::EN_INGRESO)
-            ->distinct()
-            ->pluck('gx.id_examen');
+        $examIds = CloseOrdinaryEntryService::constrainToOpen(
+            DB::table('grupo_estudiante as gs')
+                ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
+                ->join('examen as e', 'e.id_examen', '=', 'gx.id_examen')
+                ->where('gs.id_estudiante', $studentId),
+            'e.'
+        )->distinct()->pluck('gx.id_examen');
 
         $refreshed = 0;
         foreach ($examIds as $examId) {
@@ -509,7 +548,7 @@ class EntryControlSnapshotService
     {
         $token = $this->activeTokenOrFail($examId);
         $meta = $this->cache()->get($this->key($examId, $token, 'meta'));
-        if (! is_array($meta) || $meta['estado'] !== Exam::EN_INGRESO) {
+        if (! is_array($meta)) {
             abort(409, 'El control de ingreso del examen no está abierto.');
         }
 

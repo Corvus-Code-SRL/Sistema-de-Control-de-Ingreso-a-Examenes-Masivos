@@ -68,7 +68,7 @@ class InProgressIncidentWorkspaceTest extends TestCase
 
     public function testListsOnlyInProgressExamsOfTheTeacher(): void
     {
-        $scheduled = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId]);
+        $scheduled = $this->createExam($this->examStateAttributes('INGRESO_ABIERTO'), [$this->aulaId]);
         $finished = $this->createExam(['estado' => Exam::FINALIZADO], [$this->aulaId]);
 
         $ids = collect($this->getJson($this->examsUrl())->assertOk()->json('data'))->pluck('id_examen')->all();
@@ -89,9 +89,9 @@ class InProgressIncidentWorkspaceTest extends TestCase
 
     public function testListAcceptsNoStateFilterBeyondInProgress(): void
     {
-        $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId]);
+        $this->createExam($this->examStateAttributes('INGRESO_ABIERTO'), [$this->aulaId]);
 
-        $this->getJson($this->examsUrl() . '?estado=EN_INGRESO')->assertOk()
+        $this->getJson($this->examsUrl() . '?estado=PROGRAMADO')->assertOk()
             ->assertJsonCount(1, 'data')->assertJsonPath('data.0.estado', Exam::EN_CURSO);
     }
 

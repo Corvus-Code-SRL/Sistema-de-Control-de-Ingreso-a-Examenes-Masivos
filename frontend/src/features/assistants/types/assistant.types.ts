@@ -120,7 +120,7 @@ export interface ExamAssistantsData {
 }
 
 /** Estados en los que un examen todavía aparece al auxiliar: el backend no envía otros. */
-export type AssistantExamStatus = 'PROGRAMADO' | 'EN_INGRESO' | 'EN_CURSO'
+export type AssistantExamStatus = 'PROGRAMADO' | 'EN_CURSO'
 
 /** Examen que controla el auxiliar, con el ambiente que le asignó el docente (HU-09). */
 export interface AssistantExam {
@@ -130,6 +130,8 @@ export interface AssistantExam {
   hora_inicio: string | null
   hora_fin: string | null
   estado: AssistantExamStatus
+  /** Control abierto: con apertura, sin cierre ordinario y el examen PROGRAMADO o EN_CURSO. */
+  control_ingreso_abierto?: boolean
   materia: string | null
   ambiente: ExamClassroom | null
   /**

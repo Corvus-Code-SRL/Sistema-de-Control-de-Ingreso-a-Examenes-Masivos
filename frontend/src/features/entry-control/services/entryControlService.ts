@@ -18,6 +18,10 @@ export const entryControlService = {
     return response.data
   },
 
+  async closeOrdinary(examId: number): Promise<void> {
+    await apiPost(`${base(examId)}/cerrar-ingreso-ordinario`, {})
+  },
+
   async status(examId: number, version?: string, signal?: AbortSignal): Promise<StatusResponse> {
     const response = await apiClient<DataResponse<StatusResponse>>(`${base(examId)}/estado`, {
       query: { desde: version }, signal,

@@ -190,7 +190,7 @@ class InProgressIncidentTest extends TestCase
 
     public static function closedStates(): array
     {
-        return [[Exam::PROGRAMADO], [Exam::EN_INGRESO], [Exam::FINALIZADO]];
+        return [[Exam::PROGRAMADO], [Exam::FINALIZADO]];
     }
 
     public function testExpulsionPreservesIngressAndRemovesStudentFromPresentTotals(): void

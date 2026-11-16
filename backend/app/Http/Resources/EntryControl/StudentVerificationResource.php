@@ -21,6 +21,7 @@ class StudentVerificationResource extends JsonResource
             'ambiente_asignado' => $this['ambiente_asignado'],
             'antecedentes' => $this['antecedentes'],
             'ingreso_previo' => $this['ingreso_previo'],
+            'reporte_pendiente' => $this['reporte_pendiente'] ?? false,
         ];
     }
 }

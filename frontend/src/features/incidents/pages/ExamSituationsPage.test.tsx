@@ -21,7 +21,7 @@ const base: SituationWorkspace = {
 const CLOSED_MESSAGE = 'Solo se pueden registrar situaciones con el ingreso abierto o con el examen en curso.'
 const emptyHistory = { data: [], meta: { current_page: 1, last_page: 1, total: 0 } }
 
-type ExamState = 'EN_INGRESO' | 'EN_CURSO'
+type ExamState = 'PROGRAMADO' | 'EN_CURSO'
 
 function setup(options: {
   state?: ExamState; assistant?: boolean; denied?: boolean; noExams?: boolean; extraExams?: SituationExam[]
@@ -177,20 +177,20 @@ describe('Acceso independiente HU-057', () => {
     expect(screen.queryByRole('combobox', { name: 'Estado del examen' })).not.toBeInTheDocument()
   })
 
-  it('el selector lista exámenes en ingreso y en curso con su estado, sin opción de finalizados', async () => {
+  it('el selector lista exámenes con el ingreso abierto y en curso con su estado, sin opción de finalizados', async () => {
     setup({
-      state: 'EN_INGRESO',
+      state: 'PROGRAMADO',
       extraExams: [{ id_examen: 11, nombre_examen: 'Segundo parcial', fecha: '2026-10-30', estado: 'EN_CURSO' }],
     })
     const user = userEvent.setup()
     await user.click(await screen.findByRole('combobox', { name: 'Examen' }))
-    expect(await screen.findByRole('option', { name: /Primer parcial · 2026-10-29 · En ingreso/ })).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: /Primer parcial · 2026-10-29 · Ingreso abierto/ })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: /Segundo parcial · 2026-10-30 · En curso/ })).toBeInTheDocument()
     expect(screen.queryByText(/Finalizados/)).not.toBeInTheDocument()
   })
 
   it('durante el ingreso permite buscar y registrar un cambio de ambiente', async () => {
-    const api = setup({ state: 'EN_INGRESO' })
+    const api = setup({ state: 'PROGRAMADO' })
     const user = userEvent.setup()
     await selectExam(user)
     expect(await screen.findByText('José Pérez')).toBeInTheDocument()

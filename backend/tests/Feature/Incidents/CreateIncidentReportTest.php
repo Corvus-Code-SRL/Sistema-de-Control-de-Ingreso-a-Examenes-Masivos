@@ -37,7 +37,7 @@ class CreateIncidentReportTest extends TestCase
         $this->seed(IncidentTypeSeeder::class);
         Storage::fake('local');
         Storage::fake('public');
-        $this->exam = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId, $this->otraAulaId]);
+        $this->exam = $this->createExam($this->examStateAttributes('INGRESO_ABIERTO'), [$this->aulaId, $this->otraAulaId]);
         $this->context = [
             'id_usuario' => $this->docenteId,
             'id_examen' => $this->exam->id_examen,
@@ -86,6 +86,20 @@ class CreateIncidentReportTest extends TestCase
             'id_accion' => DB::table('accion')->where('operacion', 'CREAR')->value('id_accion'),
         ]);
         $this->assertSame(0, DB::table('central_riesgo')->count());
+    }
+
+    public function testReportsDuringOpenControlWithExamInProgress(): void
+    {
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $this->exam->id_examen,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
+        app(RoomAssignmentService::class)->prepare((int) $this->exam->id_examen);
+        $this->exam->update(['estado' => Exam::EN_CURSO]);
+
+        $this->postJson($this->url(), $this->payload())
+            ->assertCreated()
+            ->assertJsonPath('data.id_intento', $this->attemptId);
     }
 
     public function testAcceptsStudentWhoDoesNotBelongToExam(): void
@@ -234,7 +248,7 @@ class CreateIncidentReportTest extends TestCase
 
     public function testRejectsAttemptFromAnotherExam(): void
     {
-        $other = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId]);
+        $other = $this->createExam($this->examStateAttributes('INGRESO_ABIERTO'), [$this->aulaId]);
         $id = $this->insertEntryAttempt($this->context, ['id_examen' => $other->id_examen]);
         $this->postJson($this->url($id), $this->payload())->assertNotFound();
     }

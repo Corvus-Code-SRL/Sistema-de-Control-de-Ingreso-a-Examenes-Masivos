@@ -1822,3 +1822,69 @@ CREATE INDEX idx_central_riesgo_activo_fecha
 INSERT INTO public.accion (operacion, tipo_operacion, descripcion)
 SELECT 'RECTIFICAR_REGISTRO', 'UPDATE', 'Rectificación de un registro de la Central de Riesgo'
 WHERE NOT EXISTS (SELECT 1 FROM public.accion WHERE operacion = 'RECTIFICAR_REGISTRO');
+
+-- Versión 15: invitar docentes colaboradores a un examen (HU-026)
+--             (2026_11_16_000000_add_sin_efecto_to_estado_invitacion y
+--              2026_11_16_000001_prepare_invitacion_examen_for_collaborators)
+--   * El enum estado_invitacion suma SIN_EFECTO: la invitación pendiente de un examen que dejó de estar
+--     PROGRAMADO (abrió el control de ingreso, se canceló o terminó). PostgreSQL no usa un valor de enum
+--     nuevo en la misma transacción: en Supabase se corre primero el ALTER TYPE (fuera de transacción) y
+--     después el resto.
+--   * permite_agregar_grupos: si el colaborador, al aceptar, puede sumar sus grupos de la materia al examen
+--     (lo guarda HU-026 y lo hace cumplir HU-027). fecha_sin_efecto: cuándo quedó sin efecto.
+--   * El CHECK de estado admite SIN_EFECTO (sin fecha_respuesta y con fecha_sin_efecto).
+--   * Un docente no se invita a sí mismo ni tiene dos invitaciones vigentes (PENDIENTE o ACEPTADA) al mismo
+--     examen; tras RECHAZADA o SIN_EFECTO se lo puede invitar de nuevo.
+--   * Se registra la acción de bitácora INVITAR_COLABORADOR (accion.operacion no es UNIQUE: solo si falta).
+
+ALTER TYPE public.estado_invitacion ADD VALUE IF NOT EXISTS 'SIN_EFECTO';
+
+ALTER TABLE public.invitacion_examen
+    ADD COLUMN permite_agregar_grupos boolean NOT NULL DEFAULT true,
+    ADD COLUMN fecha_sin_efecto       timestamp with time zone;
+
+ALTER TABLE public.invitacion_examen DROP CONSTRAINT chk_invitacion_examen_estado;
+
+ALTER TABLE public.invitacion_examen
+    ADD CONSTRAINT chk_invitacion_examen_estado CHECK (
+        (estado = 'PENDIENTE'
+            AND fecha_respuesta IS NULL AND fecha_sin_efecto IS NULL)
+        OR
+        (estado IN ('ACEPTADA', 'RECHAZADA')
+            AND fecha_respuesta IS NOT NULL AND fecha_sin_efecto IS NULL)
+        OR
+        (estado = 'SIN_EFECTO'
+            AND fecha_respuesta IS NULL AND fecha_sin_efecto IS NOT NULL)
+    );
+
+ALTER TABLE public.invitacion_examen
+    ADD CONSTRAINT chk_invitacion_examen_no_autoinvitacion
+        CHECK (id_docente_creador <> id_docente_invitado);
+
+CREATE UNIQUE INDEX uq_invitacion_examen_vigente
+    ON public.invitacion_examen (id_examen, id_docente_invitado)
+    WHERE estado IN ('PENDIENTE', 'ACEPTADA');
+
+INSERT INTO public.accion (operacion, tipo_operacion, descripcion)
+SELECT 'INVITAR_COLABORADOR', 'INSERT', 'Invitación de un docente colaborador a un examen'
+WHERE NOT EXISTS (SELECT 1 FROM public.accion WHERE operacion = 'INVITAR_COLABORADOR');
+
+-- Versión 16: estado persistente del control de ingreso (HU-038)
+--             (2026_11_16_000000_add_entry_control_timestamps_to_examen y
+--              2026_11_17_000000_retire_estado_en_ingreso_examen)
+--   * La apertura y el cierre ordinario se consultan en examen; la bitácora conserva el historial.
+--   * La migración rellena estas fechas desde los eventos existentes de la bitácora.
+--   * EN_INGRESO deja de usarse: el valor sigue en el enum estado_examen (PostgreSQL no permite quitarlo),
+--     pero un CHECK impide asignarlo. El control abierto es ingreso_abierto_en NOT NULL con
+--     ingreso_ordinario_cerrado_en NULL y el examen PROGRAMADO o EN_CURSO.
+--   * En una base con datos, la migración pasa los EN_INGRESO a PROGRAMADO (si aún no llega la hora de
+--     inicio) o EN_CURSO, y cierra el ingreso ordinario de los EN_CURSO y FINALIZADO heredados (en develop
+--     iniciar el examen cerraba el control) antes de agregar el CHECK. En una base nueva no hay nada que convertir.
+--   * inicio_real_en e inicio_automatico ya no se escriben; las columnas se conservan.
+
+ALTER TABLE public.examen
+    ADD COLUMN ingreso_abierto_en timestamp with time zone,
+    ADD COLUMN ingreso_ordinario_cerrado_en timestamp with time zone;
+
+ALTER TABLE public.examen
+    ADD CONSTRAINT chk_examen_estado_sin_en_ingreso CHECK (estado <> 'EN_INGRESO');

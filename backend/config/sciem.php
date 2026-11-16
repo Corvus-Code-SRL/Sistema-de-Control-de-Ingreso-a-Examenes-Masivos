@@ -249,6 +249,9 @@ return [
                 'modulo' => 'central_riesgo', 'etiqueta' => 'Registro de la Central de Riesgo',
                 'claves' => ['id_cr_estudiante'],
             ],
+            'invitacion_examen' => [
+                'modulo' => 'examenes', 'etiqueta' => 'Invitación a examen', 'claves' => ['id_invitacion'],
+            ],
         ],
 
         'etiquetas_accion' => [
@@ -275,7 +278,11 @@ return [
             'CAMBIAR_AMBIENTE' => 'Cambiar ambiente',
             'OBSERVAR_IDENTIDAD' => 'Observar identidad',
             'RECTIFICAR_REGISTRO' => 'Rectificar registro',
+<<<<<<< HEAD
             'GUARDAR_HABILITADOS' => 'Guardar habilitados',
+=======
+            'INVITAR_COLABORADOR' => 'Invitar colaborador',
+>>>>>>> cf116f9259f76da7826a63cb0b369ade93ced04b
         ],
 
         'etiquetas_campo' => [
@@ -296,6 +303,8 @@ return [
             'rectificado_en' => 'Fecha de rectificación',
             'id_usuario_rectificador' => 'Administrador que rectificó',
             'motivo_rectificacion' => 'Motivo de la rectificación',
+            'permite_agregar_grupos' => 'Puede agregar sus grupos',
+            'fecha_sin_efecto' => 'Fecha en que quedó sin efecto',
         ],
 
         'campos_ocultos' => [

@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Exceptions\EntryControl\EntryOpeningException;
 use App\Models\Exam;
 use App\Services\EntryControl\RoomAssignmentService;
+use App\Services\EntryControl\CloseOrdinaryEntryService;
 use App\Support\Cache\EntryOpeningFailureStore;
 use Carbon\Carbon;
 use Throwable;
@@ -26,7 +27,7 @@ class OpenEntryControlJob implements ShouldQueue
         $now = Carbon::now($timezone);
 
         $exams = Exam::query()
-            ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_INGRESO])
+            ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_CURSO])
             ->whereBetween('fecha', [
                 $now->copy()->subDay()->toDateString(),
                 $now->copy()->addDay()->toDateString(),
@@ -39,7 +40,7 @@ class OpenEntryControlJob implements ShouldQueue
             }
 
             $startsAt = Carbon::createFromFormat(
-                'Y-m-d H:i',
+                '!Y-m-d H:i',
                 $exam->fecha->toDateString() . ' ' . substr($exam->hora_inicio, 0, 5),
                 $timezone
             );
@@ -49,8 +50,9 @@ class OpenEntryControlJob implements ShouldQueue
                 continue;
             }
 
-            if ($exam->estado === Exam::EN_INGRESO
-                && $assignments->hasPreparedSnapshot((int) $exam->id_examen)) {
+            if (CloseOrdinaryEntryService::isClosed((int) $exam->id_examen)
+                || (CloseOrdinaryEntryService::hasOpened((int) $exam->id_examen)
+                    && $assignments->hasPreparedSnapshot((int) $exam->id_examen))) {
                 continue;
             }
 
@@ -72,6 +74,8 @@ class OpenEntryControlJob implements ShouldQueue
                             'motivo' => $cacheException->getMessage(),
                         ]);
                     }
+                } else {
+                    $failures->forget((int) $exam->id_examen);
                 }
 
                 Log::warning('No se pudo abrir el control de ingreso', [
