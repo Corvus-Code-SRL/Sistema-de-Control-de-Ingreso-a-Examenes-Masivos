@@ -20,6 +20,8 @@ Route::prefix('control-ingreso')->group(function () {
             ->where('intento', '[0-9]{1,9}')
             ->name('control-ingreso.intentos.reporte.store');
         Route::get('/contexto', [EntryControlStatusController::class, 'context'])
+            ->withoutMiddleware('throttle:api')
+            ->middleware('throttle:polling')
             ->name('control-ingreso.examenes.contexto');
         Route::get('/buscar', [StudentVerificationController::class, 'search'])
             ->name('control-ingreso.examenes.buscar');

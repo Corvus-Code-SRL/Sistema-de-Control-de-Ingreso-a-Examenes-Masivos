@@ -9,6 +9,7 @@ use App\Services\Exams\ExamLifecycleService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Tests\Concerns\SeedsExamCatalog;
 use Tests\TestCase;
 
@@ -16,6 +17,14 @@ class EntryControlStatusTest extends TestCase
 {
     use DatabaseTransactions;
     use SeedsExamCatalog;
+
+    public function test_contexto_usa_la_cuota_de_sondeo(): void
+    {
+        $middleware = Route::getRoutes()->getByName('control-ingreso.examenes.contexto')->gatherMiddleware();
+
+        $this->assertContains('throttle:polling', $middleware);
+        $this->assertNotContains('throttle:api', $middleware);
+    }
 
     public function test_estado_del_examen_devuelve_nomina_y_latido(): void
     {
