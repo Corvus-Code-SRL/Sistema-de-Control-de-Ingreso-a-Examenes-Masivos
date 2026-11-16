@@ -6,6 +6,7 @@ import { mockApi, mockApiWith, mockNetworkFailure } from '@/test/http'
 import { renderWithRouter } from '@/test/render'
 import { EntryControlPage } from './EntryControlPage'
 import { attemptTime } from '../components/entryAttemptPresentation'
+import { ENTRY_CONTROL_POLL_MS } from '../constants'
 import type { EntryContext, Verification } from '../types/entry-control.types'
 
 const context: EntryContext = {
@@ -105,12 +106,12 @@ describe('EntryControlPage', () => {
       expect(screen.queryByText(/Datos sin actualizar/)).not.toBeInTheDocument()
 
       offline = true
-      await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+      await act(async () => { await vi.advanceTimersByTimeAsync(ENTRY_CONTROL_POLL_MS) })
       expect(screen.getByText(/Datos sin actualizar desde \d{2}:\d{2}/)).toBeInTheDocument()
       expect(screen.queryByText('En vivo')).not.toBeInTheDocument()
 
       offline = false
-      await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+      await act(async () => { await vi.advanceTimersByTimeAsync(ENTRY_CONTROL_POLL_MS) })
       expect(screen.queryByText(/Datos sin actualizar/)).not.toBeInTheDocument()
       expect(screen.getByText('En vivo')).toBeInTheDocument()
     } finally {
@@ -499,7 +500,7 @@ describe('EntryControlPage', () => {
 
       apiRoutes[1].status = 409
       apiRoutes[1].body = { message: 'El control de ingreso ha terminado.' }
-      await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+      await act(async () => { await vi.advanceTimersByTimeAsync(ENTRY_CONTROL_POLL_MS) })
 
       expect(screen.getByText('El control de ingreso ha terminado.')).toBeInTheDocument()
       expect(screen.getByText('Ingreso terminado')).toBeInTheDocument()
