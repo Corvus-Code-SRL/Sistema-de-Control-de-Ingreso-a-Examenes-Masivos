@@ -51,11 +51,6 @@ class ActionSeeder extends Seeder
                 'descripcion' => 'Retiro de un estudiante durante el examen',
             ],
             [
-                'operacion' => 'GUARDAR_HABILITADOS',
-                'tipo_operacion' => 'UPDATE',
-                'descripcion' => 'Guardado de cambios en la lista de habilitados de un examen',
-            ],
-            [
                 'operacion' => 'RECTIFICAR_REGISTRO',
                 'tipo_operacion' => 'UPDATE',
                 'descripcion' => 'Rectificación de un registro de la Central de Riesgo',
@@ -67,5 +62,14 @@ class ActionSeeder extends Seeder
         }
 
         $this->call(ExamSituationActionSeeder::class);
+
+        DB::table('accion')->updateOrInsert(
+            ['operacion' => 'GUARDAR_HABILITADOS'],
+            [
+                'operacion' => 'GUARDAR_HABILITADOS',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Guardado de cambios en la lista de habilitados de un examen',
+            ]
+        );
     }
 }

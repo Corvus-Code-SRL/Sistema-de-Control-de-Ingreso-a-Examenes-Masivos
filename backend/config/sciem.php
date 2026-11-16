@@ -275,6 +275,7 @@ return [
             'CAMBIAR_AMBIENTE' => 'Cambiar ambiente',
             'OBSERVAR_IDENTIDAD' => 'Observar identidad',
             'RECTIFICAR_REGISTRO' => 'Rectificar registro',
+            'GUARDAR_HABILITADOS' => 'Guardar habilitados',
         ],
 
         'etiquetas_campo' => [
