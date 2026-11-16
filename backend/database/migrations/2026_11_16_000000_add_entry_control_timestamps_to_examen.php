@@ -10,8 +10,13 @@ class AddEntryControlTimestampsToExamen extends Migration
     public function up()
     {
         Schema::table('examen', function (Blueprint $table): void {
-            $table->timestampTz('ingreso_abierto_en')->nullable();
-            $table->timestampTz('ingreso_ordinario_cerrado_en')->nullable();
+            if (! Schema::hasColumn('examen', 'ingreso_abierto_en')) {
+                $table->timestampTz('ingreso_abierto_en')->nullable();
+            }
+
+            if (! Schema::hasColumn('examen', 'ingreso_ordinario_cerrado_en')) {
+                $table->timestampTz('ingreso_ordinario_cerrado_en')->nullable();
+            }
         });
 
         DB::statement(<<<'SQL'
@@ -42,7 +47,10 @@ SQL);
     public function down()
     {
         Schema::table('examen', function (Blueprint $table): void {
-            $table->dropColumn(['ingreso_abierto_en', 'ingreso_ordinario_cerrado_en']);
+            $table->dropColumn(array_values(array_filter(
+                ['ingreso_abierto_en', 'ingreso_ordinario_cerrado_en'],
+                fn (string $column) => Schema::hasColumn('examen', $column)
+            )));
         });
     }
 }
