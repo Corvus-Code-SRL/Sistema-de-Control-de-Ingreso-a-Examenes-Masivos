@@ -27,7 +27,7 @@ class StudentRosterGroupAccess
         $this->subjectCatalog = $subjectCatalog;
     }
 
-    public function getOwnedActive(int $groupId, string $teacherId): Group
+    public function getAvailable(int $groupId, string $teacherId): Group
     {
         $group = Group::query()->find($groupId);
 
@@ -62,17 +62,6 @@ class StudentRosterGroupAccess
                 422
             );
         }
-
-        return $group;
-    }
-
-    /**
-     * Como getOwnedActive, y ademas exige que ningun examen del grupo este en ingreso o en curso.
-     * Es lo que usa la carga de nomina (HU-021).
-     */
-    public function getAvailable(int $groupId, string $teacherId): Group
-    {
-        $group = $this->getOwnedActive($groupId, $teacherId);
 
         if ($this->rosterLock->isLocked((int) $group->id_grupo)) {
             throw new StudentRosterGroupAccessException(

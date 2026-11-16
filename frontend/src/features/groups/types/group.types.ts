@@ -192,9 +192,6 @@ export interface GroupStudent {
   nombre: string
   /** Carrera con la que está en el grupo; null solo en inscripciones antiguas. */
   carrera?: { id_carrera: number; nombre: string | null } | null
-  /** Registrado como estudiante excepcional (HU-023); motivo_excepcional dice por que. */
-  es_excepcional?: boolean
-  motivo_excepcional?: string | null
 }
 
 /** Respuesta de `GET /grupos/{id_grupo}/estudiantes`. */

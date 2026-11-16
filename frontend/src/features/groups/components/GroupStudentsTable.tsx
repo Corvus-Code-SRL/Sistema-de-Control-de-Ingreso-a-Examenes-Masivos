@@ -18,7 +18,6 @@ import type { AsyncStatus } from '@/hooks/useAsyncResource'
 import type { ApiError } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import type { GroupCareer, GroupStudent, GroupStudentsPage } from '../types/group.types'
-import { ExceptionalBadge } from './ExceptionalBadge'
 import { MAX_SEARCH_LENGTH } from '../utils/studentFilters'
 
 interface GroupStudentsTableProps {
@@ -198,12 +197,7 @@ export function GroupStudentsTable({
                     <TableRow key={student.id_estudiante}>
                       <TableCell className="sciem-tnum">{student.cod_sis}</TableCell>
                       <TableCell className="font-medium">{surnames(student)}</TableCell>
-                      <TableCell>
-                        {student.nombre}
-                        {student.es_excepcional && (
-                          <ExceptionalBadge reason={student.motivo_excepcional} />
-                        )}
-                      </TableCell>
+                      <TableCell>{student.nombre}</TableCell>
                       {isMultiCareer && (
                         <TableCell className="text-muted-foreground">
                           {student.carrera?.nombre ?? '—'}
@@ -223,9 +217,6 @@ export function GroupStudentsTable({
                 >
                   <p className="text-sm font-medium text-foreground">
                     {surnames(student)}, {student.nombre}
-                    {student.es_excepcional && (
-                      <ExceptionalBadge reason={student.motivo_excepcional} />
-                    )}
                   </p>
                   <p className="sciem-tnum text-xs text-muted-foreground">
                     SIS {student.cod_sis}
