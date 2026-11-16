@@ -53,6 +53,19 @@ class EntryControlSnapshotService
                 'ambientes' => array_column($rooms, 'id_ambiente'),
             ],
         ];
+        // HU-027: el colaborador que aceptó la invitación controla todos los ambientes, como el creador.
+        $collaborators = DB::table('invitacion_examen as ie')
+            ->join('usuario as u', 'u.id_usuario', '=', 'ie.id_docente_invitado')
+            ->where('ie.id_examen', $examId)
+            ->where('ie.estado', 'ACEPTADA')
+            ->where('u.estado', User::ESTADO_ACTIVO)
+            ->pluck('ie.id_docente_invitado');
+        foreach ($collaborators as $collaboratorId) {
+            $controllers[(string) $collaboratorId] = [
+                'rol' => 'DOCENTE',
+                'ambientes' => array_column($rooms, 'id_ambiente'),
+            ];
+        }
         $auxiliaries = DB::table('examen_auxiliar as ea')
             ->join('usuario as u', 'u.id_usuario', '=', 'ea.id_usuario')
             ->where('ea.id_examen', $examId)

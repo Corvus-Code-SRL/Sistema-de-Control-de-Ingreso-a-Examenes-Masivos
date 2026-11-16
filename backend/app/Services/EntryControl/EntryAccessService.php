@@ -5,6 +5,7 @@ namespace App\Services\EntryControl;
 use App\Models\Exam;
 use App\Models\User;
 use App\Exceptions\Exams\ExamStateException;
+use App\Services\Exams\ExamCollaboratorService;
 use App\Services\Exams\ExamTimingService;
 use App\Support\Cache\EntryOpeningFailureStore;
 use Carbon\Carbon;
@@ -15,11 +16,16 @@ class EntryAccessService
 {
     private ExamTimingService $timing;
     private EntryOpeningFailureStore $openingFailures;
+    private ExamCollaboratorService $collaborators;
 
-    public function __construct(ExamTimingService $timing, EntryOpeningFailureStore $openingFailures)
-    {
+    public function __construct(
+        ExamTimingService $timing,
+        EntryOpeningFailureStore $openingFailures,
+        ExamCollaboratorService $collaborators
+    ) {
         $this->timing = $timing;
         $this->openingFailures = $openingFailures;
+        $this->collaborators = $collaborators;
     }
 
     public function openExamsFor(User $actor): array
@@ -39,7 +45,8 @@ class EntryAccessService
                 [$now]
             )
             ->where(function ($query) use ($actor): void {
-                $query->where('id_usuario_docente', $actor->id_usuario)
+                // Docente del examen: su creador o un colaborador que aceptó la invitación (HU-027).
+                $this->collaborators->whereTaughtBy($query, (string) $actor->id_usuario)
                     ->orWhereExists(function ($subquery) use ($actor): void {
                         $subquery->selectRaw('1')
                             ->from('examen_auxiliar')
@@ -60,6 +67,13 @@ class EntryAccessService
             ->get();
 
         $examIds = $exams->pluck('id_examen')->all();
+        $collaboratingExamIds = DB::table('invitacion_examen')
+            ->whereIn('id_examen', $examIds)
+            ->where('id_docente_invitado', $actor->id_usuario)
+            ->where('estado', 'ACEPTADA')
+            ->pluck('id_examen')
+            ->map(fn ($id) => (int) $id)
+            ->all();
         $assistantAssignments = DB::table('examen_auxiliar')
             ->whereIn('id_examen', $examIds)
             ->where('id_usuario', $actor->id_usuario)
@@ -84,12 +98,17 @@ class EntryAccessService
             ->pluck('total', 'id_examen');
 
         return $exams->map(function (Exam $exam) use (
-            $actor, $assistantAssignments, $rosterTotals, $enteredTotals
+            $actor,
+            $assistantAssignments,
+            $rosterTotals,
+            $enteredTotals,
+            $collaboratingExamIds
         ): array {
             $examId = (int) $exam->id_examen;
             $total = (int) ($rosterTotals[$examId] ?? 0);
             $entered = (int) ($enteredTotals[$examId] ?? 0);
-            $isTeacher = (string) $exam->id_usuario_docente === (string) $actor->id_usuario;
+            $isTeacher = (string) $exam->id_usuario_docente === (string) $actor->id_usuario
+                || in_array($examId, $collaboratingExamIds, true);
             $openingAt = $this->timing->startsAt($exam)
                 ->subMinutes((int) $exam->minutos_apertura);
             $assignedRoomId = $isTeacher ? null : EntryControlSnapshotService::controlRoomOf(
@@ -128,7 +147,7 @@ class EntryAccessService
     {
         $this->assertCanControl($exam, $actor);
 
-        $isTeacher = (string) $exam->id_usuario_docente === (string) $actor->id_usuario;
+        $isTeacher = $this->collaborators->isTeacherOf($exam, (string) $actor->id_usuario);
         $assignedRoomId = $isTeacher ? null : $this->assistantRoomId($exam, $actor);
 
         $exam->loadMissing(['subject', 'career', 'classrooms', 'groups']);
@@ -170,7 +189,7 @@ class EntryAccessService
             throw new AuthorizationException('No tiene permiso para controlar este examen.');
         }
 
-        $isTeacher = (string) $exam->id_usuario_docente === (string) $actor->id_usuario;
+        $isTeacher = $this->collaborators->isTeacherOf($exam, (string) $actor->id_usuario);
 
         if (! $isTeacher) {
             $enablement = DB::table('examen_auxiliar')

@@ -18,7 +18,8 @@ class ExamInProgressQueryService
         private ExamParticipantService $participants,
         private ExamTimingService $timing,
         private UserRoleService $roles,
-        private ExamInProgressSituationService $situations
+        private ExamInProgressSituationService $situations,
+        private ExamCollaboratorService $collaborators
     ) {}
 
     public function show(Exam $exam, User $actor): array
@@ -27,8 +28,8 @@ class ExamInProgressQueryService
             throw new AuthorizationException();
         }
 
-        $isTeacher = (string) $exam->id_usuario_docente
-            === (string) $actor->id_usuario;
+        // Docente del examen: su creador o un colaborador que aceptó la invitación (HU-027).
+        $isTeacher = $this->collaborators->isTeacherOf($exam, (string) $actor->id_usuario);
 
         if ($isTeacher) {
             if (!$this->roles->isTeacher($actor->id_usuario)) {
