@@ -61,6 +61,18 @@ it('muestra el motivo de apertura fallida y el ambiente del auxiliar', async () 
   expect(screen.getByRole('link', { name: /Ver detalle del examen/ })).toBeInTheDocument()
 })
 
+it('avisa al docente y permite editar si falta capacidad al abrir', async () => {
+  mockApiOnce({ body: { data: [{
+    ...exam,
+    motivo_apertura: { codigo: 'CAPACIDAD_INSUFICIENTE', mensaje: 'Capacidad 1 menor que la nómina de 2.' },
+  }] } })
+  renderWithRouter(<OpenEntryControlsPage />)
+
+  expect(await screen.findByText('No se pudo abrir')).toBeInTheDocument()
+  expect(screen.getByRole('alert')).toHaveTextContent('Capacidad 1 menor que la nómina de 2.')
+  expect(screen.getByRole('link', { name: 'Modificar examen' })).toHaveAttribute('href', '/examenes/7/editar')
+})
+
 it('actualiza la lista cuando se abre el ingreso', async () => {
   const apiRoutes = [{ matches: () => true, body: { data: [exam] } }]
   mockApi(apiRoutes)
