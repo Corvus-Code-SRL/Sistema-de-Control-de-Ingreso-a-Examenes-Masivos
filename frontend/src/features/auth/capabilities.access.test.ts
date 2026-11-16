@@ -76,6 +76,25 @@ describe('Bitácora (HU-015)', () => {
   })
 })
 
+describe('Rectificar registro de la Central de Riesgo (HU-062)', () => {
+  it('solo el Administrador tiene riesgo.rectificar', () => {
+    expect(hasCapability('Administrador', 'riesgo.rectificar')).toBe(true)
+
+    for (const role of ['Docente', 'Invitado', 'Auxiliar', 'Rol inexistente', null]) {
+      expect(hasCapability(role, 'riesgo.rectificar')).toBe(false)
+    }
+  })
+
+  it('consultar la Central (riesgo.consultar) no concede rectificar', () => {
+    expect(hasCapability('Docente', 'riesgo.consultar')).toBe(true)
+    expect(hasCapability('Docente', 'riesgo.rectificar')).toBe(false)
+  })
+
+  it('el acceso del backend a risk_rectify es solo del Administrador', () => {
+    expect(backendAccess().risk_rectify).toEqual(['Administrador'])
+  })
+})
+
 describe('capacidades del Invitado y del Docente', () => {
   it('el Invitado ejerce la docencia, habilita auxiliares por examen y revisa incidencias', () => {
     for (const capability of [

@@ -80,6 +80,8 @@ export interface IncidentReview {
   intento: IncidentAttempt | null
   revisor: IncidentReviewer | null
   en_central_riesgo: boolean
+  /** Se aprobó y un administrador lo retiró de la Central (HU-062): ya no cuenta como antecedente. */
+  retirado_de_central_riesgo: boolean
 }
 
 export interface IncidentListResponse {

@@ -173,7 +173,9 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'admin-risk-rectify',
         label: 'Rectificar registro de la central',
         icon: FilePenLine,
-        capability: 'administracion.gestionar'
+        capability: 'riesgo.rectificar',
+        to: '/rectificar-registro',
+        matches: ['/rectificar-registro/:id']
       }
     ]
   },

@@ -132,7 +132,8 @@ return [
     | por examen, toma incidencias y opera el ingreso; no consulta la Central de Riesgo, no gestiona
     | auxiliares de grupo, no reporta auxiliares, no acepta casos especiales y, mientras no haya una
     | decisión de producto, no invita a otros docentes. La bitácora (audit_log) la consulta solo el
-    | Administrador.
+    | Administrador. Rectificar un registro de la Central de Riesgo (risk_rectify, HU-062) también es solo
+    | del Administrador: consultar la Central (risk_center) no lo concede.
     |
     */
 
@@ -146,6 +147,7 @@ return [
         'special_cases'    => [Role::DOCENTE],
         'invite_teachers'  => [Role::DOCENTE],
         'audit_log'        => [Role::ADMINISTRADOR],
+        'risk_rectify'     => [Role::ADMINISTRADOR],
     ],
 
     /*
@@ -173,7 +175,7 @@ return [
     |
     | - por_pagina: filas por página (fijo, no lo elige el cliente).
     | - modulos: módulos del filtro, en el orden en que se ofrecen. «otros» no se declara: es todo lo
-    |   que no esté en `tablas`. La Central de Riesgo no figura porque nadie escribe en ella.
+    |   que no esté en `tablas`.
     | - tablas: cada tabla_afectada que hoy se registra, con su módulo, cómo se nombra el registro y
     |   las claves que lo identifican (la primera es la principal). `persona` resuelve esa clave a
     |   «Nombre (SIS)».
@@ -200,6 +202,7 @@ return [
             'ingreso' => 'Control de ingreso',
             'incidencias' => 'Incidencias',
             'situaciones' => 'Situaciones',
+            'central_riesgo' => 'Central de riesgo',
         ],
 
         'tablas' => [
@@ -242,6 +245,10 @@ return [
             'situacion_examen' => [
                 'modulo' => 'situaciones', 'etiqueta' => 'Situación de examen', 'claves' => ['id_situacion'],
             ],
+            'central_riesgo' => [
+                'modulo' => 'central_riesgo', 'etiqueta' => 'Registro de la Central de Riesgo',
+                'claves' => ['id_cr_estudiante'],
+            ],
         ],
 
         'etiquetas_accion' => [
@@ -268,6 +275,7 @@ return [
             'REGISTRAR_ESTUDIANTE_EXCEPCIONAL' => 'Registrar estudiante excepcional',
             'CAMBIAR_AMBIENTE' => 'Cambiar ambiente',
             'OBSERVAR_IDENTIDAD' => 'Observar identidad',
+            'RECTIFICAR_REGISTRO' => 'Rectificar registro',
         ],
 
         'etiquetas_campo' => [
@@ -285,6 +293,9 @@ return [
             'inicio_real_en' => 'Inicio real',
             'ip' => 'Dirección IP',
             'motivo' => 'Motivo',
+            'rectificado_en' => 'Fecha de rectificación',
+            'id_usuario_rectificador' => 'Administrador que rectificó',
+            'motivo_rectificacion' => 'Motivo de la rectificación',
         ],
 
         'campos_ocultos' => [

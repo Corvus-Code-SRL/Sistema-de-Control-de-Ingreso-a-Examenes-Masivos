@@ -6,12 +6,14 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Storage;
 use Tests\Concerns\AssignsIncidentRole;
+use Tests\Concerns\SeedsRectifications;
 use Tests\Concerns\SeedsRiskCenterRecords;
 use Tests\TestCase;
 
 class IncidentReportShowTest extends TestCase
 {
     use DatabaseTransactions;
+    use SeedsRectifications;
     use SeedsRiskCenterRecords;
     use AssignsIncidentRole;
 
@@ -59,6 +61,32 @@ class IncidentReportShowTest extends TestCase
             ->assertJsonPath('data.evidencia.disponible', true)
             ->assertJsonPath('data.revisor', null)
             ->assertJsonPath('data.en_central_riesgo', false);
+    }
+
+    public function test_un_reporte_aprobado_indica_si_esta_en_la_central_o_fue_retirado_de_ella(): void
+    {
+        $record = $this->insertApprovedRecord($this->context);
+        $url = "/api/docente/incidencias/estudiante-{$record['id_reporte_est']}";
+
+        $this->getJson($url)->assertOk()
+            ->assertJsonPath('data.en_central_riesgo', true)
+            ->assertJsonPath('data.retirado_de_central_riesgo', false);
+
+        $this->voidRecord($record['id_cr_estudiante'], $this->context['id_usuario']);
+
+        $this->getJson($url)->assertOk()
+            ->assertJsonPath('data.estado', 'APROBADO')
+            ->assertJsonPath('data.en_central_riesgo', false)
+            ->assertJsonPath('data.retirado_de_central_riesgo', true);
+    }
+
+    public function test_un_reporte_pendiente_no_esta_retirado_de_la_central(): void
+    {
+        $reporteId = $this->insertStudentReport($this->context);
+
+        $this->getJson("/api/docente/incidencias/estudiante-{$reporteId}")->assertOk()
+            ->assertJsonPath('data.en_central_riesgo', false)
+            ->assertJsonPath('data.retirado_de_central_riesgo', false);
     }
 
     public function test_reporte_sin_intento_devuelve_intento_null(): void

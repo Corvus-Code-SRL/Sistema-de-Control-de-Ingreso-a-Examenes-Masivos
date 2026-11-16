@@ -566,6 +566,28 @@ describe('AppSidebar — entradas y estado activo', () => {
     expect(screen.getByRole('link', { name: 'Consultar central' })).toHaveAttribute('aria-current', 'page')
   })
 
+  it('«Rectificar registro de la central» está conectada solo para el Administrador y se resalta en su ruta', () => {
+    const admin = renderSidebar('Administrador', '/rectificar-registro/9941')
+
+    expect(screen.getByRole('link', { name: 'Rectificar registro de la central' })).toHaveAttribute(
+      'href',
+      '/rectificar-registro'
+    )
+    expect(screen.getByRole('link', { name: 'Rectificar registro de la central' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+    expect(screen.getByRole('link', { name: 'Consultar central' })).not.toHaveAttribute('aria-current')
+    admin.unmount()
+
+    for (const role of ['Docente', 'Invitado', 'Auxiliar'] as const) {
+      const view = renderSidebar(role, '/materias')
+
+      expect(screen.queryByText('Rectificar registro de la central')).not.toBeInTheDocument()
+      view.unmount()
+    }
+  })
+
   it('administrador: /cuentas/:id resalta Modificar rol', () => {
     renderSidebar('Administrador', '/cuentas/00000000-0000-4000-8000-000000000011')
 

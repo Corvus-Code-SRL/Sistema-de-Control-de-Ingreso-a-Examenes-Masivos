@@ -47,7 +47,9 @@ describe('findActiveItem', () => {
     ['/materias/asignaciones', 'admin-assign-subject'],
     ['/ambientes', 'admin-register-classroom'],
     ['/central-riesgo', 'admin-risk-query'],
-    ['/central-riesgo/9941', 'admin-risk-query']
+    ['/central-riesgo/9941', 'admin-risk-query'],
+    ['/rectificar-registro', 'admin-risk-rectify'],
+    ['/rectificar-registro/9941', 'admin-risk-rectify']
   ])('administrador: %s resalta %s', (pathname, expected) => {
     expect(activeItemId('Administrador', pathname)).toBe(expected)
   })

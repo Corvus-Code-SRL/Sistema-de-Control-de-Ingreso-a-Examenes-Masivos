@@ -450,6 +450,61 @@ class EntryControlSnapshotService
         });
     }
 
+    /**
+     * Actualiza los antecedentes de un estudiante en los snapshots activos donde figura (HU-062): una
+     * rectificación de la Central de Riesgo cambia el tipo de falta que se le muestra al controlador.
+     * Conserva la expiración del snapshot y renueva la versión del estado para que los clientes lo relean.
+     * Sin snapshot activo no hace nada: el siguiente se reconstruye desde PostgreSQL.
+     *
+     * @return int cuántos snapshots se actualizaron
+     */
+    public function refreshBackground(int $studentId): int
+    {
+        $examIds = DB::table('grupo_estudiante as gs')
+            ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
+            ->join('examen as e', 'e.id_examen', '=', 'gx.id_examen')
+            ->where('gs.id_estudiante', $studentId)
+            ->where('e.estado', Exam::EN_INGRESO)
+            ->distinct()
+            ->pluck('gx.id_examen');
+
+        $refreshed = 0;
+        foreach ($examIds as $examId) {
+            $examId = (int) $examId;
+            $token = $this->activeToken($examId);
+            if ($token === null) {
+                continue;
+            }
+
+            $this->cache()->lock($this->key($examId, $token, 'update-lock'), 5)->block(3, function () use (
+                $examId, $token, $studentId, &$refreshed
+            ): void {
+                $meta = $this->cache()->get($this->key($examId, $token, 'meta'));
+                $student = $this->studentById($examId, $studentId, $token);
+                if (! is_array($meta) || $student === null) {
+                    return;
+                }
+
+                $student['antecedentes'] = $this->riskCenter->summariesForSnapshot([$studentId])[$studentId]
+                    ?? ['total' => 0, 'latest' => null];
+                $values = [$this->key($examId, $token, 'student', $studentId) => $student];
+
+                $status = $this->cache()->get($this->key($examId, $token, 'status'));
+                if (is_array($status)) {
+                    $status['version'] = (string) Str::uuid();
+                    $values[$this->key($examId, $token, 'status')] = $status;
+                }
+
+                if (! $this->cache()->putMany($values, Carbon::parse($meta['expira_en']))) {
+                    throw new \RuntimeException('No se pudo actualizar los antecedentes en Redis.');
+                }
+                $refreshed++;
+            });
+        }
+
+        return $refreshed;
+    }
+
     private function meta(int $examId): array
     {
         $token = $this->activeTokenOrFail($examId);
