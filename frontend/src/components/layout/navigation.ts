@@ -237,6 +237,13 @@ export const NAVIGATION: readonly NavSection[] = [
         to: '/cargar-nomina'
       },
       {
+        id: 'teacher-exceptional-student',
+        label: 'Registrar estudiante excepcional',
+        icon: UserPlus,
+        capability: 'casos-especiales.gestionar',
+        to: '/estudiante-excepcional'
+      },
+      {
         id: 'teacher-my-assistants',
         label: 'Mis auxiliares',
         icon: UserCheck,

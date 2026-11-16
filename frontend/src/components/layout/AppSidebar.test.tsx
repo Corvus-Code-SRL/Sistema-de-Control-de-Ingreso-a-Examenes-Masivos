@@ -481,6 +481,7 @@ describe('AppSidebar — entradas y estado activo', () => {
       ['Materias', '/materias'],
       ['Mis grupos', '/mis-cursos'],
       ['Cargar nómina de estudiantes', '/cargar-nomina'],
+      ['Registrar estudiante excepcional', '/estudiante-excepcional'],
       ['Mis auxiliares', '/mis-auxiliares'],
       ['Programados', '/examenes/programados'],
       ['Registrar examen', '/examenes/nuevo'],
@@ -505,7 +506,7 @@ describe('AppSidebar — entradas y estado activo', () => {
 
       expect(screen.getByRole('link', { name: 'Registrar situación excepcional' }))
         .toHaveAttribute('href', '/situacion-excepcional')
-      expect(screen.queryByText('Registrar estudiante excepcional')).not.toBeInTheDocument()
+      expect(screen.queryByText('Registrar estudiante excepcional') !== null).toBe(role === 'Docente')
     }
   )
 

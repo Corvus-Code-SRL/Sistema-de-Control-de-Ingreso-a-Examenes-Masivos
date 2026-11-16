@@ -77,6 +77,8 @@ class GroupStudentService
                 'estudiante.apellido_paterno',
                 'estudiante.apellido_materno',
                 DB::raw($career . ' as id_carrera'),
+                'grupo_estudiante.es_excepcional',
+                'grupo_estudiante.motivo_excepcional',
                 'carrera.nombre as carrera_nombre',
             ])
             ->orderByRaw(

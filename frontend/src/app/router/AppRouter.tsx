@@ -46,6 +46,7 @@ import {
 } from '@/features/groups'
 import { ClassroomsPage } from '@/features/classrooms'
 import { RiskCenterPage } from '@/features/risk-center/academic'
+import { ExceptionalStudentPage } from '@/features/exceptional-students'
 import { RosterUploadPage } from '@/features/students'
 import {
   AdminSubjectAssignmentsPage,
@@ -109,6 +110,10 @@ function DocenteRoutes() {
         <Route
           path="/cargar-nomina"
           element={guarded('grupos.gestionar', <RosterUploadPage />)}
+        />
+        <Route
+          path="/estudiante-excepcional"
+          element={guarded('casos-especiales.gestionar', <ExceptionalStudentPage />)}
         />
         <Route path="/grupos/:idGrupo/nomina" element={<RosterUploadRedirect />} />
 

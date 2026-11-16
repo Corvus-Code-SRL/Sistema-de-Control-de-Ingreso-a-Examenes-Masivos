@@ -20,6 +20,8 @@ class GroupStudentResource extends JsonResource
             'apellido_paterno' => $this->apellido_paterno,
             'apellido_materno' => $this->apellido_materno,
             'nombre' => $this->nombre,
+            'es_excepcional' => (bool) $this->es_excepcional,
+            'motivo_excepcional' => $this->motivo_excepcional,
             'carrera' => $this->id_carrera === null ? null : [
                 'id_carrera' => (int) $this->id_carrera,
                 'nombre' => $this->carrera_nombre,
