@@ -1210,4 +1210,163 @@ class StudentVerificationTest extends TestCase
         $this->getJson($this->url('buscar') . '?nombre=Estudiante')->assertForbidden();
         $this->getJson($this->url('estado'))->assertForbidden();
     }
+
+    public function test_rechaza_no_habilitado(): void
+    {
+        DB::table('examen_estudiante')->insert([
+            'id_examen' => $this->exam->id_examen,
+            'id_estudiante' => $this->student->id_estudiante,
+            'id_grupo' => $this->grupoPropioId,
+            'estado_habilitacion' => 'NO_HABILITADO',
+            'observacion' => 'ASISTENCIA_INSUFICIENTE',
+            'estado_ingreso' => 'NO_INGRESO',
+        ]);
+        $this->rebuildSnapshot();
+
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.veredicto', 'NO_HABILITADO')
+            ->assertJsonPath('data.autorizado', false)
+            ->assertJsonPath(
+                'data.motivo',
+                'El estudiante no está habilitado para este examen. Motivo: ASISTENCIA_INSUFICIENTE.'
+            );
+
+        $this->assertDatabaseHas('intento_ingreso', [
+            'id_examen' => $this->exam->id_examen,
+            'id_estudiante' => $this->student->id_estudiante,
+            'motivo' => 'NO_HABILITADO',
+            'observacion' => null,
+        ]);
+    }
+
+    public function test_rechaza_no_habilitado_con_detalle_otro(): void
+    {
+        DB::table('examen_estudiante')->insert([
+            'id_examen' => $this->exam->id_examen,
+            'id_estudiante' => $this->student->id_estudiante,
+            'id_grupo' => $this->grupoPropioId,
+            'estado_habilitacion' => 'NO_HABILITADO',
+            'observacion' => 'OTRO: Documento pendiente',
+            'estado_ingreso' => 'NO_INGRESO',
+        ]);
+        $this->rebuildSnapshot();
+
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.veredicto', 'NO_HABILITADO')
+            ->assertJsonPath('data.autorizado', false)
+            ->assertJsonPath(
+                'data.motivo',
+                'El estudiante no está habilitado para este examen. Motivo: Documento pendiente.'
+            );
+    }
+
+    public function test_sin_lista_todos_habilitados_ingresan(): void
+    {
+        // Sin fila en examen_estudiante, el estado por defecto es HABILITADO.
+        $this->assertSame(0, DB::table('examen_estudiante')->count());
+
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.veredicto', 'AUTORIZADO')
+            ->assertJsonPath('data.autorizado', true);
+
+        $this->postJson($this->url('confirmar-ingreso'), [
+            'id_estudiante' => $this->student->id_estudiante,
+            'id_ambiente' => $this->aulaId,
+        ])->assertCreated()->assertJsonPath('data.veredicto', 'INGRESO_REGISTRADO');
+
+        $this->assertDatabaseHas('examen_estudiante', [
+            'id_examen' => $this->exam->id_examen,
+            'id_estudiante' => $this->student->id_estudiante,
+            'estado_ingreso' => 'INGRESO',
+        ]);
+    }
+
+    public function test_habilitado_ingresa_normal(): void
+    {
+        DB::table('examen_estudiante')->insert([
+            'id_examen' => $this->exam->id_examen,
+            'id_estudiante' => $this->student->id_estudiante,
+            'id_grupo' => $this->grupoPropioId,
+            'estado_habilitacion' => 'HABILITADO',
+            'estado_ingreso' => 'NO_INGRESO',
+        ]);
+        $this->rebuildSnapshot();
+
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.veredicto', 'AUTORIZADO')
+            ->assertJsonPath('data.autorizado', true);
+
+        $this->postJson($this->url('confirmar-ingreso'), [
+            'id_estudiante' => $this->student->id_estudiante,
+            'id_ambiente' => $this->aulaId,
+        ])->assertCreated()->assertJsonPath('data.veredicto', 'INGRESO_REGISTRADO');
+    }
+
+    public function test_caso_especial_ingresa(): void
+    {
+        DB::table('examen_estudiante')->insert([
+            'id_examen' => $this->exam->id_examen,
+            'id_estudiante' => $this->student->id_estudiante,
+            'id_grupo' => $this->grupoPropioId,
+            'estado_habilitacion' => 'CASO ESPECIAL',
+            'estado_ingreso' => 'NO_INGRESO',
+        ]);
+        $this->rebuildSnapshot();
+
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.veredicto', 'AUTORIZADO')
+            ->assertJsonPath('data.autorizado', true);
+
+        $this->postJson($this->url('confirmar-ingreso'), [
+            'id_estudiante' => $this->student->id_estudiante,
+            'id_ambiente' => $this->aulaId,
+        ])->assertCreated()->assertJsonPath('data.veredicto', 'INGRESO_REGISTRADO');
+    }
+
+    public function test_no_habilitado_no_se_confirma(): void
+    {
+        DB::table('examen_estudiante')->insert([
+            'id_examen' => $this->exam->id_examen,
+            'id_estudiante' => $this->student->id_estudiante,
+            'id_grupo' => $this->grupoPropioId,
+            'estado_habilitacion' => 'NO_HABILITADO',
+            'observacion' => 'ASISTENCIA_INSUFICIENTE',
+            'estado_ingreso' => 'NO_INGRESO',
+        ]);
+        $this->rebuildSnapshot();
+
+        // El flujo de verificación sí registra el intento.
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.veredicto', 'NO_HABILITADO');
+
+        $this->assertDatabaseHas('intento_ingreso', [
+            'id_examen' => $this->exam->id_examen,
+            'id_estudiante' => $this->student->id_estudiante,
+            'motivo' => 'NO_HABILITADO',
+        ]);
+
+        // La confirmación no debe registrar ingreso ni duplicar el intento.
+        $this->postJson($this->url('confirmar-ingreso'), [
+            'id_estudiante' => $this->student->id_estudiante,
+            'ci' => $this->student->ci,
+            'id_ambiente' => $this->aulaId,
+        ])->assertUnprocessable()->assertJsonPath('veredicto', 'NO_HABILITADO');
+
+        $this->assertDatabaseHas('examen_estudiante', [
+            'id_examen' => $this->exam->id_examen,
+            'id_estudiante' => $this->student->id_estudiante,
+            'estado_ingreso' => 'NO_INGRESO',
+        ]);
+        $this->assertSame(1, DB::table('intento_ingreso')
+            ->where('id_examen', $this->exam->id_examen)
+            ->where('id_estudiante', $this->student->id_estudiante)
+            ->where('motivo', 'NO_HABILITADO')
+            ->count());
+    }
 }
