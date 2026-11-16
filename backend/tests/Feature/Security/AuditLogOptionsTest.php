@@ -22,11 +22,11 @@ class AuditLogOptionsTest extends TestCase
         $this->prepareAuditLog();
     }
 
-    public function test_ofrece_las_23_acciones_del_catalogo_con_su_etiqueta(): void
+    public function test_ofrece_las_24_acciones_del_catalogo_con_su_etiqueta(): void
     {
         $actions = collect($this->getJson('/api/bitacora/opciones')->assertOk()->json('data.acciones'));
 
-        $this->assertCount(23, $actions);
+        $this->assertCount(24, $actions);
         $this->assertSame('Modificar', $actions->firstWhere('codigo', 'MODIFICAR')['etiqueta']);
         $this->assertSame('Retirar estudiante', $actions->firstWhere('codigo', 'EXPULSAR_ESTUDIANTE')['etiqueta']);
         $this->assertSame('Rectificar registro', $actions->firstWhere('codigo', 'RECTIFICAR_REGISTRO')['etiqueta']);
