@@ -1822,17 +1822,3 @@ CREATE INDEX idx_central_riesgo_activo_fecha
 INSERT INTO public.accion (operacion, tipo_operacion, descripcion)
 SELECT 'RECTIFICAR_REGISTRO', 'UPDATE', 'Rectificación de un registro de la Central de Riesgo'
 WHERE NOT EXISTS (SELECT 1 FROM public.accion WHERE operacion = 'RECTIFICAR_REGISTRO');
-
--- Versión 15: estudiante excepcional en el grupo (HU-023)
---             (2026_11_08_000000_add_exceptional_to_grupo_estudiante)
---   * grupo_estudiante.es_excepcional: marca «Excepcional» (false por defecto).
---   * grupo_estudiante.motivo_excepcional: motivo del registro excepcional; obligatorio con la marca.
-
-ALTER TABLE public.grupo_estudiante
-    ADD COLUMN es_excepcional boolean NOT NULL DEFAULT false,
-    ADD COLUMN motivo_excepcional varchar(255),
-    ADD CONSTRAINT chk_grupo_estudiante_excepcional_motivo
-        CHECK (
-            NOT es_excepcional
-            OR (motivo_excepcional IS NOT NULL AND btrim(motivo_excepcional) <> '')
-        );
