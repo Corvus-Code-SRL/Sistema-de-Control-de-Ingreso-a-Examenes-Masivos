@@ -79,8 +79,9 @@ class ExamHistoryService
         $reports = DB::table('reporte_estudiante as r')
             ->join('tipo_falta as f', 'f.id_falta', '=', 'r.id_tipo_falta')
             ->leftJoin('usuario as reportante', 'reportante.id_usuario', '=', 'r.id_usuario_reportante')
+            ->leftJoin('central_riesgo as cr', 'cr.id_reporte_est', '=', 'r.id_reporte_est')
             ->where('r.id_examen', $exam->id_examen)
-            ->select(['r.fecha_reporte', 'r.estado', 'f.nombre as falta'])
+            ->select(['r.fecha_reporte', 'r.estado', 'f.nombre as falta', 'cr.rectificado_en'])
             ->selectRaw("TRIM(CONCAT_WS(' ', reportante.nombre, reportante.apellido_paterno, reportante.apellido_materno)) as reportante")
             ->orderBy('r.fecha_reporte')
             ->get();
@@ -163,7 +164,10 @@ class ExamHistoryService
             'fecha_hora' => $report->fecha_reporte,
             'descripcion' => 'Incidencia: ' . $report->falta,
             'detalle' => ($report->estado === ReportStatus::APPROVED
-                ? 'Aprobada · en Central de Riesgo' : ucfirst(strtolower($report->estado)))
+                ? ($report->rectificado_en !== null
+                    ? 'Aprobada · retirada de la Central de Riesgo'
+                    : 'Aprobada · en Central de Riesgo')
+                : ucfirst(strtolower($report->estado)))
                 . ($report->reportante ? ' · Reportó: ' . $report->reportante : ' · Reportante no registrado'),
         ]));
 

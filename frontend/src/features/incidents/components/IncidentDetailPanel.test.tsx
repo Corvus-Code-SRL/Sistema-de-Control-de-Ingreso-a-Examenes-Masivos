@@ -32,6 +32,7 @@ const pending: IncidentReview = {
   },
   revisor: null,
   en_central_riesgo: false,
+  retirado_de_central_riesgo: false,
 }
 
 const approved: IncidentReview = {
@@ -43,6 +44,12 @@ const approved: IncidentReview = {
     observacion_revision: 'Confirmado en la puerta.',
   },
   en_central_riesgo: true,
+}
+
+const withdrawn: IncidentReview = {
+  ...approved,
+  en_central_riesgo: false,
+  retirado_de_central_riesgo: true,
 }
 
 function stubDetail(incident: IncidentReview) {
@@ -89,6 +96,13 @@ describe('IncidentDetailPanel', () => {
     expect(screen.getByText('Material no permitido')).toBeInTheDocument()
     expect(screen.getByText('Rechazo por decisión del controlador')).toBeInTheDocument()
     expect(screen.getByText('Material impreso entre sus útiles.')).toBeInTheDocument()
+  })
+
+  it('una aprobada que un administrador retiró de la Central lo indica en la decisión', async () => {
+    renderPanel(withdrawn)
+
+    expect(await screen.findByText('Aprobado · retirado de la Central de Riesgo')).toBeInTheDocument()
+    expect(screen.queryByText('Aprobado · en Central de Riesgo')).not.toBeInTheDocument()
   })
 
   it('en una revisada muestra la decisión definitiva y no ofrece botones', async () => {

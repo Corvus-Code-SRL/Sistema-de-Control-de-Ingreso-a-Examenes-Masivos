@@ -112,7 +112,7 @@ class AlienAttemptsReportService
             ->selectRaw("e.id_estudiante, e.cod_sis, COUNT(*) AS intentos, "
                 . "string_agg(DISTINCT ex.nombre_examen, ' · ') AS examenes, "
                 . "(SELECT MIN(cr.id_cr_estudiante) FROM central_riesgo cr "
-                . "WHERE cr.id_estudiante = e.id_estudiante) AS id_cr_estudiante, "
+                . "WHERE cr.id_estudiante = e.id_estudiante AND cr.rectificado_en IS NULL) AS id_cr_estudiante, "
                 . "CONCAT_WS(' ', e.nombre, e.apellido_paterno, e.apellido_materno) AS nombre_completo")
             ->groupBy('e.id_estudiante', 'e.cod_sis', 'e.nombre', 'e.apellido_paterno', 'e.apellido_materno')
             ->orderByDesc('intentos')
@@ -134,7 +134,9 @@ class AlienAttemptsReportService
             'total_intentos' => (clone $base)->count(),
             'total_estudiantes' => (clone $base)->distinct()->count('ii.id_estudiante'),
             'total_en_central_riesgo' => (clone $base)
-                ->join('central_riesgo as cr', 'cr.id_estudiante', '=', 'ii.id_estudiante')
+                ->join('central_riesgo as cr', function ($join) {
+                    $join->on('cr.id_estudiante', '=', 'ii.id_estudiante')->whereNull('cr.rectificado_en');
+                })
                 ->distinct()
                 ->count('ii.id_estudiante'),
         ];

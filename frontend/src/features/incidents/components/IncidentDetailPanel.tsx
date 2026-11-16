@@ -158,7 +158,9 @@ export function IncidentDetailPanel({ incidentId, onReviewed, onBack }: Incident
                 <dt className="text-muted-foreground">Decisión</dt>
                 <dd className="font-medium">
                   {incident.estado === 'APROBADO'
-                    ? 'Aprobado · en Central de Riesgo'
+                    ? incident.retirado_de_central_riesgo
+                      ? 'Aprobado · retirado de la Central de Riesgo'
+                      : 'Aprobado · en Central de Riesgo'
                     : 'Rechazado · no entra a la Central de Riesgo'}
                 </dd>
                 <dt className="text-muted-foreground">Revisor</dt>
