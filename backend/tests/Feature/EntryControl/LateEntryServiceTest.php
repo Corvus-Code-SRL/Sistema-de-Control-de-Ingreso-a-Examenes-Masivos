@@ -50,7 +50,10 @@ class LateEntryServiceTest extends TestCase
         parent::setUp();
         $this->seedExamCatalog();
 
-        $this->exam = $this->createExam(['estado' => Exam::EN_CURSO], [$this->aulaId, $this->otraAulaId]);
+        $this->exam = $this->createExam(
+            array_merge(['estado' => Exam::EN_CURSO], $this->entryOpen(true)),
+            [$this->aulaId, $this->otraAulaId]
+        );
         DB::table('grupo_examen')->insert([
             'id_examen' => $this->exam->id_examen,
             'id_grupo' => $this->grupoPropioId,
@@ -437,7 +440,7 @@ class LateEntryServiceTest extends TestCase
     {
         $request = $this->requestSecondStudent();
 
-        foreach ([Exam::EN_INGRESO, Exam::FINALIZADO] as $state) {
+        foreach ([Exam::PROGRAMADO, Exam::FINALIZADO] as $state) {
             $this->setExamState($state);
             $conflict = LateEntryException::EXAM_NOT_IN_PROGRESS;
 
@@ -684,7 +687,7 @@ class LateEntryServiceTest extends TestCase
         $this->setExamState(Exam::FINALIZADO);
         $this->assertCount(2, $queries->list($this->exam, $this->teacher)['solicitudes']);
 
-        $this->setExamState(Exam::EN_INGRESO);
+        $this->setExamState(Exam::PROGRAMADO);
         $this->expectException(ExamStateException::class);
         $queries->list($this->exam, $this->teacher);
     }

@@ -82,7 +82,8 @@ export function useExamDetail(examId: number) {
       subject.id_materia === formData.materia?.id_materia
   )
 
-  const isProgramado = exam?.estado === 'PROGRAMADO'
+  // Con el control de ingreso abierto el examen sigue PROGRAMADO, pero ya no admite cambios.
+  const isProgramado = exam?.estado === 'PROGRAMADO' && !exam.ingreso_abierto_en
 
   const toggleGroup = useCallback(
     (groupId: number) => {

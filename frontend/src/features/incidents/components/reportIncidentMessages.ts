@@ -24,6 +24,6 @@ export const ATTEMPT_REPORT_ERRORS: Record<ReportIncidentFlow, { unconfirmed: st
 }
 
 export const REPORT_INCIDENT_STATE_LABELS: Record<SituationExam['estado'], string> = {
-  EN_INGRESO: 'En ingreso',
+  PROGRAMADO: 'Ingreso abierto',
   EN_CURSO: 'En curso',
 }

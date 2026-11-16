@@ -235,3 +235,17 @@ describe('VerificationResult acciones configurables', () => {
     expect(screen.queryByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument()
   })
 })
+
+describe('VerificationResult reporte pendiente', () => {
+  it('muestra el aviso sin bloquear la decisión de ingreso', () => {
+    const onConfirm = vi.fn()
+    render(<VerificationResult
+      result={{ ...result, reporte_pendiente: true }}
+      busy={false} onConfirm={onConfirm} onReject={() => {}} onNext={() => {}}
+    />)
+
+    expect(screen.getByText('Este estudiante tiene un reporte pendiente en este examen.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Aceptar ingreso' }))
+    expect(onConfirm).toHaveBeenCalledOnce()
+  })
+})

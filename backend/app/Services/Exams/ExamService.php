@@ -7,6 +7,7 @@ use App\Exceptions\Exams\ExamStateException;
 use App\Exceptions\Exams\ExamWarningsException;
 use App\Models\Classroom;
 use App\Models\Exam;
+use App\Services\EntryControl\CloseOrdinaryEntryService;
 use App\Models\ExamType;
 use App\Models\Group;
 use App\Services\Academic\SubjectCatalogService;
@@ -126,18 +127,18 @@ class ExamService
     }
 
     /**
-     * Exámenes vigentes del docente (vista Programados): PROGRAMADO o EN_INGRESO, del más
-     * próximo al más lejano.
+     * Exámenes vigentes del docente (vista Programados): PROGRAMADO, del más próximo al más lejano.
+     * Con el control de ingreso abierto siguen aquí hasta que llega su hora de inicio.
      *
      * El examen no guarda su período: lo da el período de sus grupos. Entra el que tiene al
      * menos un grupo del período activo y también el que aún no tiene grupos asignados, para que
      * un examen recién creado aparezca en la vista antes de vincularle sus grupos.
      *
-     * @param  array<int, string>  $states  Estados que se incluyen; por omisión PROGRAMADO y EN_INGRESO.
+     * @param  array<int, string>  $states  Estados que se incluyen; por omisión solo PROGRAMADO.
      */
     public function listScheduledForTeacher(
         string $teacherId,
-        array $states = [Exam::PROGRAMADO, Exam::EN_INGRESO]
+        array $states = [Exam::PROGRAMADO]
     ): Collection {
         $this->assertTeacherGiven($teacherId);
 
@@ -215,7 +216,7 @@ class ExamService
 
     /**
      * Criterios 10 y 11: la información general solo cambia mientras el examen está
-     * PROGRAMADO. Desde EN_INGRESO nombre, fecha, hora, duración y materia quedan fijos.
+     * PROGRAMADO y sin abrir el control de ingreso: después, nombre, fecha, hora, duración y materia quedan fijos.
      */
     public function update(Exam $exam, array $data, string $teacherId): Exam
     {
@@ -231,7 +232,7 @@ class ExamService
 
             $this->assertOwnedBy($exam, $teacherId);
 
-            if ($exam->estado !== Exam::PROGRAMADO) {
+            if ($exam->estado !== Exam::PROGRAMADO || CloseOrdinaryEntryService::hasOpened((int) $exam->id_examen)) {
                 throw new ExamStateException($this->notEditableMessage($exam->estado));
             }
 
@@ -354,7 +355,7 @@ class ExamService
 
             $this->assertOwnedBy($exam, $teacherId);
 
-            if ($exam->estado !== Exam::PROGRAMADO) {
+            if ($exam->estado !== Exam::PROGRAMADO || CloseOrdinaryEntryService::hasOpened((int) $exam->id_examen)) {
                 throw new ExamStateException($this->notCancellableMessage($exam->estado));
             }
 

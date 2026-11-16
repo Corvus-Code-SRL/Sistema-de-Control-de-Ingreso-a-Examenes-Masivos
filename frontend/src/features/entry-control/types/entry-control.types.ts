@@ -10,6 +10,7 @@ export interface EntryContext {
   hora_inicio: string | null
   hora_fin: string | null
   estado: string
+  ingreso_ordinario_cerrado?: boolean
   materia: string | null
   carrera: string | null
   grupos: string[]
@@ -59,6 +60,7 @@ export interface Verification {
   ambiente_asignado: EntryRoom | null
   antecedentes: { total: number; latest: { tipo_falta: string; fecha_registro: string } | null }
   ingreso_previo: PreviousEntry | null
+  reporte_pendiente?: boolean
 }
 
 /** Textos de las acciones del resultado de verificación según el flujo que lo usa. */
@@ -124,7 +126,8 @@ export interface EntryActionInput {
 
 export interface OpenEntryExam {
   id_examen: number
-  estado: 'PROGRAMADO' | 'EN_INGRESO'
+  estado: 'PROGRAMADO' | 'EN_CURSO'
+  control_abierto?: boolean
   nombre_examen: string
   fecha: string | null
   hora_inicio: string | null

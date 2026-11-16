@@ -30,27 +30,27 @@ class ExamSituationWorkspaceTest extends TestCase
         $this->createExam(['estado' => Exam::EN_CURSO, 'id_usuario_docente' => $this->otroDocenteId]);
         $this->createExam(['estado' => Exam::FINALIZADO]);
         $this->createExam();
-        $entryOpen = $this->createExam(['estado' => Exam::EN_INGRESO]);
+        $entryOpen = $this->createExam($this->examStateAttributes('INGRESO_ABIERTO'));
 
         $response = $this->getJson('/api/situaciones/examenes')->assertOk()->assertJsonCount(2, 'data');
 
         $states = collect($response->json('data'))->pluck('estado', 'id_examen')->sortKeys()->all();
         $this->assertSame([
             (int) $this->situationExam->id_examen => Exam::EN_CURSO,
-            (int) $entryOpen->id_examen => Exam::EN_INGRESO,
+            (int) $entryOpen->id_examen => Exam::PROGRAMADO,
         ], $states);
     }
 
     public function testCatalogCanBeFilteredByEntryOpenOrInProgressButNotByOtherStates(): void
     {
-        $entryOpen = $this->createExam(['estado' => Exam::EN_INGRESO]);
+        $entryOpen = $this->createExam($this->examStateAttributes('INGRESO_ABIERTO'));
 
-        $this->getJson('/api/situaciones/examenes?estado=EN_INGRESO')->assertOk()->assertJsonCount(1, 'data')
+        $this->getJson('/api/situaciones/examenes?estado=PROGRAMADO')->assertOk()->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id_examen', (int) $entryOpen->id_examen);
         $this->getJson('/api/situaciones/examenes?estado=EN_CURSO')->assertOk()->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id_examen', (int) $this->situationExam->id_examen);
 
-        foreach ([Exam::PROGRAMADO, Exam::FINALIZADO, Exam::CANCELADO] as $state) {
+        foreach ([Exam::FINALIZADO, Exam::CANCELADO] as $state) {
             $this->getJson('/api/situaciones/examenes?estado=' . $state)
                 ->assertStatus(422)->assertJsonValidationErrors('estado');
         }
@@ -67,10 +67,10 @@ class ExamSituationWorkspaceTest extends TestCase
 
     public function testContextWorksDuringEntryOpenSearchingByNameSisAndCi(): void
     {
-        $this->situationExam->update(['estado' => Exam::EN_INGRESO]);
+        $this->situationExam->forceFill($this->examStateAttributes('INGRESO_ABIERTO'))->save();
         $this->situationStudent->update(['nombre' => 'José', 'apellido_paterno' => 'Ávila', 'ci' => '7654321']);
 
-        $this->getJson($this->contextUrl())->assertOk()->assertJsonPath('data.examen.estado', Exam::EN_INGRESO)
+        $this->getJson($this->contextUrl())->assertOk()->assertJsonPath('data.examen.estado', Exam::PROGRAMADO)
             ->assertJsonCount(1, 'data.estudiantes');
 
         foreach (['jose', $this->situationStudent->cod_sis, '7654321'] as $term) {
@@ -82,7 +82,7 @@ class ExamSituationWorkspaceTest extends TestCase
 
     public function testContextDuringEntryOpenOffersOnlyPresentStudents(): void
     {
-        $this->situationExam->update(['estado' => Exam::EN_INGRESO]);
+        $this->situationExam->forceFill($this->examStateAttributes('INGRESO_ABIERTO'))->save();
         DB::table('examen_estudiante')->where('id_examen', $this->situationExam->id_examen)
             ->update([
                 'estado_ingreso' => 'NO_INGRESO', 'hora_ingreso' => null,
@@ -217,8 +217,11 @@ class ExamSituationWorkspaceTest extends TestCase
     {
         $this->createSituationFixture();
 
-        foreach ([Exam::FINALIZADO, Exam::PROGRAMADO] as $state) {
-            $this->situationExam->update(['estado' => $state]);
+        foreach ([
+            ['estado' => Exam::FINALIZADO],
+            ['estado' => Exam::PROGRAMADO, 'ingreso_abierto_en' => null],
+        ] as $attributes) {
+            $this->situationExam->forceFill($attributes)->save();
             $this->getJson($this->contextUrl())->assertStatus(409)->assertJsonPath(
                 'message',
                 'Solo se pueden registrar situaciones con el ingreso abierto o con el examen en curso.'
@@ -232,7 +235,7 @@ class ExamSituationWorkspaceTest extends TestCase
 
     public function testValidatesFiltersAndBoundsRouteIdentifiers(): void
     {
-        $this->getJson('/api/situaciones/examenes?estado=PROGRAMADO&page=0')->assertStatus(422)
+        $this->getJson('/api/situaciones/examenes?estado=FINALIZADO&page=0')->assertStatus(422)
             ->assertJsonValidationErrors(['estado', 'page']);
         $this->getJson($this->contextUrl() . '?page=0&id_estudiante=-1&q=' . str_repeat('x', 51))
             ->assertStatus(422)->assertJsonValidationErrors(['page', 'id_estudiante', 'q']);

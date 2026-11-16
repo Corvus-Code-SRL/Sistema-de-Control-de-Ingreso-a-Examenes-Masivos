@@ -8,6 +8,7 @@ use App\Exceptions\Incidents\IncidentReportNotFoundException;
 use App\Models\Action;
 use App\Models\RiskCenter;
 use App\Models\StudentReport;
+use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\Security\AuditLogService;
 use App\Support\ReportStatus;
 use App\Support\Storage\EvidenceStorage;
@@ -27,11 +28,16 @@ class IncidentReviewService
     private AuditLogService $auditLog;
 
     private EvidenceStorage $evidence;
+    private EntryControlSnapshotService $snapshots;
 
-    public function __construct(AuditLogService $auditLog, EvidenceStorage $evidence)
-    {
+    public function __construct(
+        AuditLogService $auditLog,
+        EvidenceStorage $evidence,
+        EntryControlSnapshotService $snapshots
+    ) {
         $this->auditLog = $auditLog;
         $this->evidence = $evidence;
+        $this->snapshots = $snapshots;
     }
 
     /**
@@ -98,7 +104,7 @@ class IncidentReviewService
      */
     public function approve(string $teacherId, string $reporte, ?string $observacion): array
     {
-        return DB::transaction(function () use ($teacherId, $reporte, $observacion) {
+        $report = DB::transaction(function () use ($teacherId, $reporte, $observacion) {
             $report = $this->lockReport($teacherId, $reporte);
 
             $this->assertPending($report);
@@ -127,8 +133,10 @@ class IncidentReviewService
                 $teacherId
             );
 
-            return $this->toDto($report->fresh($this->listRelations()));
+            return $report->fresh($this->listRelations());
         });
+
+        return $this->reviewedReport($report);
     }
 
     /**
@@ -140,7 +148,7 @@ class IncidentReviewService
      */
     public function reject(string $teacherId, string $reporte, string $observacion): array
     {
-        return DB::transaction(function () use ($teacherId, $reporte, $observacion) {
+        $report = DB::transaction(function () use ($teacherId, $reporte, $observacion) {
             $report = $this->lockReport($teacherId, $reporte);
 
             $this->assertPending($report);
@@ -164,8 +172,24 @@ class IncidentReviewService
                 $teacherId
             );
 
-            return $this->toDto($report->fresh($this->listRelations()));
+            return $report->fresh($this->listRelations());
         });
+
+        return $this->reviewedReport($report);
+    }
+
+    private function reviewedReport(StudentReport $report): array
+    {
+        if ($report->origen === 'CONTROL_INGRESO') {
+            $this->snapshots->setPendingReport(
+                (int) $report->id_examen,
+                (int) $report->id_estudiante,
+                (int) $report->id_reporte_est,
+                false
+            );
+        }
+
+        return $this->toDto($report);
     }
 
     /* ===================================================================== */

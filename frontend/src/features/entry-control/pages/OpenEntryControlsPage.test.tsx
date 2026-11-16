@@ -5,16 +5,16 @@ import { renderWithRouter } from '@/test/render'
 import { OpenEntryControlsPage } from './OpenEntryControlsPage'
 
 const exam = {
-  id_examen: 7, nombre_examen: 'Primer parcial', estado: 'PROGRAMADO' as 'PROGRAMADO' | 'EN_INGRESO',
+  id_examen: 7, nombre_examen: 'Primer parcial', estado: 'PROGRAMADO' as 'PROGRAMADO' | 'EN_CURSO',
   fecha: '2026-10-20', hora_inicio: '08:00', materia: 'Bases de Datos I',
   carrera: 'Ingeniería de Sistemas', ambientes: ['691A', '692B'],
   rol_controlador: 'DOCENTE' as const, id_ambiente_asignado: null, ambiente_asignado: null,
   apertura_programada_en: '2026-10-20T07:50:00-04:00', motivo_apertura: null,
-  total: 2, ingresados: 0, pendientes: 2,
+  total: 2, ingresados: 0, pendientes: 2, control_abierto: false,
 }
 
 it('muestra al docente la apertura prevista y el progreso del examen abierto', async () => {
-  mockApiOnce({ body: { data: [{ ...exam, estado: 'EN_INGRESO', ingresados: 1, pendientes: 1 }] } })
+  mockApiOnce({ body: { data: [{ ...exam, estado: 'PROGRAMADO', control_abierto: true, ingresados: 1, pendientes: 1 }] } })
   renderWithRouter(<OpenEntryControlsPage />)
 
   expect(await screen.findByText('Primer parcial')).toBeInTheDocument()
@@ -61,6 +61,18 @@ it('muestra el motivo de apertura fallida y el ambiente del auxiliar', async () 
   expect(screen.getByRole('link', { name: /Ver detalle del examen/ })).toBeInTheDocument()
 })
 
+it('avisa al docente y permite editar si falta capacidad al abrir', async () => {
+  mockApiOnce({ body: { data: [{
+    ...exam,
+    motivo_apertura: { codigo: 'CAPACIDAD_INSUFICIENTE', mensaje: 'Capacidad 1 menor que la nómina de 2.' },
+  }] } })
+  renderWithRouter(<OpenEntryControlsPage />)
+
+  expect(await screen.findByText('No se pudo abrir')).toBeInTheDocument()
+  expect(screen.getByRole('alert')).toHaveTextContent('Capacidad 1 menor que la nómina de 2.')
+  expect(screen.getByRole('link', { name: 'Modificar examen' })).toHaveAttribute('href', '/examenes/7/editar')
+})
+
 it('actualiza la lista cuando se abre el ingreso', async () => {
   const apiRoutes = [{ matches: () => true, body: { data: [exam] } }]
   mockApi(apiRoutes)
@@ -71,7 +83,7 @@ it('actualiza la lista cuando se abre el ingreso', async () => {
   try {
     await act(async () => { renderWithRouter(<OpenEntryControlsPage />) })
     expect(screen.getByText('Programado')).toBeInTheDocument()
-    apiRoutes[0].body = { data: [{ ...exam, estado: 'EN_INGRESO', ingresados: 1, pendientes: 1 }] }
+    apiRoutes[0].body = { data: [{ ...exam, estado: 'PROGRAMADO', control_abierto: true, ingresados: 1, pendientes: 1 }] }
 
     await act(async () => { await vi.advanceTimersByTimeAsync(15000) })
     expect(screen.getByText('Ingreso abierto')).toBeInTheDocument()

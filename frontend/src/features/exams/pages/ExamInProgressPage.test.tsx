@@ -28,9 +28,10 @@ const exam: ExamInProgress = {
   rol_controlador: 'DOCENTE',
   id_ambiente_asignado: null,
   ambientes: [{ id_ambiente: 1, nro_aula: '692C', capacidad: 50 }],
-  inicio_real_en: '2026-10-29T13:00:00Z',
+  inicio_programado: '2026-10-29T13:00:00Z',
+  ingreso_abierto_en: '2026-10-29T12:50:00Z',
+  ingreso_ordinario_cerrado_en: null,
   fin_real_en: null,
-  inicio_automatico: false,
   fin_automatico: false,
   fin_programado_en: '2026-10-29T15:00:00Z',
   hora_servidor_en: '2026-10-29T13:01:00Z',
@@ -123,11 +124,8 @@ describe('HU-038-A: puntos de extensión de En curso', () => {
 });
 
 describe('HU-038-A: consulta y filtros de En curso', () => {
-  it('muestra el inicio automático, el fin programado y los totales', async () => {
-    vi.mocked(examInProgressService.get).mockResolvedValue({
-      ...exam,
-      inicio_automatico: true,
-    });
+  it('muestra el inicio programado, la apertura del control, el fin programado y los totales', async () => {
+    vi.mocked(examInProgressService.get).mockResolvedValue(exam);
 
     renderWithRouter(<ExamInProgressPage />, {
       route: '/examenes/8/en-curso',
@@ -135,7 +133,9 @@ describe('HU-038-A: consulta y filtros de En curso', () => {
     });
 
     expect(await screen.findByText('Tercer Parcial')).toBeInTheDocument();
-    expect(screen.getByText('Inicio automático')).toBeInTheDocument();
+    expect(screen.getByText('Inicio programado')).toBeInTheDocument();
+    expect(screen.getByText(/Apertura del control:/)).toBeInTheDocument();
+    expect(screen.getByText('Ingreso ordinario abierto')).toBeInTheDocument();
     expect(screen.getByText(/Fin programado:/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Presentes (1)' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'Ausentes (1)' })).toBeInTheDocument();

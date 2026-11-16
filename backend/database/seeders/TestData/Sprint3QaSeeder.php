@@ -136,7 +136,7 @@ class Sprint3QaSeeder extends Seeder
         DB::table('examen')
             ->whereIn('fecha', [self::DATE_OWN_PARCIAL, self::DATE_FOREIGN, self::DATE_ASSISTANTS])
             ->whereNotIn('id_examen', $exams)
-            ->whereIn('estado', ['PROGRAMADO', 'EN_INGRESO'])
+            ->where('estado', 'PROGRAMADO')
             ->update(['estado' => 'CANCELADO']);
 
         // Inscripciones que deja la nómina de QA de HU-021 (códigos 202170001–202170028).

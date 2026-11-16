@@ -856,7 +856,7 @@ class StudentRosterHttpTest extends TestCase
     public function lockingExamStates(): array
     {
         return [
-            'EN_INGRESO' => [Exam::EN_INGRESO],
+            'INGRESO_ABIERTO' => ['INGRESO_ABIERTO'],
             'EN_CURSO' => [Exam::EN_CURSO],
         ];
     }
@@ -873,8 +873,7 @@ class StudentRosterHttpTest extends TestCase
             '20261001,PEREZ,ANA',
         ]))->assertOk();
 
-        $exam->estado = Exam::EN_INGRESO;
-        $exam->save();
+        $exam->forceFill($this->entryOpen())->save();
 
         $this->postJson(
             '/api/grupos/' . $group->id_grupo . '/nomina/confirm',
@@ -921,7 +920,7 @@ class StudentRosterHttpTest extends TestCase
 
     private function linkExam(Group $group, string $state): Exam
     {
-        $exam = $this->createExam(['estado' => $state]);
+        $exam = $this->createExam($this->examStateAttributes($state));
 
         DB::table('grupo_examen')->insert([
             'id_examen' => $exam->id_examen,

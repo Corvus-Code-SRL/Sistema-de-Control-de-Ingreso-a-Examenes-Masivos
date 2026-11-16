@@ -25,7 +25,7 @@ function totalStudents(exam: Exam): number {
 }
 
 /**
- * Exámenes vigentes del docente actual —PROGRAMADO y EN_INGRESO del período activo—, ordenados por
+ * Exámenes vigentes del docente actual —PROGRAMADO del período activo, con o sin el ingreso abierto—, ordenados por
  * fecha ascendente (HU-24 criterios 10-12). Los finalizados y cancelados no están aquí.
  *
  * Es el punto de entrada para reabrir un examen PROGRAMADO y editarlo o
@@ -113,18 +113,18 @@ export function ExamsPage() {
                   </TableCell>
 
                   <TableCell>
-                    <ExamStatusBadge status={exam.estado} />
+                    <ExamStatusBadge status={exam.estado} entryOpen={exam.control_ingreso_abierto} />
                   </TableCell>
 
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      {exam.estado === 'EN_INGRESO' && (
+                      {exam.control_ingreso_abierto && (
                         <Button size="sm" onClick={() => navigate(`/examenes/${exam.id_examen}/control-ingreso`)}>
                           <DoorOpen className="size-4" /> Controlar ingreso
                         </Button>
                       )}
                       <Button variant="outline" size="sm" onClick={() => navigate(`/examenes/${exam.id_examen}`)}>
-                        {exam.estado === 'PROGRAMADO' ? 'Configurar' : 'Ver detalle'}
+                        {exam.estado === 'PROGRAMADO' && !exam.ingreso_abierto_en ? 'Configurar' : 'Ver detalle'}
                       </Button>
                     </div>
                   </TableCell>

@@ -23,7 +23,7 @@ trait SeedsExamSituations
         $this->seedExamCatalog();
         $this->seed(ExamSituationActionSeeder::class);
         $this->situationExam = $this->createExam(
-            ['estado' => Exam::EN_CURSO],
+            array_merge(['estado' => Exam::EN_CURSO], $this->entryOpen()),
             [$this->aulaId, $this->otraAulaId]
         );
 

@@ -367,7 +367,7 @@ class UpdateGroupTest extends TestCase
     public function lockingExamStates(): array
     {
         return [
-            'EN_INGRESO' => [Exam::EN_INGRESO],
+            'INGRESO_ABIERTO' => ['INGRESO_ABIERTO'],
             'EN_CURSO' => [Exam::EN_CURSO],
         ];
     }

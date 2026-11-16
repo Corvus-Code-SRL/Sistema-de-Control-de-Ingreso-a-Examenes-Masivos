@@ -9,6 +9,8 @@ use App\Models\Student;
 use App\Models\User;
 use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\EntryControl\RoomAssignmentService;
+use App\Services\Exams\ExamLifecycleService;
+use App\Services\Incidents\IncidentReviewService;
 use App\Support\RecordStatus;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -181,6 +183,34 @@ class StudentVerificationTest extends TestCase
 
         $this->assertSame(0, DB::table('examen_estudiante')->count());
         $this->assertSame(0, DB::table('intento_ingreso')->count());
+    }
+
+    public function test_reverificar_advierte_reporte_pendiente_hasta_su_revision(): void
+    {
+        $attemptId = $this->postJson($this->url('rechazar-ingreso'), [
+            'id_estudiante' => $this->student->id_estudiante,
+            'id_ambiente' => $this->aulaId,
+            'motivo' => 'IDENTIDAD_DUDOSA',
+        ])->assertCreated()->json('data.id_intento');
+        $reasonId = DB::table('tipo_falta')->insertGetId(['nombre' => 'Identidad dudosa'], 'id_falta');
+        $reportId = $this->postJson($this->url("intentos/{$attemptId}/reporte"), [
+            'id_tipo_falta' => $reasonId,
+            'descripcion' => 'La identidad requiere revisión.',
+        ])->assertCreated()->json('data.id_reporte_est');
+
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.veredicto', 'AUTORIZADO')
+            ->assertJsonPath('data.reporte_pendiente', true);
+        $this->rebuildSnapshot();
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.reporte_pendiente', true);
+
+        app(IncidentReviewService::class)->reject($this->docenteId, "estudiante-{$reportId}", 'No se confirmó la falta.');
+        $this->postJson($this->url('verificar'), $this->input())
+            ->assertOk()
+            ->assertJsonPath('data.reporte_pendiente', false);
     }
 
     public function test_sis_de_auxiliar_del_examen_muestra_su_ficha_sin_registrar_intento_ni_ingreso(): void
@@ -1197,7 +1227,7 @@ class StudentVerificationTest extends TestCase
 
             Carbon::setTestNow(Carbon::parse('2026-09-29 12:01:00', config('sciem.zona_horaria')));
             app()->call([app(OpenEntryControlJob::class), 'handle']);
-            $this->assertSame(Exam::EN_INGRESO, $exam->fresh()->estado);
+            $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
         } finally {
             Carbon::setTestNow();
         }
@@ -1211,8 +1241,9 @@ class StudentVerificationTest extends TestCase
                 'fecha' => '2026-09-29',
                 'hora_inicio' => '12:31',
                 'hora_fin' => '14:01',
-                'minutos_apertura' => 120,
             ], [$this->aulaId]);
+            DB::table('examen')->where('id_examen', $exam->id_examen)
+                ->update(['minutos_apertura' => 120]);
             DB::table('grupo_examen')->insert([
                 'id_examen' => $exam->id_examen,
                 'id_grupo' => $this->grupoPropioId,
@@ -1223,7 +1254,15 @@ class StudentVerificationTest extends TestCase
 
             Carbon::setTestNow(Carbon::parse('2026-09-29 10:31:00', config('sciem.zona_horaria')));
             app()->call([app(OpenEntryControlJob::class), 'handle']);
-            $this->assertSame(Exam::EN_INGRESO, $exam->fresh()->estado);
+            $this->assertTrue(app(EntryControlSnapshotService::class)->ready((int) $exam->id_examen));
+            $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+            app(ExamLifecycleService::class)->startExpired();
+            $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+
+            Carbon::setTestNow(Carbon::parse('2026-09-29 12:31:00', config('sciem.zona_horaria')));
+            app(ExamLifecycleService::class)->startExpired();
+            $this->assertSame(Exam::EN_CURSO, $exam->fresh()->estado);
+            $this->assertTrue(app(EntryControlSnapshotService::class)->ready((int) $exam->id_examen));
         } finally {
             Carbon::setTestNow();
         }
@@ -1237,8 +1276,9 @@ class StudentVerificationTest extends TestCase
                 'fecha' => '2026-09-30',
                 'hora_inicio' => '00:30',
                 'hora_fin' => '02:00',
-                'minutos_apertura' => 120,
             ], [$this->aulaId]);
+            DB::table('examen')->where('id_examen', $exam->id_examen)
+                ->update(['minutos_apertura' => 120]);
             DB::table('grupo_examen')->insert([
                 'id_examen' => $exam->id_examen,
                 'id_grupo' => $this->grupoPropioId,
@@ -1249,7 +1289,15 @@ class StudentVerificationTest extends TestCase
 
             Carbon::setTestNow(Carbon::parse('2026-09-29 22:30:00', config('sciem.zona_horaria')));
             app()->call([app(OpenEntryControlJob::class), 'handle']);
-            $this->assertSame(Exam::EN_INGRESO, $exam->fresh()->estado);
+            $this->assertTrue(app(EntryControlSnapshotService::class)->ready((int) $exam->id_examen));
+            $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+            app(ExamLifecycleService::class)->startExpired();
+            $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+
+            Carbon::setTestNow(Carbon::parse('2026-09-30 00:30:00', config('sciem.zona_horaria')));
+            app(ExamLifecycleService::class)->startExpired();
+            $this->assertSame(Exam::EN_CURSO, $exam->fresh()->estado);
+            $this->assertTrue(app(EntryControlSnapshotService::class)->ready((int) $exam->id_examen));
         } finally {
             Carbon::setTestNow();
         }
@@ -1271,7 +1319,7 @@ class StudentVerificationTest extends TestCase
             ]);
 
             app()->call([app(OpenEntryControlJob::class), 'handle']);
-            $this->assertSame(Exam::EN_INGRESO, $other->fresh()->estado);
+            $this->assertSame(Exam::PROGRAMADO, $other->fresh()->estado);
             $firstRoom = app(RoomAssignmentService::class)->assignedRoomFor(
                 $other->id_examen,
                 $this->student->id_estudiante

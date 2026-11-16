@@ -38,7 +38,7 @@ use Illuminate\Support\Facades\DB;
  *   - Gustavo Rocha (10533) dicta otra materia (Álgebra, Estadística): nunca aparece para ese examen.
  *   - «HU-026 Parcial Cálculo I» (9811) está PROGRAMADO y recibe las invitaciones PENDIENTE (Rosario), ACEPTADA
  *     (Elena) y RECHAZADA (Rolando, que no permitía agregar grupos). Carmen no tiene invitación: sirve para invitar.
- *   - «HU-026 Final Cálculo I» (9812) ya está EN_INGRESO: no sale en el desplegable y su invitación a Carmen quedó
+ *   - «HU-026 Final Cálculo I» (9812) ya abrió el control de ingreso: no sale en el desplegable y su invitación a Carmen quedó
  *     SIN_EFECTO. Las fechas son futuras (diciembre de 2026) para que el planificador no cierre estos exámenes.
  * Volver a correrlo devuelve estos exámenes y sus invitaciones a su estado inicial. La bitácora no se toca.
  *
@@ -141,7 +141,7 @@ class Sprint5QaSeeder extends Seeder
             $this->invitationExam(self::EXAM_INVITE_SCHEDULED, 'HU-026 Parcial Cálculo I', '2026-12-10', '08:00:00',
                 '09:30:00', 90, 'PROGRAMADO'),
             $this->invitationExam(self::EXAM_INVITE_ENTRY, 'HU-026 Final Cálculo I', '2026-12-11', '10:00:00',
-                '12:00:00', 120, 'EN_INGRESO'),
+                '12:00:00', 120, 'PROGRAMADO', '2026-12-11 09:50:00-04'),
         ], ['id_examen']);
 
         $classrooms = [
@@ -228,7 +228,8 @@ class Sprint5QaSeeder extends Seeder
         string $start,
         string $end,
         int $duration,
-        string $status
+        string $status,
+        ?string $entryOpenedAt = null
     ): array {
         return [
             'id_examen' => $id,
@@ -243,6 +244,7 @@ class Sprint5QaSeeder extends Seeder
             'id_materia' => Ids::SUBJECT_CALCULUS,
             'id_usuario_docente' => Ids::TEACHER_FIXED,
             'estado' => $status,
+            'ingreso_abierto_en' => $entryOpenedAt,
         ];
     }
 

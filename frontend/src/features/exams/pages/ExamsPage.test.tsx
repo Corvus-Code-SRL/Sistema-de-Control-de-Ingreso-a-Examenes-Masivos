@@ -1,4 +1,4 @@
-import { screen, waitForElementToBeRemoved } from '@testing-library/react'
+import { screen, waitForElementToBeRemoved, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ExamsPage } from './ExamsPage'
 import { mockApi, mockApiOnce, mockApiWith } from '@/test/http'
@@ -47,7 +47,7 @@ describe('ExamsPage', () => {
     mockApiOnce({
       body: {
         data: [
-          makeExam({ id_examen: 1, nombre_examen: 'En ingreso hoy', estado: 'EN_INGRESO' }),
+          makeExam({ id_examen: 1, nombre_examen: 'Ingreso abierto hoy', ingreso_abierto_en: '2026-10-20T07:50:00Z', control_ingreso_abierto: true }),
           makeExam({ id_examen: 2, nombre_examen: 'Programado mañana' }),
         ],
       },
@@ -58,8 +58,30 @@ describe('ExamsPage', () => {
 
     expect((fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls[0][0]).toContain('vista=programados')
     const names = screen.getAllByRole('row').slice(1).map((row) => row.textContent ?? '')
-    expect(names[0]).toContain('En ingreso hoy')
+    expect(names[0]).toContain('Ingreso abierto hoy')
     expect(names[1]).toContain('Programado mañana')
+  })
+
+  it('con el ingreso abierto muestra «Ingreso abierto» y el botón Controlar ingreso; sin abrir, solo Configurar', async () => {
+    mockApiOnce({
+      body: {
+        data: [
+          makeExam({ id_examen: 1, nombre_examen: 'Ingreso abierto hoy', ingreso_abierto_en: '2026-10-20T07:50:00Z', control_ingreso_abierto: true }),
+          makeExam({ id_examen: 2, nombre_examen: 'Programado mañana' }),
+        ],
+      },
+    })
+
+    renderWithRouter(<ExamsPage />, { route: '/examenes/programados' })
+    await waitForLoad()
+
+    const [open, scheduled] = screen.getAllByRole('row').slice(1)
+    expect(within(open).getByText('Ingreso abierto')).toBeInTheDocument()
+    expect(within(open).getByRole('button', { name: /controlar ingreso/i })).toBeInTheDocument()
+    expect(within(open).getByRole('button', { name: 'Ver detalle' })).toBeInTheDocument()
+    expect(within(scheduled).getByText('Programado')).toBeInTheDocument()
+    expect(within(scheduled).queryByRole('button', { name: /controlar ingreso/i })).not.toBeInTheDocument()
+    expect(within(scheduled).getByRole('button', { name: 'Configurar' })).toBeInTheDocument()
   })
 
   it('muestra el estado vacío cuando no tiene examenes', async () => {

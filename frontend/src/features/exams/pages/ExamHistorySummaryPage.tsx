@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Check, Clock3, DoorOpen, FileText, Flag, History, Play } from 'lucide-react'
+import { ArrowLeft, Check, Clock3, DoorClosed, DoorOpen, FileText, Flag, History, Play } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -20,6 +20,7 @@ function formatDate(value: string): string {
 
 const eventStyles = {
   apertura: { Icon: DoorOpen, color: 'bg-accent-brand text-brand-deep' },
+  cierre_ingreso: { Icon: DoorClosed, color: 'bg-accent-brand text-brand-deep' },
   inicio: { Icon: Play, color: 'bg-brand text-white' },
   retraso: { Icon: Clock3, color: 'bg-accent-brand text-brand-deep' },
   incidencia: { Icon: Flag, color: 'bg-danger text-white' },

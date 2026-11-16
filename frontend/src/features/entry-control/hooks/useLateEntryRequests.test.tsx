@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api-client'
 import { makeLateEntryRequest } from '@/test/lateEntryFixtures'
-import { ENTRY_CONTROL_POLL_MS, LATE_ENTRY_POLL_MS } from '../constants'
+import { LATE_ENTRY_POLL_MS } from '../constants'
 import { LATE_ENTRY_MESSAGES } from '../components/lateEntryMessages'
 import { lateEntryService } from '../services/lateEntryService'
 import type { ControllerRole } from '../types/late-entry.types'
@@ -39,16 +39,16 @@ afterEach(() => {
 })
 
 describe('useLateEntryRequests', () => {
-  it('consulta cada 5 s, no al ritmo de 2 s del control de ingreso, y no con la pestaña oculta', async () => {
+  it('consulta cada 5 s y no con la pestaña oculta', async () => {
     const list = vi.spyOn(lateEntryService, 'list').mockResolvedValue([])
     await mount('DOCENTE')
     expect(LATE_ENTRY_POLL_MS).toBe(5000)
     expect(list).toHaveBeenCalledTimes(1)
 
-    await advance(ENTRY_CONTROL_POLL_MS)
+    await advance(LATE_ENTRY_POLL_MS - 1)
     expect(list).toHaveBeenCalledTimes(1)
 
-    await advance(LATE_ENTRY_POLL_MS - ENTRY_CONTROL_POLL_MS)
+    await advance(1)
     expect(list).toHaveBeenCalledTimes(2)
 
     Object.defineProperty(document, 'hidden', { configurable: true, value: true })

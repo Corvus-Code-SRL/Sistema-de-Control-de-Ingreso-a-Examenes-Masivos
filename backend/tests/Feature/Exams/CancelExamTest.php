@@ -62,10 +62,13 @@ class CancelExamTest extends TestCase
         $this->assertEquals(['id_examen' => $exam->id_examen, 'estado' => Exam::CANCELADO], $log->nuevo_valor);
     }
 
-    public function test_criterio_12_desde_en_ingreso_ya_no_se_puede_cancelar(): void
+    public function test_criterio_12_desde_que_abre_el_control_ya_no_se_puede_cancelar(): void
     {
-        foreach ([Exam::EN_INGRESO, Exam::EN_CURSO, Exam::FINALIZADO] as $status) {
-            $exam = $this->createExam(['nombre_examen' => "Examen {$status}", 'estado' => $status]);
+        foreach (['INGRESO_ABIERTO', Exam::EN_CURSO, Exam::FINALIZADO] as $status) {
+            $exam = $this->createExam(array_merge(
+                ['nombre_examen' => "Examen {$status}"],
+                $this->examStateAttributes($status)
+            ));
 
             $this->postJson($this->url($exam))
                 ->assertStatus(409)
@@ -74,7 +77,7 @@ class CancelExamTest extends TestCase
                     'El control de ingreso del examen ya se inició: el examen no puede cancelarse.'
                 );
 
-            $this->assertDatabaseHas('examen', ['id_examen' => $exam->id_examen, 'estado' => $status]);
+            $this->assertDatabaseHas('examen', ['id_examen' => $exam->id_examen, 'estado' => $exam->estado]);
         }
 
         $this->assertSame(0, $this->cancellationLogs());

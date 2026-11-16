@@ -97,7 +97,7 @@ function LateEntryContent({ examId }: { examId: number }) {
 
 function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConflict: () => void }) {
   const isTeacher = exam.rol_controlador === CONTROLLER_ROLE.DOCENTE
-  const open = exam.estado === EXAM_STATUS.EN_CURSO
+  const open = exam.estado === EXAM_STATUS.EN_CURSO || exam.estado === EXAM_STATUS.PROGRAMADO
   // El ingreso con retraso termina en el fin programado, aunque el examen siga EN_CURSO hasta su cierre.
   const timeOver = useLateEntryDeadline(exam.fin_programado_en, exam.hora_servidor_en)
   // El docente elige desde qué ambiente verifica, como en HU-032; el auxiliar usa el suyo.

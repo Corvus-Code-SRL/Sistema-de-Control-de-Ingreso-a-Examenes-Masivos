@@ -119,7 +119,7 @@ class SentInvitationsTest extends TestCase
 
     public function test_una_pendiente_de_un_examen_que_ya_no_esta_programado_se_muestra_sin_efecto(): void
     {
-        $exam = $this->createExam(['estado' => Exam::EN_INGRESO]);
+        $exam = $this->createExam($this->examStateAttributes('INGRESO_ABIERTO'));
         $this->createInvitation($exam, $this->otroDocenteId);
 
         $this->getJson(self::URL)
