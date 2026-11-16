@@ -154,8 +154,14 @@ export function useEligibleList(): UseEligibleListResult {
     try {
       const data = await eligibleListService.getEligibleList(examId, controller.signal)
       if (mountedRef.current && !controller.signal.aborted) {
-        setListData(data)
-        setPendingChanges(new Map())
+        // Un 200 con un body inesperado (o el handler de pruebas devolviendo
+        // { data: [] }) no debe dejar listData en un shape que rompa el render.
+        if (data && Array.isArray((data as { estudiantes?: unknown }).estudiantes)) {
+          setListData(data)
+          setPendingChanges(new Map())
+        } else {
+          setListData(null)
+        }
       }
     } catch (cause) {
       if (mountedRef.current && !controller.signal.aborted) {
@@ -303,7 +309,7 @@ export function useEligibleList(): UseEligibleListResult {
   )
 
   const studentsWithPending = useMemo((): EligibleStudent[] => {
-    if (!listData) return []
+    if (!listData || !Array.isArray(listData.estudiantes)) return []
     return listData.estudiantes.map((student) => {
       const pending = pendingChanges.get(student.id_estudiante)
       if (!pending) return student
