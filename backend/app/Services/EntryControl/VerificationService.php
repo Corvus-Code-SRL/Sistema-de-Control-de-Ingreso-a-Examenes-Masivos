@@ -258,6 +258,6 @@ class VerificationService
             return $base . ' Motivo: ' . $reason['detalle'] . '.';
         }
 
-        return $base . ' Motivo: ' . $reason['motivo'] . '.';
+        return $base . ' Motivo: ' . MotivoNoHabilitacion::label($reason['motivo']) . '.';
     }
 }

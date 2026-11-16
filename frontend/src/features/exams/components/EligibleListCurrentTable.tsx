@@ -20,7 +20,7 @@ import type {
 } from '../types/eligibleList.types'
 import { eligibilityLabel, motivoLabel, normalizeText } from '../utils/eligibleListUtils'
 
-const PAGE_SIZE = 50
+const PAGE_SIZE = 10
 
 interface EligibleListCurrentTableProps {
   students: EligibleStudent[]

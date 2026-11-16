@@ -98,4 +98,16 @@ class MotivoNoHabilitacionTest extends TestCase
             )
         );
     }
+
+    /** Etiqueta legible del motivo, para mostrarla en mensajes al usuario. */
+    public static function label(string $motivo): string
+    {
+        return match ($motivo) {
+            self::ASISTENCIA_INSUFICIENTE => 'Asistencia insuficiente',
+            self::NO_ENTREGO_TRABAJO_FINAL => 'No entregó el trabajo final',
+            self::NO_CUMPLE_PRERREQUISITO => 'No cumple prerrequisito',
+            self::OTRO => 'Otro',
+            default => $motivo,
+        };
+    }
 }
