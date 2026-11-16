@@ -1,0 +1,128 @@
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { EligibleListUploadFlow } from './EligibleListUploadFlow'
+import { eligibleListService } from '../services/eligibleListService'
+
+vi.mock('../services/eligibleListService', () => ({
+  eligibleListService: {
+    previewUpload: vi.fn(),
+    confirmUpload: vi.fn(),
+  },
+  validateEligibleFile: (file: File) => {
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    if (ext !== 'csv' && ext !== 'xlsx') return 'El archivo debe tener formato CSV o XLSX.'
+    return null
+  },
+}))
+
+const previewMock = vi.mocked(eligibleListService.previewUpload)
+const confirmMock = vi.mocked(eligibleListService.confirmUpload)
+
+function makeFile(): File {
+  return new File(['codigo_sis\n202210443'], 'lista.csv')
+}
+
+describe('EligibleListUploadFlow', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('flujo completo: upload → preview → motivo → aplicar', async () => {
+    previewMock.mockResolvedValue({
+      token: 't'.repeat(64),
+      total_filas: 1,
+      filas_validas: 1,
+      filas_inconsistentes: 0,
+      faltantes: 0,
+      filas: [
+        {
+          numero_fila: 2,
+          codigo_sis: '202210443',
+          apellidos: 'ALVAREZ',
+          nombres: 'CAMILA',
+          estado: 'matched',
+          errores: [],
+        },
+      ],
+    })
+    confirmMock.mockResolvedValue({
+      total_filas: 1,
+      filas_inconsistentes: 0,
+      no_encontrados: 0,
+      cambios_pendientes: [
+        {
+          id_estudiante: 1,
+          codigo_sis: '202210443',
+          estado_habilitacion: 'NO_HABILITADO',
+          motivo: null,
+          detalle: null,
+        },
+      ],
+    })
+
+    const onPendingChanges = vi.fn()
+    const onClose = vi.fn()
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+
+    render(
+      <EligibleListUploadFlow
+        open
+        examId={1}
+        onClose={onClose}
+        onPendingChanges={onPendingChanges}
+      />
+    )
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, makeFile())
+
+    await waitFor(() => expect(screen.getByText('202210443')).toBeInTheDocument())
+
+    await user.click(
+      await screen.findByRole('combobox', { name: /Motivo para los que no figuran/i })
+    )
+    await user.click(await screen.findByRole('option', { name: /Asistencia insuficiente/i }))
+
+    await user.click(await screen.findByRole('button', { name: /Aplicar a la lista/i }))
+
+    await waitFor(() => {
+      expect(onPendingChanges).toHaveBeenCalledWith([
+        expect.objectContaining({ id_estudiante: 1, estado_habilitacion: 'NO_HABILITADO' }),
+      ])
+    })
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('exige detalle cuando el motivo es OTRO', async () => {
+    previewMock.mockResolvedValue({
+      token: 't'.repeat(64),
+      total_filas: 0,
+      filas_validas: 0,
+      filas_inconsistentes: 0,
+      faltantes: 0,
+      filas: [],
+    })
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(
+      <EligibleListUploadFlow
+        open
+        examId={1}
+        onClose={vi.fn()}
+        onPendingChanges={vi.fn()}
+      />
+    )
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, makeFile())
+    await waitFor(() => expect(previewMock).toHaveBeenCalled())
+
+    await user.click(
+      await screen.findByRole('combobox', { name: /Motivo para los que no figuran/i })
+    )
+    await user.click(await screen.findByRole('option', { name: /Otro/i }))
+
+    await user.click(await screen.findByRole('button', { name: /Aplicar a la lista/i }))
+    expect(await screen.findByText(/al menos 10 caracteres/i)).toBeInTheDocument()
+    expect(confirmMock).not.toHaveBeenCalled()
+  })
+})
