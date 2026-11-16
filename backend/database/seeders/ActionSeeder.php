@@ -50,6 +50,11 @@ class ActionSeeder extends Seeder
                 'tipo_operacion' => 'UPDATE',
                 'descripcion' => 'Retiro de un estudiante durante el examen',
             ],
+            [
+                'operacion' => 'GUARDAR_HABILITADOS',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Guardado de cambios en la lista de habilitados de un examen',
+            ],
         ];
 
         foreach ($acciones as $accion) {
