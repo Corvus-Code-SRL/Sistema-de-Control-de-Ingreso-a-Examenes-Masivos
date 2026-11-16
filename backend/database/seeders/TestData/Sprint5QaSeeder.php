@@ -10,7 +10,8 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Escenarios de QA del Sprint 5. Hoy cubre HU-062 (rectificar un registro de la Central de Riesgo).
+ * Escenarios de QA del Sprint 5. Cubre HU-062 (rectificar un registro de la Central de Riesgo) y HU-026
+ * (invitar docentes colaboradores).
  *
  * Primero carga TestDataSeeder (cuentas, catálogo, grupos, exámenes y Central de Riesgo base) y después
  * agrega los estudiantes y registros que hacen probable la búsqueda y la rectificación. Se ejecuta a mano,
@@ -29,6 +30,17 @@ use Illuminate\Support\Facades\DB;
  * Volver a correrlo devuelve los escenarios a su estado inicial: se reescriben los reportes y los registros
  * de la central, así que lo que QA haya rectificado en estos tres registros vuelve a quedar activo (no así en
  * el resto de la Central). La bitácora no se toca.
+ *
+ * Escenario HU-026 (invitar docentes colaboradores). El creador es Marcelo Quiroga (10452), que dicta Cálculo I en
+ * Sistemas y Economía:
+ *   - Rosario Salazar (10487), Elena Camacho (10601), Rolando Vega (10602) y Carmen Ibáñez (10603) tienen grupos de
+ *     Cálculo I en el período vigente: aparecen al buscar para el examen de Cálculo.
+ *   - Gustavo Rocha (10533) dicta otra materia (Álgebra, Estadística): nunca aparece para ese examen.
+ *   - «HU-026 Parcial Cálculo I» (9811) está PROGRAMADO y recibe las invitaciones PENDIENTE (Rosario), ACEPTADA
+ *     (Elena) y RECHAZADA (Rolando, que no permitía agregar grupos). Carmen no tiene invitación: sirve para invitar.
+ *   - «HU-026 Final Cálculo I» (9812) ya está EN_INGRESO: no sale en el desplegable y su invitación a Carmen quedó
+ *     SIN_EFECTO. Las fechas son futuras (diciembre de 2026) para que el planificador no cierre estos exámenes.
+ * Volver a correrlo devuelve estos exámenes y sus invitaciones a su estado inicial. La bitácora no se toca.
  *
  * Ids propios en el rango 9000–9999, sin pisar los de TestDataIds ni los de Sprint3QaSeeder.
  */
@@ -52,6 +64,26 @@ class Sprint5QaSeeder extends Seeder
     public const RECORD_MARIA = 9963;
     public const RECORD_CARLA_ACTIVE_TWO = 9964;
 
+    // usuario.id_usuario (docentes ficticios de HU-026; los uuid comparten el prefijo de TestDataIds)
+    public const TEACHER_ELENA = '00000000-0000-4000-8000-000000000101';
+    public const TEACHER_ROLANDO = '00000000-0000-4000-8000-000000000102';
+    public const TEACHER_CARMEN = '00000000-0000-4000-8000-000000000103';
+
+    // grupo.id_grupo: Cálculo I, Sistemas, período vigente
+    public const GROUP_CALCULUS_SYS_3 = 9421;
+    public const GROUP_CALCULUS_SYS_4 = 9422;
+    public const GROUP_CALCULUS_SYS_5 = 9423;
+
+    // examen.id_examen
+    public const EXAM_INVITE_SCHEDULED = 9811;
+    public const EXAM_INVITE_ENTRY = 9812;
+
+    // invitacion_examen.id_invitacion
+    public const INVITATION_PENDING = 9970;
+    public const INVITATION_ACCEPTED = 9971;
+    public const INVITATION_REJECTED = 9972;
+    public const INVITATION_VOID = 9973;
+
     private const EXAM_FINISHED = 9807;
 
     private const EXAM_ENTRY = 9805;
@@ -66,6 +98,7 @@ class Sprint5QaSeeder extends Seeder
         DB::transaction(function () {
             $this->seedStudents();
             $this->seedRecords();
+            $this->seedCollaboratorInvitations();
         });
     }
 
@@ -77,6 +110,164 @@ class Sprint5QaSeeder extends Seeder
             $this->student(self::STUDENT_CARLA_CONDORI, '202170103', '7400103', 'Carla', 'Condori', 'Vega'),
             $this->student(self::STUDENT_DANIEL_ROJAS, '202170104', '7400104', 'Daniel', 'Rojas', 'Mendoza'),
         ], ['id_estudiante']);
+    }
+
+    private function seedCollaboratorInvitations(): void
+    {
+        $teacherRoleId = DB::table('rol')->where('nombre_rol', 'Docente')->value('id_rol');
+        $newTeachers = [self::TEACHER_ELENA, self::TEACHER_ROLANDO, self::TEACHER_CARMEN];
+
+        DB::table('usuario')->upsert([
+            $this->teacher(self::TEACHER_ELENA, 'Elena', 'Camacho', 'Rojas', '10601', 'elena.camacho'),
+            $this->teacher(self::TEACHER_ROLANDO, 'Rolando', 'Vega', 'Méndez', '10602', 'rolando.vega'),
+            $this->teacher(self::TEACHER_CARMEN, 'Carmen', 'Ibáñez', null, '10603', 'carmen.ibanez'),
+        ], ['id_usuario']);
+
+        DB::table('usuario_rol')->whereIn('id_usuario', $newTeachers)->delete();
+        DB::table('usuario_rol')->insert(array_map(fn (string $id) => [
+            'id_usuario' => $id,
+            'id_rol' => $teacherRoleId,
+            'fecha_inicio' => '2026-02-02 08:00:00-04',
+            'fecha_fin' => null,
+        ], $newTeachers));
+
+        DB::table('grupo')->upsert([
+            $this->calculusGroup(self::GROUP_CALCULUS_SYS_3, '3', self::TEACHER_ELENA),
+            $this->calculusGroup(self::GROUP_CALCULUS_SYS_4, '4', self::TEACHER_ROLANDO),
+            $this->calculusGroup(self::GROUP_CALCULUS_SYS_5, '5', self::TEACHER_CARMEN),
+        ], ['id_grupo']);
+
+        DB::table('examen')->upsert([
+            $this->invitationExam(self::EXAM_INVITE_SCHEDULED, 'HU-026 Parcial Cálculo I', '2026-12-10', '08:00:00',
+                '09:30:00', 90, 'PROGRAMADO'),
+            $this->invitationExam(self::EXAM_INVITE_ENTRY, 'HU-026 Final Cálculo I', '2026-12-11', '10:00:00',
+                '12:00:00', 120, 'EN_INGRESO'),
+        ], ['id_examen']);
+
+        $classrooms = [
+            [self::EXAM_INVITE_SCHEDULED, 9601],
+            [self::EXAM_INVITE_SCHEDULED, 9602],
+            [self::EXAM_INVITE_ENTRY, 9605],
+        ];
+
+        foreach ($classrooms as [$examId, $classroomId]) {
+            DB::table('examen_ambiente')->upsert(
+                [['id_examen' => $examId, 'id_ambiente' => $classroomId]],
+                ['id_examen', 'id_ambiente']
+            );
+        }
+
+        foreach ([self::EXAM_INVITE_SCHEDULED, self::EXAM_INVITE_ENTRY] as $examId) {
+            DB::table('grupo_examen')->upsert(
+                [['id_examen' => $examId, 'id_grupo' => Ids::GROUP_CALCULUS_SYS_1]],
+                ['id_grupo', 'id_examen']
+            );
+        }
+
+        $invitationIds = [
+            self::INVITATION_PENDING,
+            self::INVITATION_ACCEPTED,
+            self::INVITATION_REJECTED,
+            self::INVITATION_VOID,
+        ];
+
+        DB::table('invitacion_examen')->whereIn('id_invitacion', $invitationIds)->delete();
+
+        DB::table('invitacion_examen')->insert([
+            $this->invitation(self::INVITATION_PENDING, self::EXAM_INVITE_SCHEDULED, Ids::TEACHER_2,
+                'PENDIENTE', '2026-11-13 09:00:00-04'),
+            $this->invitation(self::INVITATION_ACCEPTED, self::EXAM_INVITE_SCHEDULED, self::TEACHER_ELENA,
+                'ACEPTADA', '2026-11-11 10:30:00-04', '2026-11-12 08:15:00-04'),
+            $this->invitation(self::INVITATION_REJECTED, self::EXAM_INVITE_SCHEDULED, self::TEACHER_ROLANDO,
+                'RECHAZADA', '2026-11-11 10:35:00-04', '2026-11-12 16:40:00-04', null, false),
+            $this->invitation(self::INVITATION_VOID, self::EXAM_INVITE_ENTRY, self::TEACHER_CARMEN,
+                'SIN_EFECTO', '2026-11-10 17:00:00-04', null, '2026-11-11 08:00:00-04'),
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function teacher(
+        string $id,
+        string $name,
+        string $paternal,
+        ?string $maternal,
+        string $sis,
+        string $emailUser
+    ): array {
+        return [
+            'id_usuario' => $id,
+            'nombre' => $name,
+            'apellido_paterno' => $paternal,
+            'apellido_materno' => $maternal,
+            'correo' => "{$emailUser}@sciem.test",
+            'contrasenia' => Ids::PASSWORD_HASH,
+            'cod_sis' => SisCode::normalize($sis),
+            'estado' => 'ACTIVO',
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function calculusGroup(int $id, string $number, string $teacherId): array
+    {
+        return [
+            'id_grupo' => $id,
+            'id_carrera' => Ids::CAREER_SYSTEMS,
+            'id_materia' => Ids::SUBJECT_CALCULUS,
+            'num_grupo' => $number,
+            'estado' => 'ACTIVO',
+            'id_usuario_docente' => $teacherId,
+            'id_gestion_periodo' => Ids::PERIOD_ACTIVE,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function invitationExam(
+        int $id,
+        string $name,
+        string $date,
+        string $start,
+        string $end,
+        int $duration,
+        string $status
+    ): array {
+        return [
+            'id_examen' => $id,
+            'nombre_examen' => $name,
+            'fecha' => $date,
+            'hora_inicio' => $start,
+            'hora_fin' => $end,
+            'duracion' => $duration,
+            'normas' => 'Datos ficticios para desarrollo. Presentar identificación.',
+            'id_tipo_examen' => 9701,
+            'id_carrera' => Ids::CAREER_SYSTEMS,
+            'id_materia' => Ids::SUBJECT_CALCULUS,
+            'id_usuario_docente' => Ids::TEACHER_FIXED,
+            'estado' => $status,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function invitation(
+        int $id,
+        int $examId,
+        string $invitedId,
+        string $status,
+        string $sentAt,
+        ?string $respondedAt = null,
+        ?string $voidedAt = null,
+        bool $allowGroups = true
+    ): array {
+        return [
+            'id_invitacion' => $id,
+            'id_examen' => $examId,
+            'id_docente_creador' => Ids::TEACHER_FIXED,
+            'id_docente_invitado' => $invitedId,
+            'fecha_invitacion' => $sentAt,
+            'fecha_respuesta' => $respondedAt,
+            'fecha_sin_efecto' => $voidedAt,
+            'estado' => $status,
+            'permite_agregar_grupos' => $allowGroups,
+        ];
     }
 
     /** @return array<string, mixed> */
