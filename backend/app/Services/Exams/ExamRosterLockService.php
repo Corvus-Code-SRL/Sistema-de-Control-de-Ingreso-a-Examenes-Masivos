@@ -26,13 +26,7 @@ class ExamRosterLockService
                 $query->whereIn('examen.estado', self::LOCKING_STATES)
                     ->orWhere(function ($scheduled): void {
                         $scheduled->where('examen.estado', Exam::PROGRAMADO)
-                            ->whereExists(function ($opened): void {
-                                $opened->selectRaw('1')
-                                    ->from('log')
-                                    ->where('tabla_afectada', 'examen')
-                                    ->where('nuevo_valor->evento', 'APERTURA_CONTROL')
-                                    ->whereRaw("(nuevo_valor->>'id_examen')::integer = examen.id_examen");
-                            });
+                            ->whereNotNull('examen.ingreso_abierto_en');
                     });
             })
             ->exists();

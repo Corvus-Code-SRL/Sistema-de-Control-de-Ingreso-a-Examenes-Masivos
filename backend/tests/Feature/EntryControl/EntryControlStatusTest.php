@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\EntryControl;
 
+use App\Models\AuditLog;
 use App\Models\Exam;
 use App\Models\User;
+use App\Services\EntryControl\CloseOrdinaryEntryService;
 use App\Services\EntryControl\RoomAssignmentService;
 use App\Services\Exams\ExamLifecycleService;
 use Carbon\Carbon;
@@ -195,6 +197,10 @@ class EntryControlStatusTest extends TestCase
 
         $this->postJson("/api/control-ingreso/examenes/{$exam->id_examen}/cerrar-ingreso-ordinario")
             ->assertOk();
+        $this->assertNotNull($exam->fresh()->ingreso_ordinario_cerrado_en);
+        $this->assertTrue(CloseOrdinaryEntryService::isClosed((int) $exam->id_examen));
+        AuditLog::query()->where('tabla_afectada', 'examen')->delete();
+        $this->assertTrue(CloseOrdinaryEntryService::isClosed((int) $exam->id_examen));
         $this->getJson($url)->assertStatus(409);
     }
     public function test_el_cierre_despues_de_la_apertura_anticipada_habilita_retrasos_y_no_reabre_el_control(): void

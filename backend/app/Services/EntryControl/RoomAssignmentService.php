@@ -28,7 +28,7 @@ class RoomAssignmentService
             $exam = Exam::query()->whereKey($examId)->lockForUpdate()->firstOrFail();
 
             if (! in_array($exam->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::EN_CURSO], true)
-                || CloseOrdinaryEntryService::isClosed($examId)) {
+                || $exam->ingreso_ordinario_cerrado_en !== null) {
                 throw new DomainException('El examen no admite preparación de ambientes.');
             }
 
@@ -68,7 +68,9 @@ class RoomAssignmentService
 
             $token = $this->snapshots->stage($exam);
 
-            if (! CloseOrdinaryEntryService::hasOpened($examId)) {
+            if ($exam->ingreso_abierto_en === null) {
+                $exam->ingreso_abierto_en = now();
+                $exam->save();
                 $this->auditLog->registrar(
                     'MODIFICAR',
                     'examen',

@@ -3,7 +3,6 @@
 namespace App\Services\EntryControl;
 
 use App\Exceptions\Exams\ExamStateException;
-use App\Models\AuditLog;
 use App\Models\Exam;
 use App\Models\User;
 use App\Services\Security\AuditLogService;
@@ -19,11 +18,7 @@ class CloseOrdinaryEntryService
 
     public static function hasOpened(int $examId): bool
     {
-        return AuditLog::query()
-            ->where('tabla_afectada', 'examen')
-            ->where('nuevo_valor->id_examen', $examId)
-            ->where('nuevo_valor->evento', 'APERTURA_CONTROL')
-            ->exists();
+        return Exam::query()->whereKey($examId)->whereNotNull('ingreso_abierto_en')->exists();
     }
 
     public static function allowsLate(Exam $exam): bool
@@ -40,11 +35,7 @@ class CloseOrdinaryEntryService
 
     public static function isClosed(int $examId): bool
     {
-        return AuditLog::query()
-            ->where('tabla_afectada', 'examen')
-            ->where('nuevo_valor->id_examen', $examId)
-            ->where('nuevo_valor->evento', 'CIERRE_INGRESO_ORDINARIO')
-            ->exists();
+        return Exam::query()->whereKey($examId)->whereNotNull('ingreso_ordinario_cerrado_en')->exists();
     }
 
     public function close(Exam $exam, User $actor): void
@@ -58,10 +49,13 @@ class CloseOrdinaryEntryService
             }
 
             if (! in_array($locked->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::EN_CURSO], true)
-                || self::isClosed((int) $locked->id_examen)
+                || $locked->ingreso_ordinario_cerrado_en !== null
                 || ! $this->snapshots->ready((int) $locked->id_examen)) {
                 throw new ExamStateException('El ingreso ordinario no está abierto.');
             }
+
+            $locked->ingreso_ordinario_cerrado_en = now();
+            $locked->save();
 
             $this->snapshots->deactivate((int) $locked->id_examen);
 
