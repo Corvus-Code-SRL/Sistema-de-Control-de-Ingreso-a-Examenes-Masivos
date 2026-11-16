@@ -1868,3 +1868,17 @@ CREATE UNIQUE INDEX uq_invitacion_examen_vigente
 INSERT INTO public.accion (operacion, tipo_operacion, descripcion)
 SELECT 'INVITAR_COLABORADOR', 'INSERT', 'Invitación de un docente colaborador a un examen'
 WHERE NOT EXISTS (SELECT 1 FROM public.accion WHERE operacion = 'INVITAR_COLABORADOR');
+
+-- Versión 16: aceptar o rechazar una invitación a colaborar (HU-027)
+--             (2026_11_17_000000_add_invitation_response_actions)
+--   * Se registran las acciones de bitácora ACEPTAR_INVITACION y RECHAZAR_INVITACION (solo si faltan).
+--   * No hay columnas nuevas: permite_agregar_grupos y fecha_sin_efecto son de la versión 15 y el rechazo
+--     no guarda motivo. Un colaborador es la invitación en estado ACEPTADA.
+
+INSERT INTO public.accion (operacion, tipo_operacion, descripcion)
+SELECT 'ACEPTAR_INVITACION', 'UPDATE', 'Aceptación de una invitación a colaborar en un examen'
+WHERE NOT EXISTS (SELECT 1 FROM public.accion WHERE operacion = 'ACEPTAR_INVITACION');
+
+INSERT INTO public.accion (operacion, tipo_operacion, descripcion)
+SELECT 'RECHAZAR_INVITACION', 'UPDATE', 'Rechazo de una invitación a colaborar en un examen'
+WHERE NOT EXISTS (SELECT 1 FROM public.accion WHERE operacion = 'RECHAZAR_INVITACION');

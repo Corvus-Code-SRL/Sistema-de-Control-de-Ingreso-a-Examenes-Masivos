@@ -60,6 +60,16 @@ class ActionSeeder extends Seeder
                 'tipo_operacion' => 'INSERT',
                 'descripcion' => 'Invitación de un docente colaborador a un examen',
             ],
+            [
+                'operacion' => 'ACEPTAR_INVITACION',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Aceptación de una invitación a colaborar en un examen',
+            ],
+            [
+                'operacion' => 'RECHAZAR_INVITACION',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Rechazo de una invitación a colaborar en un examen',
+            ],
         ];
 
         foreach ($acciones as $accion) {

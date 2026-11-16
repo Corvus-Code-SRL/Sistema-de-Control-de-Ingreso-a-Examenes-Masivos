@@ -279,6 +279,8 @@ return [
             'OBSERVAR_IDENTIDAD' => 'Observar identidad',
             'RECTIFICAR_REGISTRO' => 'Rectificar registro',
             'INVITAR_COLABORADOR' => 'Invitar colaborador',
+            'ACEPTAR_INVITACION' => 'Aceptar invitación',
+            'RECHAZAR_INVITACION' => 'Rechazar invitación',
         ],
 
         'etiquetas_campo' => [
