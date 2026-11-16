@@ -34,7 +34,7 @@ afterEach(() => {
 })
 
 describe('useEntryStatus', () => {
-  it('espera 3, 6, 12, 24 y hasta 30 segundos ante fallos de red, y reinicia tras una respuesta', async () => {
+  it('espera 5, 10, 20 y hasta 30 segundos ante fallos de red, y reinicia tras una respuesta', async () => {
     vi.useFakeTimers()
     Object.defineProperty(document, 'hidden', { configurable: true, value: false })
     vi.spyOn(entryControlService, 'context').mockResolvedValue(context)
@@ -48,17 +48,17 @@ describe('useEntryStatus', () => {
     expect(request).toHaveBeenCalledTimes(1)
     expect(result.current.status).toEqual(status)
 
-    await advance(2000)
+    await advance(5000)
     expect(request).toHaveBeenCalledTimes(2)
-    await advance(2999)
+    await advance(4999)
     expect(request).toHaveBeenCalledTimes(2)
     await advance(1)
     expect(request).toHaveBeenCalledTimes(3)
-    await advance(6000)
+    await advance(10000)
     expect(request).toHaveBeenCalledTimes(4)
-    await advance(12000)
+    await advance(20000)
     expect(request).toHaveBeenCalledTimes(5)
-    await advance(24000)
+    await advance(30000)
     expect(request).toHaveBeenCalledTimes(6)
     await advance(30000)
     expect(request).toHaveBeenCalledTimes(7)
@@ -66,7 +66,7 @@ describe('useEntryStatus', () => {
     expect(request).toHaveBeenCalledTimes(8)
     expect(result.current.status).toEqual(status)
     expect(result.current.statusError).toBeNull()
-    await advance(1999)
+    await advance(4999)
     expect(request).toHaveBeenCalledTimes(8)
     await advance(1)
     expect(request).toHaveBeenCalledTimes(9)
@@ -81,7 +81,7 @@ describe('useEntryStatus', () => {
       .mockRejectedValueOnce(new ApiError(409, 'El control ha terminado.'))
 
     const { result } = await mount()
-    await advance(2000)
+    await advance(5000)
     expect(result.current.ended).toBe(true)
     expect(result.current.status).toEqual(status)
     await advance(60000)
@@ -98,9 +98,9 @@ describe('useEntryStatus', () => {
       .mockResolvedValue(status)
 
     await mount()
-    await advance(2000)
+    await advance(5000)
     expect(request).toHaveBeenCalledTimes(2)
-    await advance(2000)
+    await advance(5000)
     expect(request).toHaveBeenCalledTimes(3)
   })
 
@@ -114,7 +114,7 @@ describe('useEntryStatus', () => {
       .mockResolvedValue(status)
 
     const { result } = await mount()
-    await advance(2000)
+    await advance(5000)
     expect(request).toHaveBeenCalledTimes(2)
     expect(result.current.statusError).toBe('Muchas consultas seguidas, reintentando en 7 s.')
     expect(result.current.status).toEqual(status)
@@ -125,11 +125,51 @@ describe('useEntryStatus', () => {
     expect(request).toHaveBeenCalledTimes(3)
     expect(result.current.statusError).toBeNull()
 
-    await advance(2000)
+    await advance(5000)
     expect(request).toHaveBeenCalledTimes(4)
   })
 
-  it('limita la espera de un 429 a 30 segundos', async () => {
+  it('respeta Retry-After cuando contexto recibe 429', async () => {
+    vi.useFakeTimers()
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false })
+    const contextRequest = vi.spyOn(entryControlService, 'context')
+      .mockResolvedValueOnce(context)
+      .mockRejectedValueOnce(new ApiError(429, 'Too Many Attempts.', {}, undefined, { retryAfter: 12 }))
+      .mockResolvedValue(context)
+    const statusRequest = vi.spyOn(entryControlService, 'status').mockResolvedValue(status)
+
+    const { result } = await mount()
+    await advance(5000)
+    expect(contextRequest).toHaveBeenCalledTimes(2)
+    expect(statusRequest).toHaveBeenCalledTimes(1)
+    expect(result.current.statusError).toBe('Muchas consultas seguidas, reintentando en 12 s.')
+
+    await advance(11999)
+    expect(contextRequest).toHaveBeenCalledTimes(2)
+    await advance(1)
+    expect(contextRequest).toHaveBeenCalledTimes(3)
+    expect(statusRequest).toHaveBeenCalledTimes(2)
+    expect(result.current.statusError).toBeNull()
+  })
+
+  it('mantiene cinco segundos si Retry-After pide menos', async () => {
+    vi.useFakeTimers()
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false })
+    vi.spyOn(entryControlService, 'context').mockResolvedValue(context)
+    const request = vi.spyOn(entryControlService, 'status')
+      .mockResolvedValueOnce(status)
+      .mockRejectedValueOnce(new ApiError(429, 'Too Many Attempts.', {}, undefined, { retryAfter: 1 }))
+      .mockResolvedValue(status)
+
+    await mount()
+    await advance(5000)
+    await advance(4999)
+    expect(request).toHaveBeenCalledTimes(2)
+    await advance(1)
+    expect(request).toHaveBeenCalledTimes(3)
+  })
+
+  it('respeta Retry-After aunque supere 30 segundos', async () => {
     vi.useFakeTimers()
     Object.defineProperty(document, 'hidden', { configurable: true, value: false })
     vi.spyOn(entryControlService, 'context').mockResolvedValue(context)
@@ -139,9 +179,9 @@ describe('useEntryStatus', () => {
       .mockResolvedValue(status)
 
     await mount()
-    await advance(2000)
+    await advance(5000)
     expect(request).toHaveBeenCalledTimes(2)
-    await advance(29999)
+    await advance(59999)
     expect(request).toHaveBeenCalledTimes(2)
     await advance(1)
     expect(request).toHaveBeenCalledTimes(3)
