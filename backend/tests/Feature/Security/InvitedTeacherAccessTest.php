@@ -80,11 +80,12 @@ class InvitedTeacherAccessTest extends TestCase
             'id_grupo' => $this->grupoPropioId,
         ]);
         app(RoomAssignmentService::class)->prepare((int) $exam->id_examen);
+        $exam->forceFill(['estado' => Exam::EN_CURSO])->save();
 
         $this->postJson("/api/control-ingreso/examenes/{$exam->id_examen}/cerrar-ingreso-ordinario")
             ->assertOk()
             ->assertJsonPath('data.ingreso_ordinario_cerrado', true);
-        $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+        $this->assertSame(Exam::EN_CURSO, $exam->fresh()->estado);
     }
 
     public function test_invitado_ve_sus_grupos_y_la_nomina_de_un_grupo_propio(): void

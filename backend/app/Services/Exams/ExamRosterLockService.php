@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 class ExamRosterLockService
 {
     /** Estados de examen que congelan la nómina de sus grupos. */
-    private const LOCKING_STATES = [Exam::EN_INGRESO, Exam::EN_CURSO];
+    private const LOCKING_STATES = [Exam::EN_CURSO];
 
     public function isLocked(int $groupId): bool
     {

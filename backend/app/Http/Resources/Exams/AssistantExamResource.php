@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Exams;
 
+use App\Services\EntryControl\CloseOrdinaryEntryService;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
@@ -22,6 +23,7 @@ class AssistantExamResource extends JsonResource
             'hora_inicio'   => $this->formatTime($exam->hora_inicio),
             'hora_fin'      => $this->formatTime($exam->hora_fin),
             'estado'        => $exam->estado,
+            'control_ingreso_abierto' => CloseOrdinaryEntryService::isOpen($exam),
             'materia'       => $exam->subject ? $exam->subject->nombre : null,
             'ambiente'      => $this->classroom ? new ClassroomResource($this->classroom) : null,
             'ambiente_por_defecto' => (bool) $this->getAttribute('ambiente_por_defecto'),

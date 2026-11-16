@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Storage;
  * Intentos de ingreso rechazados, reportes de estudiantes y central de riesgo de prueba (HU-042, HU-045
  * y HU-046). Corre después de ExamTestDataSeeder.
  *
- * Los exámenes 9807 (finalizado) y 9805 (en ingreso) son del docente fijo, que revisa todos los
+ * Los exámenes 9807 (finalizado) y 9805 (con el ingreso abierto) son del docente fijo, que revisa todos los
  * reportes; los controla ASSISTANT_1/2 y ellos son quienes reportan. Para que los estudiantes
  * pertenezcan a esos exámenes se suma a José Pérez a los grupos 9401 y 9407 y se habilita a los
  * auxiliares en ambos: todo eso vive aquí, no en GroupTestDataSeeder ni en ExamTestDataSeeder.

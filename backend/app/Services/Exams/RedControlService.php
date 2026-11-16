@@ -5,7 +5,6 @@ namespace App\Services\Exams;
 use App\Models\Exam;
 use App\Models\User;
 use App\Services\EntryControl\EntryAccessService;
-use App\Services\EntryControl\CloseOrdinaryEntryService;
 use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Support\Cache\EntryOpeningFailureStore;
 
@@ -35,8 +34,8 @@ class RedControlService
             $exam = Exam::query()->findOrFail($examId);
             $this->access->assertCanControl($exam, $actor);
 
-            if ($exam->estado === Exam::PROGRAMADO
-                && ! CloseOrdinaryEntryService::isClosed($examId)) {
+            // Solo el control que todavía no se abrió queda en espera; abierto y sin snapshot es un 409.
+            if ($exam->estado === Exam::PROGRAMADO && $exam->ingreso_abierto_en === null) {
                 return [
                     'estado' => Exam::PROGRAMADO,
                     'motivo_apertura' => $this->failures->get($examId),

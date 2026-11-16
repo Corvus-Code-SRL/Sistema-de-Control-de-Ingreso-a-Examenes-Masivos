@@ -37,7 +37,7 @@ class CreateIncidentReportTest extends TestCase
         $this->seed(IncidentTypeSeeder::class);
         Storage::fake('local');
         Storage::fake('public');
-        $this->exam = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId, $this->otraAulaId]);
+        $this->exam = $this->createExam($this->examStateAttributes('INGRESO_ABIERTO'), [$this->aulaId, $this->otraAulaId]);
         $this->context = [
             'id_usuario' => $this->docenteId,
             'id_examen' => $this->exam->id_examen,
@@ -248,7 +248,7 @@ class CreateIncidentReportTest extends TestCase
 
     public function testRejectsAttemptFromAnotherExam(): void
     {
-        $other = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId]);
+        $other = $this->createExam($this->examStateAttributes('INGRESO_ABIERTO'), [$this->aulaId]);
         $id = $this->insertEntryAttempt($this->context, ['id_examen' => $other->id_examen]);
         $this->postJson($this->url($id), $this->payload())->assertNotFound();
     }

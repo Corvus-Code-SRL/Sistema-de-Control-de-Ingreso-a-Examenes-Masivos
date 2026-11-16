@@ -27,14 +27,14 @@ class EntryConfirmationService
     {
         try {
             $result = DB::transaction(function () use ($exam, $input, $actor): array {
-                // Primero bloquear el examen, igual que el inicio manual/automático.
+                // Primero bloquear el examen, igual que el inicio automático.
                 // El re-chequeo impide guardar un ingreso con un estado obsoleto.
                 $currentExam = Exam::query()
                     ->whereKey($exam->id_examen)
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                if (! in_array($currentExam->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::EN_CURSO], true)
+                if (! in_array($currentExam->estado, [Exam::PROGRAMADO, Exam::EN_CURSO], true)
                     || CloseOrdinaryEntryService::isClosed((int) $currentExam->id_examen)
                     || ! $this->snapshots->ready((int) $currentExam->id_examen)) {
                     $started = $currentExam->estado === Exam::FINALIZADO;

@@ -50,7 +50,7 @@ class EntryControlStatusTest extends TestCase
     public function test_lista_incluye_progreso_y_apertura_programada_del_examen(): void
     {
         $this->seedExamCatalog();
-        $exam = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId]);
+        $exam = $this->createExam($this->examStateAttributes('INGRESO_ABIERTO'), [$this->aulaId]);
         DB::table('examen')->where('id_examen', $exam->id_examen)->update(['minutos_apertura' => 20]);
         $exam->refresh();
         DB::table('grupo_examen')->insert([
@@ -117,13 +117,12 @@ class EntryControlStatusTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-10-01 12:00:00', $timezone));
         try {
             $this->seedExamCatalog();
-            $exam = $this->createExam([
+            $exam = $this->createExam(array_merge([
                 'fecha' => '2026-10-01',
                 'hora_inicio' => '10:00',
                 'hora_fin' => '11:00',
                 'duracion' => 60,
-                'estado' => Exam::EN_INGRESO,
-            ], [$this->aulaId]);
+            ], $this->examStateAttributes('INGRESO_ABIERTO')), [$this->aulaId]);
 
             $this->actingAs(User::query()->findOrFail($this->docenteId))
                 ->getJson('/api/control-ingreso/examenes')
@@ -141,7 +140,7 @@ class EntryControlStatusTest extends TestCase
     public function test_lista_contexto_y_aula_fija_del_auxiliar(): void
     {
         $this->seedExamCatalog();
-        $exam = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId, $this->otraAulaId]);
+        $exam = $this->createExam($this->examStateAttributes('INGRESO_ABIERTO'), [$this->aulaId, $this->otraAulaId]);
         DB::table('examen_auxiliar')->insert([
             'id_examen' => $exam->id_examen,
             'id_usuario' => $this->otroDocenteId,
@@ -221,16 +220,26 @@ class EntryControlStatusTest extends TestCase
             app(RoomAssignmentService::class)->prepare((int) $exam->id_examen);
             $this->assertTrue(app(\App\Services\Exams\ExamRosterLockService::class)->isLocked($this->grupoPropioId));
             $this->actingAs(User::query()->findOrFail($this->docenteId));
-            $this->postJson("/api/control-ingreso/examenes/{$exam->id_examen}/cerrar-ingreso-ordinario")
-                ->assertOk();
+            $closeUrl = "/api/control-ingreso/examenes/{$exam->id_examen}/cerrar-ingreso-ordinario";
+            $lateUrl = "/api/control-ingreso/examenes/{$exam->id_examen}/retrasos/solicitudes";
+
+            // El ingreso ordinario solo se cierra con el examen en curso.
+            $this->postJson($closeUrl)->assertStatus(409)
+                ->assertJsonPath('message', 'El ingreso ordinario solo se puede cerrar cuando el examen está en curso.');
+            $this->assertNull($exam->fresh()->ingreso_ordinario_cerrado_en);
 
             app(ExamLifecycleService::class)->startExpired($startsAt->copy()->subMinutes(5));
             $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
             app(ExamLifecycleService::class)->startExpired($startsAt);
             $this->assertSame(Exam::EN_CURSO, $exam->fresh()->estado);
+            $this->assertNull($exam->fresh()->ingreso_ordinario_cerrado_en);
             $this->getJson("/api/examenes/{$exam->id_examen}/en-curso")->assertOk();
-            $this->getJson("/api/control-ingreso/examenes/{$exam->id_examen}/retrasos/solicitudes")
-                ->assertOk();
+            $this->getJson($lateUrl)->assertStatus(409)
+                ->assertJsonPath('message', 'El ingreso ordinario sigue abierto. Registre el ingreso desde Control de ingreso.');
+
+            $this->postJson($closeUrl)->assertOk();
+            $this->assertNotNull($exam->fresh()->ingreso_ordinario_cerrado_en);
+            $this->getJson($lateUrl)->assertOk();
 
             app()->call([app(\App\Jobs\OpenEntryControlJob::class), 'handle']);
             $this->assertFalse(app(RoomAssignmentService::class)->hasPreparedSnapshot((int) $exam->id_examen));

@@ -41,7 +41,7 @@ class AssistantAvailabilityService
             ->join('examen as e', 'e.id_examen', '=', 'ea.id_examen')
             ->where('ea.id_usuario', $assistantId)
             ->where('e.id_examen', '<>', $exam->id_examen)
-            ->whereIn('e.estado', [Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::EN_CURSO])
+            ->whereIn('e.estado', [Exam::PROGRAMADO, Exam::EN_CURSO])
             ->whereBetween('e.fecha', [
                 $startsAt->copy()->subDay()->toDateString(),
                 $endsAt->toDateString(),

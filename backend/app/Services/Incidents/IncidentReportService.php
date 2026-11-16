@@ -65,11 +65,7 @@ class IncidentReportService
                 $exam = Exam::query()->whereKey($examId)->lockForUpdate()->firstOrFail();
                 $this->access->assertCanControl($exam, $actor);
 
-                $controlOpen = $exam->estado === Exam::EN_INGRESO
-                    || (in_array($exam->estado, [Exam::PROGRAMADO, Exam::EN_CURSO], true)
-                        && $this->snapshots->ready($examId));
-
-                if (! $controlOpen || CloseOrdinaryEntryService::isClosed($examId)) {
+                if (! CloseOrdinaryEntryService::isOpen($exam)) {
                     throw new ExamStateException('El control de ingreso no está abierto.');
                 }
 

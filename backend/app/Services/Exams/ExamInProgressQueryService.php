@@ -7,7 +7,6 @@ use App\Models\Exam;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\EntryControl\EntryControlSnapshotService;
-use App\Services\EntryControl\CloseOrdinaryEntryService;
 use App\Services\Security\UserRoleService;
 use App\Services\Incidents\ExamInProgressSituationService;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -85,11 +84,7 @@ class ExamInProgressQueryService
             }
         }
 
-        if (!in_array($exam->estado, [
-            Exam::PROGRAMADO,
-            Exam::EN_CURSO,
-            Exam::FINALIZADO,
-        ], true) || ($exam->estado === Exam::PROGRAMADO && ! CloseOrdinaryEntryService::isClosed($examId))) {
+        if (!in_array($exam->estado, [Exam::EN_CURSO, Exam::FINALIZADO], true)) {
             throw new ExamStateException(
                 'El examen todavía no está en curso.'
             );
@@ -224,11 +219,14 @@ class ExamInProgressQueryService
                 $isTeacher ? 'DOCENTE' : 'AUXILIAR',
             'id_ambiente_asignado' => $assignedRoomId,
             'ambientes' => $rooms,
-            'inicio_real_en' =>
-                $exam->inicio_real_en?->toIso8601String(),
+            'inicio_programado' =>
+                $this->timing->startsAt($exam)->toIso8601String(),
+            'ingreso_abierto_en' =>
+                $exam->ingreso_abierto_en?->toIso8601String(),
+            'ingreso_ordinario_cerrado_en' =>
+                $exam->ingreso_ordinario_cerrado_en?->toIso8601String(),
             'fin_real_en' =>
                 $exam->fin_real_en?->toIso8601String(),
-            'inicio_automatico' => (bool) $exam->inicio_automatico,
             'fin_automatico' => (bool) $exam->fin_automatico,
             'fin_programado_en' =>
                 $this->timing->endsAt($exam)->toIso8601String(),

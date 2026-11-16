@@ -91,7 +91,6 @@ class EntryControlSnapshotService
 
         $meta = [
             'id_examen' => $examId,
-            'estado' => Exam::EN_INGRESO,
             'carrera' => $career,
             'ambientes' => $rooms,
             'controladores' => $controllers,
@@ -500,13 +499,13 @@ class EntryControlSnapshotService
      */
     public function refreshBackground(int $studentId): int
     {
-        $examIds = DB::table('grupo_estudiante as gs')
-            ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
-            ->join('examen as e', 'e.id_examen', '=', 'gx.id_examen')
-            ->where('gs.id_estudiante', $studentId)
-            ->where('e.estado', Exam::EN_INGRESO)
-            ->distinct()
-            ->pluck('gx.id_examen');
+        $examIds = CloseOrdinaryEntryService::constrainToOpen(
+            DB::table('grupo_estudiante as gs')
+                ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
+                ->join('examen as e', 'e.id_examen', '=', 'gx.id_examen')
+                ->where('gs.id_estudiante', $studentId),
+            'e.'
+        )->distinct()->pluck('gx.id_examen');
 
         $refreshed = 0;
         foreach ($examIds as $examId) {
@@ -549,7 +548,7 @@ class EntryControlSnapshotService
     {
         $token = $this->activeTokenOrFail($examId);
         $meta = $this->cache()->get($this->key($examId, $token, 'meta'));
-        if (! is_array($meta) || $meta['estado'] !== Exam::EN_INGRESO) {
+        if (! is_array($meta)) {
             abort(409, 'El control de ingreso del examen no está abierto.');
         }
 

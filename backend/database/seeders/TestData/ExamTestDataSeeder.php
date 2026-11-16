@@ -24,7 +24,8 @@ class ExamTestDataSeeder extends Seeder
             $this->exam(9804, 'BD cancelado', '2026-10-16', '14:00:00', '15:00:00', 60,
                 Ids::CAREER_SYSTEMS, Ids::SUBJECT_DATABASES, Ids::TEACHER_FIXED, 'CANCELADO'),
             $this->exam(9805, 'Programación ingreso', '2026-09-21', '09:00:00', '10:00:00', 60,
-                Ids::CAREER_SYSTEMS, Ids::SUBJECT_PROGRAMMING, Ids::TEACHER_FIXED, 'EN_INGRESO'),
+                Ids::CAREER_SYSTEMS, Ids::SUBJECT_PROGRAMMING, Ids::TEACHER_FIXED, 'PROGRAMADO', 9701,
+                '2026-09-21 08:50:00-04'),
             $this->exam(9806, 'Álgebra en curso', '2026-09-21', '10:00:00', '11:30:00', 90,
                 Ids::CAREER_INFORMATICS, Ids::SUBJECT_ALGEBRA, Ids::TEACHER_3, 'EN_CURSO'),
             $this->exam(9807, 'Cálculo finalizado', '2026-09-10', '08:00:00', '09:00:00', 60,
@@ -64,7 +65,8 @@ class ExamTestDataSeeder extends Seeder
         int $subjectId,
         string $teacherId,
         string $status,
-        int $typeId = 9701
+        int $typeId = 9701,
+        ?string $entryOpenedAt = null
     ): array {
         return [
             'id_examen' => $id,
@@ -79,6 +81,7 @@ class ExamTestDataSeeder extends Seeder
             'id_materia' => $subjectId,
             'id_usuario_docente' => $teacherId,
             'estado' => $status,
+            'ingreso_abierto_en' => $entryOpenedAt,
         ];
     }
 }

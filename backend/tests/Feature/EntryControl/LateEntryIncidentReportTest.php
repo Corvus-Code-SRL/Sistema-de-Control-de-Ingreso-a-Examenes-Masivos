@@ -330,7 +330,7 @@ class LateEntryIncidentReportTest extends TestCase
     {
         $attemptId = $this->deniedAttempt();
 
-        foreach ([Exam::EN_INGRESO, Exam::FINALIZADO] as $state) {
+        foreach ([Exam::PROGRAMADO, Exam::FINALIZADO] as $state) {
             $this->setLateEntryExamState($state);
             $this->report($attemptId)
                 ->assertStatus(409)

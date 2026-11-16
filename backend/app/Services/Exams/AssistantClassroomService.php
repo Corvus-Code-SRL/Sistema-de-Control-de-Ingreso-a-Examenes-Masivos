@@ -24,7 +24,7 @@ use Illuminate\Validation\ValidationException;
 class AssistantClassroomService
 {
     /** Estados en los que el auxiliar todavía tiene un examen por controlar. */
-    private const ACTIVE_STATES = [Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::EN_CURSO];
+    private const ACTIVE_STATES = [Exam::PROGRAMADO, Exam::EN_CURSO];
 
     private AuditLogService $auditLog;
     private AssistantAvailabilityService $availability;

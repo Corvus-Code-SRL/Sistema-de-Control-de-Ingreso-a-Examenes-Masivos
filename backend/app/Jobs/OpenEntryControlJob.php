@@ -27,7 +27,7 @@ class OpenEntryControlJob implements ShouldQueue
         $now = Carbon::now($timezone);
 
         $exams = Exam::query()
-            ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::EN_CURSO])
+            ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_CURSO])
             ->whereBetween('fecha', [
                 $now->copy()->subDay()->toDateString(),
                 $now->copy()->addDay()->toDateString(),

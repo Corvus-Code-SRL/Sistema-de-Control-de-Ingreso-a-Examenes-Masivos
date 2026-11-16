@@ -33,14 +33,14 @@ class ExamLifecycleService
         $this->participants = $participants;
     }
 
-    /** Inicia el examen a la hora programada, sin cerrar el control de ingreso. */
+    /** Inicia el examen a la hora programada, con el control de ingreso ya abierto y sin cerrarlo. */
     public function startExpired(?Carbon $now = null): int
     {
         $now = $now ?? Carbon::now(config('sciem.zona_horaria'));
         $started = 0;
 
         Exam::query()
-            ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_INGRESO])
+            ->where('estado', Exam::PROGRAMADO)
             ->whereDate('fecha', '<=', $now->copy()->addDay()->toDateString())
             ->orderBy('id_examen')
             ->chunkById(100, function ($exams) use ($now, &$started): void {
@@ -54,7 +54,7 @@ class ExamLifecycleService
                     try {
                         $changed = DB::transaction(function () use ($exam, $now): bool {
                             $locked = Exam::query()->whereKey($exam->id_examen)->lockForUpdate()->firstOrFail();
-                            if (! in_array($locked->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO], true)
+                            if ($locked->estado !== Exam::PROGRAMADO
                                 || $locked->duracion === null
                                 || ! CloseOrdinaryEntryService::hasOpened((int) $locked->id_examen)
                                 || $now->lessThan($this->timing->startsAt($locked))
@@ -62,21 +62,16 @@ class ExamLifecycleService
                                 return false;
                             }
 
-                            $previousState = $locked->estado;
-                            $startedAt = $this->timing->startsAt($locked)->utc();
                             $locked->estado = Exam::EN_CURSO;
-                            $locked->inicio_real_en = $startedAt;
-                            $locked->inicio_automatico = true;
                             $locked->save();
 
                             $this->auditLog->registrar(
                                 'INICIAR',
                                 'examen',
-                                ['id_examen' => $locked->id_examen, 'estado' => $previousState],
+                                ['id_examen' => $locked->id_examen, 'estado' => Exam::PROGRAMADO],
                                 [
                                     'id_examen' => $locked->id_examen,
                                     'estado' => Exam::EN_CURSO,
-                                    'inicio_real_en' => $startedAt->toIso8601String(),
                                     'tipo_inicio' => 'AUTOMATICO',
                                 ],
                                 (string) $locked->id_usuario_docente
@@ -151,7 +146,7 @@ class ExamLifecycleService
             ->each(fn ($examId) => $this->deactivateSnapshot((int) $examId));
 
         Exam::query()
-            ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::EN_CURSO])
+            ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_CURSO])
             ->whereDate('fecha', '<=', $now->toDateString())
             ->orderBy('id_examen')
             ->chunkById(100, function ($exams) use ($now, &$finished): void {
@@ -169,7 +164,7 @@ class ExamLifecycleService
                     try {
                         $changed = DB::transaction(function () use ($exam, $now): bool {
                             $locked = Exam::query()->whereKey($exam->id_examen)->lockForUpdate()->firstOrFail();
-                            if (! in_array($locked->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::EN_CURSO], true)
+                            if (! in_array($locked->estado, [Exam::PROGRAMADO, Exam::EN_CURSO], true)
                                 || $locked->duracion === null) {
                                 return false;
                             }
@@ -209,6 +204,9 @@ class ExamLifecycleService
         $exam->estado = Exam::FINALIZADO;
         $exam->fin_real_en = $finishedAt;
         $exam->fin_automatico = $automatic;
+        if ($exam->ingreso_abierto_en !== null && $exam->ingreso_ordinario_cerrado_en === null) {
+            $exam->ingreso_ordinario_cerrado_en = $finishedAt;
+        }
         $exam->save();
         app(ExamInvitationExpiryService::class)->voidPendingForExam((int) $exam->id_examen);
 

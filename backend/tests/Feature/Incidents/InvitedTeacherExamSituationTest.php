@@ -65,13 +65,13 @@ class InvitedTeacherExamSituationTest extends TestCase
 
     public function testInvitedOwnerRegistersDuringEntryOpen(): void
     {
-        $this->situationExam->update(['estado' => Exam::EN_INGRESO]);
+        $this->situationExam->forceFill($this->examStateAttributes('INGRESO_ABIERTO'))->save();
         $examId = (int) $this->situationExam->id_examen;
 
         $this->getJson('/api/situaciones/examenes')->assertOk()->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.estado', Exam::EN_INGRESO);
+            ->assertJsonPath('data.0.estado', Exam::PROGRAMADO);
         $this->getJson("/api/situaciones/examenes/{$examId}/contexto")->assertOk()
-            ->assertJsonPath('data.examen.estado', Exam::EN_INGRESO);
+            ->assertJsonPath('data.examen.estado', Exam::PROGRAMADO);
         $this->postJson($this->situationUrl(), $this->situationPayload())->assertCreated();
     }
 
