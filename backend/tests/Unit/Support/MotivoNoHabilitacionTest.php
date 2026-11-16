@@ -98,16 +98,17 @@ class MotivoNoHabilitacionTest extends TestCase
             )
         );
     }
-
-    /** Etiqueta legible del motivo, para mostrarla en mensajes al usuario. */
-    public static function label(string $motivo): string
+    
+    public function test_label_devuelve_la_etiqueta_legible(): void
     {
-        return match ($motivo) {
-            self::ASISTENCIA_INSUFICIENTE => 'Asistencia insuficiente',
-            self::NO_ENTREGO_TRABAJO_FINAL => 'No entregó el trabajo final',
-            self::NO_CUMPLE_PRERREQUISITO => 'No cumple prerrequisito',
-            self::OTRO => 'Otro',
-            default => $motivo,
-        };
+        $this->assertSame('Asistencia insuficiente', MotivoNoHabilitacion::label(MotivoNoHabilitacion::ASISTENCIA_INSUFICIENTE));
+        $this->assertSame('No entregó el trabajo final', MotivoNoHabilitacion::label(MotivoNoHabilitacion::NO_ENTREGO_TRABAJO_FINAL));
+        $this->assertSame('No cumple prerrequisito', MotivoNoHabilitacion::label(MotivoNoHabilitacion::NO_CUMPLE_PRERREQUISITO));
+        $this->assertSame('Otro', MotivoNoHabilitacion::label(MotivoNoHabilitacion::OTRO));
+    }
+
+    public function test_label_de_un_codigo_desconocido_devuelve_el_codigo(): void
+    {
+        $this->assertSame('NO_EXISTE', MotivoNoHabilitacion::label('NO_EXISTE'));
     }
 }
