@@ -37,7 +37,11 @@ class FinalReportTest extends TestCase
     /** Examen finalizado con un estudiante que ingresó a tiempo y otro ausente. */
     private function finishedExam(array $overrides = []): Exam
     {
-        $exam = $this->createExam(array_merge(['estado' => Exam::FINALIZADO], $overrides), [$this->aulaId]);
+        $exam = $this->createExam(array_merge([
+            'estado' => Exam::FINALIZADO,
+            'ingreso_abierto_en' => '2026-10-28 11:30:00+00',
+            'ingreso_ordinario_cerrado_en' => '2026-10-28 12:15:00+00',
+        ], $overrides), [$this->aulaId]);
 
         DB::table('grupo_examen')->insert([
             'id_examen' => $exam->id_examen,
@@ -86,7 +90,8 @@ class FinalReportTest extends TestCase
         $response = $this->getJson($this->url($exam))
             ->assertOk()
             ->assertJsonPath('data.cabecera.nombre_examen', 'Parcial final')
-            ->assertJsonPath('data.cabecera.hora_inicio', '08:00 (programada)')
+            ->assertJsonPath('data.cabecera.hora_inicio', '08:00')
+            ->assertJsonPath('data.cabecera.hora_apertura', '07:30')
             ->assertJsonPath('data.asistencia.totales.inscritos', 2)
             ->assertJsonPath('data.asistencia.totales.a_tiempo', 1)
             ->assertJsonPath('data.asistencia.totales.con_retraso', 0)
@@ -117,7 +122,7 @@ class FinalReportTest extends TestCase
         );
     }
 
-    public function test_encabezado_usa_las_horas_reales_en_hora_de_la_paz(): void
+    public function test_encabezado_usa_la_hora_programada_la_apertura_y_el_fin_real_en_hora_de_la_paz(): void
     {
         $exam = $this->finishedExam();
 
@@ -126,24 +131,31 @@ class FinalReportTest extends TestCase
             'fin_real_en' => '2026-10-28 13:52:00+00',
         ]);
 
+        // inicio_real_en ya no se usa: el inicio es el programado.
         $this->getJson($this->url($exam))
             ->assertOk()
-            ->assertJsonPath('data.cabecera.hora_inicio', '08:14')
+            ->assertJsonPath('data.cabecera.hora_inicio', '08:00')
+            ->assertJsonPath('data.cabecera.hora_apertura', '07:30')
             ->assertJsonPath('data.cabecera.hora_fin', '09:52');
     }
 
-    public function test_si_falta_una_hora_real_muestra_la_programada_con_su_etiqueta(): void
+    public function test_si_falta_el_fin_real_muestra_la_hora_programada_con_su_etiqueta(): void
     {
         $exam = $this->finishedExam();
 
-        DB::table('examen')->where('id_examen', $exam->id_examen)->update([
-            'inicio_real_en' => '2026-10-28 12:14:00+00',
-        ]);
+        $this->getJson($this->url($exam))
+            ->assertOk()
+            ->assertJsonPath('data.cabecera.hora_inicio', '08:00')
+            ->assertJsonPath('data.cabecera.hora_fin', '09:30 (programada)');
+    }
+
+    public function test_sin_apertura_registrada_la_cabecera_no_inventa_la_hora(): void
+    {
+        $exam = $this->finishedExam(['ingreso_abierto_en' => null, 'ingreso_ordinario_cerrado_en' => null]);
 
         $this->getJson($this->url($exam))
             ->assertOk()
-            ->assertJsonPath('data.cabecera.hora_inicio', '08:14')
-            ->assertJsonPath('data.cabecera.hora_fin', '09:30 (programada)');
+            ->assertJsonPath('data.cabecera.hora_apertura', null);
     }
 
     public function test_sin_incidencias_la_lista_viene_vacia(): void

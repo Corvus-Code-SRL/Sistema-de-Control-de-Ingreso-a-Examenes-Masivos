@@ -203,6 +203,21 @@ describe('CreateExamContainer (HU-024)', () => {
     expect(screen.getByRole('button', { name: /guardar examen/i })).toBeEnabled()
   })
 
+  it('tras crear con capacidad insuficiente permite modificar el examen', async () => {
+    hook.overrides = {
+      formData: { ...emptyForm, ambientes: [1], grupos: [100] },
+      options: { materias: [], ambientes: [{ id_ambiente: 1, nro_aula: '691A', capacidad: 1 }], grupos: [] },
+      totalStudents: 16,
+    }
+    renderContainer()
+
+    await userEvent.click(screen.getByRole('button', { name: /guardar examen/i }))
+
+    const summary = screen.getByRole('region', { name: 'Resumen de capacidad del examen' })
+    expect(within(summary).getByText(/Faltan 15 lugares.*Modifique los ambientes/)).toBeInTheDocument()
+    expect(within(summary).getByRole('link', { name: 'Modificar examen' })).toHaveAttribute('href', '/examenes/77/editar')
+  })
+
   it('bloquea el guardado normal cuando hay advertencias pendientes', () => {
     const submitExam = vi.fn()
 

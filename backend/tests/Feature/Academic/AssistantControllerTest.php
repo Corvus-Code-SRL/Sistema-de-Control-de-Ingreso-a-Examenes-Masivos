@@ -328,8 +328,8 @@ class AssistantControllerTest extends TestCase
 
     public function test_rechaza_habilitar_auxiliar_si_el_examen_no_esta_programado(): void
     {
-        // Cambia el examen a EN_INGRESO
-        DB::table('examen')->where('id_examen', $this->examId)->update(['estado' => 'EN_INGRESO']);
+        // Con el control de ingreso abierto las habilitaciones quedan fijas.
+        DB::table('examen')->where('id_examen', $this->examId)->update(['ingreso_abierto_en' => now('UTC')->format('Y-m-d H:i:sP')]);
 
         $response = $this->postJson("/api/docente/examenes/{$this->examId}/auxiliares", [
             'id_usuario' => $this->auxiliarAId,

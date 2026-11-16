@@ -2,14 +2,13 @@
 
 namespace Tests\Feature\Exams;
 
-use App\Models\Action;
-use App\Models\AuditLog;
 use App\Models\Exam;
-use App\Services\EntryControl\EntryConfirmationService;
+use App\Services\EntryControl\CloseOrdinaryEntryService;
+use App\Services\EntryControl\RoomAssignmentService;
 use App\Services\Exams\ExamLifecycleService;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
+use App\Services\Exams\ExamTimingService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Tests\Concerns\SeedsExamCatalog;
 use Tests\TestCase;
 
@@ -18,132 +17,136 @@ class StartExamTest extends TestCase
     use DatabaseTransactions;
     use SeedsExamCatalog;
 
-    protected function setUp(): void
+    /** Fila 1 del modelo: antes de abrir el control el examen está PROGRAMADO y nadie entra. */
+    public function test_antes_de_abrir_el_control_el_examen_esta_programado_y_no_se_inicia(): void
     {
-        parent::setUp();
         $this->seedExamCatalog();
+        $exam = $this->createExam(['fecha' => $this->futureDate(), 'hora_inicio' => '00:05'], [$this->aulaId])->fresh();
+
+        app(ExamLifecycleService::class)->startExpired(app(ExamTimingService::class)->startsAt($exam));
+
+        $fresh = $exam->fresh();
+        $this->assertSame(Exam::PROGRAMADO, $fresh->estado);
+        $this->assertNull($fresh->ingreso_abierto_en);
+        $this->assertFalse(CloseOrdinaryEntryService::isOpen($fresh));
     }
 
-    private function url(Exam $exam): string
+    /** Filas 2 y 3: la apertura no cambia el estado; en hora_inicio pasa a EN_CURSO con el ingreso aún abierto. */
+    public function test_la_apertura_anticipada_no_inicia_el_examen_antes_de_su_hora(): void
     {
-        return "/api/examenes/{$exam->id_examen}/iniciar";
-    }
-
-    public function test_docente_inicia_examen_en_ingreso_y_se_audita(): void
-    {
-        $exam = $this->createExam(['estado' => Exam::EN_INGRESO]);
-
-        $this->postJson($this->url($exam))
-            ->assertOk()
-            ->assertJsonPath('mensaje', 'Examen iniciado correctamente.')
-            ->assertJsonPath('data.estado', Exam::EN_CURSO)
-            ->assertJsonPath('data.inicio_automatico', false);
-
-        $exam->refresh();
-        $this->assertNotNull($exam->inicio_real_en);
-        $this->assertSame(Exam::EN_CURSO, $exam->estado);
-
-        $log = AuditLog::query()->where('tabla_afectada', 'examen')->sole();
-        $this->assertSame('INICIAR', Action::query()->whereKey($log->id_accion)->value('operacion'));
-        $this->assertSame($this->docenteId, $log->id_usuario);
-    }
-
-    public function test_no_se_puede_iniciar_dos_veces(): void
-    {
-        $exam = $this->createExam(['estado' => Exam::EN_INGRESO]);
-
-        $this->postJson($this->url($exam))->assertOk();
-        $this->postJson($this->url($exam))->assertStatus(409);
-        $this->assertSame(1, AuditLog::query()->where('tabla_afectada', 'examen')->count());
-    }
-
-    public function test_docente_ajeno_no_puede_iniciar(): void
-    {
+        $this->seedExamCatalog();
         $exam = $this->createExam([
-            'estado' => Exam::EN_INGRESO,
-            'id_usuario_docente' => $this->otroDocenteId,
-        ]);
-
-        $this->postJson($this->url($exam))->assertForbidden();
-        $this->assertSame(Exam::EN_INGRESO, $exam->fresh()->estado);
-    }
-
-    public function test_inicio_automatico_a_los_diez_minutos_sin_duplicar_bitacora(): void
-    {
-        $zone = config('sciem.zona_horaria');
-        $exam = $this->createExam([
-            'fecha' => '2026-10-28',
-            'hora_inicio' => '08:00',
-            'hora_fin' => '09:30',
-            'duracion' => 90,
-            'estado' => Exam::EN_INGRESO,
-        ]);
+            'fecha' => $this->futureDate(),
+            'hora_inicio' => '00:05',
+        ], [$this->aulaId])->fresh();
+        DB::table('grupo_examen')->insert(['id_examen' => $exam->id_examen, 'id_grupo' => $this->grupoPropioId]);
+        app(RoomAssignmentService::class)->prepare((int) $exam->id_examen);
+        $timing = app(ExamTimingService::class);
+        $openingAt = $timing->opensAt($exam);
+        $startsAt = $timing->startsAt($exam);
+        $scheduledEnd = $timing->endsAt($exam);
+        $this->assertSame('23:55', $openingAt->format('H:i'));
         $lifecycle = app(ExamLifecycleService::class);
 
-        $this->assertSame(0, $lifecycle->startExpired(Carbon::parse('2026-10-28 08:09:00', $zone)));
-        $this->assertSame(Exam::EN_INGRESO, $exam->fresh()->estado);
-        $this->assertSame(1, $lifecycle->startExpired(Carbon::parse('2026-10-28 08:10:00', $zone)));
-        $this->assertSame(0, $lifecycle->startExpired(Carbon::parse('2026-10-28 08:11:00', $zone)));
+        $opened = $exam->fresh();
+        $this->assertSame(Exam::PROGRAMADO, $opened->estado);
+        $this->assertNotNull($opened->ingreso_abierto_en);
+        $this->assertNull($opened->ingreso_ordinario_cerrado_en);
+        $this->assertTrue(CloseOrdinaryEntryService::isOpen($opened));
 
-        $exam->refresh();
-        $this->assertSame(Exam::EN_CURSO, $exam->estado);
-        $this->assertTrue($exam->inicio_automatico);
-        $this->assertSame('08:10', $exam->inicio_real_en->setTimezone($zone)->format('H:i'));
-        $log = AuditLog::query()->where('tabla_afectada', 'examen')->sole();
-        $this->assertSame('INICIAR', $log->accion->operacion);
-        $this->assertSame('AUTOMATICO', $log->nuevo_valor['tipo_inicio']);
+        $lifecycle->startExpired($openingAt->copy()->subSecond());
+        $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+
+        $lifecycle->startExpired($openingAt);
+        $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+
+        $lifecycle->startExpired($startsAt->copy()->subSecond());
+        $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+
+        $lifecycle->startExpired($startsAt);
+        $started = $exam->fresh();
+        $this->assertSame(Exam::EN_CURSO, $started->estado);
+        $this->assertNull($started->inicio_real_en);
+        $this->assertTrue($started->ingreso_abierto_en->equalTo($opened->ingreso_abierto_en));
+        $this->assertNull($started->ingreso_ordinario_cerrado_en);
+        $this->assertTrue(CloseOrdinaryEntryService::isOpen($started));
+        $this->assertSame('01:35', $scheduledEnd->format('H:i'));
+        $this->assertFalse($timing->hasEnded($exam, $startsAt));
+
+        $payload = json_decode((string) DB::table('log as l')
+            ->join('accion as ac', 'ac.id_accion', '=', 'l.id_accion')
+            ->where('ac.operacion', 'INICIAR')
+            ->whereRaw("l.nuevo_valor->>'id_examen' = ?", [(string) $exam->id_examen])
+            ->value('l.nuevo_valor'), true);
+        $this->assertSame('AUTOMATICO', $payload['tipo_inicio']);
+        $this->assertArrayNotHasKey('inicio_real_en', $payload);
     }
 
-    public function test_confirmacion_rechaza_un_examen_ya_iniciado_aun_con_modelo_obsoleto(): void
+    /** Fila 4: «Cerrar ingreso ordinario» deja el examen EN_CURSO y solo admite el ingreso con retraso. */
+    public function test_cerrar_el_ingreso_ordinario_mantiene_en_curso_y_habilita_el_retraso(): void
     {
-        $exam = $this->createExam(['estado' => Exam::EN_INGRESO]);
-        $studentId = DB::table('grupo_estudiante')
-            ->where('id_grupo', $this->grupoPropioId)
-            ->value('id_estudiante');
-        $actor = $this->actAsTeacher($this->docenteId);
-        $stale = clone $exam;
-        $exam->update(['estado' => Exam::EN_CURSO]);
+        $exam = $this->examInProgressWithEntryOpen();
+        $this->actAsTeacher($this->docenteId);
 
-        $result = app(EntryConfirmationService::class)->confirm($stale, [
-            'id_estudiante' => (int) $studentId,
-            'id_ambiente' => $this->aulaId,
-        ], $actor);
+        $this->postJson("/api/control-ingreso/examenes/{$exam->id_examen}/cerrar-ingreso-ordinario")->assertOk();
 
-        $this->assertFalse($result['creado']);
-        $this->assertSame('EXAMEN_INICIADO', $result['veredicto']);
-        $this->assertSame('El examen ya inició.', $result['motivo']);
-        $this->assertSame(0, DB::table('examen_estudiante')
-            ->where('id_examen', $exam->id_examen)->count());
+        $closed = $exam->fresh();
+        $this->assertSame(Exam::EN_CURSO, $closed->estado);
+        $this->assertNotNull($closed->ingreso_ordinario_cerrado_en);
+        $this->assertFalse(CloseOrdinaryEntryService::isOpen($closed));
+        $this->assertTrue(CloseOrdinaryEntryService::allowsLate($closed));
     }
 
-    public function test_confirmacion_rechaza_un_examen_finalizado_con_su_propio_mensaje(): void
+    /** Fila 5: al terminar con el ingreso abierto, el cierre queda en la hora de término. */
+    public function test_finalizar_con_el_ingreso_abierto_lo_cierra_en_la_hora_de_termino(): void
     {
-        $exam = $this->createExam(['estado' => Exam::EN_INGRESO]);
-        $studentId = DB::table('grupo_estudiante')
-            ->where('id_grupo', $this->grupoPropioId)
-            ->value('id_estudiante');
-        $actor = $this->actAsTeacher($this->docenteId);
-        $stale = clone $exam;
-        $exam->update(['estado' => Exam::FINALIZADO]);
+        $exam = $this->examInProgressWithEntryOpen();
+        $this->actAsTeacher($this->docenteId);
 
-        $result = app(EntryConfirmationService::class)->confirm($stale, [
-            'id_estudiante' => (int) $studentId,
-            'id_ambiente' => $this->aulaId,
-        ], $actor);
+        $this->postJson("/api/examenes/{$exam->id_examen}/finalizar")->assertOk();
 
-        $this->assertFalse($result['creado']);
-        $this->assertSame('EXAMEN_INICIADO', $result['veredicto']);
-        $this->assertSame('El examen ya finalizó.', $result['motivo']);
-        $this->assertSame(0, DB::table('examen_estudiante')
-            ->where('id_examen', $exam->id_examen)->count());
+        $finished = $exam->fresh();
+        $this->assertSame(Exam::FINALIZADO, $finished->estado);
+        $this->assertNotNull($finished->fin_real_en);
+        $this->assertTrue($finished->ingreso_ordinario_cerrado_en->equalTo($finished->fin_real_en));
+        $this->assertFalse(CloseOrdinaryEntryService::isOpen($finished));
+        $this->assertFalse(CloseOrdinaryEntryService::allowsLate($finished));
     }
 
-    public function test_solo_se_inicia_desde_en_ingreso(): void
+    public function test_finalizar_con_el_ingreso_ya_cerrado_conserva_la_hora_de_cierre(): void
     {
-        foreach ([Exam::PROGRAMADO, Exam::EN_CURSO, Exam::FINALIZADO, Exam::CANCELADO] as $state) {
-            $exam = $this->createExam(['estado' => $state]);
-            $this->postJson($this->url($exam))->assertStatus(409);
-            $this->assertSame($state, $exam->fresh()->estado);
-        }
+        $exam = $this->examInProgressWithEntryOpen();
+        $this->actAsTeacher($this->docenteId);
+        $this->postJson("/api/control-ingreso/examenes/{$exam->id_examen}/cerrar-ingreso-ordinario")->assertOk();
+        $closedAt = $exam->fresh()->ingreso_ordinario_cerrado_en;
+
+        $this->postJson("/api/examenes/{$exam->id_examen}/finalizar")->assertOk();
+
+        $this->assertTrue($exam->fresh()->ingreso_ordinario_cerrado_en->equalTo($closedAt));
+    }
+
+    public function test_el_ingreso_ordinario_no_ofrece_inicio_manual_del_examen(): void
+    {
+        $this->seedExamCatalog();
+        $exam = $this->createExam(['estado' => Exam::PROGRAMADO]);
+
+        $this->postJson("/api/examenes/{$exam->id_examen}/iniciar")->assertNotFound();
+        $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
+    }
+
+    /** Examen que pasó por la apertura real del control y el inicio programado. */
+    private function examInProgressWithEntryOpen(): Exam
+    {
+        $this->seedExamCatalog();
+        $exam = $this->createExam([
+            'fecha' => $this->futureDate(),
+            'hora_inicio' => '00:05',
+        ], [$this->aulaId])->fresh();
+        DB::table('grupo_examen')->insert(['id_examen' => $exam->id_examen, 'id_grupo' => $this->grupoPropioId]);
+        app(RoomAssignmentService::class)->prepare((int) $exam->id_examen);
+        app(ExamLifecycleService::class)->startExpired(app(ExamTimingService::class)->startsAt($exam));
+        $this->assertSame(Exam::EN_CURSO, $exam->fresh()->estado);
+
+        return $exam;
     }
 }

@@ -46,8 +46,12 @@ class LateEntryQueryService
     {
         $access = $this->access->resolve($exam, $actor);
 
-        if (! in_array($exam->estado, [Exam::EN_CURSO, Exam::FINALIZADO], true)) {
-            throw new ExamStateException(self::NOT_STARTED_MESSAGE);
+        if ($exam->estado !== Exam::FINALIZADO && ! CloseOrdinaryEntryService::allowsLate($exam)) {
+            throw new ExamStateException(
+                $exam->estado === Exam::EN_CURSO
+                    ? LateEntryException::ORDINARY_ENTRY_OPEN_MESSAGE
+                    : self::NOT_STARTED_MESSAGE
+            );
         }
 
         $requests = LateEntryRequest::query()
@@ -85,8 +89,8 @@ class LateEntryQueryService
     {
         $this->access->resolve($exam, $actor);
 
-        if ($exam->estado !== Exam::EN_CURSO) {
-            throw LateEntryException::examNotInProgress();
+        if (! CloseOrdinaryEntryService::allowsLate($exam)) {
+            throw LateEntryException::notAvailableFor($exam);
         }
 
         $query = DB::table('estudiante as est')

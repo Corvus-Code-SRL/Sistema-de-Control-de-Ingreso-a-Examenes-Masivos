@@ -412,8 +412,8 @@ class LateEntryService
 
     private function assertInProgress(Exam $exam): void
     {
-        if ($exam->estado !== Exam::EN_CURSO) {
-            throw LateEntryException::examNotInProgress();
+        if (! CloseOrdinaryEntryService::allowsLate($exam)) {
+            throw LateEntryException::notAvailableFor($exam);
         }
     }
 

@@ -32,8 +32,14 @@ class ExamSituationWorkspaceService
             ? [$filters['estado']]
             : ($scope['states'] ?? ExamSituationAccessService::REGISTRABLE_STATES);
 
-        return $this->accessFor($scope)->visibleExams($actor)
-            ->whereIn('estado', $states)
+        $access = $this->accessFor($scope);
+        $query = $access->visibleExams($actor)->whereIn('estado', $states);
+
+        if (! isset($scope['states'])) {
+            $access->onlyRegistrable($query);
+        }
+
+        return $query
             ->orderByDesc('fecha')->orderByDesc('id_examen')
             ->paginate(20, ['examen.*'], 'page', (int) ($filters['page'] ?? 1));
     }

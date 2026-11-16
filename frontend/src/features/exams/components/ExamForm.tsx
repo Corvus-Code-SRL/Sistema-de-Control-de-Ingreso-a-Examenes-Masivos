@@ -1,6 +1,7 @@
 import type { CreateExamFormData, SubjectCareerOption } from '../types/exams.types'
 import { localToday, MAX_DURATION_MINUTES } from '../utils/examValidators'
 import { FormSelect } from '@/components/common/FormSelect'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { CalendarDays, Clock3 } from 'lucide-react'
 
 interface Props {
@@ -17,10 +18,16 @@ const pickerClass = (invalid: boolean) =>
   `relative flex h-9 items-center justify-between rounded-lg border bg-card px-3 text-sm focus-within:ring-2 focus-within:ring-ring ${invalid ? 'border-danger' : 'border-border-strong'}`
 
 export function ExamForm({ formData, subjects, errors, updateFormData }: Props) {
-  const [hour, minute] = formData.hora_inicio.split(':').map(Number)
+  const [hour, minute] = (formData.hora_inicio || '08:00').split(':').map(Number)
+  const period = hour < 12 ? 'AM' : 'PM'
   const displayedTime = formData.hora_inicio
-    ? `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`
+    ? `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${period}`
     : 'hh:mm AM/PM'
+  const selectClass = 'h-9 rounded-lg border border-border-strong bg-card px-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring'
+
+  const setTime = (nextHour: number, nextMinute: number) => {
+    updateFormData({ hora_inicio: `${String(nextHour).padStart(2, '0')}:${String(nextMinute).padStart(2, '0')}` })
+  }
 
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
@@ -79,16 +86,37 @@ export function ExamForm({ formData, subjects, errors, updateFormData }: Props) 
           </div>
           <div className="space-y-1">
             <label htmlFor="hora_inicio" className="block text-sm font-medium text-foreground">Hora de inicio <span className="text-danger">*</span></label>
-            <div className={pickerClass(Boolean(errors.hora_inicio))}>
-              <span aria-hidden="true" className={formData.hora_inicio ? 'text-foreground' : 'text-muted-foreground'}>
-                {displayedTime}
-              </span>
-              <Clock3 aria-hidden="true" className="size-4 text-muted-foreground" />
-              <input id="hora_inicio" type="time" lang="es-BO" value={formData.hora_inicio}
-                onChange={(event) => updateFormData({ hora_inicio: event.target.value })}
-                onClick={(event) => event.currentTarget.showPicker?.()}
-                className="absolute inset-0 size-full cursor-pointer opacity-0" />
-            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button id="hora_inicio" type="button" aria-label="Hora de inicio" aria-invalid={Boolean(errors.hora_inicio)}
+                  className={`${pickerClass(Boolean(errors.hora_inicio))} w-full cursor-pointer text-left`}>
+                  <span className={formData.hora_inicio ? 'text-foreground' : 'text-muted-foreground'}>{displayedTime}</span>
+                  <Clock3 aria-hidden="true" className="size-4 text-muted-foreground" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-auto">
+                <div className="flex items-center gap-2">
+                  <select aria-label="Hora" value={hour % 12 || 12} className={selectClass}
+                    onChange={(event) => setTime(Number(event.target.value) % 12 + (period === 'PM' ? 12 : 0), minute)}>
+                    {Array.from({ length: 12 }, (_, index) => index + 1).map((value) =>
+                      <option key={value} value={value}>{String(value).padStart(2, '0')}</option>
+                    )}
+                  </select>
+                  <span aria-hidden="true">:</span>
+                  <select aria-label="Minutos" value={minute} className={selectClass}
+                    onChange={(event) => setTime(hour, Number(event.target.value))}>
+                    {Array.from({ length: 60 }, (_, index) => index).map((value) =>
+                      <option key={value} value={value}>{String(value).padStart(2, '0')}</option>
+                    )}
+                  </select>
+                  <select aria-label="Período" value={period} className={selectClass}
+                    onChange={(event) => setTime(hour % 12 + (event.target.value === 'PM' ? 12 : 0), minute)}>
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                  </select>
+                </div>
+              </PopoverContent>
+            </Popover>
             {errors.hora_inicio && <p className="text-xs font-medium text-danger">{errors.hora_inicio}</p>}
           </div>
           <div className="space-y-1">

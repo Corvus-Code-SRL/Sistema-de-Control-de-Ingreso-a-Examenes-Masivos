@@ -66,7 +66,8 @@ export interface SituationExam {
   id_examen: number
   nombre_examen: string
   fecha: string
-  estado: 'EN_INGRESO' | 'EN_CURSO'
+  /** PROGRAMADO solo aparece con el control de ingreso abierto. */
+  estado: 'PROGRAMADO' | 'EN_CURSO'
 }
 
 export interface SituationExamsPage {

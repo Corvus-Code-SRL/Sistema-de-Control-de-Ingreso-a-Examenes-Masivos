@@ -4,6 +4,7 @@ namespace Tests\Feature\Security;
 
 use App\Models\Exam;
 use App\Models\Role;
+use App\Services\EntryControl\RoomAssignmentService;
 use App\Services\Security\UserRoleService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -71,13 +72,20 @@ class InvitedTeacherAccessTest extends TestCase
             ->assertJsonPath('data.id_usuario_docente', $this->docenteId);
     }
 
-    public function test_invitado_inicia_su_examen(): void
+    public function test_invitado_cierra_el_ingreso_ordinario_de_su_examen(): void
     {
-        $exam = $this->createExam(['estado' => Exam::EN_INGRESO]);
+        $exam = $this->createExam([], [$this->aulaId]);
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
+        app(RoomAssignmentService::class)->prepare((int) $exam->id_examen);
+        $exam->forceFill(['estado' => Exam::EN_CURSO])->save();
 
-        $this->postJson("/api/examenes/{$exam->id_examen}/iniciar")
+        $this->postJson("/api/control-ingreso/examenes/{$exam->id_examen}/cerrar-ingreso-ordinario")
             ->assertOk()
-            ->assertJsonPath('data.estado', Exam::EN_CURSO);
+            ->assertJsonPath('data.ingreso_ordinario_cerrado', true);
+        $this->assertSame(Exam::EN_CURSO, $exam->fresh()->estado);
     }
 
     public function test_invitado_ve_sus_grupos_y_la_nomina_de_un_grupo_propio(): void

@@ -245,8 +245,11 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
               {hasSelectedRooms && hasSelectedGroups && capacityDeficit > 0 && (
                 <p role="status" className="mt-2 flex gap-2 rounded-lg border border-warn-border bg-warn-soft p-2 text-xs text-warn-fg">
                   <AlertTriangle aria-hidden="true" className="size-4 shrink-0" />
-                  Faltan {capacityDeficit} lugares; podrá confirmar el registro de todos modos.
+                  {createdExam ? `Faltan ${capacityDeficit} lugares. Modifique los ambientes antes de la apertura del control.` : `Faltan ${capacityDeficit} lugares; podrá confirmar el registro de todos modos.`}
                 </p>
+              )}
+              {createdExam && capacityDeficit > 0 && (
+                <Button asChild variant="outline" className="mt-3 w-full"><Link to={`/examenes/${createdExam.id_examen}/editar`}>Modificar examen</Link></Button>
               )}
               {(!hasSelectedRooms || !hasSelectedGroups) && (
                 <p className="mt-1 text-xs text-muted-foreground">Seleccione ambientes y grupos para comparar la capacidad.</p>

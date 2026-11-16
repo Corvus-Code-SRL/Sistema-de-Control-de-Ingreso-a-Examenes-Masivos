@@ -73,6 +73,20 @@ describe('ExamForm - materias', () => {
   })
 })
 
+describe('ExamForm - hora', () => {
+  it('permite elegir hora y minutos en formato AM/PM', async () => {
+    const user = userEvent.setup()
+    render(<ExamFormHarness />)
+
+    await user.click(screen.getByRole('button', { name: 'Hora de inicio' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Hora' }), '9')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Minutos' }), '30')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Período' }), 'PM')
+
+    expect(screen.getByRole('button', { name: 'Hora de inicio' })).toHaveTextContent('9:30 PM')
+  })
+})
+
 describe('ExamForm - apertura', () => {
   it('permite configurar los minutos antes del examen', async () => {
     render(<ExamFormHarness />)

@@ -55,6 +55,11 @@ class ActionSeeder extends Seeder
                 'tipo_operacion' => 'INSERT',
                 'descripcion' => 'Registro de un estudiante excepcional en un grupo',
             ],
+            [
+                'operacion' => 'INVITAR_COLABORADOR',
+                'tipo_operacion' => 'INSERT',
+                'descripcion' => 'Invitación de un docente colaborador a un examen',
+            ],
         ];
 
         foreach ($acciones as $accion) {

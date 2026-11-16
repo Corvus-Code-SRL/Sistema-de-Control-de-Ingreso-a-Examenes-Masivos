@@ -68,10 +68,10 @@ class ExamInProgressTest extends TestCase
     {
         foreach ([
             Exam::PROGRAMADO,
-            Exam::EN_INGRESO,
+            'INGRESO_ABIERTO',
             Exam::CANCELADO,
         ] as $state) {
-            $exam = $this->createExam(['estado' => $state]);
+            $exam = $this->createExam($this->examStateAttributes($state));
 
             $this->getJson($this->url($exam))
                 ->assertStatus(409);

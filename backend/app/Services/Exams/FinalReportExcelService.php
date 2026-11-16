@@ -55,7 +55,8 @@ class FinalReportExcelService
             ['Materia', $header['materia'] ?? '—'],
             ['Docente', $header['docente'] ?? '—'],
             ['Fecha del examen', Carbon::parse($header['fecha'])->format('d/m/Y')],
-            ['Hora de inicio', $header['hora_inicio'] ?? '—'],
+            ['Hora de inicio programada', $header['hora_inicio'] ?? '—'],
+            ['Apertura del control', $header['hora_apertura'] ?? '—'],
             ['Hora de fin', $header['hora_fin'] ?? '—'],
             ['Reporte generado', $generatedAt->format('d/m/Y H:i')],
         ];

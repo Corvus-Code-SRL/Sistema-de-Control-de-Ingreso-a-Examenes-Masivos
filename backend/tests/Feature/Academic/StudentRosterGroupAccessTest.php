@@ -140,7 +140,7 @@ class StudentRosterGroupAccessTest extends TestCase
     public function lockingExamStates(): array
     {
         return [
-            'EN_INGRESO' => [Exam::EN_INGRESO],
+            'INGRESO_ABIERTO' => ['INGRESO_ABIERTO'],
             'EN_CURSO' => [Exam::EN_CURSO],
         ];
     }
@@ -194,7 +194,7 @@ class StudentRosterGroupAccessTest extends TestCase
 
     private function linkExam(Group $group, string $state): void
     {
-        $exam = $this->createExam(['estado' => $state]);
+        $exam = $this->createExam($this->examStateAttributes($state));
 
         DB::table('grupo_examen')->insert([
             'id_examen' => $exam->id_examen,

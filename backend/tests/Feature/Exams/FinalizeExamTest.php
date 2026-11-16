@@ -73,7 +73,7 @@ class FinalizeExamTest extends TestCase
 
     public function test_docente_creador_finaliza_en_curso_desactiva_snapshot_y_audita(): void
     {
-        $exam = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId]);
+        $exam = $this->createExam($this->examStateAttributes('INGRESO_ABIERTO'), [$this->aulaId]);
         DB::table('grupo_examen')->insert([
             'id_examen' => $exam->id_examen,
             'id_grupo' => $this->grupoPropioId,
@@ -103,7 +103,7 @@ class FinalizeExamTest extends TestCase
         $this->assertFalse($closed->fin_automatico);
         $this->assertFalse(app(EntryControlSnapshotService::class)->ready((int) $exam->id_examen));
 
-        $log = AuditLog::query()->where('tabla_afectada', 'examen')->sole();
+        $log = AuditLog::query()->where('tabla_afectada', 'examen')->orderByDesc('id_log')->firstOrFail();
         $this->assertSame(
             'FINALIZAR',
             Action::query()->whereKey($log->id_accion)->value('operacion')
@@ -205,14 +205,14 @@ class FinalizeExamTest extends TestCase
 
     public function test_finalizacion_manual_rechaza_estados_distintos_de_en_curso(): void
     {
-        foreach ([Exam::PROGRAMADO, Exam::EN_INGRESO, Exam::CANCELADO, Exam::FINALIZADO] as $state) {
-            $exam = $this->createExam([
-                'nombre_examen' => "Examen {$state}",
-                'estado' => $state,
-            ]);
+        foreach ([Exam::PROGRAMADO, 'INGRESO_ABIERTO', Exam::CANCELADO, Exam::FINALIZADO] as $state) {
+            $exam = $this->createExam(array_merge(
+                ['nombre_examen' => "Examen {$state}"],
+                $this->examStateAttributes($state)
+            ));
 
             $this->postJson($this->url($exam))->assertStatus(409);
-            $this->assertSame($state, $exam->fresh()->estado);
+            $this->assertSame($exam->estado, $exam->fresh()->estado);
         }
     }
 
@@ -292,20 +292,25 @@ class FinalizeExamTest extends TestCase
             'estado' => Exam::EN_CURSO,
         ]);
         $entry = $this->createExam($attributes + [
-            'nombre_examen' => 'En ingreso antiguo',
-            'estado' => Exam::EN_INGRESO,
+            'nombre_examen' => 'Ingreso abierto antiguo',
+            'estado' => Exam::PROGRAMADO,
+            'ingreso_abierto_en' => '2026-09-30 11:50:00+00',
         ]);
 
         $service = app(ExamLifecycleService::class);
         $timezone = config('sciem.zona_horaria');
         $this->assertSame(1, $service->finishExpired(Carbon::parse('2026-09-30 10:59:59', $timezone)));
         $this->assertSame(Exam::PROGRAMADO, $programmed->fresh()->estado);
-        $this->assertSame(Exam::EN_INGRESO, $entry->fresh()->estado);
+        $this->assertSame(Exam::PROGRAMADO, $entry->fresh()->estado);
 
         $this->assertSame(2, $service->finishExpired(Carbon::parse('2026-10-01 12:00:00', $timezone)));
         $this->assertSame(Exam::FINALIZADO, $programmed->fresh()->estado);
         $this->assertSame(Exam::FINALIZADO, $running->fresh()->estado);
         $this->assertSame(Exam::FINALIZADO, $entry->fresh()->estado);
+        $this->assertNull($programmed->fresh()->ingreso_abierto_en);
+        $this->assertNull($programmed->fresh()->ingreso_ordinario_cerrado_en);
+        // El ingreso que seguía abierto se cierra al terminar el examen.
+        $this->assertTrue($entry->fresh()->ingreso_ordinario_cerrado_en->equalTo($entry->fresh()->fin_real_en));
     }
 
     public function test_finalizacion_automatica_congela_esperados_y_audita(): void
@@ -354,7 +359,7 @@ class FinalizeExamTest extends TestCase
             'estado' => Exam::EN_CURSO,
         ]);
         DB::table('examen')->where('id_examen', $exam->id_examen)
-            ->update(['inicio_real_en' => '2026-10-01 14:05:00+00']);
+            ->update(['ingreso_abierto_en' => '2026-10-01 13:50:00+00']);
         DB::table('grupo_examen')->insert([
             'id_examen' => $exam->id_examen,
             'id_grupo' => $this->grupoPropioId,
@@ -376,11 +381,13 @@ class FinalizeExamTest extends TestCase
         $this->assertSame('2026-10-01T15:44:00+00:00', Carbon::parse($history['fin_real_en'])->utc()->toIso8601String());
 
         $header = app(FinalReportService::class)->build($closed, $this->docenteId)['cabecera'];
-        $this->assertSame('10:05', $header['hora_inicio']);
+        $this->assertSame('10:04', $header['hora_inicio']);
+        $this->assertSame('09:50', $header['hora_apertura']);
         $this->assertSame('11:44', $header['hora_fin']);
+        $this->assertSame('2026-10-01T15:44:00+00:00', $closed->ingreso_ordinario_cerrado_en->utc()->toIso8601String());
     }
 
-    public function test_cierre_de_recuperacion_tardio_usa_el_plazo_y_no_falla_sin_inicio_real(): void
+    public function test_cierre_de_recuperacion_tardio_usa_el_plazo_de_un_examen_que_nunca_paso_a_en_curso(): void
     {
         $zone = config('sciem.zona_horaria');
         $exam = $this->createExam([
@@ -388,7 +395,8 @@ class FinalizeExamTest extends TestCase
             'hora_inicio' => '10:04',
             'hora_fin' => '11:34',
             'duracion' => 90,
-            'estado' => Exam::EN_INGRESO,
+            'estado' => Exam::PROGRAMADO,
+            'ingreso_abierto_en' => '2026-10-01 13:50:00+00',
         ]);
         DB::table('grupo_examen')->insert([
             'id_examen' => $exam->id_examen,
@@ -415,7 +423,7 @@ class FinalizeExamTest extends TestCase
         $this->assertTrue($history['fin_automatico']);
 
         $header = app(FinalReportService::class)->build($closed, $this->docenteId)['cabecera'];
-        $this->assertSame('10:04 (programada)', $header['hora_inicio']);
+        $this->assertSame('10:04', $header['hora_inicio']);
         $this->assertSame('13:34', $header['hora_fin']);
     }
 

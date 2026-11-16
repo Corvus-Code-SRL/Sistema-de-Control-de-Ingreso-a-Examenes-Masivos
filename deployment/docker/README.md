@@ -132,16 +132,17 @@ $DC build app                                       # reconstruir la imagen tras
 
 ## Apertura automática de ingreso
 
-Un examen pasa a `EN_INGRESO` **solo** por el planificador de Laravel: no hay acción manual de "abrir
-control" ni ruta HTTP para hacerlo (eso es de la HU-12). Cada minuto, `OpenEntryControlJob` busca los
+El control de ingreso de un examen se abre **solo** por el planificador de Laravel: no hay acción manual de
+"abrir control" ni ruta HTTP para hacerlo (eso es de la HU-12). Abrirlo no cambia el estado del examen: queda
+`PROGRAMADO` y se registra `examen.ingreso_abierto_en`. Cada minuto, `OpenEntryControlJob` busca los
 exámenes `PROGRAMADO` cuya hora de inicio esté dentro de `examen.minutos_apertura` minutos (10 por defecto,
 entre 0 y 30, en la zona `SCIEM_ZONA_HORARIA`) y que aún no hayan terminado. Si tienen nómina y ambientes
 con capacidad suficiente, prepara en Redis un snapshot versionado (identidades, pertenencia, aulas,
-antecedentes, permisos, contadores y últimos ingresos), lo activa y recién entonces cambia el estado. Si no
-tienen nómina o capacidad, conservan `PROGRAMADO` y el motivo queda en el log de Laravel. Durante
-`EN_INGRESO`, verificar, buscar y consultar `/estado` leen Redis; confirmar persiste en PostgreSQL y
+antecedentes, permisos, contadores y últimos ingresos), lo activa y recién entonces registra la apertura. Si no
+tienen nómina o capacidad, no se abre y el motivo queda en el log de Laravel. Mientras el control está abierto
+(hasta que el docente cierra el ingreso ordinario o el examen termina), verificar, buscar y consultar `/estado` leen Redis; confirmar persiste en PostgreSQL y
 actualiza Redis después del commit. Si se pierden las claves de un examen abierto, el siguiente ciclo
-reconstruye el snapshot. El cambio de estado no requiere ninguna migración.
+reconstruye el snapshot. En `hora_inicio` el planificador pasa el examen a `EN_CURSO` sin cerrar el ingreso.
 
 ### ⚠ Nunca con la base compartida
 

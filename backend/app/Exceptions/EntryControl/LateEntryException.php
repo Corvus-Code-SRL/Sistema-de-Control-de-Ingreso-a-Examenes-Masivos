@@ -2,6 +2,7 @@
 
 namespace App\Exceptions\EntryControl;
 
+use App\Models\Exam;
 use App\Services\EntryControl\VerificationService;
 use App\Support\ApiResponse;
 use Exception;
@@ -16,6 +17,7 @@ use Illuminate\Http\Request;
 class LateEntryException extends Exception
 {
     public const EXAM_NOT_IN_PROGRESS = 'EXAMEN_NO_EN_CURSO';
+    public const ORDINARY_ENTRY_OPEN = 'INGRESO_ORDINARIO_ABIERTO';
     public const PENDING_REQUEST = 'SOLICITUD_PENDIENTE';
     public const REQUEST_RESOLVED = 'SOLICITUD_RESUELTA';
     public const OTHER_EXAM = 'EN_OTRO_EXAMEN';
@@ -23,6 +25,8 @@ class LateEntryException extends Exception
 
     public const EXAM_NOT_IN_PROGRESS_MESSAGE =
         'Solo puede registrar ingresos con retraso mientras el examen está en curso.';
+    public const ORDINARY_ENTRY_OPEN_MESSAGE =
+        'El ingreso ordinario sigue abierto. Registre el ingreso desde Control de ingreso.';
     public const PENDING_REQUEST_MESSAGE =
         'Existe una solicitud pendiente para este estudiante. Autorícela o rechácela.';
     public const REQUEST_RESOLVED_MESSAGE = 'La solicitud ya fue resuelta.';
@@ -51,6 +55,17 @@ class LateEntryException extends Exception
     public static function examNotInProgress(): self
     {
         return new self(self::EXAM_NOT_IN_PROGRESS, self::EXAM_NOT_IN_PROGRESS_MESSAGE, self::CONFLICT);
+    }
+
+    public static function ordinaryEntryOpen(): self
+    {
+        return new self(self::ORDINARY_ENTRY_OPEN, self::ORDINARY_ENTRY_OPEN_MESSAGE, self::CONFLICT);
+    }
+
+    /** El motivo por el que el examen no admite ingresos con retraso: aún no está en curso o el ordinario sigue abierto. */
+    public static function notAvailableFor(Exam $exam): self
+    {
+        return $exam->estado === Exam::EN_CURSO ? self::ordinaryEntryOpen() : self::examNotInProgress();
     }
 
     public static function pendingRequest(): self

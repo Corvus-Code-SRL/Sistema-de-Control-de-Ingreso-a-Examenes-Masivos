@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Exams\ExamInProgressController;
 use App\Http\Controllers\Exams\AssistantClassroomController;
+use App\Http\Controllers\Exams\CollaboratorInvitationController;
 use App\Http\Controllers\Exams\ExamController;
 use App\Http\Controllers\Exams\ExamHistoryController;
 use App\Http\Controllers\Exams\ExamGroupController;
@@ -57,10 +58,6 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
         ->where('exam', '[0-9]{1,9}')
         ->name('cancelar');
 
-    Route::post('/{exam}/iniciar', [ExamController::class, 'start'])
-        ->where('exam', '[0-9]{1,9}')
-        ->name('iniciar');
-
     Route::post('/{exam}/finalizar', [ExamController::class, 'finish'])
         ->where('exam', '[0-9]{1,9}')
         ->name('finalizar');
@@ -100,3 +97,21 @@ Route::get('grupos/{id_grupo}/examenes', [GroupExamController::class, 'index'])
 // HU-09 — vista de solo lectura del auxiliar.
 Route::get('auxiliar/examenes', [AssistantClassroomController::class, 'myExams'])
      ->name('auxiliar.examenes');
+
+// HU-026 — invitar docentes colaboradores a un examen propio. La recepción y respuesta de las invitaciones
+// (HU-027) vive en otras rutas.
+Route::prefix('docente/invitaciones')->name('docente.invitaciones.')->group(function () {
+    Route::get('/', [CollaboratorInvitationController::class, 'index'])
+        ->name('index');
+
+    Route::get('/examenes', [CollaboratorInvitationController::class, 'exams'])
+        ->name('examenes');
+
+    Route::get('/examenes/{exam}/docentes', [CollaboratorInvitationController::class, 'candidates'])
+        ->where('exam', '[0-9]{1,9}')
+        ->name('docentes');
+
+    Route::post('/examenes/{exam}', [CollaboratorInvitationController::class, 'store'])
+        ->where('exam', '[0-9]{1,9}')
+        ->name('store');
+});

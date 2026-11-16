@@ -6,6 +6,7 @@ use App\Exceptions\Exams\ExamStateException;
 use App\Models\Exam;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\EntryControl\CloseOrdinaryEntryService;
 use App\Services\Security\UserRoleService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
@@ -14,8 +15,11 @@ use Illuminate\Support\Facades\DB;
 /** Autoriza por examen y ambiente sin aplicar los horarios del control de ingreso. */
 class ExamSituationAccessService
 {
-    /** Estados en los que se puede registrar una situación: desde que abre el ingreso hasta que termina el examen. */
-    public const REGISTRABLE_STATES = [Exam::EN_INGRESO, Exam::EN_CURSO];
+    /**
+     * Estados en los que se puede registrar una situación: con el control de ingreso abierto (un examen
+     * PROGRAMADO solo cuenta si ya abrió) o con el examen en curso, aunque ya se haya cerrado el ingreso ordinario.
+     */
+    public const REGISTRABLE_STATES = [Exam::PROGRAMADO, Exam::EN_CURSO];
 
     private UserRoleService $roles;
 
@@ -122,13 +126,27 @@ class ExamSituationAccessService
             });
     }
 
+    public function isRegistrable(Exam $exam): bool
+    {
+        return $exam->estado === Exam::EN_CURSO || CloseOrdinaryEntryService::isOpen($exam);
+    }
+
+    /** Limita una consulta de exámenes a los que admiten situaciones (ver REGISTRABLE_STATES). */
+    public function onlyRegistrable(Builder $query): Builder
+    {
+        return $query->where(function (Builder $registrable): void {
+            $registrable->where('examen.estado', Exam::EN_CURSO)
+                ->orWhere(fn (Builder $open) => CloseOrdinaryEntryService::constrainToOpen($open, 'examen.'));
+        });
+    }
+
     public function assertRegistrable(Exam $exam): void
     {
-        $this->assertInStates(
-            $exam,
-            self::REGISTRABLE_STATES,
-            'Solo se pueden registrar situaciones con el ingreso abierto o con el examen en curso.'
-        );
+        if (! $this->isRegistrable($exam)) {
+            throw new ExamStateException(
+                'Solo se pueden registrar situaciones con el ingreso abierto o con el examen en curso.'
+            );
+        }
     }
 
     /** @param array<int, string> $states */

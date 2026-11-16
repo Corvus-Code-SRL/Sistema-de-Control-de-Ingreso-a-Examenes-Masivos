@@ -9,6 +9,8 @@ use App\Support\RecordStatus;
 use Carbon\Carbon;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\ExamTypeSeeder;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Catálogos que usan las pruebas de exámenes, sobre el catálogo académico.
@@ -67,6 +69,8 @@ trait SeedsExamCatalog
      */
     protected function createExam(array $overrides = [], array $classroomIds = []): Exam
     {
+        $entryDates = Arr::only($overrides, ['ingreso_abierto_en', 'ingreso_ordinario_cerrado_en']);
+        $overrides = Arr::except($overrides, ['ingreso_abierto_en', 'ingreso_ordinario_cerrado_en']);
         $startsAt = Carbon::createFromFormat(
             'Y-m-d H:i',
             ($overrides['fecha'] ?? $this->futureDate()) . ' ' . ($overrides['hora_inicio'] ?? '08:00')
@@ -86,11 +90,53 @@ trait SeedsExamCatalog
             'estado'             => Exam::PROGRAMADO,
         ], $overrides));
 
+        if ($entryDates !== []) {
+            $exam->forceFill($entryDates)->save();
+        }
+
         if ($classroomIds !== []) {
             $exam->classrooms()->attach($classroomIds);
         }
 
         return $exam;
+    }
+
+    /**
+     * Atributos de un examen para un estado de prueba. 'INGRESO_ABIERTO' es un examen PROGRAMADO con el
+     * control de ingreso abierto, que reemplaza al antiguo estado EN_INGRESO.
+     *
+     * @return array<string, mixed>
+     */
+    protected function examStateAttributes(string $state): array
+    {
+        return $state === 'INGRESO_ABIERTO'
+            ? array_merge(['estado' => Exam::PROGRAMADO], $this->entryOpen())
+            : ['estado' => $state];
+    }
+
+    /** Cambia el estado de un examen guardado, sin pasar por la API (ver examStateAttributes). */
+    protected function putExamInState(int $examId, string $state): void
+    {
+        $attributes = array_map(
+            fn ($value) => $value instanceof Carbon ? $value->format('Y-m-d H:i:sP') : $value,
+            $this->examStateAttributes($state)
+        );
+
+        DB::table('examen')->where('id_examen', $examId)->update($attributes);
+    }
+
+    /**
+     * Fechas de un examen con el control de ingreso abierto (HU-038). Con $closed el ingreso ordinario
+     * ya se cerró, que es el único momento en que existe el ingreso con retraso.
+     *
+     * @return array{ingreso_abierto_en: Carbon, ingreso_ordinario_cerrado_en: Carbon|null}
+     */
+    protected function entryOpen(bool $closed = false): array
+    {
+        return [
+            'ingreso_abierto_en' => Carbon::now('UTC')->subMinutes(10),
+            'ingreso_ordinario_cerrado_en' => $closed ? Carbon::now('UTC')->subMinute() : null,
+        ];
     }
 
     protected function examTypeId(string $category): int

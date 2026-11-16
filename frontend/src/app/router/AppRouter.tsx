@@ -45,6 +45,7 @@ import {
   SubjectGroupsPage,
 } from '@/features/groups'
 import { ClassroomsPage } from '@/features/classrooms'
+import { COLLABORATOR_INVITATIONS_PATH, CollaboratorInvitationsPage } from '@/features/collaborators'
 import { RectifyRiskRecordPage, RiskCenterPage } from '@/features/risk-center/academic'
 import { ExceptionalStudentPage } from '@/features/exceptional-students'
 import { RosterUploadPage } from '@/features/students'
@@ -135,6 +136,11 @@ function DocenteRoutes() {
         <Route
           path="/examenes/reportes"
           element={guarded('examenes.gestionar', <ExamReportsPage />)}
+        />
+
+        <Route
+          path={COLLABORATOR_INVITATIONS_PATH}
+          element={guarded('docentes.invitar', <CollaboratorInvitationsPage />)}
         />
 
         <Route

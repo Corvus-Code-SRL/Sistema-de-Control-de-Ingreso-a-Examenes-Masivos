@@ -15,11 +15,13 @@ class EntryAccessService
 {
     private ExamTimingService $timing;
     private EntryOpeningFailureStore $openingFailures;
+    private EntryControlSnapshotService $snapshots;
 
-    public function __construct(ExamTimingService $timing, EntryOpeningFailureStore $openingFailures)
+    public function __construct(ExamTimingService $timing, EntryOpeningFailureStore $openingFailures, EntryControlSnapshotService $snapshots)
     {
         $this->timing = $timing;
         $this->openingFailures = $openingFailures;
+        $this->snapshots = $snapshots;
     }
 
     public function openExamsFor(User $actor): array
@@ -32,7 +34,7 @@ class EntryAccessService
 
         $exams = Exam::query()
             ->with(['subject', 'career', 'classrooms'])
-            ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_INGRESO])
+            ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_CURSO])
             ->whereNotNull('duracion')
             ->whereRaw(
                 '(examen.fecha + examen.hora_inicio + make_interval(mins => examen.duracion)) > ?::timestamp',
@@ -83,15 +85,15 @@ class EntryAccessService
             ->groupBy('ee.id_examen')
             ->pluck('total', 'id_examen');
 
-        return $exams->map(function (Exam $exam) use (
+        return $exams->reject(fn (Exam $exam) => CloseOrdinaryEntryService::isClosed((int) $exam->id_examen))
+            ->map(function (Exam $exam) use (
             $actor, $assistantAssignments, $rosterTotals, $enteredTotals
         ): array {
             $examId = (int) $exam->id_examen;
             $total = (int) ($rosterTotals[$examId] ?? 0);
             $entered = (int) ($enteredTotals[$examId] ?? 0);
             $isTeacher = (string) $exam->id_usuario_docente === (string) $actor->id_usuario;
-            $openingAt = $this->timing->startsAt($exam)
-                ->subMinutes((int) $exam->minutos_apertura);
+            $openingAt = $this->timing->opensAt($exam);
             $assignedRoomId = $isTeacher ? null : EntryControlSnapshotService::controlRoomOf(
                 $assistantAssignments[$examId]->id_ambiente === null
                     ? null
@@ -103,6 +105,7 @@ class EntryAccessService
                 'id_examen' => $examId,
                 'nombre_examen' => $exam->nombre_examen,
                 'estado' => $exam->estado,
+                'control_abierto' => $this->snapshots->ready($examId),
                 'fecha' => $exam->fecha ? $exam->fecha->format('Y-m-d') : null,
                 'hora_inicio' => $exam->hora_inicio ? substr($exam->hora_inicio, 0, 5) : null,
                 'materia' => $exam->subject ? $exam->subject->nombre : null,
@@ -114,7 +117,7 @@ class EntryAccessService
                     ? null
                     : $exam->classrooms->firstWhere('id_ambiente', $assignedRoomId)?->nro_aula,
                 'apertura_programada_en' => $openingAt->toIso8601String(),
-                'motivo_apertura' => $exam->estado === Exam::PROGRAMADO
+                'motivo_apertura' => ! $this->snapshots->ready($examId)
                     ? $this->openingFailures->get($examId)
                     : null,
                 'total' => $total,
@@ -140,6 +143,7 @@ class EntryAccessService
             'hora_inicio' => $exam->hora_inicio ? substr($exam->hora_inicio, 0, 5) : null,
             'hora_fin' => $exam->hora_fin ? substr($exam->hora_fin, 0, 5) : null,
             'estado' => $exam->estado,
+            'ingreso_ordinario_cerrado' => CloseOrdinaryEntryService::isClosed((int) $exam->id_examen),
             'materia' => $exam->subject ? $exam->subject->nombre : null,
             'carrera' => $exam->career ? $exam->career->nombre : null,
             'grupos' => $exam->groups->pluck('num_grupo')->values()->all(),
@@ -187,7 +191,7 @@ class EntryAccessService
             }
         }
 
-        if (! in_array($exam->estado, [Exam::PROGRAMADO, Exam::EN_INGRESO], true)
+        if (! in_array($exam->estado, [Exam::PROGRAMADO, Exam::EN_CURSO], true)
             || $exam->duracion === null
             || $this->timing->hasEnded($exam)) {
             throw new ExamStateException('El tiempo de control de ingreso del examen ya terminó.');

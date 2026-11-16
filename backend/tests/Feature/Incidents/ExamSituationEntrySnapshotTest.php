@@ -13,7 +13,7 @@ use RuntimeException;
 use Tests\Concerns\SeedsExamSituations;
 use Tests\TestCase;
 
-/** Un cambio de ambiente durante «En ingreso» debe verse en el control de ingreso (Redis) de ambas aulas. */
+/** Un cambio de ambiente con el ingreso abierto debe verse en el control de ingreso (Redis) de ambas aulas. */
 class ExamSituationEntrySnapshotTest extends TestCase
 {
     use DatabaseTransactions;
@@ -23,7 +23,7 @@ class ExamSituationEntrySnapshotTest extends TestCase
     {
         parent::setUp();
         $this->seedExamSituations();
-        $this->situationExam->update(['estado' => Exam::EN_INGRESO]);
+        $this->situationExam->forceFill($this->examStateAttributes('INGRESO_ABIERTO'))->save();
     }
 
     private function entryUrl(string $action): string
