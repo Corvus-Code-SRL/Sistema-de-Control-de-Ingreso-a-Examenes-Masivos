@@ -1779,3 +1779,46 @@ ALTER TABLE public.examen DROP CONSTRAINT chk_examen_minutos_apertura;
 
 ALTER TABLE public.examen
     ADD CONSTRAINT chk_examen_minutos_apertura CHECK (minutos_apertura >= 0);
+
+-- Versión 14: rectificar un registro de la Central de Riesgo (HU-062)
+--             (2026_11_14_000000_add_rectification_to_central_riesgo)
+--   * Rectificar es anular: un administrador retira de la Central un registro que no correspondía. La fila
+--     de central_riesgo nunca se borra ni se reactiva; se marca con tres columnas que deben estar las tres
+--     vacías (registro activo) o las tres con valor (registro rectificado).
+--   * reporte_estudiante, su evidencia y sus datos de revisión no se modifican.
+--   * Los índices parciales cubren las lecturas de registros activos (consulta HU-046, aviso del control de
+--     ingreso, reporte HU-063). Toda lectura de la Central debe filtrar rectificado_en IS NULL.
+--   * Se registra la acción de bitácora RECTIFICAR_REGISTRO (accion.operacion no es UNIQUE: solo si falta).
+
+ALTER TABLE public.central_riesgo
+    ADD COLUMN rectificado_en          timestamp with time zone,
+    ADD COLUMN id_usuario_rectificador uuid,
+    ADD COLUMN motivo_rectificacion    text;
+
+ALTER TABLE public.central_riesgo
+    ADD CONSTRAINT fk_central_riesgo_rectificador
+        FOREIGN KEY (id_usuario_rectificador) REFERENCES public.usuario(id_usuario);
+
+ALTER TABLE public.central_riesgo
+    ADD CONSTRAINT chk_central_riesgo_rectificacion CHECK (
+        (rectificado_en IS NULL
+            AND id_usuario_rectificador IS NULL
+            AND motivo_rectificacion IS NULL)
+        OR
+        (rectificado_en IS NOT NULL
+            AND id_usuario_rectificador IS NOT NULL
+            AND motivo_rectificacion IS NOT NULL
+            AND length(btrim(motivo_rectificacion)) > 0)
+    );
+
+CREATE INDEX idx_central_riesgo_activo_estudiante
+    ON public.central_riesgo (id_estudiante)
+    WHERE rectificado_en IS NULL;
+
+CREATE INDEX idx_central_riesgo_activo_fecha
+    ON public.central_riesgo (fecha_registro DESC, id_cr_estudiante DESC)
+    WHERE rectificado_en IS NULL;
+
+INSERT INTO public.accion (operacion, tipo_operacion, descripcion)
+SELECT 'RECTIFICAR_REGISTRO', 'UPDATE', 'Rectificación de un registro de la Central de Riesgo'
+WHERE NOT EXISTS (SELECT 1 FROM public.accion WHERE operacion = 'RECTIFICAR_REGISTRO');

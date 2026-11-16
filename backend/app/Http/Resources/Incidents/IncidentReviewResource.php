@@ -28,6 +28,7 @@ class IncidentReviewResource extends JsonResource
             'hora_reporte'      => $r['hora_reporte'],
             'ambiente'          => $r['ambiente'],
             'en_central_riesgo' => $r['en_central_riesgo'],
+            'retirado_de_central_riesgo' => $r['retirado_de_central_riesgo'],
         ];
     }
 }

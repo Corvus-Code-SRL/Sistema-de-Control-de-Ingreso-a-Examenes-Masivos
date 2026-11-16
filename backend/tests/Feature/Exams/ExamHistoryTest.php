@@ -296,6 +296,47 @@ class ExamHistoryTest extends TestCase
         $this->assertSame('Ana Rojas', $timeline[4]['detalle']);
     }
 
+    public function test_la_linea_de_tiempo_distingue_la_incidencia_retirada_de_la_central(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::FINALIZADO], [$this->aulaId]);
+        DB::table('grupo_examen')->insert(['id_examen' => $exam->id_examen, 'id_grupo' => $this->grupoPropioId]);
+        $students = DB::table('grupo_estudiante')->where('id_grupo', $this->grupoPropioId)
+            ->orderBy('id_estudiante')->pluck('id_estudiante');
+        $typeId = DB::table('tipo_falta')->insertGetId(['nombre' => 'Suplantación'], 'id_falta');
+        $recordIds = [];
+        foreach ([0, 1] as $index) {
+            $reportId = DB::table('reporte_estudiante')->insertGetId([
+                'id_estudiante' => $students[$index],
+                'id_examen' => $exam->id_examen,
+                'id_tipo_falta' => $typeId,
+                'id_usuario_reportante' => $this->docenteId,
+                'id_usuario_revisor' => $this->docenteId,
+                'evidencia_url' => 'https://example.test/evidencia',
+                'evidencia_public_id' => 'evidencia-prueba',
+                'fecha_reporte' => '2026-10-28 08:1' . $index . ':00-04',
+                'fecha_revision' => '2026-10-28 09:00:00-04',
+                'estado' => 'APROBADO',
+            ], 'id_reporte_est');
+            $recordIds[$index] = DB::table('central_riesgo')->insertGetId([
+                'id_reporte_est' => $reportId,
+                'id_estudiante' => $students[$index],
+                'fecha_registro' => '2026-10-28 09:00:00-04',
+            ], 'id_cr_estudiante');
+        }
+        DB::table('central_riesgo')->where('id_cr_estudiante', $recordIds[1])->update([
+            'rectificado_en' => '2026-11-02 10:00:00-04',
+            'id_usuario_rectificador' => $this->docenteId,
+            'motivo_rectificacion' => 'Registro retirado por error de identificación.',
+        ]);
+
+        $details = collect($this->getJson('/api/historial/examenes/' . $exam->id_examen)->assertOk()
+            ->json('data.linea_tiempo'))->where('tipo', 'incidencia')->pluck('detalle')->all();
+
+        $this->assertCount(2, $details);
+        $this->assertStringStartsWith('Aprobada · en Central de Riesgo', $details[0]);
+        $this->assertStringStartsWith('Aprobada · retirada de la Central de Riesgo', $details[1]);
+    }
+
     public function test_un_retraso_autorizado_muestra_a_quien_lo_autorizo(): void
     {
         $exam = $this->createExam(['estado' => Exam::FINALIZADO], [$this->aulaId]);

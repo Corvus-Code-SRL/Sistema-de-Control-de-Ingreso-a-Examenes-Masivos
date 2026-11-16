@@ -8,6 +8,7 @@ use App\Services\Reports\Academic\AlienAttemptsReportService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Tests\Concerns\SeedsRectifications;
 use Tests\Concerns\SeedsRiskCenterRecords;
 use Tests\Concerns\SeedsSecurityAccounts;
 use Tests\TestCase;
@@ -19,6 +20,7 @@ use Tests\TestCase;
 class AlienAttemptsReportTest extends TestCase
 {
     use DatabaseTransactions;
+    use SeedsRectifications;
     use SeedsRiskCenterRecords;
     use SeedsSecurityAccounts;
 
@@ -375,6 +377,58 @@ class AlienAttemptsReportTest extends TestCase
         } finally {
             DB::statement('RESET TIME ZONE');
         }
+    }
+
+    public function test_un_registro_rectificado_deja_de_marcar_al_estudiante_en_la_central(): void
+    {
+        $retirado = $this->insertStudent('Retirado', 'Central', null, '202300701');
+        $vigente = $this->insertStudent('Vigente', 'Central', null, '202300702');
+        $this->insertAttempt('NO_PERTENECE', $retirado);
+        $this->insertAttempt('NO_PERTENECE', $vigente);
+        $voided = $this->insertApprovedRecord($this->context, ['id_estudiante' => $retirado])['id_cr_estudiante'];
+        $active = $this->insertApprovedRecord($this->context, ['id_estudiante' => $vigente])['id_cr_estudiante'];
+        $this->voidRecord($voided, $this->administratorId);
+
+        $this->actAs($this->createAccount(Role::ADMINISTRADOR));
+
+        $response = $this->getJson($this->url())->assertOk();
+
+        $this->assertSame(['202300701', '202300702'], array_column($response->json('data'), 'cod_sis'));
+        $this->assertNull($response->json('data.0.id_cr_estudiante'));
+        $this->assertSame($active, $response->json('data.1.id_cr_estudiante'));
+        $response->assertJsonPath('meta.total_en_central_riesgo', 1)
+            ->assertJsonPath('meta.total_estudiantes', 2);
+    }
+
+    public function test_con_un_registro_rectificado_y_otro_activo_se_muestra_el_activo(): void
+    {
+        $estudiante = $this->insertStudent('Mixto', 'Registros', null, '202300703');
+        $this->insertAttempt('NO_PERTENECE', $estudiante);
+        $voided = $this->insertApprovedRecord($this->context, ['id_estudiante' => $estudiante])['id_cr_estudiante'];
+        $active = $this->insertApprovedRecord($this->context, ['id_estudiante' => $estudiante])['id_cr_estudiante'];
+        $this->voidRecord($voided, $this->administratorId);
+
+        $this->actAs($this->createAccount(Role::ADMINISTRADOR));
+
+        $this->getJson($this->url())->assertOk()
+            ->assertJsonPath('data.0.id_cr_estudiante', $active)
+            ->assertJsonPath('meta.total_en_central_riesgo', 1);
+
+        $pdf = app(AlienAttemptsReportService::class)->pdf(['desde' => '2026-10-01', 'hasta' => '2026-10-31']);
+        $this->assertSame($active, $pdf['estudiantes'][0]['id_cr_estudiante']);
+    }
+
+    public function test_el_pdf_tampoco_cuenta_al_estudiante_con_todos_sus_registros_rectificados(): void
+    {
+        $estudiante = $this->insertStudent('Todo', 'Retirado', null, '202300704');
+        $this->insertAttempt('NO_PERTENECE', $estudiante);
+        $record = $this->insertApprovedRecord($this->context, ['id_estudiante' => $estudiante])['id_cr_estudiante'];
+        $this->voidRecord($record, $this->administratorId);
+
+        $pdf = app(AlienAttemptsReportService::class)->pdf(['desde' => '2026-10-01', 'hasta' => '2026-10-31']);
+
+        $this->assertNull($pdf['estudiantes'][0]['id_cr_estudiante']);
+        $this->assertSame(0, $pdf['meta']['total_en_central_riesgo']);
     }
 
     public function test_cuenta_los_intentos_una_sola_vez_aunque_el_estudiante_tenga_varios_registros_de_cr(): void

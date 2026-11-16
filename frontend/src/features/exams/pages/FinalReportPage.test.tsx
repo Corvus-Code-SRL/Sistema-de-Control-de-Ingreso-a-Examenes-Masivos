@@ -254,4 +254,47 @@ describe('FinalReportPage (HU-051)', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(UNAVAILABLE)
   })
+
+  it('Descargar Excel pide el archivo y lo guarda con el nombre del examen y la fecha', async () => {
+    let savedAs = ''
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement
+    ) {
+      savedAs = this.download
+    })
+    mockApi([
+      {
+        matches: (url) => url.endsWith('/examenes/9/reporte-final/excel'),
+        body: new Blob(['PK'])
+      },
+      {
+        matches: (url) => url.endsWith('/examenes/9/reporte-final'),
+        body: { data: makeReport() }
+      }
+    ])
+    await renderReport()
+
+    fireEvent.click(screen.getByRole('button', { name: /descargar excel/i }))
+
+    await waitFor(() => expect(savedAs).toBe('reporte-final-parcial-final-2026-10-20.xlsx'))
+  })
+
+  it('si falla la descarga del Excel muestra el mensaje del servidor', async () => {
+    mockApi([
+      {
+        matches: (url) => url.endsWith('/examenes/9/reporte-final/excel'),
+        status: 403,
+        body: { message: UNAVAILABLE }
+      },
+      {
+        matches: (url) => url.endsWith('/examenes/9/reporte-final'),
+        body: { data: makeReport() }
+      }
+    ])
+    await renderReport()
+
+    fireEvent.click(screen.getByRole('button', { name: /descargar excel/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(UNAVAILABLE)
+  })
 })

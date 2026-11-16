@@ -21,6 +21,7 @@ const incident: IncidentReview = {
   intento: null,
   revisor: null,
   en_central_riesgo: false,
+  retirado_de_central_riesgo: false,
 }
 
 function setup() {
