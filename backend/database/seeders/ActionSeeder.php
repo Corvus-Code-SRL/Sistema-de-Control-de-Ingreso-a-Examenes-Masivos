@@ -51,9 +51,14 @@ class ActionSeeder extends Seeder
                 'descripcion' => 'Retiro de un estudiante durante el examen',
             ],
             [
+                'operacion' => 'RECTIFICAR_REGISTRO',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Rectificación de un registro de la Central de Riesgo',
+            ],
+            [
                 'operacion' => 'REGISTRAR_ESTUDIANTE_EXCEPCIONAL',
                 'tipo_operacion' => 'INSERT',
-                'descripcion' => 'Registro de un estudiante excepcional en un grupo',
+                'descripcion' => 'Registro de un estudiante excepcional en un examen',
             ],
             [
                 'operacion' => 'INVITAR_COLABORADOR',
