@@ -22,6 +22,7 @@ import {
   ScanFace,
   ScanSearch,
   ScrollText,
+  Square,
   ShieldAlert,
   SquarePen,
   Unlink,
@@ -322,6 +323,13 @@ export const NAVIGATION: readonly NavSection[] = [
         to: '/examenes/en-curso',
         capability: 'ingreso.operar',
         matches: ['/examenes/:examId/en-curso']
+      },
+      {
+        id: 'teacher-finish-exam',
+        label: 'Terminar examen',
+        icon: Square,
+        capability: 'examenes.gestionar',
+        to: '/examenes/terminar'
       },
       {
         id: 'teacher-late-student',

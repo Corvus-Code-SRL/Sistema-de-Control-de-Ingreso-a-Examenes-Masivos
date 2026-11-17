@@ -110,6 +110,7 @@ describe('menú por capacidades', () => {
         items: [
           ['Control de ingreso', '/control-ingreso'],
           ['En curso', '/examenes/en-curso'],
+          ['Terminar examen', '/examenes/terminar'],
           ['Registrar estudiante con retraso', '/retrasos'],
           ['Registrar situación excepcional', '/situacion-excepcional'],
           ['Reportar incidencia', '/reportar-incidencia']
@@ -174,6 +175,7 @@ describe('menú por capacidades', () => {
         'Habilitar auxiliar para el examen',
         'Control de ingreso',
         'En curso',
+        'Terminar examen',
         'Registrar situación excepcional',
         'Reportar incidencia',
         'Registrar estudiante con retraso',

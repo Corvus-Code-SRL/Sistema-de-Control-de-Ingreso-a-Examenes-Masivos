@@ -487,6 +487,7 @@ describe('AppSidebar — entradas y estado activo', () => {
       ['Invitar docentes colaboradores', '/colaboradores/invitar'],
       ['Control de ingreso', '/control-ingreso'],
       ['En curso', '/examenes/en-curso'],
+      ['Terminar examen', '/examenes/terminar'],
       ['Registrar estudiante con retraso', '/retrasos'],
       ['Registrar situación excepcional', '/situacion-excepcional'],
       ['Reportar incidencia', '/reportar-incidencia'],
@@ -525,6 +526,21 @@ describe('AppSidebar — entradas y estado activo', () => {
     expect(screen.getByRole('link', { name: 'Mis grupos' })).toHaveAttribute('aria-current', 'page')
     expect(sectionButton('Grupos académicos y nóminas')).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getAllByRole('link').filter((link) => link.getAttribute('aria-current'))).toHaveLength(1)
+  })
+
+  it.each(['Docente', 'Invitado'] as const)('%s ve Terminar examen como la entrada activa', (role) => {
+    renderSidebar(role, '/examenes/terminar')
+
+    expect(screen.getByRole('link', { name: 'Terminar examen', current: 'page' }))
+      .toHaveAttribute('href', '/examenes/terminar')
+    expect(screen.getByRole('link', { name: 'En curso' })).not.toHaveAttribute('aria-current')
+  })
+
+  it.each(['Auxiliar', 'Administrador'] as const)('%s no ve Terminar examen', async (role) => {
+    renderSidebar(role, '/examenes/terminar')
+    await openAllSections(userEvent.setup())
+
+    expect(screen.queryByRole('link', { name: 'Terminar examen' })).not.toBeInTheDocument()
   })
 
   it('/examenes/:id/control-ingreso resalta Control de ingreso y no Programados', async () => {
