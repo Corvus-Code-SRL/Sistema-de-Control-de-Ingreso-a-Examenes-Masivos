@@ -218,13 +218,13 @@ class ExamEligibleListImportTest extends TestCase
         }
     }
 
-    public function test_confirm_examen_en_ingreso_devuelve_409(): void
+    public function test_confirm_examen_en_curso_devuelve_409(): void
     {
         $exam = $this->createExamWithRoster(1);
 
         $token = $this->previewCsv($exam, ['300000001'])->json('data.token');
 
-        DB::table('examen')->where('id_examen', $exam->id_examen)->update(['estado' => Exam::EN_INGRESO]);
+        DB::table('examen')->where('id_examen', $exam->id_examen)->update(['estado' => Exam::EN_CURSO]);
 
         $this->postJson("/api/examenes/{$exam->id_examen}/habilitados/confirm", [
             'token' => $token,

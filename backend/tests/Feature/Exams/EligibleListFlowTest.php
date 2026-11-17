@@ -63,9 +63,9 @@ class EligibleListFlowTest extends TestCase
         ]);
 
         // 5. El control de ingreso lo rechaza con el motivo.
-        // Pasamos a EN_INGRESO y preparamos el snapshot en Redis para que
+        // Pasamos a EN_CURSO y preparamos el snapshot en Redis para que
         // VerificationService::verify() encuentre al estudiante.
-        DB::table('examen')->where('id_examen', $exam->id_examen)->update(['estado' => Exam::EN_INGRESO]);
+        DB::table('examen')->where('id_examen', $exam->id_examen)->update(['estado' => Exam::EN_CURSO]);
         app(\App\Services\EntryControl\RoomAssignmentService::class)->prepare($exam->id_examen);
 
         $student = DB::table('estudiante')->where('id_estudiante', $noHabilitadoId)->first();

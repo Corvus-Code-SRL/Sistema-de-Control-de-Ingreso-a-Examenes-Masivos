@@ -58,14 +58,30 @@ class ExamEligibleListExamsTest extends TestCase
         $this->getJson('/api/examenes/habilitados')->assertForbidden();
     }
 
-    public function test_devuelve_programados_y_en_ingreso(): void
+    public function test_excluye_finalizados_y_cancelados(): void
     {
         $this->actAsTeacher($this->docenteId);
 
-        $programado = $this->createExam(['estado' => Exam::PROGRAMADO, 'nombre_examen' => 'Prog']);
-        $enIngreso = $this->createExam([
-            'estado' => Exam::EN_INGRESO,
-            'nombre_examen' => 'Ing',
+        $programado = $this->createExam(['estado' => Exam::PROGRAMADO]);
+
+        $this->createExam(['estado' => Exam::FINALIZADO]);
+        $this->createExam(['estado' => Exam::CANCELADO]);
+
+        $response = $this->getJson('/api/examenes/habilitados')
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+
+        $this->assertSame($programado->id_examen, $response->json('data.0.id_examen'));
+    }
+
+    public function test_devuelve_programados_y_en_curso(): void
+    {
+        $this->actAsTeacher($this->docenteId);
+
+        $programado = $this->createExam(['estado' => Exam::PROGRAMADO]);
+        $enCurso = $this->createExam([
+            'estado' => Exam::EN_CURSO,
+            'nombre_examen' => 'En curso',
             'fecha' => $this->futureDate(8),
         ]);
 
@@ -76,28 +92,11 @@ class ExamEligibleListExamsTest extends TestCase
         $ids = array_column($response->json('data'), 'id_examen');
 
         $this->assertContains($programado->id_examen, $ids);
-        $this->assertContains($enIngreso->id_examen, $ids);
+        $this->assertContains($enCurso->id_examen, $ids);
 
         // Orden ascendente por fecha.
         $this->assertSame($programado->id_examen, $ids[0]);
-        $this->assertSame($enIngreso->id_examen, $ids[1]);
-    }
-
-    public function test_excluye_finalizados_y_cancelados(): void
-    {
-        $this->actAsTeacher($this->docenteId);
-
-        $programado = $this->createExam(['estado' => Exam::PROGRAMADO]);
-
-        $this->createExam(['estado' => Exam::FINALIZADO]);
-        $this->createExam(['estado' => Exam::CANCELADO]);
-        $this->createExam(['estado' => Exam::EN_CURSO]);
-
-        $response = $this->getJson('/api/examenes/habilitados')
-            ->assertOk()
-            ->assertJsonCount(1, 'data');
-
-        $this->assertSame($programado->id_examen, $response->json('data.0.id_examen'));
+        $this->assertSame($enCurso->id_examen, $ids[1]);
     }
 
     public function test_devuelve_el_shape_minimo_del_selector(): void

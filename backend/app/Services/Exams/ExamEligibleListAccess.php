@@ -57,8 +57,7 @@ class ExamEligibleListAccess
     private function notWritableMessage(string $status): string
     {
         return match ($status) {
-            Exam::EN_INGRESO => 'El control de ingreso ya empezó. La lista de habilitados es de solo lectura.',
-            Exam::EN_CURSO   => 'El examen está en curso. La lista de habilitados es de solo lectura.',
+            Exam::EN_CURSO => 'El control de ingreso ya empezó. La lista de habilitados es de solo lectura.',
             Exam::FINALIZADO => 'El examen ya finalizó. La lista de habilitados es de solo lectura.',
             Exam::CANCELADO  => 'El examen está cancelado. La lista de habilitados es de solo lectura.',
             default          => 'La lista de habilitados solo puede modificarse mientras el examen está PROGRAMADO.',

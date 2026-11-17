@@ -29,14 +29,9 @@ export interface ReadOnlyMessage {
 
 export function readOnlyMessage(estado: string): ReadOnlyMessage {
   switch (estado) {
-    case 'EN_INGRESO':
-      return {
-        title: 'El control de ingreso ya empezó',
-        description: 'La lista de habilitados quedó fija. Solo se puede consultar.',
-      }
     case 'EN_CURSO':
       return {
-        title: 'El examen está en curso',
+        title: 'El control de ingreso ya empezó',
         description: 'La lista de habilitados quedó fija. Solo se puede consultar.',
       }
     case 'FINALIZADO':

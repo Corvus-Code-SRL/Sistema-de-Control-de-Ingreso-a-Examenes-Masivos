@@ -27,11 +27,11 @@ class EntryConfirmationServiceTest extends TestCase
 
         $this->seedExamCatalog();
 
-        // Examen EN_INGRESO con un solo ambiente y el grupo propio asignado.
+        // Examen EN_CURSO con un solo ambiente y el grupo propio asignado.
         // RoomAssignmentService::prepare deja el snapshot listo (Redis) para
         // que VerificationService::verify() funcione.
         $this->exam = $this->createExam(
-            ['estado' => Exam::EN_INGRESO],
+            ['estado' => Exam::EN_CURSO],
             [$this->aulaId]
         );
 

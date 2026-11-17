@@ -182,6 +182,9 @@ class ExamEligibleListService
         $roster = $this->roster->expected($examId)->get([
             'estudiante.id_estudiante',
             'estudiante.cod_sis',
+            'estudiante.nombre',
+            'estudiante.apellido_paterno',
+            'estudiante.apellido_materno',
             'estado_habilitacion',
         ]);
 
@@ -200,6 +203,7 @@ class ExamEligibleListService
                     $cambios[] = [
                         'id_estudiante' => $id,
                         'codigo_sis' => (string) $row->cod_sis,
+                        'nombre_completo' => $this->fullName($row),
                         'estado_habilitacion' => self::HABILITADO,
                         'motivo' => null,
                         'detalle' => null,
@@ -213,6 +217,7 @@ class ExamEligibleListService
             $cambios[] = [
                 'id_estudiante' => $id,
                 'codigo_sis' => (string) $row->cod_sis,
+                'nombre_completo' => $this->fullName($row),
                 'estado_habilitacion' => self::NO_HABILITADO,
                 'motivo' => $motivo,
                 'detalle' => MotivoNoHabilitacion::requiresDetail($motivo) ? $detalle : null,
@@ -462,7 +467,7 @@ class ExamEligibleListService
         return Exam::query()
             ->with(['subject', 'career', 'groups'])
             ->where('id_usuario_docente', $teacherId)
-            ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_INGRESO])
+            ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_CURSO])
             ->orderBy('fecha')
             ->orderBy('hora_inicio')
             ->orderBy('id_examen')

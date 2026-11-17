@@ -255,9 +255,9 @@ class ExamEligibleListSaveTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors(['cambios.1.id_estudiante']);
     }
 
-    public function test_examen_en_ingreso_devuelve_409(): void
+    public function test_examen_en_curso_devuelve_409(): void
     {
-        $exam = $this->createExam(['estado' => Exam::EN_INGRESO]);
+        $exam = $this->createExam(['estado' => Exam::EN_CURSO]);
         $this->seedRoster($exam, 1);
         $studentId = $this->studentIds($exam)[0];
 

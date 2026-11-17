@@ -110,9 +110,9 @@ class ExamEligibleListPreviewTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_preview_examen_en_ingreso_devuelve_409(): void
+    public function test_preview_examen_en_curso_devuelve_409(): void
     {
-        $exam = $this->createExam(['estado' => Exam::EN_INGRESO]);
+        $exam = $this->createExam(['estado' => Exam::EN_CURSO]);
         $this->seedRoster($exam, 1);
 
         $this->previewCsv($exam, ['300000001'])
