@@ -88,7 +88,6 @@ export interface RecentEntry {
   controlador_apellido: string | null
 }
 
-
 /** Avance de un grupo del examen cuando la lista va separada por grupo (HU-027). */
 export interface EntryGroupProgress {
   id_grupo: number
