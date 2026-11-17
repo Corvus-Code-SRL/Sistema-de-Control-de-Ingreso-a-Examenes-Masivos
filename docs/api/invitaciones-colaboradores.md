@@ -119,7 +119,7 @@ HU-026 **posee** la escritura de `SIN_EFECTO`, el enum, el CHECK, el índice y l
 | `estado` | enum `estado_invitacion` | `PENDIENTE`, `ACEPTADA`, `RECHAZADA` y **`SIN_EFECTO`** (nuevo). Constantes en `ExamInvitation`. |
 | `fecha_respuesta` | timestamptz | La escribe HU-027 al aceptar o rechazar. |
 | **`permite_agregar_grupos`** | boolean, NOT NULL, por omisión `true` | **Nuevo.** Si el colaborador puede sumar sus grupos al aceptar. **HU-027 debe respetarlo:** con `false`, aceptar no admite grupos. |
-| **`lista_por_grupo`** | boolean, NOT NULL, por omisión `false` | **Versión 18.** Lista dividida por grupo en el control de ingreso y durante el examen. CHECK `chk_invitacion_examen_lista_por_grupo`: solo `true` si `permite_agregar_grupos`. |
+| **`lista_por_grupo`** | boolean, NOT NULL, por omisión `false` | **Versión 17.** Lista dividida por grupo en el control de ingreso y durante el examen. CHECK `chk_invitacion_examen_lista_por_grupo`: solo `true` si `permite_agregar_grupos`. |
 | `fecha_sin_efecto` | timestamptz | **Nuevo.** La escribe `ExamInvitationExpiryService`. |
 
 **CHECK `chk_invitacion_examen_estado`** (cada estado fija qué fechas existen):

@@ -1889,22 +1889,11 @@ ALTER TABLE public.examen
 ALTER TABLE public.examen
     ADD CONSTRAINT chk_examen_estado_sin_en_ingreso CHECK (estado <> 'EN_INGRESO');
 
--- Versión 17: aceptar o rechazar una invitación a colaborar (HU-027)
---             (2026_11_17_000000_add_invitation_response_actions)
---   * Se registran las acciones de bitácora ACEPTAR_INVITACION y RECHAZAR_INVITACION (solo si faltan).
---   * No hay columnas nuevas: permite_agregar_grupos y fecha_sin_efecto son de la versión 15 y el rechazo
---     no guarda motivo. Un colaborador es la invitación en estado ACEPTADA.
-
-INSERT INTO public.accion (operacion, tipo_operacion, descripcion)
-SELECT 'ACEPTAR_INVITACION', 'UPDATE', 'Aceptación de una invitación a colaborar en un examen'
-WHERE NOT EXISTS (SELECT 1 FROM public.accion WHERE operacion = 'ACEPTAR_INVITACION');
-
-INSERT INTO public.accion (operacion, tipo_operacion, descripcion)
-SELECT 'RECHAZAR_INVITACION', 'UPDATE', 'Rechazo de una invitación a colaborar en un examen'
-WHERE NOT EXISTS (SELECT 1 FROM public.accion WHERE operacion = 'RECHAZAR_INVITACION');
-
--- Versión 18: lista separada por grupo en la invitación a colaborar (HU-026 la elige, HU-027 la aplica)
+-- Versión 17: lista separada por grupo en la invitación a colaborar (HU-026 la elige, HU-027 la aplica)
 --             (2026_11_17_000001_add_lista_por_grupo_to_invitacion_examen)
+--   * Las acciones de bitácora ACEPTAR_INVITACION y RECHAZAR_INVITACION (HU-027) no van en el esquema: las
+--     siembra ActionSeeder, que debe correr después de migrar.
+--   * Un colaborador es la invitación en estado ACEPTADA; el rechazo no guarda motivo.
 --   * invitacion_examen.lista_por_grupo: si quien invita pide que, cuando el colaborador sume sus grupos, la
 --     lista del examen se muestre dividida por grupo (con su docente) en el control de ingreso y durante el
 --     examen. Por defecto false: la lista va junta. La nómina es la misma en los dos casos.

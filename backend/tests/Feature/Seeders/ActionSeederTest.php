@@ -131,6 +131,15 @@ class ActionSeederTest extends TestCase
         $this->assertSame(27, DB::table('accion')->count());
     }
 
+    public function test_las_acciones_de_invitaciones_van_al_final_del_catalogo(): void
+    {
+        $this->seed(ActionSeeder::class);
+
+        $lastThree = DB::table('accion')->orderByDesc('id_accion')->limit(3)->pluck('operacion')->reverse()->values()->all();
+
+        $this->assertSame(['GUARDAR_HABILITADOS', 'ACEPTAR_INVITACION', 'RECHAZAR_INVITACION'], $lastThree);
+    }
+
     public function test_registra_el_retiro_del_examen_sin_duplicados(): void
     {
         $this->seed(ActionSeeder::class);
