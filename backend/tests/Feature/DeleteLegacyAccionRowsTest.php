@@ -57,7 +57,7 @@ class DeleteLegacyAccionRowsTest extends TestCase
             ->all();
     }
 
-    public function test_elimina_las_cuatro_filas_heredadas_y_no_toca_las_veintisiete_vigentes(): void
+    public function test_elimina_las_cuatro_filas_heredadas_y_no_toca_las_veintiocho_vigentes(): void
     {
         $this->seed(ActionSeeder::class);
         $this->insertLegacyRows();

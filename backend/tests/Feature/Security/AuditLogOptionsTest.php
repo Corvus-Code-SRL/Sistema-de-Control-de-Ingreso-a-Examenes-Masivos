@@ -22,7 +22,7 @@ class AuditLogOptionsTest extends TestCase
         $this->prepareAuditLog();
     }
 
-    public function test_ofrece_las_27_acciones_del_catalogo_con_su_etiqueta(): void
+    public function test_ofrece_las_28_acciones_del_catalogo_con_su_etiqueta(): void
     {
         $actions = collect($this->getJson('/api/bitacora/opciones')->assertOk()->json('data.acciones'));
 

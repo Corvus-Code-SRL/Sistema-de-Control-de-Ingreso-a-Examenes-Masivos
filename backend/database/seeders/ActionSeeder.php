@@ -56,11 +56,6 @@ class ActionSeeder extends Seeder
                 'descripcion' => 'Rectificación de un registro de la Central de Riesgo',
             ],
             [
-                'operacion' => 'REGISTRAR_ESTUDIANTE_EXCEPCIONAL',
-                'tipo_operacion' => 'INSERT',
-                'descripcion' => 'Registro de un estudiante excepcional en un examen',
-            ],
-            [
                 'operacion' => 'INVITAR_COLABORADOR',
                 'tipo_operacion' => 'INSERT',
                 'descripcion' => 'Invitación de un docente colaborador a un examen',
@@ -93,6 +88,11 @@ class ActionSeeder extends Seeder
                 'operacion' => 'RECHAZAR_INVITACION',
                 'tipo_operacion' => 'UPDATE',
                 'descripcion' => 'Rechazo de una invitación a colaborar en un examen',
+            ],
+            [
+                'operacion' => 'REGISTRAR_ESTUDIANTE_EXCEPCIONAL',
+                'tipo_operacion' => 'INSERT',
+                'descripcion' => 'Registro de un estudiante excepcional en un examen',
             ],
         ];
 
