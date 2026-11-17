@@ -18,6 +18,8 @@ export { ExamHistorySummaryPage } from './pages/ExamHistorySummaryPage';
 export { examDetailPath, examFinalReportPath } from './utils/paths';
 export { ExamInProgressPage } from './pages/ExamInProgressPage';
 export { ExamTimerPage } from './pages/ExamTimerPage';
+export { ExamTimerCard } from './components/ExamTimerCard';
+export { ExamTimersProvider } from './hooks/useExamTimers';
 export { FinishExamAction } from './components/FinishExamAction';
 export { InProgressExamsPage } from './pages/InProgressExamsPage';
 export type { ExamInProgressExtensions } from './components/ExamInProgressExtensions';
