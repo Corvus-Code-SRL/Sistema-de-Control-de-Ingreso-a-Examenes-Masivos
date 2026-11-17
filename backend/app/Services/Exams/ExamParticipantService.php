@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Participantes de un examen, derivados y nunca copiados.
  *
- * esperados = estudiantes asociados al examen.
+ * esperados = estudiantes asociados al examen (nómina de sus grupos y excepcionales, HU-023).
  * ingresados = estudiantes con INGRESO o CON_RETRASO.
  * pendientes = estudiantes esperados sin ingreso real.
  */
@@ -21,46 +21,16 @@ class ExamParticipantService
     {
         $this->roster = $roster;
     }
+
     /**
      * Un estudiante inscrito en varios grupos del examen aparece una sola vez.
      * Su id_grupo corresponde al menor de esos grupos.
      */
-    /** HU023_UNION_EXCEPCIONALES: los excepcionales son por examen, no por padron. */
     public function expected(int $examId): Builder
     {
-        $exam = Exam::query()->findOrFail($examId);
-
-        if ($exam->estado === Exam::FINALIZADO) {
         return $this->roster->expected($examId);
-}
-
-        $regular = $this->roster->expected($examId);
-
-        $exceptional = DB::table('estudiante')
-            ->join('examen_estudiante_excepcional as ex', 'ex.id_estudiante', '=', 'estudiante.id_estudiante')
-            ->join('grupo', 'grupo.id_grupo', '=', 'ex.id_grupo')
-            ->leftJoin('examen_estudiante as ee', function ($join) use ($examId): void {
-                 $join->on('ee.id_estudiante', '=', 'estudiante.id_estudiante')
-                 ->where('ee.id_examen', '=', $examId);
-    })
-            ->where('ex.id_examen', $examId)
-            ->whereNotExists(function (Builder $query) use ($examId): void {
-                $query->selectRaw('1')
-                    ->from('grupo_estudiante as ge')
-                    ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'ge.id_grupo')
-                    ->where('gx.id_examen', $examId)
-                    ->whereColumn('ge.id_estudiante', 'estudiante.id_estudiante');
-            })
-           ->select('estudiante.*', 'ex.id_grupo')
-           ->selectRaw('grupo.num_grupo AS num_grupo')
-           ->selectRaw("COALESCE(ee.estado_habilitacion, 'HABILITADO') AS estado_habilitacion")
-           ->selectRaw("COALESCE(ee.estado_ingreso, 'NO_INGRESO') AS estado_ingreso")
-           ->selectRaw('ee.observacion AS observacion')
-           ->selectRaw('ee.hora_ingreso AS hora_ingreso')
-           ->selectRaw('ee.id_ambiente AS id_ambiente');
-
-        return DB::query()->fromSub($regular->unionAll($exceptional), 'estudiante');
     }
+
     public function entered(int $examId): Builder
     {
         return DB::table('examen_estudiante')
@@ -69,7 +39,7 @@ class ExamParticipantService
             ->whereIn('examen_estudiante.estado_ingreso', ['INGRESO', 'CON_RETRASO'])
             ->select(
                 'estudiante.*',
-                'examen_estudiante.id_grupo',
+                'examen_estudiante.id_grupo_efectivo as id_grupo',
                 'examen_estudiante.estado_habilitacion',
                 'examen_estudiante.estado_ingreso',
                 'examen_estudiante.hora_ingreso'
@@ -124,19 +94,10 @@ class ExamParticipantService
 
         $frozenCounts = [];
 
-        $rows = DB::table('examen_estudiante as ee')
-            ->whereIn('ee.id_examen', array_keys($finalized))
-            ->where(function ($query) {
-                $query->where('ee.estado_ingreso', '!=', 'NO_INGRESO')
-                    ->orWhereNotExists(function ($subquery) {
-                        $subquery->selectRaw('1')
-                            ->from('examen_estudiante_excepcional as ex')
-                            ->whereColumn('ex.id_examen', 'ee.id_examen')
-                            ->whereColumn('ex.id_estudiante', 'ee.id_estudiante');
-                    });
-            })
-            ->selectRaw('id_examen, id_grupo, COUNT(*) AS total')
-            ->groupBy('id_examen', 'id_grupo')
+        $rows = DB::table('examen_estudiante')
+            ->whereIn('id_examen', array_keys($finalized))
+            ->selectRaw('id_examen, id_grupo_efectivo AS id_grupo, COUNT(*) AS total')
+            ->groupBy('id_examen', 'id_grupo_efectivo')
             ->get();
 
         foreach ($rows as $row) {

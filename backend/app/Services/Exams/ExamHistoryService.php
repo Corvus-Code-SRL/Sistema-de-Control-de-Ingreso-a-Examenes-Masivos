@@ -285,18 +285,8 @@ class ExamHistoryService
         }
 
         $known = [StudentExam::INGRESO, StudentExam::CON_RETRASO, StudentExam::NO_INGRESO];
-        $rows = DB::table('examen_estudiante as ee')
-            ->whereIn('ee.id_examen', $examIds)
-            // Excepcionales sin ingreso no se contabilizan como ausentes.
-            ->where(function ($query) {
-                $query->where('ee.estado_ingreso', '!=', StudentExam::NO_INGRESO)
-                    ->orWhereNotExists(function ($subquery) {
-                        $subquery->selectRaw('1')
-                            ->from('examen_estudiante_excepcional as ex')
-                            ->whereColumn('ex.id_examen', 'ee.id_examen')
-                            ->whereColumn('ex.id_estudiante', 'ee.id_estudiante');
-                    });
-            })
+        $rows = DB::table('examen_estudiante')
+            ->whereIn('id_examen', $examIds)
             ->selectRaw("id_examen, count(*) as esperados,
                 count(*) filter (where estado_ingreso = ?) as a_tiempo,
                 count(*) filter (where estado_ingreso = ?) as con_retraso,

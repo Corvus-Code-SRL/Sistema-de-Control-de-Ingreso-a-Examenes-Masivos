@@ -138,7 +138,7 @@ class FinalReportExcelService
         foreach ($students as $student) {
             $this->valuesRow($sheet, $row++, [
                 $student['cod_sis'],
-                $student['nombre'],
+                $student['nombre'] . ($student['es_excepcional'] ?? false ? ' (Excepcional)' : ''),
                 $student['ambiente'] ?? '—',
                 $student['hora_ingreso'] ?? '—',
                 $student['estado'],
