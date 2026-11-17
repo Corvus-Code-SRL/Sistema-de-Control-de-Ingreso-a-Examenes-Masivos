@@ -52,6 +52,7 @@ describe('EligibleListUploadFlow', () => {
         {
           id_estudiante: 1,
           codigo_sis: '202210443',
+          nombre_completo: 'Álvarez Rojas, Camila',
           estado_habilitacion: 'NO_HABILITADO',
           motivo: null,
           detalle: null,
@@ -95,7 +96,73 @@ describe('EligibleListUploadFlow', () => {
         expect.objectContaining({ id_estudiante: 1, estado_habilitacion: 'NO_HABILITADO' }),
       ])
     })
+    // El panel NO se cierra al aplicar: muestra el resumen.
+    expect(onClose).not.toHaveBeenCalled()
+
+    // El resumen lista al no habilitado con nombre y SIS.
+    expect(await screen.findByText('Quedarán no habilitados')).toBeInTheDocument()
+    expect(screen.getByText('202210443')).toBeInTheDocument()
+    expect(screen.getByText('Álvarez Rojas, Camila')).toBeInTheDocument()
+
+    // "Listo" cierra el panel.
+    await user.click(screen.getByRole('button', { name: /Listo/i }))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('muestra las filas con error y las duplicadas del preview', async () => {
+    previewMock.mockResolvedValue({
+      token: 't'.repeat(64),
+      total_filas: 4,
+      filas_validas: 1,
+      filas_inconsistentes: 3,
+      faltantes: 0,
+      filas: [
+                {
+          numero_fila: 3,
+          codigo_sis: '202210443',
+          apellidos: 'ALVAREZ',
+          nombres: 'CAMILA',
+          estado: 'inconsistent',
+          errores: ['duplicate_row_in_file'],
+        },
+        {
+          numero_fila: 4,
+          codigo_sis: '202210443',
+          apellidos: 'ALVAREZ',
+          nombres: 'OTRA PERSONA',
+          estado: 'inconsistent',
+          errores: ['conflicting_duplicate_in_file'],
+        },
+        {
+          numero_fila: 5,
+          codigo_sis: null,
+          apellidos: 'SIN SIS',
+          nombres: 'ESTUDIANTE',
+          estado: 'inconsistent',
+          errores: ['missing_sis_code'],
+        },
+      ],
+    })
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(
+      <EligibleListUploadFlow
+        open
+        examId={1}
+        onClose={vi.fn()}
+        onPendingChanges={vi.fn()}
+      />
+    )
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, makeFile())
+
+    expect(await screen.findByText('Filas con error')).toBeInTheDocument()
+    // 2 filas con códigos de duplicado (duplicate_row_in_file + conflicting_duplicate_in_file).
+    expect(screen.getByText('2 duplicadas en el archivo')).toBeInTheDocument()
+    expect(screen.getByText('código SIS duplicado en el archivo')).toBeInTheDocument()
+    expect(screen.getByText('código SIS duplicado con datos distintos')).toBeInTheDocument()
+    expect(screen.getByText('sin código SIS')).toBeInTheDocument()
   })
 
   it('exige detalle cuando el motivo es OTRO', async () => {

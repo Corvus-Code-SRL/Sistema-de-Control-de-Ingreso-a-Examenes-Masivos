@@ -88,7 +88,8 @@ export function EligibleListUploadFlow({
           detalle: c.detalle ?? undefined,
         }))
       )
-      onClose()
+      // No cerramos el panel: el hook pasa a step === 'result' y el docente
+      // ve el resumen de no habilitados antes de pulsar "Listo".
     }
   }
 
@@ -98,8 +99,21 @@ export function EligibleListUploadFlow({
     const coinciden = filas.filter((f) => f.estado === 'matched').length
     const noEstan = filas.filter((f) => f.estado === 'not_found_in_exam').length
     const deNominaNoFiguran = upload.preview.faltantes
-    return { coinciden, noEstan, deNominaNoFiguran }
+    const conError = filas.filter((f) => f.estado === 'inconsistent')
+    const duplicadas = conError.filter((f) =>
+      f.errores.some(
+        (e) => e === 'duplicate_row_in_file' || e === 'conflicting_duplicate_in_file'
+      )
+    )
+    return { coinciden, noEstan, deNominaNoFiguran, conError, duplicadas }
   }, [upload.preview])
+
+  const noHabilitados = useMemo(() => {
+    if (!upload.result) return []
+    return upload.result.cambios_pendientes.filter(
+      (c) => c.estado_habilitacion === 'NO_HABILITADO'
+    )
+  }, [upload.result])
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
@@ -181,6 +195,42 @@ export function EligibleListUploadFlow({
                 <UploadStat label="No están en la nómina" value={previewSummary?.noEstan ?? 0} tone="warn" />
               </div>
 
+              {(previewSummary?.conError.length ?? 0) > 0 && (
+                <div className="space-y-2 rounded-xl border border-danger-border bg-danger-soft/40 p-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-danger-fg">
+                    <AlertTriangle aria-hidden="true" className="size-4" />
+                    Filas con error
+                    <Badge variant="outline" className="border-danger-border bg-card text-danger-fg">
+                      {previewSummary?.conError.length}
+                    </Badge>
+                  </div>
+                  {(previewSummary?.duplicadas.length ?? 0) > 0 && (
+                    <p className="text-xs text-danger-fg">
+                      {previewSummary?.duplicadas.length}{' '}
+                      {previewSummary?.duplicadas.length === 1 ? 'duplicada' : 'duplicadas'} en el archivo
+                    </p>
+                  )}
+                  <ul className="max-h-48 space-y-1 overflow-y-auto text-sm">
+                    {previewSummary?.conError.map((fila) => (
+                      <li
+                        key={fila.numero_fila ?? `${fila.codigo_sis}-${fila.errores.join('-')}`}
+                        className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"
+                      >
+                        <span className="sciem-tnum font-medium text-muted-foreground">
+                          {fila.codigo_sis ?? '—'}
+                        </span>
+                        <span className="font-medium">
+                          {[fila.apellidos, fila.nombres].filter(Boolean).join(', ') || '—'}
+                        </span>
+                        <span className="text-xs text-danger-fg">
+                          {fila.errores.map(describeError).join(' · ')}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {(previewSummary?.deNominaNoFiguran ?? 0) > 0 && (
                 <Alert className="border-warn-border bg-warn-soft text-warn-fg">
                   <AlertTriangle aria-hidden="true" />
@@ -257,14 +307,68 @@ export function EligibleListUploadFlow({
               <p className="sciem-label">Aplicando cambios…</p>
             </div>
           )}
+          {upload.step === 'result' && upload.result && (
+            <>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <UploadStat label="Filas leídas" value={upload.result.total_filas} tone="ok" />
+                <UploadStat label="Filas con error" value={upload.result.filas_inconsistentes} tone="danger" />
+                <UploadStat label="Fuera de la nómina" value={upload.result.no_encontrados} tone="warn" />
+              </div>
+
+              {noHabilitados.length > 0 ? (
+                <div className="space-y-2 rounded-xl border border-warn-border bg-warn-soft/50 p-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-warn-fg">
+                    <AlertTriangle aria-hidden="true" className="size-4" />
+                    Quedarán no habilitados
+                    <Badge variant="outline" className="border-warn-border bg-card text-warn-fg">
+                      {noHabilitados.length}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-warn-fg">
+                    Son los de la nómina que no figuran en el archivo. Si continúa, se aplicarán como
+                    cambios pendientes.
+                  </p>
+                  <ul className="max-h-48 space-y-1 overflow-y-auto text-sm">
+                    {noHabilitados.map((cambio) => (
+                      <li
+                        key={cambio.id_estudiante}
+                        className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"
+                      >
+                        <span className="sciem-tnum font-medium text-muted-foreground">
+                          {cambio.codigo_sis}
+                        </span>
+                        <span className="font-medium">{cambio.nombre_completo}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <Alert className="border-ok-border bg-ok-soft text-ok-fg">
+                  <CheckCircle2 aria-hidden="true" />
+                  <AlertTitle>Ningún estudiante quedará no habilitado</AlertTitle>
+                  <AlertDescription>
+                    Todos los estudiantes de la nómina figuran en el archivo.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </>
+          )}
         </div>
 
         <SheetFooter className="border-t border-border-soft p-6">
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          {upload.step !== 'result' && (
+            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          )}
           {upload.step === 'preview' && (
             <Button onClick={() => void handleApply()} disabled={!motivo}>
               <CheckCircle2 aria-hidden="true" className="size-4" />
               Aplicar a la lista
+            </Button>
+          )}
+          {upload.step === 'result' && (
+            <Button onClick={onClose}>
+              <CheckCircle2 aria-hidden="true" className="size-4" />
+              Listo
             </Button>
           )}
         </SheetFooter>
@@ -284,4 +388,17 @@ function UploadStat({ label, value, tone }: { label: string; value: number; tone
       <p className="sciem-tnum text-2xl font-semibold">{value}</p>
     </div>
   )
+}
+
+function describeError(code: string): string {
+  const labels: Record<string, string> = {
+    missing_sis_code: 'sin código SIS',
+    sis_code_not_numeric: 'código SIS no numérico',
+    sis_code_invalid_length: 'longitud de código SIS inválida',
+    duplicate_row_in_file: 'código SIS duplicado en el archivo',
+    conflicting_duplicate_in_file: 'código SIS duplicado con datos distintos',
+    missing_last_names: 'faltan apellidos',
+    missing_first_names: 'faltan nombres',
+  }
+  return labels[code] ?? code
 }
