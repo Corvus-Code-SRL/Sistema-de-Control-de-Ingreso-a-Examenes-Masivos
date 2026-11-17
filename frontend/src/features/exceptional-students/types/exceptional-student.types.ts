@@ -19,6 +19,7 @@ export interface ExceptionalStudentCareer {
 export interface ExceptionalCandidate {
   id_estudiante: number
   cod_sis: string
+  ci: string
   nombre_completo: string
   /** Carrera de su inscripción más reciente; nula si no tiene ninguna. */
   carrera: ExceptionalStudentCareer | null
@@ -40,7 +41,16 @@ export interface ExceptionalRegistration {
   mensaje?: string
 }
 
+export interface ExceptionalOptions {
+  grupos: { id_grupo: number; nombre: string; carrera_principal: number }[]
+  carreras: { id_grupo: number; id_carrera: number; nombre: string }[]
+  ambientes: { id_ambiente: number; nombre: string; capacidad: number; ocupados: number }[]
+}
+
 export interface RegisterExceptionalInput {
   studentId: number
   reason: string
+  groupId: number
+  careerId: number
+  roomId: number
 }

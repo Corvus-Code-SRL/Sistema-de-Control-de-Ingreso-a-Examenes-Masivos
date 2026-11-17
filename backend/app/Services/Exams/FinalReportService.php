@@ -101,6 +101,16 @@ class FinalReportService
             ->join('grupo as g', 'g.id_grupo', '=', 'ee.id_grupo')
             ->leftJoin('ambiente as a', 'a.id_ambiente', '=', 'ee.id_ambiente')
             ->where('ee.id_examen', $examId)
+            // El excepcional que no ingresó no cuenta como ausente ni aparece en el reporte.
+            ->where(function ($query) {
+                $query->where('ee.estado_ingreso', '!=', 'NO_INGRESO')
+                    ->orWhereNotExists(function ($subquery) {
+                        $subquery->selectRaw('1')
+                            ->from('examen_estudiante_excepcional as ex')
+                            ->whereColumn('ex.id_examen', 'ee.id_examen')
+                            ->whereColumn('ex.id_estudiante', 'ee.id_estudiante');
+                    });
+            })
             ->orderBy('e.apellido_paterno')
             ->orderBy('e.apellido_materno')
             ->orderBy('e.nombre')

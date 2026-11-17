@@ -7,6 +7,7 @@ import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { EXCEPTIONAL_MESSAGES } from '../components/exceptionalStudentMessages'
 import { ExceptionalStudentWorkspace } from '../components/ExceptionalStudentWorkspace'
 import { useExceptionalExams } from '../hooks/useExceptionalExams'
@@ -36,7 +37,7 @@ function examLabel(exam: ExceptionalExam): string {
  */
 export function ExceptionalStudentPage() {
   const exams = useExceptionalExams()
-  const [selectedId, setSelectedId] = useState<number | ''>('')
+  const [selectedId, setSelectedId] = useState<number | null>(null)
   const list = exams.data ?? []
   const selected = list.find((exam) => exam.id_examen === selectedId) ?? null
 
@@ -69,21 +70,21 @@ export function ExceptionalStudentPage() {
       {list.length > 0 && (
         <Card className="space-y-2 p-4">
           <Label htmlFor="exceptional-exam">Examen</Label>
-          <select
-            id="exceptional-exam"
-            value={selectedId}
-            onChange={(event) =>
-              setSelectedId(event.target.value === '' ? '' : Number(event.target.value))
-            }
-            className="h-11 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:w-[32rem]"
+          <Select
+            value={selectedId === null ? '' : String(selectedId)}
+            onValueChange={(value) => setSelectedId(Number(value))}
           >
-            <option value="">Elija un examen</option>
-            {list.map((exam) => (
-              <option key={exam.id_examen} value={exam.id_examen}>
-                {examLabel(exam)}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="exceptional-exam" className="h-11 w-full sm:w-[32rem]">
+              <SelectValue placeholder="Elija un examen" />
+            </SelectTrigger>
+            <SelectContent>
+              {list.map((exam) => (
+                <SelectItem key={exam.id_examen} value={String(exam.id_examen)}>
+                  {examLabel(exam)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Card>
       )}
 

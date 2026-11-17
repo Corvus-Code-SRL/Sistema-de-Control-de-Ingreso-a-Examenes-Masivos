@@ -1,9 +1,11 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { exceptionalStudentService } from '../services/exceptionalStudentService'
+import type { ExceptionalOptions } from '../types/exceptional-student.types'
 import { useExceptionalStudentFlow } from '../hooks/useExceptionalStudentFlow'
 import type { ExceptionalExam, RegisterExceptionalInput } from '../types/exceptional-student.types'
 import { ExceptionalRegistrationForm } from './ExceptionalRegistrationForm'
@@ -15,6 +17,15 @@ import { EXCEPTIONAL_MESSAGES } from './exceptionalStudentMessages'
  */
 export function ExceptionalStudentWorkspace({ exam }: { exam: ExceptionalExam }) {
   const flow = useExceptionalStudentFlow(exam)
+  const [options, setOptions] = useState<ExceptionalOptions | null>(null)
+  const [optionsError, setOptionsError] = useState('')
+  useEffect(() => {
+    const controller = new AbortController()
+    exceptionalStudentService.options(exam.id_examen, controller.signal)
+      .then(({ data }) => { if (!controller.signal.aborted) setOptions(data) })
+      .catch(() => { if (!controller.signal.aborted) setOptionsError('No se pudieron cargar grupos, carreras y ambientes.') })
+    return () => controller.abort()
+  }, [exam.id_examen])
   const [code, setCode] = useState('')
   const [codeError, setCodeError] = useState('')
   const blocked = !exam.permitido
@@ -106,6 +117,10 @@ export function ExceptionalStudentWorkspace({ exam }: { exam: ExceptionalExam })
               <dd className="font-medium">{flow.search.candidate.nombre_completo}</dd>
             </div>
             <div>
+              <dt className="text-muted-foreground">CI</dt>
+              <dd>{flow.search.candidate.ci}</dd>
+            </div>
+            <div>
               <dt className="text-muted-foreground">Código SIS</dt>
               <dd className="sciem-tnum">{flow.search.candidate.cod_sis}</dd>
             </div>
@@ -127,6 +142,8 @@ export function ExceptionalStudentWorkspace({ exam }: { exam: ExceptionalExam })
           ) : (
             <ExceptionalRegistrationForm
               candidate={flow.search.candidate}
+              options={options}
+              optionsError={optionsError}
               registering={flow.registering}
               error={flow.formError}
               onSubmit={handleRegister}

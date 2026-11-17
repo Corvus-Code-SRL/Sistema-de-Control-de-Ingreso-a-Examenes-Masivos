@@ -2,6 +2,7 @@ import { apiClient, apiPost } from '@/lib/api-client'
 import type {
   ExceptionalCandidate,
   ExceptionalExam,
+  ExceptionalOptions,
   ExceptionalRegistration,
   RegisterExceptionalInput
 } from '../types/exceptional-student.types'
@@ -21,10 +22,20 @@ export const exceptionalStudentService = {
     )
   },
 
+  options(examId: number, signal?: AbortSignal): Promise<{ data: ExceptionalOptions }> {
+    return apiClient(`/docente/examenes/${examId}/estudiantes-excepcionales/opciones`, { signal })
+  },
+
   register(examId: number, input: RegisterExceptionalInput): Promise<ExceptionalRegistration> {
-    return apiPost<ExceptionalRegistration>(`/docente/examenes/${examId}/estudiantes-excepcionales`, {
-      id_estudiante: input.studentId,
-      motivo: input.reason.trim()
-    })
+    return apiPost<ExceptionalRegistration>(
+      `/docente/examenes/${examId}/estudiantes-excepcionales`,
+      {
+        id_estudiante: input.studentId,
+        motivo: input.reason.trim(),
+        id_grupo: input.groupId,
+        id_carrera: input.careerId,
+        id_ambiente: input.roomId
+      }
+    )
   }
 }

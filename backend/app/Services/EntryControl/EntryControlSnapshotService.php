@@ -117,7 +117,7 @@ class EntryControlSnapshotService
                 $student,
                 $group,
                 $entries[$studentId] ?? null,
-                $assignedRooms[$studentId] ?? null,
+                $this->selectedRoom($rooms, $entries[$studentId] ?? null, $assignedRooms[$studentId] ?? null),
                 $risks[$studentId] ?? ['total' => 0, 'latest' => null],
                 $group['carrera'] ?? $career
             );
@@ -627,13 +627,28 @@ class EntryControlSnapshotService
             $student,
             $membersByStudent[$studentId],
             $this->entries($examId, $studentId)[$studentId] ?? null,
-            $assignedRooms[$studentId] ?? null,
+            $this->selectedRoom($this->rooms($examId), $this->entries($examId, $studentId)[$studentId] ?? null, $assignedRooms[$studentId] ?? null),
             $this->riskCenter->summariesForSnapshot([$studentId])[$studentId] ?? ['total' => 0, 'latest' => null],
             $membersByStudent[$studentId]['carrera'] ?? $this->careerName($exam)
         );
     }
 
     /** @return array<int, array{id_ambiente: int, nro_aula: string, capacidad: int}> */
+    /** Respeta el ambiente asignado al excepcional antes del ingreso. */
+    private function selectedRoom(array $rooms, ?array $entry, ?array $fallback): ?array
+    {
+        $roomId = $entry['id_ambiente_asignado'] ?? null;
+        if ($roomId !== null) {
+            foreach ($rooms as $room) {
+                if ((int) $room['id_ambiente'] === (int) $roomId) {
+                    return $room;
+                }
+            }
+        }
+
+        return $fallback;
+    }
+
     private function rooms(int $examId): array
     {
         return DB::table('examen_ambiente as ea')
@@ -672,6 +687,24 @@ class EntryControlSnapshotService
                     'id_grupo' => (int) $membership->id_grupo,
                     'num_grupo' => $membership->num_grupo,
                     'carrera' => $membership->carrera,
+                ];
+            }
+        }
+
+        // HU-023: excepcionales del examen, sin alterar la nomina del grupo.
+        $exceptionals = DB::table('examen_estudiante_excepcional as ex')
+            ->join('grupo as g', 'g.id_grupo', '=', 'ex.id_grupo')
+            ->join('carrera as c', 'c.id_carrera', '=', 'ex.id_carrera')
+            ->where('ex.id_examen', $examId)
+            ->get(['ex.id_estudiante', 'ex.id_grupo', 'g.num_grupo', 'c.nombre as carrera']);
+
+        foreach ($exceptionals as $exceptional) {
+            $studentId = (int) $exceptional->id_estudiante;
+            if (! isset($membersByStudent[$studentId])) {
+                $membersByStudent[$studentId] = [
+                    'id_grupo' => (int) $exceptional->id_grupo,
+                    'num_grupo' => $exceptional->num_grupo,
+                    'carrera' => $exceptional->carrera,
                 ];
             }
         }
@@ -763,6 +796,7 @@ class EntryControlSnapshotService
                 ] : null;
 
                 return [(int) $entry->id_estudiante => [
+                    'id_ambiente_asignado' => $entry->id_ambiente === null ? null : (int) $entry->id_ambiente,
                     'estado_habilitacion' => $entry->estado_habilitacion,
                     'ingreso_previo' => $previous,
                     'reciente' => $realEntry ? [

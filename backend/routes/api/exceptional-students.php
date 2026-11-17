@@ -11,6 +11,9 @@ Route::prefix('docente')->group(function () {
     Route::get('examenes/{id_examen}/estudiantes-excepcionales/buscar', [ExceptionalStudentController::class, 'search'])
         ->where('id_examen', '[0-9]{1,9}');
 
+    Route::get('examenes/{id_examen}/estudiantes-excepcionales/opciones', [ExceptionalStudentController::class, 'options'])
+        ->where('id_examen', '[0-9]{1,9}');
+
     Route::post('examenes/{id_examen}/estudiantes-excepcionales', [ExceptionalStudentController::class, 'store'])
         ->where('id_examen', '[0-9]{1,9}');
 });

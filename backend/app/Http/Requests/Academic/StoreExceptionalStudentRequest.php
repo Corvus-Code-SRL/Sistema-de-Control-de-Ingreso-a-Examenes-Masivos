@@ -16,6 +16,9 @@ class StoreExceptionalStudentRequest extends ExceptionalStudentRequest
         return [
             'id_examen' => ['required', 'integer', 'min:1', 'max:' . self::MAX_ID],
             'id_estudiante' => ['required', 'integer', 'min:1', 'max:' . self::MAX_ID],
+            'id_grupo' => ['required', 'integer', 'min:1', 'max:' . self::MAX_ID],
+            'id_carrera' => ['required', 'integer', 'min:1', 'max:' . self::MAX_ID],
+            'id_ambiente' => ['required', 'integer', 'min:1', 'max:' . self::MAX_ID],
             'motivo' => ['required', 'string', 'min:' . self::MIN_REASON_LENGTH, 'max:' . self::MAX_REASON_LENGTH],
         ];
     }
@@ -62,6 +65,20 @@ class StoreExceptionalStudentRequest extends ExceptionalStudentRequest
         return (int) $this->validated()['id_estudiante'];
     }
 
+    public function groupId(): int
+    {
+        return (int) $this->validated()['id_grupo'];
+    }
+
+    public function careerId(): int
+    {
+        return (int) $this->validated()['id_carrera'];
+    }
+
+    public function roomId(): int
+    {
+        return (int) $this->validated()['id_ambiente'];
+    }
     public function reason(): string
     {
         return (string) $this->validated()['motivo'];

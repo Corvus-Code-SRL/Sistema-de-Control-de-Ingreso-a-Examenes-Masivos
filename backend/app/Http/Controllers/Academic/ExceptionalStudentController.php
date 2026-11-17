@@ -38,6 +38,14 @@ class ExceptionalStudentController extends Controller
         );
     }
 
+    /** GET /api/docente/examenes/{id_examen}/estudiantes-excepcionales/opciones */
+    public function options(\App\Http\Requests\Academic\ExceptionalOptionsRequest $request): JsonResponse
+    {
+        return response()->json(['data' => $this->service->options(
+            $request->examId(), $this->currentUser->teacherId()
+        )]);
+    }
+
     /** GET /api/docente/examenes/{id_examen}/estudiantes-excepcionales/buscar?cod_sis= */
     public function search(SearchExceptionalStudentRequest $request): JsonResponse
     {
@@ -61,7 +69,10 @@ class ExceptionalStudentController extends Controller
             $request->examId(),
             $this->currentUser->teacherId(),
             $request->studentId(),
-            $request->reason()
+            $request->reason(),
+            $request->groupId(),
+            $request->careerId(),
+            $request->roomId()
         );
 
         return (new ExceptionalStudentResource($registered))
