@@ -91,7 +91,6 @@ describe('menú por capacidades', () => {
           ['Materias', '/materias'],
           ['Mis grupos', '/mis-cursos'],
           ['Cargar nómina de estudiantes', '/cargar-nomina'],
-        ['Registrar estudiante excepcional', '/estudiante-excepcional'],
           ['Mis auxiliares', '/mis-auxiliares']
         ]
       },
@@ -114,6 +113,7 @@ describe('menú por capacidades', () => {
           ['En curso', '/examenes/en-curso'],
           ['Registrar estudiante con retraso', '/retrasos'],
           ['Registrar situación excepcional', '/situacion-excepcional'],
+          ['Registrar estudiante excepcional', '/estudiante-excepcional'],
           ['Reportar incidencia', '/reportar-incidencia']
         ]
       },
@@ -253,7 +253,11 @@ describe('menú por capacidades', () => {
     expect(entries.map((item) => [item.to, item.capability])).toEqual([
       ['/estudiante-excepcional', 'casos-especiales.gestionar']
     ])
-    expect(menuOf('Docente').flatMap((section) => section.items)).toContainEqual([
+    const inEntryControl = menuOf('Docente').find(
+      (section) => section.label === 'Control de ingreso y examen en curso'
+    )
+
+    expect(inEntryControl?.items).toContainEqual([
       'Registrar estudiante excepcional',
       '/estudiante-excepcional'
     ])
