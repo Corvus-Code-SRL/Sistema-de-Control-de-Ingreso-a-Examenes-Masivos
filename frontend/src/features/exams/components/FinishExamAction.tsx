@@ -68,6 +68,7 @@ function FinishExamDialog({ exam }: { exam: ExamInProgress }) {
     ['A tiempo', exam.totales.a_tiempo],
     ['Con retraso', exam.totales.con_retraso],
     ['Ausentes', exam.totales.ausentes],
+    ['No habilitados', exam.totales.no_habilitados],
     ['Incidencias pendientes', exam.totales.incidencias_pendientes],
   ] as const;
 

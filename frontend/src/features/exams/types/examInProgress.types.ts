@@ -17,6 +17,7 @@ export interface InProgressStudent {
     ci: string | null;
     nombre_completo: string;
     estado_ingreso: EntryState;
+    estado_habilitacion?: string;
     hora_ingreso: string | null;
     expulsado_en?: string | null;
     total_incidencias?: number;
@@ -57,6 +58,7 @@ export interface ExamInProgress {
     a_tiempo: number;
     con_retraso: number;
     ausentes: number;
+    no_habilitados: number;
     presentes: number;
     expulsados?: number;
     total: number;
