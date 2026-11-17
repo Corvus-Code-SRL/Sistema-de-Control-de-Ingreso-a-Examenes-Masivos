@@ -54,7 +54,7 @@ export function makeExamInProgress(overrides: Partial<ExamInProgress> = {}): Exa
     nombre_examen: 'Primer parcial',
     materia: 'Bases de Datos I',
     estado: 'EN_CURSO',
-    rol_controlador: 'DOCENTE',
+    rol_controlador: 'DOCENTE', es_creador: true,
     id_ambiente_asignado: null,
     ambientes: [
       { id_ambiente: 5, nro_aula: '691A', capacidad: 40 },

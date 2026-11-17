@@ -76,5 +76,23 @@ class ActionSeeder extends Seeder
                 'descripcion' => 'Guardado de cambios en la lista de habilitados de un examen',
             ]
         );
+
+        // Van al final: los ids existentes no cambian y, en una base nueva, quedan en el mismo orden que en producción.
+        $responses = [
+            [
+                'operacion' => 'ACEPTAR_INVITACION',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Aceptación de una invitación a colaborar en un examen',
+            ],
+            [
+                'operacion' => 'RECHAZAR_INVITACION',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Rechazo de una invitación a colaborar en un examen',
+            ],
+        ];
+
+        foreach ($responses as $response) {
+            DB::table('accion')->updateOrInsert(['operacion' => $response['operacion']], $response);
+        }
     }
 }

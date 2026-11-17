@@ -33,10 +33,11 @@ describe('NAVIGATION', () => {
     expect(labels).not.toContain('Inicio')
   })
 
-  it('la única insignia es el contador de incidencias pendientes', () => {
+  it('las insignias son los contadores de invitaciones e incidencias pendientes', () => {
     const withBadge = NAVIGATION.flatMap((section) => section.items).filter((item) => item.badge)
 
     expect(withBadge.map((item) => [item.label, item.badge])).toEqual([
+      ['Invitaciones recibidas', 'pendingInvitations'],
       ['Revisar reportes de incidencias', 'pendingIncidents']
     ])
   })
@@ -101,7 +102,7 @@ describe('menú por capacidades', () => {
           ['Editar examen', undefined],
           ['Habilitar auxiliar para el examen', undefined],
           ['Invitar docentes colaboradores', '/colaboradores/invitar'],
-          ['Invitaciones a otros exámenes', undefined],
+          ['Invitaciones recibidas', '/invitaciones'],
           ['Cargar lista de habilitados', '/examenes/habilitados']
         ]
       },

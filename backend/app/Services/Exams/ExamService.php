@@ -41,18 +41,22 @@ class ExamService
 
     private ExamParticipantService $participants;
 
+    private ExamCollaboratorService $collaborators;
+
     public function __construct(
         SubjectCatalogService $subjectCatalog,
         AuditLogService $auditLog,
         ExamGroupService $groupService,
         AssistantAvailabilityService $assistantAvailability,
-        ExamParticipantService $participants
+        ExamParticipantService $participants,
+        ExamCollaboratorService $collaborators
     ) {
         $this->subjectCatalog = $subjectCatalog;
         $this->auditLog = $auditLog;
         $this->groupService = $groupService;
         $this->assistantAvailability = $assistantAvailability;
         $this->participants = $participants;
+        $this->collaborators = $collaborators;
     }
 
     /**
@@ -96,14 +100,16 @@ class ExamService
 
     /**
      * Exámenes del docente indicado, del más próximo al más lejano (vista Programados).
+     *
+     * @param  bool  $withCollaborations  Suma los exámenes donde el docente es colaborador aceptado (HU-027).
      */
-    public function listForTeacher(string $teacherId): Collection
+    public function listForTeacher(string $teacherId, bool $withCollaborations = false): Collection
     {
         $this->assertTeacherGiven($teacherId);
 
         $exams = Exam::query()
             ->with($this->listRelations())
-            ->where('id_usuario_docente', $teacherId)
+            ->where(fn (Builder $query) => $this->whereOwnOrCollaborating($query, $teacherId, $withCollaborations))
             ->orderBy('fecha')
             ->orderBy('hora_inicio')
             ->get();
@@ -135,10 +141,13 @@ class ExamService
      * un examen recién creado aparezca en la vista antes de vincularle sus grupos.
      *
      * @param  array<int, string>  $states  Estados que se incluyen; por omisión solo PROGRAMADO.
+     * @param  bool  $withCollaborations  Suma los exámenes donde el docente es colaborador aceptado (HU-027). Solo
+     *     la vista Programados lo pide: lo que se administra (invitar docentes) sigue siendo del creador.
      */
     public function listScheduledForTeacher(
         string $teacherId,
-        array $states = [Exam::PROGRAMADO]
+        array $states = [Exam::PROGRAMADO],
+        bool $withCollaborations = false
     ): Collection {
         $this->assertTeacherGiven($teacherId);
 
@@ -146,7 +155,7 @@ class ExamService
 
         $exams = Exam::query()
             ->with($this->listRelations())
-            ->where('id_usuario_docente', $teacherId)
+            ->where(fn (Builder $query) => $this->whereOwnOrCollaborating($query, $teacherId, $withCollaborations))
             ->whereIn('estado', $states)
             ->where(function (Builder $query) use ($activePeriodId) {
                 $query->whereDoesntHave('groups')
@@ -171,6 +180,29 @@ class ExamService
         $this->assertOwnedBy($exam, $teacherId);
 
         return $this->loadDetail($exam);
+    }
+
+    /** Detalle de solo lectura: el del creador y el de un colaborador que aceptó la invitación (HU-027). */
+    public function findReadable(Exam $exam, string $teacherId): Exam
+    {
+        $this->assertTeacherGiven($teacherId);
+
+        if (! $this->collaborators->isTeacherOf($exam, $teacherId)) {
+            throw new ExamOwnershipException();
+        }
+
+        return $this->loadDetail($exam);
+    }
+
+    private function whereOwnOrCollaborating(Builder $query, string $teacherId, bool $withCollaborations): void
+    {
+        if ($withCollaborations) {
+            $this->collaborators->whereTaughtBy($query, $teacherId);
+
+            return;
+        }
+
+        $query->where('id_usuario_docente', $teacherId);
     }
 
     public function create(array $data, string $teacherId): Exam

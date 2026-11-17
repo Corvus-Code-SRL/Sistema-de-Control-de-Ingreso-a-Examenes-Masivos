@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Carbon\Carbon|null $fecha_sin_efecto
  * @property string $estado
  * @property bool $permite_agregar_grupos
+ * @property bool $lista_por_grupo
  */
 class ExamInvitation extends Model
 {
@@ -42,6 +43,7 @@ class ExamInvitation extends Model
         'fecha_respuesta' => 'datetime',
         'fecha_sin_efecto' => 'datetime',
         'permite_agregar_grupos' => 'boolean',
+        'lista_por_grupo' => 'boolean',
     ];
 
     protected $fillable = [
@@ -53,6 +55,7 @@ class ExamInvitation extends Model
         'fecha_sin_efecto',
         'estado',
         'permite_agregar_grupos',
+        'lista_por_grupo',
     ];
 
     /** Invitaciones que todavía cuentan: pendientes o aceptadas. */

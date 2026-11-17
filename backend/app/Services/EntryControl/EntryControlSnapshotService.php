@@ -4,6 +4,7 @@ namespace App\Services\EntryControl;
 
 use App\Models\Exam;
 use App\Models\User;
+use App\Services\Exams\ExamCollaboratorService;
 use App\Services\Exams\ExamTimingService;
 use App\Services\RiskCenter\Academic\RiskCenterQueryService;
 use App\Support\Database\AccentInsensitiveSearch;
@@ -27,11 +28,16 @@ class EntryControlSnapshotService
 
     private ExamTimingService $timing;
     private RiskCenterQueryService $riskCenter;
+    private ExamCollaboratorService $collaborators;
 
-    public function __construct(ExamTimingService $timing, RiskCenterQueryService $riskCenter)
-    {
+    public function __construct(
+        ExamTimingService $timing,
+        RiskCenterQueryService $riskCenter,
+        ExamCollaboratorService $collaborators
+    ) {
         $this->timing = $timing;
         $this->riskCenter = $riskCenter;
+        $this->collaborators = $collaborators;
     }
 
     public function stage(Exam $exam): string
@@ -42,6 +48,18 @@ class EntryControlSnapshotService
 
         $rooms = $this->rooms($examId);
         $membersByStudent = $this->memberships($examId);
+        // HU-027: si el docente que invitó pidió la lista separada por grupo, cada grupo lleva su docente y el
+        // estado del control cuenta los ingresos por grupo. La nómina es la misma.
+        $groupsWithTeacher = $this->collaborators->listsByGroup($examId)
+            ? $this->collaborators->examGroups($examId)
+            : null;
+        if ($groupsWithTeacher !== null) {
+            $teacherByGroup = array_column($groupsWithTeacher, 'docente', 'id_grupo');
+            foreach ($membersByStudent as &$membership) {
+                $membership['docente'] = $teacherByGroup[$membership['id_grupo']] ?? null;
+            }
+            unset($membership);
+        }
         $assignedRooms = self::assignRooms(array_keys($membersByStudent), $rooms);
         $entries = $this->entries($examId);
         $pendingReports = DB::table('reporte_estudiante')
@@ -59,6 +77,19 @@ class EntryControlSnapshotService
                 'ambientes' => array_column($rooms, 'id_ambiente'),
             ],
         ];
+        // HU-027: el colaborador que aceptó la invitación controla todos los ambientes, como el creador.
+        $collaborators = DB::table('invitacion_examen as ie')
+            ->join('usuario as u', 'u.id_usuario', '=', 'ie.id_docente_invitado')
+            ->where('ie.id_examen', $examId)
+            ->where('ie.estado', 'ACEPTADA')
+            ->where('u.estado', User::ESTADO_ACTIVO)
+            ->pluck('ie.id_docente_invitado');
+        foreach ($collaborators as $collaboratorId) {
+            $controllers[(string) $collaboratorId] = [
+                'rol' => 'DOCENTE',
+                'ambientes' => array_column($rooms, 'id_ambiente'),
+            ];
+        }
         $auxiliaries = DB::table('examen_auxiliar as ea')
             ->join('usuario as u', 'u.id_usuario', '=', 'ea.id_usuario')
             ->where('ea.id_examen', $examId)
@@ -92,6 +123,7 @@ class EntryControlSnapshotService
         $meta = [
             'id_examen' => $examId,
             'carrera' => $career,
+            'lista_por_grupo' => $groupsWithTeacher !== null,
             'ambientes' => $rooms,
             'controladores' => $controllers,
             'auxiliares_sin_ambiente' => $unassigned,
@@ -147,7 +179,9 @@ class EntryControlSnapshotService
         $values[$this->key($examId, $token, 'search')] = $search;
         $values[$this->key($examId, $token, 'status')] = $this->initialStatus(
             count($membersByStudent),
-            $entries
+            $entries,
+            $groupsWithTeacher,
+            $membersByStudent
         );
 
         foreach (array_chunk($values, 500, true) as $chunk) {
@@ -418,8 +452,10 @@ class EntryControlSnapshotService
                 'controlador' => $controllerName,
             ];
 
+            $groupId = $student['grupo']['id_grupo'] ?? null;
             $recent = [
                 'id_estudiante' => $studentId,
+                'id_grupo' => $groupId,
                 'cod_sis' => $student['estudiante']['cod_sis'],
                 'nombre' => $student['nombre'],
                 'apellido_paterno' => $student['apellido_paterno'],
@@ -433,6 +469,14 @@ class EntryControlSnapshotService
 
             $status['ingresados']++;
             $status['pendientes'] = max(0, $status['pendientes'] - 1);
+            if (isset($status['por_grupo'])) {
+                foreach ($status['por_grupo'] as &$groupStatus) {
+                    if ($groupStatus['id_grupo'] === $groupId) {
+                        $groupStatus['ingresados']++;
+                    }
+                }
+                unset($groupStatus);
+            }
             array_unshift($status['ultimos_ingresos'], $recent);
             $status['ultimos_ingresos'] = array_slice($status['ultimos_ingresos'], 0, 10);
             $status['version'] = (string) Str::uuid();
@@ -578,20 +622,53 @@ class EntryControlSnapshotService
         return is_string($token) && $token !== '' ? $token : null;
     }
 
-    private function initialStatus(int $total, array $entries): array
-    {
+    /**
+     * @param array<int, array{id_grupo: int, num_grupo: string, docente: string|null}>|null $groups grupos con su
+     *     docente si la lista va separada por grupo (HU-027); null si va junta
+     * @param array<int, array{id_grupo: int}> $membersByStudent
+     */
+    private function initialStatus(
+        int $total,
+        array $entries,
+        ?array $groups = null,
+        array $membersByStudent = []
+    ): array {
         $entered = collect($entries)
             ->filter(fn (array $entry) => $entry['ingreso_previo'] !== null)
             ->sortByDesc(fn (array $entry) => $entry['ingreso_previo']['registrado_en'] ?? '')
             ->values();
 
-        return [
+        $recent = $entered->take(10)->map(function (array $entry) use ($membersByStudent) {
+            $line = $entry['reciente'];
+            $line['id_grupo'] = $membersByStudent[(int) $line['id_estudiante']]['id_grupo'] ?? null;
+
+            return $line;
+        });
+
+        $status = [
             'ingresados' => $entered->count(),
             'pendientes' => max(0, $total - $entered->count()),
             'total' => $total,
-            'ultimos_ingresos' => $entered->take(10)->pluck('reciente')->values()->all(),
+            'ultimos_ingresos' => $recent->values()->all(),
             'version' => (string) Str::uuid(),
         ];
+
+        if ($groups !== null) {
+            $status['por_grupo'] = array_map(function (array $group) use ($entries, $membersByStudent) {
+                $members = array_keys(array_filter(
+                    $membersByStudent,
+                    fn (array $membership) => $membership['id_grupo'] === $group['id_grupo']
+                ));
+                $enteredCount = count(array_filter(
+                    $members,
+                    fn (int $studentId) => ($entries[$studentId]['ingreso_previo'] ?? null) !== null
+                ));
+
+                return $group + ['total' => count($members), 'ingresados' => $enteredCount];
+            }, $groups);
+        }
+
+        return $status;
     }
 
     /**

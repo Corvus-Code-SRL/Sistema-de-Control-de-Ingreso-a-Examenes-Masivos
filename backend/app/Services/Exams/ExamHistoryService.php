@@ -10,18 +10,28 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-/** Consultas de solo lectura del historial de exámenes de un docente. */
+/**
+ * Consultas de solo lectura del historial de exámenes de un docente: los que creó y aquellos en los que colaboró
+ * tras aceptar la invitación (HU-027).
+ */
 class ExamHistoryService
 {
+    private ExamCollaboratorService $collaborators;
+
+    public function __construct(ExamCollaboratorService $collaborators)
+    {
+        $this->collaborators = $collaborators;
+    }
+
     public function index(string $teacherId, array $filters): array
     {
         $base = Exam::query()
-            ->where('id_usuario_docente', $teacherId)
+            ->where(fn ($query) => $this->collaborators->whereTaughtBy($query, $teacherId))
             ->where('estado', Exam::FINALIZADO);
 
         $subjects = DB::table('materia as m')
             ->join('examen as e', 'e.id_materia', '=', 'm.id_materia')
-            ->where('e.id_usuario_docente', $teacherId)
+            ->where(fn ($query) => $this->collaborators->whereTaughtBy($query, $teacherId, 'e'))
             ->where('e.estado', Exam::FINALIZADO)
             ->distinct()
             ->orderBy('m.nombre')
@@ -70,7 +80,7 @@ class ExamHistoryService
 
     public function show(Exam $exam, string $teacherId): array
     {
-        abort_unless($exam->id_usuario_docente === $teacherId, 403, 'No tiene acceso a este examen.');
+        abort_unless($this->collaborators->isTeacherOf($exam, $teacherId), 403, 'No tiene acceso a este examen.');
         abort_unless($exam->estado === Exam::FINALIZADO, 404);
 
         $exam->load('subject:id_materia,nombre');

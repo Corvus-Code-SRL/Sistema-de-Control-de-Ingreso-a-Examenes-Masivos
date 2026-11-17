@@ -30,7 +30,7 @@ function makeExam(estado: ExamStatus, groups: Group[] = [], overrides: Partial<E
     id_tipo_examen: 1,
     id_carrera: 2,
     id_materia: 3,
-    id_usuario_docente: 'DOC-1',
+    id_usuario_docente: 'DOC-1', es_creador: true,
     tipo_examen: { id_tipo_examen: 1, nombre: 'Parcial', categoria: 'REGULAR' },
     materia: { id_materia: 3, nombre: 'Cálculo II', codigo: 'MAT-102' },
     carrera: { id_carrera: 2, nombre: 'Ingenieria de Sistemas' },
@@ -122,6 +122,26 @@ describe('ExamDetailPage: texto de solo lectura (HU-024)', () => {
         name: /guardar grupos/i,
       })
     ).not.toBeInTheDocument()
+  })
+
+  it('un colaborador consulta el examen sin editar, cancelar ni habilitar auxiliares', async () => {
+    mockExam('PROGRAMADO', [], { es_creador: false })
+    await renderDetail()
+
+    expect(screen.getByText(/usted colabora en este examen/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /editar examen/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /cancelar examen/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /habilitar auxiliares/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /personal del control de ingreso/i })).not.toBeInTheDocument()
+  })
+
+  it('el creador no ve el aviso de colaborador y conserva sus acciones', async () => {
+    mockExam('PROGRAMADO')
+    await renderDetail()
+
+    expect(screen.queryByText(/usted colabora en este examen/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /editar examen/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /cancelar examen/i })).toBeInTheDocument()
   })
 
   it('muestra las acciones de auxiliares y ambientes cuando está PROGRAMADO', async () => {

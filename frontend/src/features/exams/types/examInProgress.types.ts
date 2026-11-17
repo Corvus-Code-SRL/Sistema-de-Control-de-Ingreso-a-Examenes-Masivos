@@ -13,6 +13,8 @@ export interface InProgressExamRow {
 
 export interface InProgressStudent {
     id_estudiante: number;
+    /** Grupo por el que figura en la nómina; la tabla lo usa si la lista va separada por grupo (HU-027). */
+    id_grupo?: number | null;
     cod_sis: string;
     ci: string | null;
     nombre_completo: string;
@@ -35,12 +37,20 @@ export interface InProgressStudent {
     };
 }
 
+/** Grupo del examen con su docente (HU-027). */
+export interface InProgressGroup {
+    id_grupo: number;
+    num_grupo: string;
+    docente: string | null;
+}
+
 export interface ExamInProgress {
     id_examen: number;
     nombre_examen: string;
     materia: string | null;
     estado: 'PROGRAMADO' | 'EN_CURSO' | 'FINALIZADO';
     rol_controlador: 'DOCENTE' | 'AUXILIAR';
+    es_creador: boolean;
     id_ambiente_asignado: number | null;
     ambientes: {
     id_ambiente: number;
@@ -65,6 +75,9 @@ export interface ExamInProgress {
     incidencias_pendientes: number;
     };
     estudiantes: InProgressStudent[];
+    /** HU-027: quien invitó pidió la lista separada por grupo; la tabla se divide con `grupos`. */
+    lista_por_grupo?: boolean;
+    grupos?: InProgressGroup[];
     situaciones_habilitadas?: boolean;
     incidencias_habilitadas?: boolean;
     total_situaciones?: number;

@@ -7,6 +7,7 @@ use App\Http\Controllers\Exams\ExamController;
 use App\Http\Controllers\Exams\ExamHistoryController;
 use App\Http\Controllers\Exams\ExamGroupController;
 use App\Http\Controllers\Exams\GroupExamController;
+use App\Http\Controllers\Exams\ReceivedInvitationController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Exams\ClassroomController;
 use App\Http\Controllers\Exams\FinalReportController;
@@ -138,4 +139,22 @@ Route::prefix('docente/invitaciones')->name('docente.invitaciones.')->group(func
     Route::post('/examenes/{exam}', [CollaboratorInvitationController::class, 'store'])
         ->where('exam', '[0-9]{1,9}')
         ->name('store');
+});
+
+// HU-027 — invitaciones recibidas: el docente invitado las consulta y las acepta (sumando sus grupos) o rechaza.
+Route::prefix('invitaciones')->name('invitaciones.')->group(function () {
+    Route::get('/', [ReceivedInvitationController::class, 'index'])
+        ->name('index');
+
+    Route::get('/{invitation}', [ReceivedInvitationController::class, 'show'])
+        ->where('invitation', '[0-9]{1,9}')
+        ->name('show');
+
+    Route::post('/{invitation}/aceptar', [ReceivedInvitationController::class, 'accept'])
+        ->where('invitation', '[0-9]{1,9}')
+        ->name('aceptar');
+
+    Route::post('/{invitation}/rechazar', [ReceivedInvitationController::class, 'reject'])
+        ->where('invitation', '[0-9]{1,9}')
+        ->name('rechazar');
 });
