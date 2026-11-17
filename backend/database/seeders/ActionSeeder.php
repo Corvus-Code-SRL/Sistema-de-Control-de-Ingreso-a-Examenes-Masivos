@@ -89,6 +89,11 @@ class ActionSeeder extends Seeder
                 'tipo_operacion' => 'UPDATE',
                 'descripcion' => 'Rechazo de una invitación a colaborar en un examen',
             ],
+            [
+                'operacion' => 'REGISTRAR_ESTUDIANTE_EXCEPCIONAL',
+                'tipo_operacion' => 'INSERT',
+                'descripcion' => 'Registro de un estudiante excepcional en un examen',
+            ],
         ];
 
         foreach ($responses as $response) {

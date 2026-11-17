@@ -22,17 +22,15 @@ class AuditLogOptionsTest extends TestCase
         $this->prepareAuditLog();
     }
 
-    public function test_ofrece_las_29_acciones_del_catalogo_con_su_etiqueta(): void
+    public function test_ofrece_las_28_acciones_del_catalogo_con_su_etiqueta(): void
     {
         $actions = collect($this->getJson('/api/bitacora/opciones')->assertOk()->json('data.acciones'));
 
-        $this->assertCount(29, $actions);
+        $this->assertCount(28, $actions);
         $this->assertSame('Modificar', $actions->firstWhere('codigo', 'MODIFICAR')['etiqueta']);
         $this->assertSame('Retirar estudiante', $actions->firstWhere('codigo', 'EXPULSAR_ESTUDIANTE')['etiqueta']);
         $this->assertSame('Rectificar registro', $actions->firstWhere('codigo', 'RECTIFICAR_REGISTRO')['etiqueta']);
         $this->assertSame('Guardar habilitados', $actions->firstWhere('codigo', 'GUARDAR_HABILITADOS')['etiqueta']);
-        $this->assertSame('Iniciar cronómetro', $actions->firstWhere('codigo', 'INICIAR_CRONOMETRO')['etiqueta']);
-        $this->assertSame('Ajustar cronómetro', $actions->firstWhere('codigo', 'AJUSTAR_CRONOMETRO')['etiqueta']);
     }
 
     public function test_deshabilitar_y_habilitar_siguen_en_el_selector_aunque_nadie_los_escriba_aun(): void

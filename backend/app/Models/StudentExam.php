@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $observacion
  * @property string $estado_ingreso
  * @property string|null $hora_ingreso
- * @property int $id_grupo
+ * @property int|null $id_grupo grupo de la nómina; null en un estudiante excepcional (HU-023)
  */
 class StudentExam extends Pivot
 {

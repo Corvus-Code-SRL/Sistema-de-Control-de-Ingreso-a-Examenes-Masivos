@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Participantes de un examen, derivados y nunca copiados.
  *
- * esperados = estudiantes asociados al examen.
+ * esperados = estudiantes asociados al examen (nómina de sus grupos y excepcionales, HU-023).
  * ingresados = estudiantes con INGRESO o CON_RETRASO.
  * pendientes = estudiantes esperados sin ingreso real.
  */
@@ -21,6 +21,7 @@ class ExamParticipantService
     {
         $this->roster = $roster;
     }
+
     /**
      * Un estudiante inscrito en varios grupos del examen aparece una sola vez.
      * Su id_grupo corresponde al menor de esos grupos.
@@ -38,7 +39,7 @@ class ExamParticipantService
             ->whereIn('examen_estudiante.estado_ingreso', ['INGRESO', 'CON_RETRASO'])
             ->select(
                 'estudiante.*',
-                'examen_estudiante.id_grupo',
+                'examen_estudiante.id_grupo_efectivo as id_grupo',
                 'examen_estudiante.estado_habilitacion',
                 'examen_estudiante.estado_ingreso',
                 'examen_estudiante.hora_ingreso'
@@ -95,8 +96,8 @@ class ExamParticipantService
 
         $rows = DB::table('examen_estudiante')
             ->whereIn('id_examen', array_keys($finalized))
-            ->selectRaw('id_examen, id_grupo, COUNT(*) AS total')
-            ->groupBy('id_examen', 'id_grupo')
+            ->selectRaw('id_examen, id_grupo_efectivo AS id_grupo, COUNT(*) AS total')
+            ->groupBy('id_examen', 'id_grupo_efectivo')
             ->get();
 
         foreach ($rows as $row) {

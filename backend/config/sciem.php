@@ -276,6 +276,7 @@ return [
             'RECHAZAR_INGRESO_RETRASO' => 'Rechazar ingreso con retraso',
             'REGISTRAR_INGRESO_RETRASO' => 'Registrar ingreso con retraso',
             'EXPULSAR_ESTUDIANTE' => 'Retirar estudiante',
+            'REGISTRAR_ESTUDIANTE_EXCEPCIONAL' => 'Registrar estudiante excepcional',
             'CAMBIAR_AMBIENTE' => 'Cambiar ambiente',
             'OBSERVAR_IDENTIDAD' => 'Observar identidad',
             'RECTIFICAR_REGISTRO' => 'Rectificar registro',

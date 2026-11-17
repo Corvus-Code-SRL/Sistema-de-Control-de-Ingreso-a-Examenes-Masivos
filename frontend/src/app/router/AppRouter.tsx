@@ -51,6 +51,7 @@ import {
 import { ClassroomsPage } from '@/features/classrooms'
 import { COLLABORATOR_INVITATIONS_PATH, CollaboratorInvitationsPage } from '@/features/collaborators'
 import { RectifyRiskRecordPage, RiskCenterPage } from '@/features/risk-center/academic'
+import { ExceptionalStudentPage } from '@/features/exceptional-students'
 import { RosterUploadPage } from '@/features/students'
 import {
   AdminSubjectAssignmentsPage,
@@ -129,6 +130,10 @@ function DocenteRoutes() {
         <Route
           path="/cargar-nomina"
           element={guarded('grupos.gestionar', <RosterUploadPage />)}
+        />
+        <Route
+          path="/estudiante-excepcional"
+          element={guarded('casos-especiales.gestionar', <ExceptionalStudentPage />)}
         />
         <Route path="/grupos/:idGrupo/nomina" element={<RosterUploadRedirect />} />
 
@@ -212,7 +217,7 @@ function DocenteRoutes() {
         <Route path="/historial/:id" element={guarded('examenes.gestionar', <ExamHistorySummaryPage />)} />
         <Route path="/incidencias" element={guarded('incidencias.revisar', <IncidentsPage />)} />
         <Route path={INVITATIONS_PATH} element={guarded('examenes.gestionar', <InvitationsPage />)} />
-        
+
         <Route
           path="/central-riesgo/:id?"
           element={guarded('riesgo.consultar', <RiskCenterPage />)}
