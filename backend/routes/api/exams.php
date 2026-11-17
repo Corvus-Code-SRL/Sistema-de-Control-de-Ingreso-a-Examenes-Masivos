@@ -48,7 +48,8 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
     Route::post('/', [ExamController::class, 'store'])
         ->name('store');
 
-    Route::get('/cronometros', [ExamTimerController::class, 'index'])->name('cronometros');
+    Route::get('/cronometros', [ExamTimerController::class, 'index'])
+        ->withoutMiddleware('throttle:api')->middleware('throttle:polling')->name('cronometros');
     Route::get('/{exam}/cronometro', [ExamTimerController::class, 'show'])
         ->where('exam', '[0-9]{1,9}')->name('cronometro.show');
     Route::match(['post', 'put'], '/{exam}/cronometro', [ExamTimerController::class, 'save'])
