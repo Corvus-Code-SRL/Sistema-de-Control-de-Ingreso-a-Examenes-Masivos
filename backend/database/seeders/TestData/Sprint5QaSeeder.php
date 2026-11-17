@@ -45,7 +45,9 @@ use Illuminate\Support\Facades\DB;
  * Escenario HU-027 (responder invitaciones). Rosario Salazar (10487) entra y ve su bandeja en los cuatro estados:
  *   - Pendientes: la de «HU-026 Parcial Cálculo I» (9811) y la de «HU-027 Parcial aula chica»
  *     (9821), que se rinde en el aula QA-8 (8 lugares) y ya tiene el grupo 1 (7 inscritos): al marcar su grupo 2
- *     (5 inscritos) la pantalla avisa que se supera la capacidad, sin impedir aceptar.
+ *     (5 inscritos) la pantalla avisa que se supera la capacidad, sin impedir aceptar. Esta invitación pide la
+ *     lista separada por grupo: tras aceptar con el grupo 2, al abrir el control de ingreso y durante el examen
+ *     la lista se ve dividida en «Grupo 1 · Marcelo» y «Grupo 2 · Rosario».
  *   - Aceptada: «HU-027 Final Cálculo I» (9822), ya EN_INGRESO y sin permitir grupos; Rosario lo ve en el
  *     control de ingreso como docente.
  *   - Rechazada: «HU-027 Recuperatorio» (9823), PROGRAMADO.
@@ -251,7 +253,7 @@ class Sprint5QaSeeder extends Seeder
 
         DB::table('invitacion_examen')->insert([
             $this->invitation(self::INVITATION_RESPONSE_PENDING, self::EXAM_RESPONSE_SMALL_ROOM, Ids::TEACHER_2,
-                'PENDIENTE', '2026-11-14 09:00:00-04'),
+                'PENDIENTE', '2026-11-14 09:00:00-04', null, null, true, true),
             $this->invitation(self::INVITATION_RESPONSE_ACCEPTED, self::EXAM_RESPONSE_ACCEPTED, Ids::TEACHER_2,
                 'ACEPTADA', '2026-11-10 11:00:00-04', '2026-11-10 15:20:00-04', null, false),
             $this->invitation(self::INVITATION_RESPONSE_REJECTED, self::EXAM_RESPONSE_REJECTED, Ids::TEACHER_2,
@@ -331,7 +333,8 @@ class Sprint5QaSeeder extends Seeder
         string $sentAt,
         ?string $respondedAt = null,
         ?string $voidedAt = null,
-        bool $allowGroups = true
+        bool $allowGroups = true,
+        bool $listByGroup = false
     ): array {
         return [
             'id_invitacion' => $id,
@@ -343,6 +346,7 @@ class Sprint5QaSeeder extends Seeder
             'fecha_sin_efecto' => $voidedAt,
             'estado' => $status,
             'permite_agregar_grupos' => $allowGroups,
+            'lista_por_grupo' => $listByGroup,
         ];
     }
 
