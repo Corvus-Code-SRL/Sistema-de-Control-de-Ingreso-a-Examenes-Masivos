@@ -24,12 +24,6 @@ function formatDate(value: string) {
   return value?.split('-').reverse().join('/') || '—'
 }
 
-interface StartOffer {
-  limit: string
-  minutes: number
-  message: string
-}
-
 function ExamCountdown({ exam }: { exam: ExamTimer }) {
   const { clock, ready, accept } = useExamTimers()
   const timer = exam.cronometro_iniciado_en === null ? undefined : exam
@@ -38,11 +32,12 @@ function ExamCountdown({ exam }: { exam: ExamTimer }) {
   const [adjusting, setAdjusting] = useState(false)
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [offer, setOffer] = useState<StartOffer | null>(null)
   const requestRef = useRef<AbortController | null>(null)
   const duration = exam.duracion
-  const limit = Date.parse(timer?.fin_permitido_en ?? '')
-  const canAdjust = timer && clock && limit > clock.serverNowMs + performance.now() - clock.sampledMonoMs
+  const limit = Date.parse(exam.fin_permitido_en ?? '')
+  const limitSeconds = useExamTimerRemaining({ ...exam, cronometro_vence_en: exam.fin_permitido_en }, clock)
+  const expired = limitSeconds === 0
+  const canAdjust = timer && !expired && Number.isFinite(limit)
   const count = Number(minutes)
   const validMinutes = Number.isInteger(count) && count >= 1 && count <= MAX_MINUTES
 
@@ -56,8 +51,8 @@ function ExamCountdown({ exam }: { exam: ExamTimer }) {
     setAdjusting(true)
   }
 
-  async function save(confirmed: StartOffer | null) {
-    if (requestRef.current || !ready || !validMinutes || (timer && !adjusting)) return
+  async function save() {
+    if (requestRef.current || !ready || !validMinutes || expired || (timer && !adjusting)) return
 
     const controller = new AbortController()
     requestRef.current = controller
@@ -70,34 +65,22 @@ function ExamCountdown({ exam }: { exam: ExamTimer }) {
         if (controller.signal.aborted) return
         const latest = detail.examen
         if (latest.estado !== EXAM_STATUS.EN_CURSO) {
-          setOffer(null)
           setError('El examen ya no está disponible para iniciar el cronómetro.')
           return
         }
         if (latest.cronometro_iniciado_en !== null) {
           accept(detail)
-          setOffer(null)
           return
         }
 
         const finish = latest.fin_permitido_en
         const availableMs = Date.parse(finish ?? '') - Date.parse(detail.hora_servidor_en)
         if (!finish || !Number.isFinite(availableMs)) {
-          setOffer(null)
           setError('No se pudo determinar la hora de fin programada del examen.')
           return
         }
         if (availableMs <= 0) {
-          setOffer(null)
           setError('La hora de fin programada ya pasó. No se puede iniciar el cronómetro.')
-          return
-        }
-        if (availableMs < count * MINUTE_MS && (confirmed?.limit !== finish || confirmed.minutes !== count)) {
-          const availableSeconds = Math.floor(availableMs / 1000)
-          const whole = Math.floor(availableSeconds / 60)
-          const rest = availableSeconds % 60
-          const available = availableSeconds === 0 ? 'menos de 1 s' : `${whole} min${rest > 0 ? ` ${rest} s` : ''}`
-          setOffer({ limit: finish, minutes: count, message: `Quedan ${available} de los ${count} min solicitados, hasta las ${finish.slice(11, 16)}.` })
           return
         }
       }
@@ -105,12 +88,11 @@ function ExamCountdown({ exam }: { exam: ExamTimer }) {
       const result = await examTimerService.save(exam.id_examen, count, adjusting, controller.signal)
       if (controller.signal.aborted) return
       accept(result)
-      setOffer(null)
       setAdjusting(false)
     } catch (cause) {
       if (controller.signal.aborted) return
       setError(cause instanceof ApiError && cause.status >= 400 && cause.status < 500
-        ? cause.message
+        ? cause.errors.minutos?.[0] ?? cause.message
         : 'No se pudo guardar el cronómetro. Intente nuevamente.')
     } finally {
       requestRef.current = null
@@ -157,31 +139,30 @@ function ExamCountdown({ exam }: { exam: ExamTimer }) {
                 {seconds === 0 ? 'Tiempo agotado' : 'Quedan 10 minutos o menos.'}
               </p>
             )}
-            {offer && !timer && <p className="mt-3 text-sm font-medium text-warn-fg">{offer.message}</p>}
             {checking && <p className="mt-3 text-sm text-muted-foreground">Verificando el cronómetro…</p>}
           </div>
 
           {(!timer || adjusting) && (
             <div className="mt-4 space-y-2">
               <Label htmlFor="exam-timer-minutes">{adjusting ? 'Duración total en minutos' : 'Minutos concedidos'}</Label>
-              <Input id="exam-timer-minutes" type="number" min={1} max={MAX_MINUTES} step={1} value={minutes} disabled={checking}
-                onChange={(event) => { setMinutes(event.target.value); setOffer(null) }} />
+              <Input id="exam-timer-minutes" type="number" min={1} max={MAX_MINUTES} step={1} value={minutes} disabled={checking || expired}
+                onChange={(event) => setMinutes(event.target.value)} />
               {adjusting && <p className="text-sm text-muted-foreground">Se cuentan desde el inicio del cronómetro, hasta el fin programado como máximo.</p>}
               <div className="flex flex-wrap gap-2">
-                <Button type="button" disabled={!ready || !validMinutes || checking} onClick={() => void save(offer)}>
+                <Button type="button" disabled={!ready || !validMinutes || checking || expired} onClick={() => void save()}>
                   <Clock className="size-4" aria-hidden="true" />
-                  {adjusting ? 'Guardar ajuste' : offer ? 'Iniciar con el tiempo disponible' : 'Iniciar tiempo'}
+                  {adjusting ? 'Guardar ajuste' : 'Iniciar cronómetro'}
                 </Button>
-                {(adjusting || offer) && (
+                {adjusting && (
                   <Button type="button" variant="outline" disabled={checking} onClick={() => {
                     setAdjusting(false)
-                    setOffer(null)
                     setError(null)
                   }}>Volver</Button>
                 )}
               </div>
             </div>
           )}
+          {expired && <p role="status" className="mt-3 text-sm text-warn-fg">La hora final permitida ya pasó. No se puede iniciar ni ajustar el cronómetro.</p>}
           {canAdjust && !adjusting && (
             <Button type="button" variant="outline" className="mt-4" onClick={openAdjustment}>Ajustar tiempo</Button>
           )}

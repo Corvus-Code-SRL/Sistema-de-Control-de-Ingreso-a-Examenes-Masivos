@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { act, fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/lib/api-client'
 import { mockApiWith } from '@/test/http'
 import { renderWithRouter } from '@/test/render'
 import { ExamTimerCard } from '../components/ExamTimerCard'
@@ -78,7 +79,7 @@ describe('HU-038 — Controlar tiempo del examen', () => {
     let resolve!: (detail: ExamTimerDetail) => void
     vi.spyOn(examTimerService, 'get').mockReturnValueOnce(new Promise((complete) => { resolve = complete }))
     mountPage()
-    const start = await screen.findByRole('button', { name: 'Iniciar tiempo' })
+    const start = await screen.findByRole('button', { name: 'Iniciar cronómetro' })
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Minutos concedidos' }), { target: { value: '20' } })
 
     act(() => { fireEvent.click(start); fireEvent.click(start) })
@@ -88,29 +89,26 @@ describe('HU-038 — Controlar tiempo del examen', () => {
 
     expect(calls.filter(({ method }) => method === 'POST').map(({ body }) => body)).toEqual([{ minutos: 20 }])
     expect(screen.getByRole('timer')).toHaveTextContent('00:20:00')
-    expect(screen.queryByRole('button', { name: 'Iniciar tiempo' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Iniciar cronómetro' })).not.toBeInTheDocument()
   })
 
-  it('advierte antes de guardar que el fin programado recorta los minutos', async () => {
-    const { state, calls } = mockBackend()
-    state.mutation = { ...started, cronometro_vence_en: '2026-11-17T20:00:00Z' }
+  it('muestra el 422 de minutos sin ofrecer reducir el tiempo', async () => {
+    const { calls } = mockBackend()
+    vi.spyOn(examTimerService, 'save').mockRejectedValueOnce(new ApiError(422, 'Validación fallida', {
+      minutos: ['El tiempo solicitado excede el límite disponible'],
+    }))
     mountPage()
-    const user = userEvent.setup()
-    await user.click(await screen.findByRole('button', { name: 'Iniciar tiempo' }))
-
-    expect(screen.getByText('Quedan 100 min de los 120 min solicitados, hasta las 16:00.')).toBeInTheDocument()
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Iniciar cronómetro' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('El tiempo solicitado excede el límite disponible')
+    expect(screen.queryByRole('button', { name: 'Iniciar con el tiempo disponible' })).not.toBeInTheDocument()
     expect(calls.every(({ method }) => method === 'GET')).toBe(true)
-    await user.click(screen.getByRole('button', { name: 'Iniciar con el tiempo disponible' }))
-
-    expect(screen.getByRole('timer')).toHaveTextContent('01:40:00')
-    expect(calls.filter(({ method }) => method === 'POST')).toHaveLength(1)
   })
 
   it.each(['PROGRAMADO', 'FINALIZADO', 'CANCELADO'] as const)('rechaza un inicio si el detalle vuelve %s', async (estado) => {
     const { state, calls } = mockBackend()
     state.detail = { ...notStarted, estado }
     mountPage()
-    await userEvent.setup().click(await screen.findByRole('button', { name: 'Iniciar tiempo' }))
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Iniciar cronómetro' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('El examen ya no está disponible')
     expect(calls.every(({ method }) => method === 'GET')).toBe(true)
   })
@@ -119,8 +117,9 @@ describe('HU-038 — Controlar tiempo del examen', () => {
     const { state, calls } = mockBackend()
     state.now = () => '2026-11-17T20:00:00Z'
     mountPage()
-    await userEvent.setup().click(await screen.findByRole('button', { name: 'Iniciar tiempo' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('La hora de fin programada ya pasó')
+    expect(await screen.findByRole('button', { name: 'Iniciar cronómetro' })).toBeDisabled()
+    expect(screen.getByRole('spinbutton')).toBeDisabled()
+    expect(screen.getByText(/La hora final permitida ya pasó/)).toBeInTheDocument()
     expect(calls.every(({ method }) => method === 'GET')).toBe(true)
   })
 
@@ -129,12 +128,13 @@ describe('HU-038 — Controlar tiempo del examen', () => {
     state.failDetail = true
     mountPage()
     const user = userEvent.setup()
-    await user.click(await screen.findByRole('button', { name: 'Iniciar tiempo' }))
+    await user.click(await screen.findByRole('button', { name: 'Iniciar cronómetro' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Intente nuevamente')
     expect(calls.every(({ method }) => method === 'GET')).toBe(true)
     state.failDetail = false
     state.detail = started
-    await user.click(screen.getByRole('button', { name: 'Iniciar tiempo' }))
+    state.exams = [started]
+    await user.click(screen.getByRole('button', { name: 'Iniciar cronómetro' }))
     expect(screen.getByRole('timer')).toHaveTextContent('00:20:00')
     expect(calls.every(({ method }) => method === 'GET')).toBe(true)
   })
@@ -150,7 +150,7 @@ describe('HU-038 — Controlar tiempo del examen', () => {
     state.now = () => '2026-11-17T18:40:00Z'
     mountPage()
     expect(await screen.findByText('Tiempo agotado')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Iniciar tiempo' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Iniciar cronómetro' })).not.toBeInTheDocument()
     expect(calls.every(({ method }) => method === 'GET')).toBe(true)
   })
 
@@ -166,6 +166,34 @@ describe('HU-038 — Controlar tiempo del examen', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar ajuste' }))
     expect(calls.filter(({ method }) => method === 'PUT').map(({ body }) => body)).toEqual([{ minutos: 30 }])
     expect(screen.getByRole('timer')).toHaveTextContent('00:25:00')
+  })
+
+  it('permite ajustar una cuenta agotada antes del límite del examen', async () => {
+    const { state, calls } = mockBackend([started])
+    state.now = () => '2026-11-17T18:41:00Z'
+    state.mutation = { ...started, cronometro_vence_en: '2026-11-17T18:50:00Z' }
+    mountPage()
+    const user = userEvent.setup()
+    expect(await screen.findByText('Tiempo agotado')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Ajustar tiempo' }))
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '30' } })
+    await user.click(screen.getByRole('button', { name: 'Guardar ajuste' }))
+    expect(calls.filter(({ method }) => method === 'PUT').map(({ body }) => body)).toEqual([{ minutos: 30 }])
+    expect(screen.getByRole('timer')).toHaveTextContent('00:09:00')
+  })
+
+  it('bloquea un ajuste abierto cuando se alcanza la hora final permitida', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance', 'Date'] })
+    const { state, calls } = mockBackend([started])
+    state.now = () => '2026-11-17T19:59:59Z'
+    mountPage()
+    await advance(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Ajustar tiempo' }))
+    await advance(1_000)
+    expect(screen.getByRole('spinbutton')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Guardar ajuste' })).toBeDisabled()
+    expect(screen.getByText(/La hora final permitida ya pasó/)).toBeInTheDocument()
+    expect(calls.every(({ method }) => method === 'GET')).toBe(true)
   })
 
   it('avisa a los diez minutos y llega a cero sin consultar por segundo ni escribir', async () => {
@@ -197,13 +225,13 @@ describe('HU-038 — Controlar tiempo del examen', () => {
     await advance(0)
 
     state.failPolling = true
-    await advance(5_000)
+    await advance(15_000)
     expect(screen.getByRole('alert')).toHaveTextContent('Se reintentará automáticamente')
-    expect(screen.getByRole('timer')).toHaveTextContent('00:19:55')
+    expect(screen.getByRole('timer')).toHaveTextContent('00:19:45')
 
     state.failPolling = false
     state.exams = []
-    await advance(5_000)
+    await advance(15_000)
     expect(screen.getByRole('alert')).toHaveTextContent('El examen «Primer Parcial» ya no está disponible')
     expect(screen.queryByRole('timer')).not.toBeInTheDocument()
   })
@@ -227,7 +255,8 @@ describe('HU-038 — Controlar tiempo del examen', () => {
     // Una vez terminal, el servidor ya no devuelve el examen dentro del listado en curso.
     state.detail = { ...initial, estado }
     state.exams = []
-    await advance(5_000)
+    if (initial.cronometro_iniciado_en === null) fireEvent.focus(window)
+    await advance(15_000)
 
     expect(screen.getByRole('alert')).toHaveTextContent('El examen «Primer Parcial» ya no está disponible')
     expect(screen.queryByRole('combobox', { name: 'Examen' })).not.toBeInTheDocument()
