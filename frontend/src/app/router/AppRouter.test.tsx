@@ -219,17 +219,7 @@ describe('AppRouter — Controlar tiempo del examen (HU-038)', () => {
     window.localStorage.clear()
   })
 
-  it('deniega la ruta y la tarjeta al Invitado', async () => {
-    const backend = stubBackend('invitado')
-    const app = renderApp(route)
-    expect(await screen.findByText('No tiene permiso para ver esta sección.')).toBeInTheDocument()
-    expect(app.pathname).toBe(route)
-    expect(screen.queryByRole('heading', { name: title })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: title })).not.toBeInTheDocument()
-    expect(backend.calls.some(({ url }) => url.endsWith('/examenes/cronometros'))).toBe(false)
-  })
-
-  it.each(['docente'] as const)('permite abrir la ruta a %s', async (account) => {
+  it.each(['docente', 'invitado'] as const)('permite abrir la ruta a %s', async (account) => {
     stubBackend(account)
 
     const app = renderApp(route)

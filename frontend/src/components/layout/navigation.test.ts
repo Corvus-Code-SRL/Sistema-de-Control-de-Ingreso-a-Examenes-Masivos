@@ -170,13 +170,13 @@ describe('menú por capacidades', () => {
     expect(entries).not.toContain('Mis auxiliares')
     expect(entries).not.toContain('Central de riesgo')
     expect(entries).not.toContain('Invitar docentes colaboradores')
-    expect(entries).not.toContain('Controlar tiempo del examen')
     expect(entries).toEqual(
       expect.arrayContaining([
         'Materias',
         'Registrar examen',
         'Habilitar auxiliar para el examen',
         'Control de ingreso',
+        'Controlar tiempo del examen',
         'En curso',
         'Registrar situación excepcional',
         'Reportar incidencia',

@@ -50,7 +50,7 @@ export const ACCESS_BY_FEATURE: Record<AccessFeature, readonly RoleName[]> = {
   invite_teachers: ['Docente'],
   audit_log: ['Administrador'],
   risk_rectify: ['Administrador'],
-  exam_timer: ['Docente'],
+  exam_timer: ['Docente', 'Invitado'],
 }
 
 const CAPABILITIES_BY_FEATURE = {

@@ -198,22 +198,23 @@ class ExamTimerTest extends TestCase
         $this->putJson($this->url($exam), ['minutos' => 10])->assertForbidden();
     }
 
-    public function test_el_invitado_no_tiene_la_capacidad_del_cronometro_aunque_sea_propietario(): void
+    public function test_el_invitado_propietario_controla_el_cronometro_de_su_examen(): void
     {
         $exam = $this->inProgressExam();
         $role = Role::firstOrCreate(['nombre_rol' => Role::INVITADO], ['estado' => 'ACTIVO']);
         DB::table('usuario_rol')->where('id_usuario', $this->docenteId)->update(['id_rol' => $role->id_rol]);
-        $this->getJson('/api/examenes/cronometros')->assertForbidden();
-        $this->getJson($this->url($exam))->assertForbidden();
-        $this->postJson($this->url($exam), ['minutos' => 10])->assertForbidden();
-        $this->putJson($this->url($exam), ['minutos' => 10])->assertForbidden();
+        $this->getJson('/api/examenes/cronometros')->assertOk()->assertJsonCount(1, 'data.examenes');
+        $this->postJson($this->url($exam), ['minutos' => 10])->assertOk();
+        $this->putJson($this->url($exam), ['minutos' => 20])->assertOk();
     }
 
     public function test_audita_inicio_y_ajuste_sin_duplicar_reintentos_ni_rechazos(): void
     {
         $this->seed(ActionSeeder::class);
-        $this->assertDatabaseHas('accion', ['id_accion' => 28, 'operacion' => 'INICIAR_CRONOMETRO']);
-        $this->assertDatabaseHas('accion', ['id_accion' => 29, 'operacion' => 'AJUSTAR_CRONOMETRO']);
+        $startId = DB::table('accion')->where('operacion', 'INICIAR_CRONOMETRO')->value('id_accion');
+        $adjustId = DB::table('accion')->where('operacion', 'AJUSTAR_CRONOMETRO')->value('id_accion');
+        $this->assertNotNull($startId);
+        $this->assertSame($startId + 1, $adjustId);
         $exam = $this->inProgressExam();
         $this->postJson($this->url($exam), ['minutos' => 10])->assertOk();
         $this->postJson($this->url($exam), ['minutos' => 10])->assertOk();
@@ -221,9 +222,9 @@ class ExamTimerTest extends TestCase
         $this->putJson($this->url($exam), ['minutos' => 101])->assertUnprocessable();
         $this->travel(11)->minutes();
         $this->putJson($this->url($exam), ['minutos' => 20])->assertOk();
-        $logs = AuditLog::whereIn('id_accion', [28, 29])->orderBy('id_log')->get();
+        $logs = AuditLog::whereIn('id_accion', [$startId, $adjustId])->orderBy('id_log')->get();
         $this->assertCount(2, $logs);
-        $this->assertSame([28, 29], $logs->pluck('id_accion')->all());
+        $this->assertSame([$startId, $adjustId], $logs->pluck('id_accion')->all());
         $this->assertSame($this->docenteId, $logs[0]->id_usuario);
         $this->assertSame('examen', $logs[0]->tabla_afectada);
         $this->assertNull($logs[0]->antiguo_valor['cronometro_iniciado_en']);

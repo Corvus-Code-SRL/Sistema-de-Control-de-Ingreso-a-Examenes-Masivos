@@ -148,7 +148,7 @@ return [
         'invite_teachers'  => [Role::DOCENTE],
         'audit_log'        => [Role::ADMINISTRADOR],
         'risk_rectify'     => [Role::ADMINISTRADOR],
-        'exam_timer'       => [Role::DOCENTE],
+        'exam_timer'       => [Role::DOCENTE, Role::INVITADO],
     ],
 
     /*
