@@ -67,5 +67,14 @@ class ActionSeeder extends Seeder
         }
 
         $this->call(ExamSituationActionSeeder::class);
+
+        DB::table('accion')->updateOrInsert(
+            ['operacion' => 'GUARDAR_HABILITADOS'],
+            [
+                'operacion' => 'GUARDAR_HABILITADOS',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Guardado de cambios en la lista de habilitados de un examen',
+            ]
+        );
     }
 }

@@ -108,6 +108,7 @@ class FinalReportService
                 'ee.id_grupo',
                 'g.num_grupo',
                 'ee.estado_ingreso',
+                'ee.estado_habilitacion',
                 'ee.hora_ingreso',
                 'ee.expulsado_en',
                 'e.cod_sis',
@@ -127,7 +128,14 @@ class FinalReportService
                 'inscritos' => $group->count(),
                 'a_tiempo' => $group->where('estado_ingreso', 'INGRESO')->count(),
                 'con_retraso' => $group->where('estado_ingreso', 'CON_RETRASO')->count(),
-                'ausentes' => $group->where('estado_ingreso', 'NO_INGRESO')->count(),
+                'ausentes' => $group
+                    ->where('estado_ingreso', 'NO_INGRESO')
+                    ->where('estado_habilitacion', '!=', 'NO_HABILITADO')
+                    ->count(),
+                'no_habilitados' => $group
+                    ->where('estado_ingreso', 'NO_INGRESO')
+                    ->where('estado_habilitacion', 'NO_HABILITADO')
+                    ->count(),
                 'sin_clasificar' => $group
                     ->whereNotIn('estado_ingreso', array_keys(self::ENTRY_LABELS))
                     ->count(),
@@ -142,6 +150,7 @@ class FinalReportService
                 'a_tiempo' => $groups->sum('a_tiempo'),
                 'con_retraso' => $groups->sum('con_retraso'),
                 'ausentes' => $groups->sum('ausentes'),
+                'no_habilitados' => $groups->sum('no_habilitados'),
                 'sin_clasificar' => $groups->sum('sin_clasificar'),
             ],
         ];
@@ -157,7 +166,9 @@ class FinalReportService
             'estado' => ($row->expulsado_en ?? null) !== null
                 ? 'Expulsado · ' . Carbon::parse($row->expulsado_en)
                     ->setTimezone(config('sciem.zona_horaria'))->format('H:i')
-                : (self::ENTRY_LABELS[$row->estado_ingreso] ?? self::UNCLASSIFIED_LABEL),
+                : (($row->estado_habilitacion ?? null) === 'NO_HABILITADO'
+                    ? 'No habilitado'
+                    : (self::ENTRY_LABELS[$row->estado_ingreso] ?? self::UNCLASSIFIED_LABEL)),
         ])->all();
     }
 

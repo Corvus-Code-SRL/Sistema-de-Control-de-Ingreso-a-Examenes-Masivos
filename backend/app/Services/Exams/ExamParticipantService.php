@@ -15,46 +15,19 @@ use Illuminate\Support\Facades\DB;
  */
 class ExamParticipantService
 {
+    private ExamRosterService $roster;
+
+    public function __construct(ExamRosterService $roster)
+    {
+        $this->roster = $roster;
+    }
     /**
      * Un estudiante inscrito en varios grupos del examen aparece una sola vez.
      * Su id_grupo corresponde al menor de esos grupos.
      */
     public function expected(int $examId): Builder
     {
-        $exam = Exam::query()->findOrFail($examId);
-
-        if ($exam->estado === Exam::FINALIZADO) {
-            return DB::table('estudiante')
-                ->join(
-                    'examen_estudiante',
-                    'examen_estudiante.id_estudiante',
-                    '=',
-                    'estudiante.id_estudiante'
-                )
-                ->where('examen_estudiante.id_examen', $examId)
-                ->select(
-                    'estudiante.*',
-                    'examen_estudiante.id_grupo'
-                );
-        }
-
-        return DB::table('estudiante')
-            ->join(
-                'grupo_estudiante',
-                'grupo_estudiante.id_estudiante',
-                '=',
-                'estudiante.id_estudiante'
-            )
-            ->join(
-                'grupo_examen',
-                'grupo_examen.id_grupo',
-                '=',
-                'grupo_estudiante.id_grupo'
-            )
-            ->where('grupo_examen.id_examen', $examId)
-            ->select('estudiante.*')
-            ->selectRaw('MIN(grupo_estudiante.id_grupo) AS id_grupo')
-            ->groupBy('estudiante.id_estudiante');
+        return $this->roster->expected($examId);
     }
 
     public function entered(int $examId): Builder

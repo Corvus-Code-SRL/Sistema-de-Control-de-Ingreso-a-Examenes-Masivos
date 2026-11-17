@@ -26,7 +26,7 @@ export interface HistorySummary {
   ingreso_abierto_en: string | null
   fin_real_en: string | null
   fin_automatico: boolean
-  totales: { a_tiempo: number; con_retraso: number; ausentes: number; sin_clasificar: number; incidencias: number }
+  totales: { a_tiempo: number; con_retraso: number; ausentes: number; no_habilitados: number; sin_clasificar: number; incidencias: number }
   linea_tiempo: { tipo: 'apertura' | 'cierre_ingreso' | 'inicio' | 'retraso' | 'incidencia' | 'fin'; fecha_hora: string; descripcion: string; detalle: string }[]
   ambientes: { id_ambiente: number; nro_aula: string; presentes: number; auxiliares: string[] }[]
 }

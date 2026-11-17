@@ -24,3 +24,12 @@ export type { ExamInProgress, InProgressExamRow, InProgressStudent } from './typ
 export { EXAM_STATUS } from './types/exams.types';
 export { useInProgressExams } from './hooks/useInProgressExams';
 export { examInProgressService } from './services/examInProgressService';
+export { ExamEligibleListPage } from './pages/ExamEligibleListPage'
+export { useEligibleList } from './hooks/useEligibleList'
+export { useEligibleListUpload } from './hooks/useEligibleListUpload'
+export { eligibleListService } from './services/eligibleListService'
+export { EligibleListCurrentTable } from './components/EligibleListCurrentTable'
+export { DisableStudentsDialog } from './components/DisableStudentsDialog'
+export { EligibleListUploadFlow } from './components/EligibleListUploadFlow'
+export { ChangesBanner } from './components/ChangesBanner'
+export * from './types/eligibleList.types'
