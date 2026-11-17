@@ -21,8 +21,8 @@ const exam: ExamInProgress = {
   }],
 }
 
-describe('composición de En curso (HU-037, HU-038-B, HU-042 y HU-057)', () => {
-  it('conserva el cierre de HU-038, las situaciones de HU-057 y suma el contador y «Reportar» de HU-042', async () => {
+describe('composición de En curso', () => {
+  it('conserva las situaciones y las incidencias al retirar la acción de finalizar', async () => {
     mockApiWith(({ url }) => {
       if (url.includes('/situaciones')) {
         return { body: { data: [], meta: { current_page: 1, last_page: 1, total: 0 } } }
@@ -36,10 +36,18 @@ describe('composición de En curso (HU-037, HU-038-B, HU-042 y HU-057)', () => {
       {examInProgressExtensions.panels?.(exam)}
     </>)
 
-    expect(screen.getByRole('button', { name: /Terminar examen/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Terminar examen/ })).not.toBeInTheDocument()
     expect(screen.getByText('Incidencias pendientes: 2')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Registrar situación' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reportar' })).toBeInTheDocument()
     expect(await screen.findByRole('region', { name: 'Situaciones del examen' })).toBeInTheDocument()
+  })
+
+  it('conserva la hora real de un examen finalizado en el encabezado', () => {
+    const finished = { ...exam, estado: 'FINALIZADO', fin_real_en: '2026-10-30T14:10:00Z' } as const
+    renderWithRouter(<>{examInProgressExtensions.headerActions?.(finished)}</>)
+
+    expect(screen.getByText('10:10')).toHaveAttribute('datetime', finished.fin_real_en)
+    expect(screen.queryByRole('button', { name: /Terminar examen/ })).not.toBeInTheDocument()
   })
 })
