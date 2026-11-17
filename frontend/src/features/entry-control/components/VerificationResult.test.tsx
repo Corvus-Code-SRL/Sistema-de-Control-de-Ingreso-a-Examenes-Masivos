@@ -73,6 +73,16 @@ describe('VerificationResult CI', () => {
     expect(screen.getByText('Aula 691A')).toBeInTheDocument()
   })
 
+  it('con la lista separada por grupo muestra también el docente del grupo (HU-027)', () => {
+    render(<VerificationResult
+      result={{ ...result, grupo: { id_grupo: 3, num_grupo: '3', docente: 'Luis Vargas' } }}
+      presentedCi="7100001" subjectName="Cálculo I"
+      busy={false} onConfirm={() => {}} onReject={() => {}} onNext={() => {}}
+    />)
+
+    expect(screen.getByText('Grupo 3 · Cálculo I · Luis Vargas')).toBeInTheDocument()
+  })
+
   it('muestra CI no coincide y no ofrece aceptar el ingreso', () => {
     render(<VerificationResult
       result={{ ...result, veredicto: 'CI_NO_COINCIDE', motivo: 'El CI no coincide con el registrado', autorizado: false }}

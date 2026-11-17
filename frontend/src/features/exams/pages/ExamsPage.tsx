@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import { LoadingState } from '@/components/common/LoadingState';
 import { PageHeader } from '@/components/common/PageHeader';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -88,7 +89,12 @@ export function ExamsPage() {
               {exams.map((exam) => (
                 <TableRow key={exam.id_examen}>
                   <TableCell>
-                    <p className="font-medium">{exam.nombre_examen}</p>
+                    <p className="font-medium">
+                      {exam.nombre_examen}
+                      {!exam.es_creador && (
+                        <Badge variant="secondary" className="ml-2 align-middle">Colaborador</Badge>
+                      )}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {exam.materia?.nombre} · {exam.carrera?.nombre}
                     </p>
@@ -124,7 +130,7 @@ export function ExamsPage() {
                         </Button>
                       )}
                       <Button variant="outline" size="sm" onClick={() => navigate(`/examenes/${exam.id_examen}`)}>
-                        {exam.estado === 'PROGRAMADO' && !exam.ingreso_abierto_en ? 'Configurar' : 'Ver detalle'}
+                        {exam.es_creador && exam.estado === 'PROGRAMADO' && !exam.ingreso_abierto_en ? 'Configurar' : 'Ver detalle'}
                       </Button>
                     </div>
                   </TableCell>

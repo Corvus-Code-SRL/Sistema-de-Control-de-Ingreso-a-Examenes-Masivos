@@ -15,6 +15,7 @@ export interface EntryContext {
   carrera: string | null
   grupos: string[]
   rol_controlador: 'DOCENTE' | 'AUXILIAR'
+  es_creador: boolean
   id_ambiente_asignado: number | null
   ambientes: EntryRoom[]
 }
@@ -56,7 +57,8 @@ export interface Verification {
   autorizado: boolean
   estudiante: EntryStudent | null
   auxiliar?: EntryAssistant | null
-  grupo: { id_grupo: number; num_grupo: string } | null
+  /** `docente` solo viene si la lista del examen va separada por grupo (HU-027). */
+  grupo: { id_grupo: number; num_grupo: string; docente?: string | null } | null
   ambiente_asignado: EntryRoom | null
   antecedentes: { total: number; latest: { tipo_falta: string; fecha_registro: string } | null }
   ingreso_previo: PreviousEntry | null
@@ -74,6 +76,8 @@ export interface VerificationActions {
 
 export interface RecentEntry {
   id_estudiante: number
+  /** Grupo por el que figura en la nómina (para la lista separada por grupo). */
+  id_grupo?: number | null
   cod_sis: string
   nombre: string
   apellido_paterno: string | null
@@ -85,11 +89,22 @@ export interface RecentEntry {
   controlador_apellido: string | null
 }
 
+/** Avance de un grupo del examen cuando la lista va separada por grupo (HU-027). */
+export interface EntryGroupProgress {
+  id_grupo: number
+  num_grupo: string
+  docente: string | null
+  total: number
+  ingresados: number
+}
+
 export interface EntryStatus {
   ingresados: number
   pendientes: number
   total: number
   ultimos_ingresos: RecentEntry[]
+  /** Solo si quien invitó pidió la lista separada por grupo; con la lista junta no viene. */
+  por_grupo?: EntryGroupProgress[]
   version: string
   conectados?: unknown[]
 }
@@ -135,6 +150,7 @@ export interface OpenEntryExam {
   carrera: string | null
   ambientes: string[]
   rol_controlador: 'DOCENTE' | 'AUXILIAR'
+  es_creador: boolean
   id_ambiente_asignado: number | null
   ambiente_asignado: string | null
   apertura_programada_en: string

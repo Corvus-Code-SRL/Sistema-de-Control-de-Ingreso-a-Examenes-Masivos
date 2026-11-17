@@ -47,7 +47,7 @@ describe('HU-038-A: listado En curso', () => {
         id_tipo_examen: 1,
         id_carrera: 1,
         id_materia: 1,
-        id_usuario_docente: 'docente',
+        id_usuario_docente: 'docente', es_creador: true,
         materia: { id_materia: 1, nombre: 'Álgebra Lineal', codigo: 'MAT101' },
         ambientes: [{ id_ambiente: 1, nro_aula: '692C', capacidad: 50 }],
       },
@@ -63,7 +63,7 @@ describe('HU-038-A: listado En curso', () => {
         id_tipo_examen: 1,
         id_carrera: 1,
         id_materia: 1,
-        id_usuario_docente: 'docente',
+        id_usuario_docente: 'docente', es_creador: true,
       },
     ]);
 

@@ -35,6 +35,7 @@ import {
   ExamHistoryPage,
   ExamReportsPage,
   ExamHistorySummaryPage,
+  ExamEligibleListPage,
 } from '@/features/exams'
 
 import {
@@ -63,6 +64,7 @@ import {
 import { examInProgressExtensions } from './examInProgressExtensions'
 import { AlienAttemptsReportPage } from '@/features/reports/academic'
 import { AuditLogPage } from '@/features/audit-log'
+import { INVITATIONS_PATH, InvitationsPage } from '@/features/invitations'
 
 /** Envuelve una pantalla con la capacidad que exige. Sin sesión redirige al login (ver ProtectedRoute). */
 function guarded(capability: Capability, element: ReactElement) {
@@ -159,6 +161,11 @@ function DocenteRoutes() {
           element={guarded('examenes.gestionar', <FinalReportPage />)}
         />
 
+        <Route
+          path="/examenes/habilitados"
+          element={guarded('examenes.gestionar', <ExamEligibleListPage />)}
+        />
+
         <Route path="/situacion-excepcional" element={guarded('situaciones.registrar', <ExamSituationsPage />)} />
         <Route path="/reportar-incidencia" element={guarded('incidencias.registrar', <ReportIncidentPage />)} />
         <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
@@ -188,7 +195,8 @@ function DocenteRoutes() {
         <Route path="/historial" element={guarded('examenes.gestionar', <ExamHistoryPage />)} />
         <Route path="/historial/:id" element={guarded('examenes.gestionar', <ExamHistorySummaryPage />)} />
         <Route path="/incidencias" element={guarded('incidencias.revisar', <IncidentsPage />)} />
-
+        <Route path={INVITATIONS_PATH} element={guarded('examenes.gestionar', <InvitationsPage />)} />
+        
         <Route
           path="/central-riesgo/:id?"
           element={guarded('riesgo.consultar', <RiskCenterPage />)}

@@ -41,6 +41,7 @@ export function ExamHistorySummaryPage() {
     ['A tiempo', data.totales.a_tiempo],
     ['Con retraso', data.totales.con_retraso],
     ['Ausentes', data.totales.ausentes],
+    ['No habilitados', data.totales.no_habilitados],
     ...(data.totales.sin_clasificar > 0 ? [['Sin clasificar', data.totales.sin_clasificar] as [string, number]] : []),
     ['Incidencias', data.totales.incidencias],
   ] : []

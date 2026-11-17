@@ -28,10 +28,11 @@ function makeReport(overrides: Partial<FinalReport> = {}): FinalReport {
           a_tiempo: 1,
           con_retraso: 1,
           ausentes: 1,
+          no_habilitados: 0,
           sin_clasificar: 0
         }
       ],
-      totales: { inscritos: 3, a_tiempo: 1, con_retraso: 1, ausentes: 1, sin_clasificar: 0 }
+      totales: { inscritos: 3, a_tiempo: 1, con_retraso: 1, ausentes: 1, no_habilitados: 0, sin_clasificar: 0 }
     },
     estudiantes: [
       {
@@ -172,6 +173,29 @@ describe('FinalReportPage (HU-051)', () => {
     await renderReport()
 
     expect(screen.getByRole('columnheader', { name: /sin clasificar/i })).toBeInTheDocument()
+  })
+
+  it('la columna No habilitados solo aparece cuando hay casos', async () => {
+    mockReport()
+    await renderReport()
+
+    expect(screen.queryByRole('columnheader', { name: /no habilitados/i })).not.toBeInTheDocument()
+  })
+
+  it('muestra la columna No habilitados y las sumas cuadran con los inscritos', async () => {
+    const report = makeReport()
+    report.asistencia.grupos[0].ausentes = 0
+    report.asistencia.grupos[0].no_habilitados = 1
+    report.asistencia.totales.ausentes = 0
+    report.asistencia.totales.no_habilitados = 1
+    mockReport(report)
+    await renderReport()
+
+    expect(screen.getByRole('columnheader', { name: /no habilitados/i })).toBeInTheDocument()
+    const { totales } = report.asistencia
+    expect(totales.a_tiempo + totales.con_retraso + totales.ausentes + totales.no_habilitados).toBe(
+      totales.inscritos
+    )
   })
 
   it('un examen ajeno o no finalizado muestra el mensaje del servidor', async () => {

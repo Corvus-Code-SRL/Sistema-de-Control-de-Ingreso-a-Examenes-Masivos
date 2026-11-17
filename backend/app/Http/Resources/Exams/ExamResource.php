@@ -8,6 +8,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Examen con su par materia-carrera, su estado y el docente que lo creó.
+ *
+ * `es_creador` distingue al creador, que administra el examen, de un colaborador (HU-027), que solo lo ve y
+ * lo controla: la interfaz oculta con él las acciones que el servidor responde con 403.
  */
 class ExamResource extends JsonResource
 {
@@ -37,6 +40,7 @@ class ExamResource extends JsonResource
             'id_carrera'         => $this->id_carrera,
             'id_materia'         => $this->id_materia,
             'id_usuario_docente' => $this->id_usuario_docente,
+            'es_creador'         => (string) $this->id_usuario_docente === (string) optional($request->user())->id_usuario,
 
             'tipo_examen' => $this->whenLoaded('examType', fn () => [
                 'id_tipo_examen' => $this->examType->id_tipo_examen,

@@ -9,6 +9,7 @@ class SendCollaboratorInvitationRequest extends CollaboratorInvitationRequest
         return [
             'id_docente' => ['required', 'uuid'],
             'permite_agregar_grupos' => ['sometimes', 'boolean'],
+            'lista_por_grupo' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -18,6 +19,7 @@ class SendCollaboratorInvitationRequest extends CollaboratorInvitationRequest
             'id_docente.required' => 'Debe indicarse el docente a invitar.',
             'id_docente.uuid' => 'El identificador del docente no es válido.',
             'permite_agregar_grupos.boolean' => 'La opción de agregar grupos no es válida.',
+            'lista_por_grupo.boolean' => 'La opción de lista separada por grupo no es válida.',
         ];
     }
 }
