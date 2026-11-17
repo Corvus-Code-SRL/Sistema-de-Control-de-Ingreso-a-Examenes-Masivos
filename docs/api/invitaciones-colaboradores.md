@@ -1,140 +1,156 @@
-# API de invitaciones recibidas (HU-027)
+# API de invitación de docentes colaboradores (HU-026)
 
-El docente **invitado** ve las invitaciones que le enviaron (HU-026) y las **acepta** o **rechaza**. Al aceptar puede sumar sus propios grupos de la materia al examen, si la invitación lo permite, y desde ese momento es **docente colaborador** del examen.
+Permite al **Docente** que creó un examen **invitar a otros docentes** que dictan la misma materia, para dar un examen común. Esta historia termina cuando la invitación queda enviada con estado **PENDIENTE**: recibirla, aceptarla o rechazarla es de **HU-027**.
 
-Convenciones: prefijo `/api`, cabecera `Accept: application/json`, token de Sanctum. Las respuestas correctas llevan `data` (y `mensaje` al responder); los errores llevan `message` (y `errors` por campo en los 422). Middlewares: `auth:sanctum`, `account.active`, `password.changed`.
+Convenciones: prefijo `/api`, cabecera `Accept: application/json`, token de Sanctum. Las respuestas correctas llevan `data` (y `mensaje` al crear); los errores llevan `message` (y `errors` por campo en los 422). Middlewares: `auth:sanctum`, `account.active`, `password.changed`.
 
 | Método | Ruta | Para qué |
 |---|---|---|
-| GET | `/api/invitaciones?estado=pendientes\|aceptadas\|cerradas` | Bandeja: invitaciones recibidas de una pestaña, con el total de cada pestaña |
-| GET | `/api/invitaciones/{id_invitacion}` | Detalle: examen, ambientes, grupos del examen y grupos propios |
-| POST | `/api/invitaciones/{id_invitacion}/aceptar` | Acepta, sumando los grupos elegidos |
-| POST | `/api/invitaciones/{id_invitacion}/rechazar` | Rechaza (sin motivo) |
+| GET | `/api/docente/invitaciones/examenes` | Exámenes PROGRAMADOS propios (el desplegable) |
+| GET | `/api/docente/invitaciones/examenes/{id_examen}/docentes?criterio=` | Busca docentes invitables a ese examen |
+| POST | `/api/docente/invitaciones/examenes/{id_examen}` | Envía la invitación (queda PENDIENTE) |
+| GET | `/api/docente/invitaciones` | Invitaciones enviadas por el docente, de la más reciente a la más antigua |
 
-`{id_invitacion}` es de 1 a 9 dígitos; otro formato, una invitación que no existe o una **dirigida a otro docente** responde **404** («No existe la invitación indicada.»), para no revelar invitaciones ajenas. Las rutas de HU-026 (`/api/docente/invitaciones/*`) son las del docente que invita.
+`{id_examen}` es de 1 a 9 dígitos; otro formato, o un examen que no existe, responde **404**. Estas rutas son solo de HU-026: la bandeja de invitaciones **recibidas** de HU-027 usa otras (`/api/invitaciones`).
 
 ## Quién puede usarla
 
-Una cuenta **activa** con rol **Docente o Invitado** (función `teaching` de `config/sciem.php`, los mismos roles a los que HU-026 puede invitar). En el cliente, la capacidad `examenes.gestionar`. Un Auxiliar, un Administrador o una cuenta sin rol recibe **403** («Solo un docente puede consultar y responder invitaciones a exámenes.»); sin token, **401**.
+Solo un **Docente** con la cuenta **activa** (capacidad `invite_teachers` en `config/sciem.php`, `docentes.invitar` en el cliente). Un docente con rol **Invitado**, un Auxiliar, un Administrador, una cuenta sin rol o deshabilitada recibe **403** («Solo un docente puede invitar colaboradores a un examen.»); sin token, **401**. Un docente que aceptó una invitación a un examen ajeno tampoco puede invitar a él: solo el creador.
 
-## Estado que se muestra y pestañas
+## Reglas
 
-`estado` es el que ve el docente (`ExamInvitation::effectiveState()`): una invitación **PENDIENTE** cuyo examen ya no está **PROGRAMADO** se muestra **SIN_EFECTO** aunque el ciclo de vida todavía no la haya escrito así.
+- **Solo el creador** del examen invita a él. Otro docente recibe **403** («Solo el docente que creó el examen puede invitar colaboradores a él.»).
+- **Solo mientras el examen está PROGRAMADO.** Con el control de ingreso ya abierto (o el examen cancelado o terminado) la búsqueda y el envío responden **409** («El control de ingreso del examen ya se inició: ya no se puede invitar docentes.» / «El examen está cancelado: ya no se puede invitar docentes.»), y el examen deja de salir en el desplegable.
+- **Quién se puede invitar:** un docente con la cuenta **ACTIVA**, con rol **Docente o Invitado** (los roles que ejercen la docencia, `sciem.access.teaching`), que tenga al menos un **grupo ACTIVO de la materia del examen en el período vigente**. Se compara solo `id_materia`, no la carrera, igual que al asignar grupos a un examen. Nunca el propio docente.
+- **Sin invitaciones repetidas:** no se puede invitar al mismo docente al mismo examen mientras su invitación esté **PENDIENTE o ACEPTADA** (**409**, «El docente ya tiene una invitación pendiente o aceptada para este examen.»). Tras **RECHAZADA** o **SIN_EFECTO** sí se lo puede invitar de nuevo.
 
-| Pestaña | Contiene |
-|---|---|
-| `pendientes` (por defecto) | PENDIENTE con el examen PROGRAMADO |
-| `aceptadas` | ACEPTADA |
-| `cerradas` | RECHAZADA, SIN_EFECTO y la PENDIENTE cuyo examen ya salió de PROGRAMADO |
+## GET /api/docente/invitaciones/examenes
 
-Otro valor de `estado` responde **422**. El orden es de la más reciente a la más antigua.
-
-## GET /api/invitaciones
+Los exámenes **PROGRAMADOS** del docente (con al menos un grupo del período vigente, o aún sin grupos), del más próximo al más lejano. Sin exámenes responde **200** con `data: []`.
 
 ```json
 {
   "data": [
     {
-      "id_invitacion": 9974,
+      "id_examen": 9811,
+      "nombre_examen": "HU-026 Parcial Cálculo I",
+      "fecha": "2026-12-10",
+      "hora_inicio": "08:00",
+      "hora_fin": "09:30",
+      "materia": { "id_materia": 9201, "nombre": "Cálculo I", "codigo": "MAT-101" },
+      "carrera": { "id_carrera": 9101, "nombre": "Ingeniería de Sistemas" },
+      "ambientes": [ { "id_ambiente": 9601, "nro_aula": "691A" }, { "id_ambiente": 9602, "nro_aula": "692B" } ]
+    }
+  ]
+}
+```
+
+## GET /api/docente/invitaciones/examenes/{id_examen}/docentes
+
+| Parámetro | Regla |
+|---|---|
+| `criterio` | Obligatorio, de 2 a 100 caracteres. Busca por **nombre o apellidos sin distinguir mayúsculas ni tildes** («jose» encuentra «José»), o por **código SIS**. |
+
+Devuelve hasta 20 docentes, ordenados por apellido. Sin coincidencias responde **200** con `data: []` (la interfaz muestra «No hay docentes de esta materia que coincidan con la búsqueda»). `ya_invitado` es `true` si ya tiene una invitación PENDIENTE o ACEPTADA a ese examen (la interfaz no ofrece invitarlo otra vez).
+
+```json
+{ "data": [ { "id_usuario": "0000…0102", "nombre_completo": "Rolando Vega Méndez", "cod_sis": "10602", "ya_invitado": false } ] }
+```
+
+## POST /api/docente/invitaciones/examenes/{id_examen}
+
+| Campo | Regla |
+|---|---|
+| `id_docente` | Obligatorio, uuid del docente a invitar. Un docente que no existe responde **404**; uno que no es invitable (sin grupos de la materia en el período vigente, inactivo, sin rol docente, o el propio docente) responde **422** en `errors.id_docente`. |
+| `permite_agregar_grupos` | Opcional, booleano; por omisión `true`. Si el colaborador, al aceptar, puede sumar **sus propios grupos** de la materia al examen para unir las listas del control de ingreso. HU-026 solo lo guarda y lo muestra: **HU-027 lo hace cumplir**. |
+| `lista_por_grupo` | Opcional, booleano; por omisión `false`. Si la lista del examen se muestra **dividida por grupo** (con su docente) en el control de ingreso y durante el examen, en lugar de junta. Solo con `permite_agregar_grupos: true`; si no, **422** en `lista_por_grupo` («Solo puede separar la lista por grupo si permite agregar grupos.»). En la pantalla es un segundo checkbox que se habilita al marcar «permitir agregar grupos». |
+
+Responde **201** con la invitación (mismo formato que la lista de enviadas) y `mensaje: "Invitación enviada correctamente."`. Todo ocurre en una transacción que **bloquea la fila del examen**, así que dos envíos simultáneos se ordenan y un envío no se cruza con la apertura del control de ingreso; el índice único parcial de la base es el respaldo (también responde 409). Queda registrada en la bitácora la acción `INVITAR_COLABORADOR` sobre `invitacion_examen`, con el docente que invita, la fecha y la hora, y los datos de la invitación.
+
+## GET /api/docente/invitaciones
+
+Las invitaciones que **envió** el docente, de todos sus exámenes, de la más reciente a la más antigua. Sin invitaciones responde **200** con `data: []`.
+
+```json
+{
+  "data": [
+    {
+      "id_invitacion": 9970,
       "estado": "PENDIENTE",
-      "fecha_invitacion": "2026-11-14T13:00:00+00:00",
+      "fecha_invitacion": "2026-11-13T13:00:00+00:00",
       "fecha_respuesta": null,
       "fecha_sin_efecto": null,
       "permite_agregar_grupos": true,
       "lista_por_grupo": false,
       "examen": {
-        "id_examen": 9821,
-        "nombre_examen": "HU-027 Parcial aula chica",
-        "materia": "Cálculo I",
-        "carrera": "Ingeniería de Sistemas",
-        "periodo": null,
-        "fecha": "2026-12-14",
-        "hora_inicio": "08:00",
-        "hora_fin": "09:30"
+        "id_examen": 9811, "nombre_examen": "HU-026 Parcial Cálculo I", "materia": "Cálculo I",
+        "carrera": "Ingeniería de Sistemas", "fecha": "2026-12-10", "hora_inicio": "08:00", "hora_fin": "09:30",
+        "estado": "PROGRAMADO"
       },
-      "invitante": { "nombre_completo": "Marcelo Quiroga Andrade" }
+      "docente": { "id_usuario": "0000…0012", "nombre_completo": "Rosario Salazar Vidal", "cod_sis": "10487" }
     }
-  ],
-  "meta": { "total_pendientes": 2, "total_aceptadas": 1, "total_cerradas": 2 }
+  ]
 }
 ```
 
-Las fechas de la invitación van en UTC con desfase (ISO 8601); la interfaz las muestra en hora de La Paz. La fecha y las horas del examen son locales. En la bandeja `examen.periodo` es `null`: solo el detalle lo calcula.
+`estado` es uno de `PENDIENTE`, `ACEPTADA`, `RECHAZADA` o `SIN_EFECTO` (la interfaz los muestra como Pendiente, Aceptada, Rechazada y Sin efecto). Una invitación PENDIENTE cuyo examen ya no está PROGRAMADO se muestra `SIN_EFECTO` aunque todavía no se haya escrito así (lectura derivada; `fecha_sin_efecto` queda `null` en ese caso).
 
-## GET /api/invitaciones/{id_invitacion}
+## «Sin efecto»
 
-Lo mismo que una fila de la bandeja, más:
+Una invitación PENDIENTE solo se puede responder mientras el examen está PROGRAMADO. Cuando el examen **sale de PROGRAMADO**, sus pendientes pasan a `SIN_EFECTO` con `fecha_sin_efecto`:
 
-```json
-{
-  "data": {
-    "…": "campos de la bandeja",
-    "examen": { "…": "…", "periodo": "2/2026" },
-    "ambientes": [ { "id_ambiente": 9607, "nro_aula": "QA-8", "capacidad": 8 } ],
-    "grupos_examen": [ { "id_grupo": 9401, "num_grupo": "1", "inscritos": 7 } ],
-    "mis_grupos": [
-      { "id_grupo": 9402, "num_grupo": "2", "inscritos": 5, "seleccionable": true, "motivo": null, "sumado": false }
-    ]
-  }
-}
-```
-
-- `examen.periodo`: período de los grupos del examen («2/2026»); `null` si el examen aún no tiene grupos.
-- `mis_grupos`: grupos del invitado de la **materia del examen**, **ACTIVOS** y del **período vigente**. `seleccionable` es `false` si ya está en el examen (`sumado: true`) o no tiene nómina (`motivo: "sin nómina"`).
-- La capacidad no bloquea: la interfaz suma `inscritos` y compara con la capacidad de `ambientes` para avisar.
-- La invitación **no guarda mensaje ni motivo de rechazo**: `invitacion_examen` no tiene esas columnas.
-
-## POST /api/invitaciones/{id_invitacion}/aceptar
-
-```json
-{ "grupos": [9402] }
-```
-
-`grupos` es opcional y puede ir vacío: se acepta sin sumar grupos. Responde **200** con el detalle actualizado y `mensaje: "Invitación aceptada."`.
-
-Reglas, en este orden y dentro de una transacción:
-
-1. Se bloquea la fila del **examen** (`FOR UPDATE`, como la apertura del control de ingreso y el envío de invitaciones) y luego la de la invitación.
-2. La invitación debe estar **PENDIENTE**; si no, **409** («La invitación ya fue respondida o quedó sin efecto.»).
-3. El examen debe estar **PROGRAMADO**; si no, **409** («La invitación ya no se puede responder: el examen ya abrió el control de ingreso o no está programado.»).
-4. Si `permite_agregar_grupos` es `false` y llegan grupos, **422** en `grupos` («Esta invitación no permite agregar grupos al examen.»).
-5. Los grupos se validan con la regla de `ExamGroupService` (**422** en `grupos`): propios del invitado, ACTIVOS, del período vigente y de la materia del examen; con nómina («El grupo N no tiene nómina cargada.»); y sin estudiantes repetidos con los grupos que el examen ya tenía («Un estudiante figura en más de uno de los grupos seleccionados.»).
-6. Se vinculan los grupos (`grupo_examen`), la invitación pasa a **ACEPTADA** con `fecha_respuesta` y `fecha_sin_efecto` queda `null`.
-7. Bitácora: `ACEPTAR_INVITACION` sobre `invitacion_examen`, con el estado anterior y los `grupos_sumados`, firmada por el invitado.
-
-Si cualquier paso falla no cambia nada.
-
-## POST /api/invitaciones/{id_invitacion}/rechazar
-
-Sin cuerpo. Mismos pasos 1 a 3; la invitación pasa a **RECHAZADA** con `fecha_respuesta`, el examen no cambia y se registra `RECHAZAR_INVITACION`. Responde **200** con `mensaje: "Invitación rechazada."`.
-
-## Lista junta o dividida por grupo
-
-Quien invita elige en HU-026 (`lista_por_grupo`, segundo checkbox, solo si permite agregar grupos). La **nómina es la misma** en los dos casos: los grupos sumados se vinculan al examen y sus estudiantes entran en la misma lista. Solo cambia cómo se muestra, y lo decide `ExamCollaboratorService::listsByGroup()`: basta una invitación **ACEPTADA** con `lista_por_grupo: true`.
-
-| Dónde | Lista junta (por defecto) | Lista dividida por grupo |
-|---|---|---|
-| `GET /api/control-ingreso/examenes/{id}/estado` (032) | `ingresados`, `pendientes`, `total` | Además `por_grupo: [{id_grupo, num_grupo, docente, total, ingresados}]`; cada fila de `ultimos_ingresos` trae `id_grupo` |
-| `POST …/verificar` (032) | `grupo: {id_grupo, num_grupo, carrera}` | `grupo` trae además `docente` |
-| `GET /api/examenes/{id}/en-curso` (038) | `lista_por_grupo: false` | `lista_por_grupo: true`; la vista agrupa `estudiantes` por `id_grupo` usando `grupos: [{id_grupo, num_grupo, docente}]` |
-
-El conteo por grupo se arma al abrir el control de ingreso (el snapshot); como solo se acepta mientras el examen está PROGRAMADO, no cambia después.
-
-## Qué puede hacer el colaborador
-
-Un colaborador es la invitación **ACEPTADA** (no hay otra tabla; ver `ExamCollaboratorService`). Es docente del examen en:
-
-| HU | Qué |
+| Momento | Dónde se escribe |
 |---|---|
-| 032 | Ve el examen en el control de ingreso con `rol_controlador: DOCENTE` y controla todos los ambientes |
-| 037 | Solicitudes y registro de ingreso con retraso, como docente |
-| 038 | Vista del examen en curso |
-| 042 / 057 | Situaciones e incidencias del examen |
-| 051 | Reporte final del examen finalizado |
-| 052 | Historial: el examen aparece entre los suyos |
+| Se abre el control de ingreso | `RoomAssignmentService::prepare` |
+| Se cancela el examen | `ExamService::cancel` |
+| El examen termina (incluido el cierre automático de uno que quedó sin iniciar) | `ExamLifecycleService::finishLockedExam` |
 
-Siguen siendo **solo del creador**: editar, cancelar, asignar grupos y auxiliares, invitar, iniciar y terminar el examen, y revisar los reportes de falta. El examen tampoco aparece en su lista de exámenes programados.
+En los tres casos llama a `ExamInvitationExpiryService::voidPendingForExam($idExamen)` dentro de la transacción que ya tiene bloqueado el examen. Solo toca las PENDIENTES: las aceptadas y rechazadas se conservan. Repetirlo no cambia nada. Si la apertura del ingreso falla, la transacción se revierte y las invitaciones siguen PENDIENTES.
 
-## Datos de QA
+## Contrato para HU-027
 
-`Sprint5QaSeeder`: Rosario Salazar (10487) tiene invitaciones en los cuatro estados; la del examen 9821 («HU-027 Parcial aula chica», aula QA-8 de 8 lugares) sirve para ver el aviso de capacidad al marcar su grupo 2. Ver el comentario del seeder.
+HU-026 **posee** la escritura de `SIN_EFECTO`, el enum, el CHECK, el índice y las columnas de abajo; HU-027 **no debe volver a agregarlos** y solo agrega lo suyo.
+
+**Tabla `invitacion_examen`** (`App\Models\ExamInvitation`):
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id_invitacion`, `id_examen`, `id_docente_creador`, `id_docente_invitado`, `fecha_invitacion` | — | Ya existían. Nunca se modifican tras el envío. |
+| `estado` | enum `estado_invitacion` | `PENDIENTE`, `ACEPTADA`, `RECHAZADA` y **`SIN_EFECTO`** (nuevo). Constantes en `ExamInvitation`. |
+| `fecha_respuesta` | timestamptz | La escribe HU-027 al aceptar o rechazar. |
+| **`permite_agregar_grupos`** | boolean, NOT NULL, por omisión `true` | **Nuevo.** Si el colaborador puede sumar sus grupos al aceptar. **HU-027 debe respetarlo:** con `false`, aceptar no admite grupos. |
+| **`lista_por_grupo`** | boolean, NOT NULL, por omisión `false` | **Versión 18.** Lista dividida por grupo en el control de ingreso y durante el examen. CHECK `chk_invitacion_examen_lista_por_grupo`: solo `true` si `permite_agregar_grupos`. |
+| `fecha_sin_efecto` | timestamptz | **Nuevo.** La escribe `ExamInvitationExpiryService`. |
+
+**CHECK `chk_invitacion_examen_estado`** (cada estado fija qué fechas existen):
+
+| Estado | `fecha_respuesta` | `fecha_sin_efecto` |
+|---|---|---|
+| `PENDIENTE` | vacía | vacía |
+| `ACEPTADA` / `RECHAZADA` | **obligatoria** | vacía |
+| `SIN_EFECTO` | vacía | **obligatoria** |
+
+También: `chk_invitacion_examen_fechas` (la respuesta no es anterior al envío) y `chk_invitacion_examen_no_autoinvitacion` (creador ≠ invitado). El índice único parcial `uq_invitacion_examen_vigente (id_examen, id_docente_invitado) WHERE estado IN ('PENDIENTE','ACEPTADA')` impide dos invitaciones vigentes; si HU-027 pasa una invitación de PENDIENTE a otro estado, no lo viola.
+
+**Reglas que HU-027 debe cumplir al responder:**
+
+1. Solo se responde una invitación **PENDIENTE**; otra responde **409**.
+2. Solo mientras el examen esté **PROGRAMADO**; si no, **409**.
+3. Bloquear la fila del examen con `lockForUpdate` antes de cambiar la invitación, como hace HU-026: así una respuesta no se cruza con la apertura del control de ingreso (que bloquea la misma fila y deja la invitación SIN_EFECTO).
+4. Aceptar con grupos solo si `permite_agregar_grupos` es `true`; los grupos deben ser del invitado, ACTIVOS, de la materia del examen y del período vigente (la misma regla que `ExamGroupService`).
+5. Al aceptar o rechazar, escribir `fecha_respuesta` y dejar `fecha_sin_efecto` vacía.
+
+**Columnas que HU-026 no crea:** `mensaje` y `motivo_rechazo` (que la maqueta de HU-027 menciona). Si las necesita, las agrega HU-027 con su propia migración.
+
+**Acciones de bitácora:** HU-026 registra `INVITAR_COLABORADOR` (tabla `invitacion_examen`, tipo INSERT, etiqueta «Invitar colaborador»). Las acciones de aceptar y rechazar las define HU-027, en `ActionSeeder`, en una migración idempotente y en `config/sciem.php` (`bitacora.etiquetas_accion`); `AuditLogOptionsTest` exige que toda acción del catálogo tenga etiqueta.
+
+**Rutas, carpetas y nombres ya ocupados por HU-026:** API `/api/docente/invitaciones/*`; Service `CollaboratorInvitationService` y `ExamInvitationExpiryService`; feature del cliente `features/collaborators` y ruta `/colaboradores/invitar`. HU-027 conserva `/api/invitaciones`, `features/invitations` y `/invitaciones`.
+
+## Migraciones (orden y despliegue)
+
+Dos migraciones, **en este orden**:
+
+1. `2026_11_16_000000_add_sin_efecto_to_estado_invitacion`: `ALTER TYPE public.estado_invitacion ADD VALUE IF NOT EXISTS 'SIN_EFECTO'`. Va **fuera de transacción** (`$withinTransaction = false`), porque PostgreSQL no usa un valor de enum nuevo dentro de la misma transacción.
+2. `2026_11_16_000001_prepare_invitacion_examen_for_collaborators`: las dos columnas, el CHECK nuevo, el CHECK de no auto-invitación, el índice único parcial y la acción `INVITAR_COLABORADOR`. Es **idempotente**: repetirla no cambia nada. Su `down()` aborta sin tocar nada si ya hay invitaciones o filas de bitácora de la acción.
+
+`php artisan migrate --force` las aplica en ese orden. El mismo SQL está al final de `docs/database/creation-script.sql` (versión 15).
