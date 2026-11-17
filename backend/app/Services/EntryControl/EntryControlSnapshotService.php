@@ -60,7 +60,7 @@ class EntryControlSnapshotService
             }
             unset($membership);
         }
-        $assignedRooms = self::assignRooms(array_keys($membersByStudent), $rooms);
+        $assignedRooms = self::assignRooms($this->rosterStudentIds($membersByStudent), $rooms);
         $entries = $this->entries($examId);
         $pendingReports = DB::table('reporte_estudiante')
             ->where('id_examen', $examId)
@@ -149,7 +149,7 @@ class EntryControlSnapshotService
                 $student,
                 $group,
                 $entries[$studentId] ?? null,
-                $this->selectedRoom($rooms, $entries[$studentId] ?? null, $assignedRooms[$studentId] ?? null),
+                $this->displayRoom($rooms, $group, $entries[$studentId] ?? null, $assignedRooms[$studentId] ?? null),
                 $risks[$studentId] ?? ['total' => 0, 'latest' => null],
                 $group['carrera'] ?? $career
             );
@@ -543,13 +543,21 @@ class EntryControlSnapshotService
      */
     public function refreshBackground(int $studentId): int
     {
-        $examIds = CloseOrdinaryEntryService::constrainToOpen(
+        $rosterExamIds = CloseOrdinaryEntryService::constrainToOpen(
             DB::table('grupo_estudiante as gs')
                 ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
                 ->join('examen as e', 'e.id_examen', '=', 'gx.id_examen')
                 ->where('gs.id_estudiante', $studentId),
             'e.'
         )->distinct()->pluck('gx.id_examen');
+        $exceptionalExamIds = CloseOrdinaryEntryService::constrainToOpen(
+            DB::table('examen_estudiante as ee')
+                ->join('examen as e', 'e.id_examen', '=', 'ee.id_examen')
+                ->where('ee.id_estudiante', $studentId)
+                ->where('ee.es_excepcional', true),
+            'e.'
+        )->distinct()->pluck('ee.id_examen');
+        $examIds = $rosterExamIds->merge($exceptionalExamIds)->unique()->values();
 
         $refreshed = 0;
         foreach ($examIds as $examId) {
@@ -698,23 +706,103 @@ class EntryControlSnapshotService
             return null;
         }
 
-        $assignedRooms = self::assignRooms(array_keys($membersByStudent), $this->rooms($examId));
+        $rooms = $this->rooms($examId);
+        $assignedRooms = self::assignRooms($this->rosterStudentIds($membersByStudent), $rooms);
+        $entry = $this->entries($examId, $studentId)[$studentId] ?? null;
 
         return $this->studentRecord(
             $student,
             $membersByStudent[$studentId],
-            $this->entries($examId, $studentId)[$studentId] ?? null,
-            $this->selectedRoom($this->rooms($examId), $this->entries($examId, $studentId)[$studentId] ?? null, $assignedRooms[$studentId] ?? null),
+            $entry,
+            $this->displayRoom($rooms, $membersByStudent[$studentId], $entry, $assignedRooms[$studentId] ?? null),
             $this->riskCenter->summariesForSnapshot([$studentId])[$studentId] ?? ['total' => 0, 'latest' => null],
             $membersByStudent[$studentId]['carrera'] ?? $this->careerName($exam)
         );
     }
 
-    /** @return array<int, array{id_ambiente: int, nro_aula: string, capacidad: int}> */
-    /** Respeta el ambiente asignado al excepcional antes del ingreso. */
-    private function selectedRoom(array $rooms, ?array $entry, ?array $fallback): ?array
+    /**
+     * HU-023: suma a un estudiante excepcional al snapshot activo sin reconstruirlo, igual que markEntered()
+     * actualiza uno ya existente. Sin snapshot activo no hace nada: el siguiente se arma desde PostgreSQL.
+     * Es idempotente: si el estudiante ya está en el snapshot, no lo cuenta otra vez.
+     */
+    public function addStudent(Exam $exam, int $studentId): void
     {
-        $roomId = $entry['id_ambiente_asignado'] ?? null;
+        $examId = (int) $exam->id_examen;
+        $token = $this->activeToken($examId);
+        if ($token === null) {
+            return;
+        }
+
+        $this->cache()->lock($this->key($examId, $token, 'update-lock'), 5)->block(3, function () use (
+            $exam, $examId, $token, $studentId
+        ): void {
+            $meta = $this->cache()->get($this->key($examId, $token, 'meta'));
+            $status = $this->cache()->get($this->key($examId, $token, 'status'));
+            $search = $this->cache()->get($this->key($examId, $token, 'search'));
+            $record = $this->recordFor($exam, $studentId);
+            $student = $this->students([$studentId])->first();
+            if (! is_array($meta) || ! is_array($status) || ! is_array($search) || $record === null
+                || $student === null) {
+                throw new \RuntimeException('El estado operativo del examen está incompleto.');
+            }
+
+            if ($this->cache()->has($this->key($examId, $token, 'student', $studentId))) {
+                return;
+            }
+
+            $groupId = $record['grupo']['id_grupo'] ?? null;
+            $status['total']++;
+            $status['pendientes']++;
+            if (isset($status['por_grupo'])) {
+                foreach ($status['por_grupo'] as &$groupStatus) {
+                    if ($groupStatus['id_grupo'] === $groupId) {
+                        $groupStatus['total']++;
+                    }
+                }
+                unset($groupStatus);
+            }
+            $status['version'] = (string) Str::uuid();
+
+            $search[] = [
+                'id_estudiante' => $studentId,
+                'cod_sis' => $student->cod_sis,
+                'ci' => $student->ci,
+                'nombre_completo' => $record['estudiante']['nombre_completo'],
+                'nombre_busqueda' => $this->normalizeName($record['estudiante']['nombre_completo']),
+            ];
+            usort($search, fn (array $left, array $right) => strcmp(
+                $left['nombre_busqueda'],
+                $right['nombre_busqueda']
+            ));
+
+            $values = [
+                $this->key($examId, $token, 'student', $studentId) => $record,
+                $this->key($examId, $token, 'sis', sha1((string) $student->cod_sis)) => $studentId,
+                $this->key($examId, $token, 'search') => $search,
+                $this->key($examId, $token, 'status') => $status,
+            ];
+            if ($student->ci !== null) {
+                $values[$this->key($examId, $token, 'ci', sha1((string) $student->ci))] = $studentId;
+            }
+
+            if (! $this->cache()->putMany($values, Carbon::parse($meta['expira_en']))) {
+                throw new \RuntimeException('No se pudo agregar al estudiante al estado del ingreso en Redis.');
+            }
+        });
+    }
+
+    /**
+     * Aula con la que se muestra a un estudiante. Al excepcional se le respeta el aula que eligió el docente
+     * al registrarlo; a los demás, la del reparto automático.
+     *
+     * @param array<int, array{id_ambiente: int, nro_aula: string, capacidad: int}> $rooms
+     * @param array<string, mixed>|null $group
+     * @param array<string, mixed>|null $entry
+     * @param array{id_ambiente: int, nro_aula: string}|null $assigned
+     */
+    private function displayRoom(array $rooms, ?array $group, ?array $entry, ?array $assigned): ?array
+    {
+        $roomId = ($group['motivo_excepcional'] ?? null) === null ? null : ($entry['id_ambiente_asignado'] ?? null);
         if ($roomId !== null) {
             foreach ($rooms as $room) {
                 if ((int) $room['id_ambiente'] === (int) $roomId) {
@@ -723,9 +811,25 @@ class EntryControlSnapshotService
             }
         }
 
-        return $fallback;
+        return $assigned;
     }
 
+    /**
+     * Ids de los estudiantes de la nómina: el reparto automático de aulas solo los considera a ellos, para que
+     * registrar un excepcional no cambie el aula de nadie más.
+     *
+     * @param array<int, array<string, mixed>> $membersByStudent
+     * @return array<int, int>
+     */
+    private function rosterStudentIds(array $membersByStudent): array
+    {
+        return array_keys(array_filter(
+            $membersByStudent,
+            fn (array $membership): bool => ($membership['motivo_excepcional'] ?? null) === null
+        ));
+    }
+
+    /** @return array<int, array{id_ambiente: int, nro_aula: string, capacidad: int}> */
     private function rooms(int $examId): array
     {
         return DB::table('examen_ambiente as ea')
@@ -768,12 +872,21 @@ class EntryControlSnapshotService
             }
         }
 
-        // HU-023: excepcionales del examen, sin alterar la nomina del grupo.
-        $exceptionals = DB::table('examen_estudiante_excepcional as ex')
-            ->join('grupo as g', 'g.id_grupo', '=', 'ex.id_grupo')
-            ->join('carrera as c', 'c.id_carrera', '=', 'ex.id_carrera')
-            ->where('ex.id_examen', $examId)
-            ->get(['ex.id_estudiante', 'ex.id_grupo', 'g.num_grupo', 'c.nombre as carrera']);
+        // HU-023: los excepcionales solo existen en la lista de este examen; si ya figuran en la nómina, esta
+        // prevalece.
+        $exceptionals = DB::table('examen_estudiante as ee')
+            ->join('grupo as g', 'g.id_grupo', '=', 'ee.id_grupo_excepcional')
+            ->join('carrera as c', 'c.id_carrera', '=', 'ee.id_carrera_excepcional')
+            ->where('ee.id_examen', $examId)
+            ->where('ee.es_excepcional', true)
+            ->orderBy('ee.id_estudiante')
+            ->get([
+                'ee.id_estudiante',
+                'ee.id_grupo_excepcional as id_grupo',
+                'g.num_grupo',
+                'c.nombre as carrera',
+                'ee.motivo_excepcional',
+            ]);
 
         foreach ($exceptionals as $exceptional) {
             $studentId = (int) $exceptional->id_estudiante;
@@ -782,6 +895,7 @@ class EntryControlSnapshotService
                     'id_grupo' => (int) $exceptional->id_grupo,
                     'num_grupo' => $exceptional->num_grupo,
                     'carrera' => $exceptional->carrera,
+                    'motivo_excepcional' => $exceptional->motivo_excepcional,
                 ];
             }
         }
@@ -839,7 +953,9 @@ class EntryControlSnapshotService
             'nombre' => $student->nombre,
             'apellido_paterno' => $student->apellido_paterno,
             'apellido_materno' => $student->apellido_materno,
-            'grupo' => $group,
+            'grupo' => $group === null ? null : array_diff_key($group, ['motivo_excepcional' => true]),
+            'es_excepcional' => ($group['motivo_excepcional'] ?? null) !== null,
+            'motivo_excepcional' => $group['motivo_excepcional'] ?? null,
             'estado_habilitacion' => $entry['estado_habilitacion'] ?? null,
             'observacion' => $entry['observacion'] ?? null,
             'ambiente_asignado' => $assignedRoom,
@@ -860,7 +976,25 @@ class EntryControlSnapshotService
             ->groupBy('gs2.id_estudiante')
             ->selectRaw('gs2.id_estudiante, MIN(gs2.id_grupo) AS id_grupo');
 
-        return DB::table('grupo_estudiante as gs')
+        // La nómina parte de grupo_estudiante: ee puede no existir, así que el id sale de la tabla de origen.
+        $entryColumns = fn (string $studentColumn): array => [
+            $studentColumn,
+            DB::raw("COALESCE(ee.estado_habilitacion, 'HABILITADO') as estado_habilitacion"),
+            'ee.observacion',
+            DB::raw("COALESCE(ee.estado_ingreso, 'NO_INGRESO') as estado_ingreso"),
+            'ee.hora_ingreso',
+            'ee.registrado_en',
+            'ee.id_ambiente',
+            'a.nro_aula',
+            'est.cod_sis',
+            'est.nombre',
+            'est.apellido_paterno',
+            'est.apellido_materno',
+            'u.nombre as controlador_nombre',
+            'u.apellido_paterno as controlador_apellido',
+        ];
+
+        $rosterEntries = DB::table('grupo_estudiante as gs')
             ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
             ->join('estudiante as est', 'est.id_estudiante', '=', 'gs.id_estudiante')
             ->joinSub($minGroupPerStudent, 'mg', function ($join): void {
@@ -876,22 +1010,19 @@ class EntryControlSnapshotService
             ->where('gx.id_examen', $examId)
             ->when($studentId !== null, fn ($query) => $query->where('gs.id_estudiante', $studentId))
             ->orderBy('gs.id_estudiante')
-            ->get([
-                'gs.id_estudiante',
-                DB::raw("COALESCE(ee.estado_habilitacion, 'HABILITADO') as estado_habilitacion"),
-                'ee.observacion',
-                DB::raw("COALESCE(ee.estado_ingreso, 'NO_INGRESO') as estado_ingreso"),
-                'ee.hora_ingreso',
-                'ee.registrado_en',
-                'ee.id_ambiente',
-                'a.nro_aula',
-                'est.cod_sis',
-                'est.nombre',
-                'est.apellido_paterno',
-                'est.apellido_materno',
-                'u.nombre as controlador_nombre',
-                'u.apellido_paterno as controlador_apellido',
-            ])
+            ->get($entryColumns('gs.id_estudiante'));
+
+        $exceptionalEntries = DB::table('examen_estudiante as ee')
+            ->join('estudiante as est', 'est.id_estudiante', '=', 'ee.id_estudiante')
+            ->leftJoin('ambiente as a', 'a.id_ambiente', '=', 'ee.id_ambiente')
+            ->leftJoin('usuario as u', 'u.id_usuario', '=', 'ee.id_usuario_controlador')
+            ->where('ee.id_examen', $examId)
+            ->where('ee.es_excepcional', true)
+            ->when($studentId !== null, fn ($query) => $query->where('ee.id_estudiante', $studentId))
+            ->get($entryColumns('ee.id_estudiante'));
+
+        // La nómina se agrega al final para que prevalezca si el estudiante figura en ambas.
+        return $exceptionalEntries->concat($rosterEntries)
             ->mapWithKeys(function ($entry): array {
                 $realEntry = in_array($entry->estado_ingreso, ['INGRESO', 'CON_RETRASO'], true);
                 $previous = $realEntry ? [

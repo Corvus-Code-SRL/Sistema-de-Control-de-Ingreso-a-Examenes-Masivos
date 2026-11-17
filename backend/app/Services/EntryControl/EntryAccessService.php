@@ -6,6 +6,7 @@ use App\Models\Exam;
 use App\Models\User;
 use App\Exceptions\Exams\ExamStateException;
 use App\Services\Exams\ExamCollaboratorService;
+use App\Services\Exams\ExamRosterService;
 use App\Services\Exams\ExamTimingService;
 use App\Support\Cache\EntryOpeningFailureStore;
 use Carbon\Carbon;
@@ -18,17 +19,20 @@ class EntryAccessService
     private EntryOpeningFailureStore $openingFailures;
     private EntryControlSnapshotService $snapshots;
     private ExamCollaboratorService $collaborators;
+    private ExamRosterService $roster;
 
     public function __construct(
         ExamTimingService $timing,
         EntryOpeningFailureStore $openingFailures,
         EntryControlSnapshotService $snapshots,
-        ExamCollaboratorService $collaborators
+        ExamCollaboratorService $collaborators,
+        ExamRosterService $roster
     ) {
         $this->timing = $timing;
         $this->openingFailures = $openingFailures;
         $this->snapshots = $snapshots;
         $this->collaborators = $collaborators;
+        $this->roster = $roster;
     }
 
     public function openExamsFor(User $actor): array
@@ -82,23 +86,8 @@ class EntryAccessService
             ->where('id_usuario', $actor->id_usuario)
             ->get(['id_examen', 'id_ambiente'])
             ->keyBy('id_examen');
-        $rosterTotals = DB::table('grupo_examen as gx')
-            ->join('grupo_estudiante as gs', 'gs.id_grupo', '=', 'gx.id_grupo')
-            ->whereIn('gx.id_examen', $examIds)
-            ->selectRaw('gx.id_examen, count(distinct gs.id_estudiante) as total')
-            ->groupBy('gx.id_examen')
-            ->pluck('total', 'id_examen');
-        $enteredTotals = DB::table('examen_estudiante as ee')
-            ->join('grupo_examen as gx', 'gx.id_examen', '=', 'ee.id_examen')
-            ->join('grupo_estudiante as gs', function ($join): void {
-                $join->on('gs.id_grupo', '=', 'gx.id_grupo')
-                    ->on('gs.id_estudiante', '=', 'ee.id_estudiante');
-            })
-            ->whereIn('ee.id_examen', $examIds)
-            ->whereIn('ee.estado_ingreso', ['INGRESO', 'CON_RETRASO'])
-            ->selectRaw('ee.id_examen, count(distinct ee.id_estudiante) as total')
-            ->groupBy('ee.id_examen')
-            ->pluck('total', 'id_examen');
+        $rosterTotals = $this->roster->expectedTotals($examIds);
+        $enteredTotals = $this->roster->enteredTotals($examIds);
 
         $stillOpen = $exams->reject(fn (Exam $exam) => CloseOrdinaryEntryService::isClosed((int) $exam->id_examen));
 

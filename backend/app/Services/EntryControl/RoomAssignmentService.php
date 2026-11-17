@@ -5,6 +5,7 @@ namespace App\Services\EntryControl;
 use App\Exceptions\EntryControl\EntryOpeningException;
 use App\Models\Exam;
 use App\Services\Exams\ExamInvitationExpiryService;
+use App\Services\Exams\ExamRosterService;
 use App\Services\Security\AuditLogService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -13,11 +14,16 @@ class RoomAssignmentService
 {
     private EntryControlSnapshotService $snapshots;
     private AuditLogService $auditLog;
+    private ExamRosterService $roster;
 
-    public function __construct(EntryControlSnapshotService $snapshots, AuditLogService $auditLog)
-    {
+    public function __construct(
+        EntryControlSnapshotService $snapshots,
+        AuditLogService $auditLog,
+        ExamRosterService $roster
+    ) {
         $this->snapshots = $snapshots;
         $this->auditLog = $auditLog;
+        $this->roster = $roster;
     }
 
     /**
@@ -33,11 +39,7 @@ class RoomAssignmentService
                 throw new DomainException('El examen no admite preparación de ambientes.');
             }
 
-            $studentCount = (int) DB::table('grupo_estudiante as gs')
-                ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
-                ->where('gx.id_examen', $examId)
-                ->distinct()
-                ->count('gs.id_estudiante');
+            $studentCount = $this->roster->expectedTotals([$examId])[$examId] ?? 0;
 
             if ($studentCount === 0) {
                 throw new EntryOpeningException(
