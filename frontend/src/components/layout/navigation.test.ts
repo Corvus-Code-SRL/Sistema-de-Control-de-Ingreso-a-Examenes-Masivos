@@ -102,7 +102,7 @@ describe('menú por capacidades', () => {
           ['Habilitar auxiliar para el examen', undefined],
           ['Invitar docentes colaboradores', '/colaboradores/invitar'],
           ['Invitaciones a otros exámenes', undefined],
-          ['Habilitar estudiantes', '/examenes/habilitados']
+          ['Cargar lista de habilitados', '/examenes/habilitados']
         ]
       },
       {

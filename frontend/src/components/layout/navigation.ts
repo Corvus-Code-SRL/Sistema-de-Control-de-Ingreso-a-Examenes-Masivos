@@ -295,7 +295,7 @@ export const NAVIGATION: readonly NavSection[] = [
       },
       {
         id: 'teacher-upload-eligible',
-        label: 'Habilitar estudiantes',
+        label: 'Cargar lista de habilitados',
         icon: UserCheck,
         capability: 'examenes.gestionar',
         to: '/examenes/habilitados'
