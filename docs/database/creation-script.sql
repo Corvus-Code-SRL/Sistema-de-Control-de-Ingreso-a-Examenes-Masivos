@@ -1973,3 +1973,31 @@ CREATE INDEX idx_examen_estudiante_excepcional
     ON public.examen_estudiante(id_examen) WHERE es_excepcional;
 CREATE INDEX idx_examen_estudiante_grupo_efectivo
     ON public.examen_estudiante(id_grupo_efectivo);
+
+-- Versión 19: cronómetro del examen, independiente de su ciclo de vida (HU-038)
+--             (2026_11_17_120000_add_cronometro_to_examen)
+--   * Las acciones de bitácora INICIAR_CRONOMETRO y AJUSTAR_CRONOMETRO no van en el esquema: las siembra
+--     ActionSeeder, que debe correr después de migrar.
+--   * cronometro_iniciado_en y cronometro_vence_en son nulas hasta que el docente inicia el cronómetro; no
+--     cambian el estado del examen ni el control de ingreso.
+--   * examen_cronometro_fechas_check: o ambas son nulas o ambas existen y el vencimiento es posterior al inicio.
+
+ALTER TABLE public.examen
+    ADD COLUMN IF NOT EXISTS cronometro_iniciado_en timestamp with time zone,
+    ADD COLUMN IF NOT EXISTS cronometro_vence_en timestamp with time zone;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'examen_cronometro_fechas_check'
+          AND conrelid = 'public.examen'::regclass
+    ) THEN
+        ALTER TABLE public.examen
+            ADD CONSTRAINT examen_cronometro_fechas_check CHECK (
+                (cronometro_iniciado_en IS NULL AND cronometro_vence_en IS NULL)
+                OR (cronometro_iniciado_en IS NOT NULL AND cronometro_vence_en IS NOT NULL
+                    AND cronometro_vence_en > cronometro_iniciado_en)
+            );
+    END IF;
+END $$;
