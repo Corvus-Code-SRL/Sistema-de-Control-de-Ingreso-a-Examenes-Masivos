@@ -13,6 +13,7 @@ use App\Exceptions\Exams\DuplicateInvitationException;
 use App\Exceptions\Exams\ExamAssistantNotFoundException;
 use App\Exceptions\Exams\ExamOwnershipException;
 use App\Exceptions\Exams\ExamStateException;
+use App\Exceptions\Exams\ExamTimerLimitException;
 use App\Exceptions\Exams\ExamWarningsException;
 use App\Exceptions\Exams\FinalReportUnavailableException;
 use App\Exceptions\Security\DuplicateAccountException;
@@ -60,6 +61,7 @@ class Handler extends ExceptionHandler
         ExamAssistantNotFoundException::class,
         ExamOwnershipException::class,
         ExamStateException::class,
+        ExamTimerLimitException::class,
         ExamWarningsException::class,
         FinalReportUnavailableException::class,
         DuplicateAccountException::class,

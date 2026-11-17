@@ -38,19 +38,19 @@ class InvitedTeacherAccessTest extends TestCase
         $this->assignRole($userId, Role::INVITADO);
     }
 
-    public function test_el_mapa_de_acceso_define_las_diez_funciones_con_la_decision_del_invitado(): void
+    public function test_el_mapa_de_acceso_define_las_funciones_con_la_decision_del_invitado(): void
     {
         $access = config('sciem.access');
 
         $this->assertSame([
             'teaching', 'exam_assistants', 'incidents', 'risk_center',
-            'group_assistants', 'report_assistant', 'special_cases', 'invite_teachers', 'audit_log', 'risk_rectify',
+            'group_assistants', 'report_assistant', 'special_cases', 'invite_teachers', 'audit_log', 'risk_rectify', 'exam_timer',
         ], array_keys($access));
 
         $allowed = [
             'teaching' => true, 'exam_assistants' => true, 'incidents' => true, 'risk_center' => false,
             'group_assistants' => false, 'report_assistant' => false, 'special_cases' => false,
-            'invite_teachers' => false,
+            'invite_teachers' => false, 'exam_timer' => false,
         ];
 
         foreach ($allowed as $feature => $invitedCan) {

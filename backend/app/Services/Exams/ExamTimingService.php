@@ -29,6 +29,7 @@ class ExamTimingService
 
     public function resolutionLimit(Exam $exam): Carbon
     {
+        // Punto de extensión para HU-047: hasta entonces rige fecha + hora de inicio + duración.
         return $this->endsAt($exam);
     }
 

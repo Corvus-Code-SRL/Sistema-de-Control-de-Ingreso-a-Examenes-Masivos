@@ -4,13 +4,19 @@ namespace App\Http\Requests\Exams;
 
 use App\Services\Security\UserRoleService;
 use App\Support\CurrentUser;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ExamTimerRequest extends FormRequest
 {
     public function authorize(CurrentUser $currentUser, UserRoleService $roles): bool
     {
-        return $roles->isTeacher($currentUser->id());
+        return $roles->canUse($currentUser->id(), 'exam_timer');
+    }
+
+    protected function failedAuthorization()
+    {
+        throw new AuthorizationException('Solo el docente responsable del examen puede controlar su tiempo');
     }
 
     public function rules(): array
