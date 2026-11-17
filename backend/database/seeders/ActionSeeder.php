@@ -99,5 +99,23 @@ class ActionSeeder extends Seeder
         foreach ($responses as $response) {
             DB::table('accion')->updateOrInsert(['operacion' => $response['operacion']], $response);
         }
+
+        // HU-038: también al final, después de los anteriores, para no mover los ids existentes.
+        $timer = [
+            [
+                'operacion' => 'INICIAR_CRONOMETRO',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Inicio del cronómetro de un examen',
+            ],
+            [
+                'operacion' => 'AJUSTAR_CRONOMETRO',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Ajuste del cronómetro de un examen',
+            ],
+        ];
+
+        foreach ($timer as $action) {
+            DB::table('accion')->updateOrInsert(['operacion' => $action['operacion']], $action);
+        }
     }
 }

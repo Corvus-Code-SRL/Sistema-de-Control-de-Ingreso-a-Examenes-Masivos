@@ -110,6 +110,7 @@ describe('menú por capacidades', () => {
         label: 'Control de ingreso y examen en curso',
         items: [
           ['Control de ingreso', '/control-ingreso'],
+          ['Controlar tiempo del examen', '/examenes/controlar-tiempo'],
           ['En curso', '/examenes/en-curso'],
           ['Registrar estudiante con retraso', '/retrasos'],
           ['Registrar situación excepcional', '/situacion-excepcional'],
@@ -175,6 +176,7 @@ describe('menú por capacidades', () => {
         'Registrar examen',
         'Habilitar auxiliar para el examen',
         'Control de ingreso',
+        'Controlar tiempo del examen',
         'En curso',
         'Registrar situación excepcional',
         'Reportar incidencia',

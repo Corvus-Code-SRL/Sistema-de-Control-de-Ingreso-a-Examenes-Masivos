@@ -126,6 +126,7 @@ class ApiRateLimitTest extends TestCase
         return [
             'estado del control de ingreso' => [self::POLLING_ROUTES[0]],
             'examen en curso' => [self::POLLING_ROUTES[1]],
+            'cronómetros' => ['/api/examenes/cronometros'],
         ];
     }
 

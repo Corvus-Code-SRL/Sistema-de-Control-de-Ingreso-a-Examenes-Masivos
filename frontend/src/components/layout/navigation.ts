@@ -319,6 +319,13 @@ export const NAVIGATION: readonly NavSection[] = [
         matches: ['/examenes/:examId/control-ingreso']
       },
       {
+        id: 'teacher-exam-timer',
+        label: 'Controlar tiempo del examen',
+        icon: Clock,
+        capability: 'examenes.controlar-tiempo',
+        to: '/examenes/controlar-tiempo'
+      },
+      {
         id: 'teacher-exam-in-progress',
         label: 'En curso',
         icon: PlaySquare,
