@@ -1914,3 +1914,12 @@ BEGIN
             CHECK (NOT lista_por_grupo OR permite_agregar_grupos);
     END IF;
 END $$;
+-- HU-038: tiempo de resolución independiente del ciclo de vida del examen.
+ALTER TABLE public.examen
+    ADD COLUMN cronometro_iniciado_en timestamp with time zone,
+    ADD COLUMN cronometro_vence_en timestamp with time zone,
+    ADD CONSTRAINT examen_cronometro_fechas_check CHECK (
+        (cronometro_iniciado_en IS NULL AND cronometro_vence_en IS NULL)
+        OR (cronometro_iniciado_en IS NOT NULL AND cronometro_vence_en IS NOT NULL
+            AND cronometro_vence_en > cronometro_iniciado_en)
+    );
