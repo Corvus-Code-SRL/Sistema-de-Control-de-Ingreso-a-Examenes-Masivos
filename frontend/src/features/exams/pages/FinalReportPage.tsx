@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Download, FileSpreadsheet, Printer, ShieldAlert } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/common/EmptyState'
+import { ExceptionalMark } from '@/components/common/ExceptionalMark'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
@@ -150,7 +151,10 @@ function StudentsSection({ report }: { report: FinalReport }) {
           {report.estudiantes.map((student) => (
             <TableRow key={student.cod_sis}>
               <TableCell>{student.cod_sis}</TableCell>
-              <TableCell>{student.nombre}</TableCell>
+              <TableCell>
+                {student.nombre}
+                {student.es_excepcional && <ExceptionalMark reason={student.motivo_excepcional} />}
+              </TableCell>
               <TableCell>{orDash(student.ambiente)}</TableCell>
               <TableCell>{orDash(student.hora_ingreso)}</TableCell>
               <TableCell>{student.estado}</TableCell>
