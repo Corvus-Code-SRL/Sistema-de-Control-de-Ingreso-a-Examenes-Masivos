@@ -53,16 +53,20 @@ class ExamController extends Controller
     public function index(IndexExamRequest $request): JsonResponse
     {
         $exams = $request->wantsScheduledOnly()
-            ? $this->examService->listScheduledForTeacher($this->currentUser->teacherId())
-            : $this->examService->listForTeacher($this->currentUser->teacherId());
+            ? $this->examService->listScheduledForTeacher(
+                $this->currentUser->teacherId(),
+                [Exam::PROGRAMADO],
+                true
+            )
+            : $this->examService->listForTeacher($this->currentUser->teacherId(), true);
 
         return ApiResponse::success(ExamResource::collection($exams));
     }
 
-    /** GET /api/examenes/{exam} */
+    /** GET /api/examenes/{exam} — solo lectura para un colaborador; editar y cancelar siguen siendo del creador. */
     public function show(Exam $exam): JsonResponse
     {
-        $exam = $this->examService->find($exam, $this->currentUser->teacherId());
+        $exam = $this->examService->findReadable($exam, $this->currentUser->teacherId());
 
         return ApiResponse::success(new ExamResource($exam));
     }

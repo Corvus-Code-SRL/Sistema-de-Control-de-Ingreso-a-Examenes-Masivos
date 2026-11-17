@@ -133,6 +133,7 @@ class EntryAccessService
                 'carrera' => $exam->career ? $exam->career->nombre : null,
                 'ambientes' => $exam->classrooms->pluck('nro_aula')->values()->all(),
                 'rol_controlador' => $isTeacher ? 'DOCENTE' : 'AUXILIAR',
+                'es_creador' => (string) $exam->id_usuario_docente === (string) $actor->id_usuario,
                 'id_ambiente_asignado' => $assignedRoomId,
                 'ambiente_asignado' => $assignedRoomId === null
                     ? null
@@ -169,6 +170,7 @@ class EntryAccessService
             'carrera' => $exam->career ? $exam->career->nombre : null,
             'grupos' => $exam->groups->pluck('num_grupo')->values()->all(),
             'rol_controlador' => $isTeacher ? 'DOCENTE' : 'AUXILIAR',
+            'es_creador' => (string) $exam->id_usuario_docente === (string) $actor->id_usuario,
             'id_ambiente_asignado' => $assignedRoomId,
             'ambientes' => $exam->classrooms->map(fn ($room) => [
                 'id_ambiente' => (int) $room->id_ambiente,

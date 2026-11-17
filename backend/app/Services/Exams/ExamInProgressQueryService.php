@@ -231,6 +231,7 @@ class ExamInProgressQueryService
             'estado' => $exam->estado,
             'rol_controlador' =>
                 $isTeacher ? 'DOCENTE' : 'AUXILIAR',
+            'es_creador' => (string) $exam->id_usuario_docente === (string) $actor->id_usuario,
             'id_ambiente_asignado' => $assignedRoomId,
             'ambientes' => $rooms,
             'inicio_programado' =>
