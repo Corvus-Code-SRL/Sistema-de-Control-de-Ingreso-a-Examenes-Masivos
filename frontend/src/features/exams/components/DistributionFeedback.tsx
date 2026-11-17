@@ -52,8 +52,12 @@ export function DistributionFeedback({ data, missingSeats, unassigned, error, mu
           <Info aria-hidden="true" /><AlertTitle>{messages.unassigned}</AlertTitle>
           <AlertDescription>
             {unassigned} {unassigned === 1 ? 'estudiante sin ambiente' : 'estudiantes sin ambiente'}:
-            {' '}se ubicarán automáticamente al abrir el control de ingreso si siguen existiendo lugares disponibles.
-            Puede ubicarlos ahora y guardar la distribución.
+            {data.editable ? (
+              <> se ubicarán automáticamente al abrir el control de ingreso si siguen existiendo lugares disponibles.
+                Puede ubicarlos ahora y guardar la distribución.</>
+            ) : (
+              <> consulte estos casos con el docente responsable del examen.</>
+            )}
           </AlertDescription>
         </Alert>
       )}
