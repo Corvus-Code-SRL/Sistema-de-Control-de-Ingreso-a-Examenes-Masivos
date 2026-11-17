@@ -62,6 +62,8 @@ export interface SentInvitation {
   fecha_sin_efecto: string | null
   /** Si el colaborador, al aceptar, puede sumar sus propios grupos al examen. */
   permite_agregar_grupos: boolean
+  /** Si la lista del examen se muestra dividida por grupo (con su docente) en vez de junta. */
+  lista_por_grupo: boolean
   examen: SentInvitationExam
   docente: SentInvitationTeacher
 }
@@ -69,4 +71,6 @@ export interface SentInvitation {
 export interface SendInvitationPayload {
   id_docente: string
   permite_agregar_grupos: boolean
+  /** Solo puede ser true si permite_agregar_grupos es true (el backend responde 422 si no). */
+  lista_por_grupo: boolean
 }
