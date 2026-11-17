@@ -11,6 +11,7 @@ use App\Http\Controllers\Exams\ReceivedInvitationController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Exams\ClassroomController;
 use App\Http\Controllers\Exams\FinalReportController;
+use App\Http\Controllers\Exams\ExamEligibleListController;
 
 // ...
 
@@ -34,6 +35,11 @@ Route::prefix('historial/examenes')->name('historial.examenes.')->group(function
 Route::prefix('examenes')->name('examenes.')->group(function () {
     Route::get('/formulario', [ExamController::class, 'formOptions'])
          ->name('formulario');
+
+    // HU-028 — selector de exámenes para "Habilitar estudiantes".
+    // Debe ir antes de GET /{exam} para no chocar con el binding.
+    Route::get('/habilitados', [ExamEligibleListController::class, 'exams'])
+        ->name('habilitados.selector');
 
     Route::get('/', [ExamController::class, 'index'])
          ->name('index');
@@ -62,6 +68,24 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
     Route::post('/{exam}/finalizar', [ExamController::class, 'finish'])
         ->where('exam', '[0-9]{1,9}')
         ->name('finalizar');
+
+    Route::prefix('{exam}/habilitados')->name('habilitados.')->group(function () {
+        Route::get('/', [ExamEligibleListController::class, 'current'])
+            ->where('exam', '[0-9]{1,9}')
+            ->name('current');
+
+        Route::put('/', [ExamEligibleListController::class, 'save'])
+            ->where('exam', '[0-9]{1,9}')
+            ->name('save');
+
+        Route::post('/preview', [ExamEligibleListController::class, 'preview'])
+            ->where('exam', '[0-9]{1,9}')
+            ->name('preview');
+
+        Route::post('/confirm', [ExamEligibleListController::class, 'confirm'])
+            ->where('exam', '[0-9]{1,9}')
+            ->name('confirm');
+    });
 
     Route::get('/{exam}/reporte-final', [FinalReportController::class, 'show'])
         ->where('exam', '[0-9]{1,9}')

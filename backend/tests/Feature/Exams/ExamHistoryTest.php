@@ -479,10 +479,45 @@ class ExamHistoryTest extends TestCase
             ->assertJsonPath('data.examenes.0.esperados', 1);
     }
 
-    /** Puntuales + con retraso + ausentes + sin clasificar: las incidencias no suman. */
+    /** Puntuales + con retraso + ausentes + no habilitados + sin clasificar: las incidencias no suman. */
     private function classifiedTotal(array $totals): int
     {
-        return $totals['a_tiempo'] + $totals['con_retraso'] + $totals['ausentes'] + $totals['sin_clasificar'];
+        return $totals['a_tiempo'] + $totals['con_retraso'] + $totals['ausentes']
+            + $totals['no_habilitados'] + $totals['sin_clasificar'];
+    }
+
+    public function test_los_no_habilitados_tienen_su_propio_total_y_los_totales_cuadran(): void
+    {
+        $exam = $this->createExam(['estado' => Exam::FINALIZADO]);
+        DB::table('grupo_examen')->insert([
+            'id_examen' => $exam->id_examen,
+            'id_grupo' => $this->grupoPropioId,
+        ]);
+        $this->enrollStudents($this->grupoPropioId, 1);
+        $students = DB::table('grupo_estudiante')->where('id_grupo', $this->grupoPropioId)
+            ->orderBy('id_estudiante')->pluck('id_estudiante');
+
+        foreach ($students as $index => $studentId) {
+            DB::table('examen_estudiante')->insert([
+                'id_examen' => $exam->id_examen,
+                'id_estudiante' => $studentId,
+                'id_grupo' => $this->grupoPropioId,
+                'estado_habilitacion' => $index === 2 ? 'NO_HABILITADO' : 'HABILITADO',
+                'observacion' => $index === 2 ? 'NO_FIGURA_EN_LISTA' : null,
+                'estado_ingreso' => $index === 0 ? 'INGRESO' : 'NO_INGRESO',
+                'hora_ingreso' => $index === 0 ? '08:05:00' : null,
+                'registrado_en' => $index === 0 ? now() : null,
+            ]);
+        }
+
+        $summary = $this->getJson('/api/historial/examenes/' . $exam->id_examen)
+            ->assertOk()
+            ->assertJsonPath('data.totales.a_tiempo', 1)
+            ->assertJsonPath('data.totales.ausentes', 1)
+            ->assertJsonPath('data.totales.no_habilitados', 1)
+            ->assertJsonPath('data.total_estudiantes', 3);
+
+        $this->assertSame(3, $this->classifiedTotal($summary->json('data.totales')));
     }
 
     public function test_sin_nomina_congelada_usa_las_inscripciones_actuales_como_ausentes(): void

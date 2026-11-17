@@ -17,7 +17,7 @@ import {
   type ExamClockSync,
 } from '../utils/examClock';
 
-type Filter = 'presentes' | 'retraso' | 'ausentes' | 'expulsados' | 'todos';
+type Filter = 'presentes' | 'retraso' | 'ausentes' | 'no_habilitados' | 'expulsados' | 'todos';
 
 const CAMPUS_TIME_ZONE = 'America/La_Paz';
 
@@ -40,11 +40,20 @@ function localTime(value: string): string {
   }).format(new Date(value));
 }
 
+/** Un no habilitado que no ingresó no cuenta como ausente: tiene su propio total. */
+function isNotEnabled(student: InProgressStudent): boolean {
+  return student.estado_ingreso === 'NO_INGRESO' && student.estado_habilitacion === 'NO_HABILITADO';
+}
+
+function isAbsent(student: InProgressStudent): boolean {
+  return student.estado_ingreso === 'NO_INGRESO' && !isNotEnabled(student);
+}
+
 function entryLabel(student: InProgressStudent): string {
   if (student.expulsado_en) return `Expulsado · ${localTime(student.expulsado_en)}`;
   if (student.estado_ingreso === 'INGRESO') return 'A tiempo';
   if (student.estado_ingreso === 'CON_RETRASO') return 'Con retraso';
-  return 'Ausente';
+  return isNotEnabled(student) ? 'No habilitado' : 'Ausente';
 }
 
 interface ExamInProgressPageProps {
@@ -156,6 +165,11 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
       count: data?.totales.ausentes ?? 0,
     },
     {
+      value: 'no_habilitados',
+      label: 'No habilitados',
+      count: data?.totales.no_habilitados ?? 0,
+    },
+    {
       value: 'expulsados',
       label: 'Expulsados',
       count: data?.totales.expulsados ?? 0,
@@ -175,7 +189,8 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
       (filter === 'expulsados' && !!student.expulsado_en) ||
       (filter === 'presentes' && !student.expulsado_en && student.estado_ingreso !== 'NO_INGRESO') ||
       (filter === 'retraso' && !student.expulsado_en && student.estado_ingreso === 'CON_RETRASO') ||
-      (filter === 'ausentes' && !student.expulsado_en && student.estado_ingreso === 'NO_INGRESO');
+      (filter === 'ausentes' && !student.expulsado_en && isAbsent(student)) ||
+      (filter === 'no_habilitados' && !student.expulsado_en && isNotEnabled(student));
 
     const matchesSearch = normalizeSearch([
       student.nombre_completo,
@@ -220,6 +235,8 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
         ? 'No hay estudiantes con retraso.'
         : filter === 'ausentes'
           ? 'No hay estudiantes ausentes.'
+          : filter === 'no_habilitados'
+            ? 'No hay estudiantes no habilitados.'
           : filter === 'expulsados'
             ? 'No hay estudiantes expulsados.'
             : 'No hay estudiantes registrados en la nómina.';
@@ -346,11 +363,12 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
 
           </section>
 
-          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {([
               ['A tiempo', data.totales.a_tiempo],
               ['Con retraso', data.totales.con_retraso],
               ['Ausentes', data.totales.ausentes],
+              ['No habilitados', data.totales.no_habilitados],
               ['Expulsados', data.totales.expulsados ?? 0],
             ] as const).map(([label, value]) => (
               <div

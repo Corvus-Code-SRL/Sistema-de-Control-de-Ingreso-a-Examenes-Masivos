@@ -39,6 +39,7 @@ const exam: ExamInProgress = {
     a_tiempo: 1,
     con_retraso: 0,
     ausentes: 1,
+    no_habilitados: 0,
     presentes: 1,
     total: 2,
     incidencias_pendientes: 0,
@@ -193,6 +194,44 @@ describe('HU-038-A: consulta y filtros de En curso', () => {
     expect(screen.queryByText('Álvaro Núñez')).not.toBeInTheDocument();
   });
 
+  it('un no habilitado no es ausente: tiene su propio total y su propio filtro', async () => {
+    const user = userEvent.setup();
+    vi.mocked(examInProgressService.get).mockResolvedValue({
+      ...exam,
+      totales: { ...exam.totales, no_habilitados: 1, total: 3 },
+      estudiantes: [
+        ...exam.estudiantes,
+        {
+          id_estudiante: 12,
+          cod_sis: '202300300',
+          ci: '9876543',
+          nombre_completo: 'Rosa Quispe',
+          estado_ingreso: 'NO_INGRESO',
+          estado_habilitacion: 'NO_HABILITADO',
+          hora_ingreso: null,
+          id_ambiente: null,
+          ambiente: null,
+        },
+      ],
+    });
+
+    renderWithRouter(<ExamInProgressPage />, {
+      route: '/examenes/8/en-curso',
+      path: '/examenes/:examId/en-curso',
+    });
+
+    await screen.findByText('María Pérez');
+
+    await user.click(screen.getByRole('button', { name: 'Ausentes (1)' }));
+    expect(screen.getByText('Juan López')).toBeInTheDocument();
+    expect(screen.queryByText('Rosa Quispe')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'No habilitados (1)' }));
+    expect(screen.getByText('Rosa Quispe')).toBeInTheDocument();
+    expect(screen.queryByText('Juan López')).not.toBeInTheDocument();
+    expect(screen.getByText('No habilitado')).toBeInTheDocument();
+  });
+
   it('con el filtro Todos, la búsqueda deja solo al estudiante que coincide', async () => {
     const user = userEvent.setup();
     vi.mocked(examInProgressService.get).mockResolvedValue({
@@ -315,7 +354,7 @@ describe('HU-038-B: terminar examen desde En curso', () => {
     const finish = vi.spyOn(examsService, 'finishExam');
     vi.mocked(examInProgressService.get).mockResolvedValue({
       ...exam,
-      totales: { a_tiempo: 12, con_retraso: 3, ausentes: 5, incidencias_pendientes: 2, presentes: 15, total: 20 },
+      totales: { a_tiempo: 12, con_retraso: 3, ausentes: 5, no_habilitados: 0, incidencias_pendientes: 2, presentes: 15, total: 20 },
     });
     renderExam();
     await user.click(await screen.findByRole('button', { name: finishLabel }));

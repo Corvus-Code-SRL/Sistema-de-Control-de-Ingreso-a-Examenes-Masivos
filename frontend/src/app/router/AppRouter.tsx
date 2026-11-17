@@ -34,6 +34,7 @@ import {
   ExamHistoryPage,
   ExamReportsPage,
   ExamHistorySummaryPage,
+  ExamEligibleListPage,
 } from '@/features/exams'
 
 import {
@@ -157,6 +158,11 @@ function DocenteRoutes() {
         <Route
           path="/examenes/:examId/reporte-final"
           element={guarded('examenes.gestionar', <FinalReportPage />)}
+        />
+
+        <Route
+          path="/examenes/habilitados"
+          element={guarded('examenes.gestionar', <ExamEligibleListPage />)}
         />
 
         <Route path="/situacion-excepcional" element={guarded('situaciones.registrar', <ExamSituationsPage />)} />
