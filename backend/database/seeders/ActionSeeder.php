@@ -100,15 +100,22 @@ class ActionSeeder extends Seeder
             DB::table('accion')->updateOrInsert(['operacion' => $response['operacion']], $response);
         }
 
-        // HU-038: se agregan al final para conservar los identificadores 1 a 27.
-        foreach ([28 => 'INICIAR_CRONOMETRO', 29 => 'AJUSTAR_CRONOMETRO'] as $id => $operation) {
-            DB::table('accion')->updateOrInsert(['id_accion' => $id], [
-                'operacion' => $operation,
+        // HU-038: también al final, después de los anteriores, para no mover los ids existentes.
+        $timer = [
+            [
+                'operacion' => 'INICIAR_CRONOMETRO',
                 'tipo_operacion' => 'UPDATE',
-                'descripcion' => $id === 28 ? 'Inicio del cronómetro de un examen' : 'Ajuste del cronómetro de un examen',
-            ]);
-        }
+                'descripcion' => 'Inicio del cronómetro de un examen',
+            ],
+            [
+                'operacion' => 'AJUSTAR_CRONOMETRO',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Ajuste del cronómetro de un examen',
+            ],
+        ];
 
-        DB::statement("SELECT setval(pg_get_serial_sequence('accion', 'id_accion'), (SELECT MAX(id_accion) FROM accion))");
+        foreach ($timer as $action) {
+            DB::table('accion')->updateOrInsert(['operacion' => $action['operacion']], $action);
+        }
     }
 }
