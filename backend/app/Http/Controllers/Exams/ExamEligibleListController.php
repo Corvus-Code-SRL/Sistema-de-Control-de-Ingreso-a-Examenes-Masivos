@@ -24,9 +24,9 @@ use RuntimeException;
  * - GET /habilitados → EligibleListCurrentResource
  * - PUT /habilitados → aplica cambios en transacción
  *
- * Camino secundario (importación):
+ * Camino por archivo:
  * - POST /habilitados/preview → preview del archivo
- * - POST /habilitados/confirm → devuelve cambios pendientes (no aplica)
+ * - POST /habilitados/confirm → reemplaza la lista en una sola transacción
  */
 class ExamEligibleListController extends Controller
 {
@@ -45,7 +45,7 @@ class ExamEligibleListController extends Controller
     /**
      * GET /api/examenes/habilitados — selector de exámenes de HU-028.
      *
-     * Solo exámenes del docente en PROGRAMADO o EN_INGRESO. Sin paginación.
+     * Solo exámenes del docente PROGRAMADOS con el control de ingreso sin abrir. Sin paginación.
      */
     public function exams(ListEligibleListExamsRequest $request): JsonResponse
     {
@@ -90,17 +90,16 @@ class ExamEligibleListController extends Controller
     ): JsonResponse {
         $teacherId = $this->currentUser->teacherId();
 
-        $validated = $request->validated();
-
-        $result = $this->service->confirm(
+        $result = $this->service->replaceFromUpload(
             $exam,
-            (string) $validated['token'],
-            $teacherId,
-            (string) $validated['motivo'],
-            isset($validated['detalle']) ? (string) $validated['detalle'] : null
+            (string) $request->validated()['token'],
+            $teacherId
         );
 
-        return ApiResponse::success(new EligibleListImportResource($result));
+        return ApiResponse::success(
+            new EligibleListImportResource($result),
+            'Lista de habilitados reemplazada correctamente.'
+        );
     }
 
     public function save(

@@ -70,6 +70,17 @@ class ExamEligibleListCurrentTest extends TestCase
             ->assertJsonPath('data.editable', true);
     }
 
+    public function test_editable_false_en_programado_con_el_control_de_ingreso_abierto(): void
+    {
+        $exam = $this->createExamWithRoster(1);
+        $this->putExamInState($exam->id_examen, 'INGRESO_ABIERTO');
+
+        $this->getJson("/api/examenes/{$exam->id_examen}/habilitados")
+            ->assertOk()
+            ->assertJsonPath('data.editable', false)
+            ->assertJsonPath('data.estado', Exam::PROGRAMADO);
+    }
+
     public function test_editable_false_en_en_curso(): void
     {
         $exam = $this->createExam(['estado' => Exam::EN_CURSO]);

@@ -3,21 +3,12 @@
 namespace App\Services\Exams\Importers;
 
 /**
- * Resultado de confirmar la importación de una lista de habilitados
- * (HU-028).
+ * Resultado de confirmar la carga de una lista de habilitados (HU-028).
  *
- * IMPORTANTE: este resultado NO se aplica. El Service solo valida el
- * token, re-analiza el archivo, y devuelve los cambios listos para que
- * el cliente los muestre como "cambios pendientes". Aplicarlos es
- * responsabilidad de PUT /habilitados (SaveEligibleListChangesRequest).
- *
- * `cambios_pendientes[]` trae, por cada fila MATCHED del archivo, el
- * estado propuesto. Las filas MATCHED del archivo se proponen como
- * HABILITADO (están en el archivo). Las filas de la nómina que NO están
- * en el archivo se proponen como NO_HABILITADO, con el motivo y el
- * detalle que el docente eligió en el panel de importación.
- *
- * Las filas INCONSISTENT y NOT_FOUND_IN_EXAM no generan cambios.
+ * La carga ya se aplicó cuando se construye este resultado: los estudiantes
+ * del archivo quedaron habilitados y los de la nómina que no figuran en él
+ * quedaron «No habilitado» con el motivo fijo. `noHabilitados` los lista con
+ * su código SIS y su nombre para mostrárselos al docente.
  */
 final class EligibleListImportResult
 {
@@ -27,38 +18,26 @@ final class EligibleListImportResult
 
     private int $noEncontrados;
 
-    /**
-     * @var array<int, array{
-     *     id_estudiante: int,
-     *     codigo_sis: string,
-     *     nombre_completo: string,
-     *     estado_habilitacion: string,
-     *     motivo: ?string,
-     *     detalle: ?string
-     * }>
-     */
-    private array $cambiosPendientes;
+    private int $habilitados;
+
+    /** @var array<int, array{id_estudiante: int, codigo_sis: string, nombre_completo: string}> */
+    private array $noHabilitados;
 
     /**
-     * @param array<int, array{
-     *     id_estudiante: int,
-     *     codigo_sis: string,
-     *     nombre_completo: string,
-     *     estado_habilitacion: string,
-     *     motivo: ?string,
-     *     detalle: ?string
-     * }> $cambiosPendientes
+     * @param array<int, array{id_estudiante: int, codigo_sis: string, nombre_completo: string}> $noHabilitados
      */
     public function __construct(
         int $totalRows,
         int $inconsistentRows,
         int $noEncontrados,
-        array $cambiosPendientes
+        int $habilitados,
+        array $noHabilitados
     ) {
         $this->totalRows = $totalRows;
         $this->inconsistentRows = $inconsistentRows;
         $this->noEncontrados = $noEncontrados;
-        $this->cambiosPendientes = $cambiosPendientes;
+        $this->habilitados = $habilitados;
+        $this->noHabilitados = $noHabilitados;
     }
 
     public function totalRows(): int
@@ -76,18 +55,14 @@ final class EligibleListImportResult
         return $this->noEncontrados;
     }
 
-    /**
-     * @return array<int, array{
-     *     id_estudiante: int,
-     *     codigo_sis: string,
-     *     nombre_completo: string,
-     *     estado_habilitacion: string,
-     *     motivo: ?string,
-     *     detalle: ?string
-     * }>
-     */
-    public function cambiosPendientes(): array
+    public function habilitados(): int
     {
-        return $this->cambiosPendientes;
+        return $this->habilitados;
+    }
+
+    /** @return array<int, array{id_estudiante: int, codigo_sis: string, nombre_completo: string}> */
+    public function noHabilitados(): array
+    {
+        return $this->noHabilitados;
     }
 }

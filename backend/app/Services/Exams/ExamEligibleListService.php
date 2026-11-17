@@ -3,7 +3,6 @@
 namespace App\Services\Exams;
 
 use App\Exceptions\Academic\StudentRosterPreviewUnavailableException;
-use App\Exceptions\Exams\ExamStateException;
 use App\Models\Exam;
 use App\Services\Academic\Importers\StudentRosterAnalysisResult;
 use App\Services\Academic\Importers\StudentRosterAnalyzer;
@@ -12,38 +11,40 @@ use App\Services\Exams\Importers\EligibleListCurrentResult;
 use App\Services\Exams\Importers\EligibleListDatabaseMatch;
 use App\Services\Exams\Importers\EligibleListDatabaseMatcher;
 use App\Services\Exams\Importers\EligibleListImportResult;
+use App\Services\Exams\Importers\EligibleListPreview;
 use App\Services\Exams\Importers\EligibleListPreviewResult;
 use App\Services\Exams\Importers\EligibleListPreviewStore;
 use App\Services\Security\AuditLogService;
 use App\Support\MotivoNoHabilitacion;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Throwable;
 
 /**
  * Lista de habilitados de un examen (HU-028).
  *
- * Flujo principal:
- * - current(): lista completa, editable solo en PROGRAMADO.
- * - saveChanges(): PUT /habilitados, aplica cambios en transacción.
+ * Camino manual:
+ * - current(): lista completa; editable solo dentro de la ventana de escritura
+ *   (PROGRAMADO con el control de ingreso sin abrir, ver ExamEligibleListAccess).
+ * - saveChanges(): PUT /habilitados, aplica cambios puntuales en una transacción.
  *
- * Camino secundario (importación):
+ * Camino por archivo:
  * - preview(): sube un archivo y muestra qué pasaría (no toca BD).
- * - confirm(): valida el token y devuelve "cambios pendientes"; no
- *   aplica nada. El cliente los muestra y luego llama a saveChanges().
+ * - replaceFromUpload(): confirma el preview y reemplaza la lista completa en
+ *   una sola transacción, con la fila del examen bloqueada.
  *
  * Reglas:
- * - Solo PROGRAMADO permite preview, confirm y saveChanges (409 si no).
- * - current() se permite en cualquier estado (404 / 403 si no es del
- *   docente).
+ * - Fuera de la ventana de escritura, preview, confirm y PUT responden 409.
+ * - current() se permite en cualquier estado (404 / 403 si no es del docente).
  * - Siempre hay un estado por estudiante. Por defecto HABILITADO.
- * - CASO ESPECIAL se preserva: HU-028 no puede quitarlo. Si el cliente
- *   intenta cambiarlo, 422.
- * - El archivo solo trae cod_sis. Los del archivo se proponen
- *   HABILITADO; los de la nómina que no están en el archivo se proponen
- *   NO_HABILITADO.
- * - Archivo vacío: se propone NO_HABILITADO a todos los de la nómina.
+ * - Los estudiantes que ya están en CASO ESPECIAL no se tocan: desde esta
+ *   vista no se pueden cambiar (422 en el PUT, se omiten al reemplazar).
+ * - El archivo solo trae cod_sis. Los del archivo quedan HABILITADO y los de la
+ *   nómina que no figuran quedan NO_HABILITADO con un motivo fijo.
+ * - Archivo vacío: todos los de la nómina quedan NO_HABILITADO.
  */
 class ExamEligibleListService
 {
@@ -116,132 +117,124 @@ class ExamEligibleListService
     }
 
     /**
-     * Valida el token y devuelve los cambios pendientes que el cliente
-     * deberá aplicar vía PUT /habilitados. NO escribe en BD.
+     * Confirma el preview y reemplaza la lista completa del examen.
+     *
+     * Todo ocurre en una sola transacción con la fila del examen bloqueada: la ventana de escritura
+     * se vuelve a comprobar bajo el bloqueo y el token solo se consume si la transacción termina bien.
      */
-    public function confirm(
-        int $examId,
-        string $token,
-        string $teacherId,
-        string $motivo,
-        ?string $detalle
-    ): EligibleListImportResult {
+    public function replaceFromUpload(int $examId, string $token, string $teacherId): EligibleListImportResult
+    {
         $this->access->getAvailableForWrite($examId, $teacherId);
 
-        $preview = $this->previewStore->find($token);
+        $this->findPreviewFor($token, $examId, $teacherId);
 
-        if ($preview === null) {
-            throw new StudentRosterPreviewUnavailableException(
-                'El preview de la lista no existe o ha expirado.',
-                404
-            );
-        }
+        $result = DB::transaction(function () use ($examId, $token, $teacherId): EligibleListImportResult {
+            $this->access->lockForWrite($examId, $teacherId);
 
-        if ($preview->teacherId() !== $teacherId) {
-            throw new StudentRosterPreviewUnavailableException(
-                'El preview no pertenece al docente actual.',
-                403
-            );
-        }
+            $preview = $this->findPreviewFor($token, $examId, $teacherId);
 
-        if ($preview->examId() !== $examId) {
-            throw new StudentRosterPreviewUnavailableException(
-                'El preview no corresponde al examen indicado.',
-                422
-            );
-        }
+            $analysis = $this->analyzer->analyze($preview->rows());
+            $matches = $this->matcher->classify($examId, $analysis);
 
-        // Valida motivo/detalle antes de construir cambios.
-        $observacion = MotivoNoHabilitacion::toObservation($motivo, $detalle);
+            $matchedStudentIds = [];
+            $noEncontrados = 0;
 
-        $analysis = $this->analyzer->analyze($preview->rows());
-
-        $matches = $this->matcher->classify($examId, $analysis);
-
-        $matchedStudentIds = [];
-
-        foreach ($matches as $match) {
-            if (
-                $match->status() === EligibleListDatabaseMatch::MATCHED
-                && $match->studentId() !== null
-            ) {
-                $matchedStudentIds[$match->studentId()] = true;
-            }
-        }
-
-        $noEncontrados = 0;
-
-        foreach ($matches as $match) {
-            if ($match->status() === EligibleListDatabaseMatch::NOT_FOUND_IN_EXAM) {
-                $noEncontrados++;
-            }
-        }
-
-        // Nómina completa del examen (para proponer NO_HABILITADO a los
-        // que no están en el archivo).
-        $roster = $this->roster->expected($examId)->get([
-            'estudiante.id_estudiante',
-            'estudiante.cod_sis',
-            'estudiante.nombre',
-            'estudiante.apellido_paterno',
-            'estudiante.apellido_materno',
-            'estado_habilitacion',
-        ]);
-
-        $cambios = [];
-
-        foreach ($roster as $row) {
-            $id = (int) $row->id_estudiante;
-
-            if ($row->estado_habilitacion === self::CASO_ESPECIAL) {
-                // No se toca: HU-028 no quita CASO ESPECIAL.
-                continue;
+            foreach ($matches as $match) {
+                if ($match->status() === EligibleListDatabaseMatch::MATCHED && $match->studentId() !== null) {
+                    $matchedStudentIds[$match->studentId()] = true;
+                } elseif ($match->status() === EligibleListDatabaseMatch::NOT_FOUND_IN_EXAM) {
+                    $noEncontrados++;
+                }
             }
 
-            if (isset($matchedStudentIds[$id])) {
-                if ($row->estado_habilitacion !== self::HABILITADO) {
-                    $cambios[] = [
+            $roster = $this->roster->expected($examId)->get([
+                'estudiante.id_estudiante',
+                'estudiante.cod_sis',
+                'estudiante.nombre',
+                'estudiante.apellido_paterno',
+                'estudiante.apellido_materno',
+                'id_grupo',
+                'estado_habilitacion',
+                'observacion',
+            ]);
+
+            $targets = [];
+            $groupIds = [];
+            $before = [];
+            $habilitados = 0;
+            $noHabilitados = [];
+
+            foreach ($roster as $row) {
+                if ($row->estado_habilitacion === self::CASO_ESPECIAL) {
+                    continue;
+                }
+
+                $id = (int) $row->id_estudiante;
+                $enabled = isset($matchedStudentIds[$id]);
+                $newState = $enabled ? self::HABILITADO : self::NO_HABILITADO;
+                $newObservation = $enabled ? null : MotivoNoHabilitacion::NO_FIGURA_EN_LISTA;
+
+                if ($enabled) {
+                    $habilitados++;
+                } else {
+                    $noHabilitados[] = [
                         'id_estudiante' => $id,
                         'codigo_sis' => (string) $row->cod_sis,
                         'nombre_completo' => $this->fullName($row),
-                        'estado_habilitacion' => self::HABILITADO,
-                        'motivo' => null,
-                        'detalle' => null,
                     ];
                 }
 
-                continue;
+                if ($row->estado_habilitacion === $newState && $row->observacion === $newObservation) {
+                    continue;
+                }
+
+                $targets[$id] = ['estado_habilitacion' => $newState, 'observacion' => $newObservation];
+                $groupIds[$id] = (int) $row->id_grupo;
+                $before[$id] = [
+                    'estado_habilitacion' => $row->estado_habilitacion,
+                    'observacion' => $row->observacion,
+                ];
             }
 
-            // No está en el archivo: proponer NO_HABILITADO.
-            $cambios[] = [
-                'id_estudiante' => $id,
-                'codigo_sis' => (string) $row->cod_sis,
-                'nombre_completo' => $this->fullName($row),
-                'estado_habilitacion' => self::NO_HABILITADO,
-                'motivo' => $motivo,
-                'detalle' => MotivoNoHabilitacion::requiresDetail($motivo) ? $detalle : null,
-            ];
+            usort(
+                $noHabilitados,
+                static fn (array $a, array $b): int => strcmp($a['codigo_sis'], $b['codigo_sis'])
+            );
+
+            $this->applyRows($examId, $targets, $groupIds);
+
+            $this->registerAudit(
+                $examId,
+                $teacherId,
+                'ARCHIVO',
+                $before,
+                $targets,
+                ['habilitados' => $habilitados, 'no_habilitados' => count($noHabilitados)]
+            );
+
+            return new EligibleListImportResult(
+                $analysis->totalRows(),
+                $analysis->inconsistentRows(),
+                $noEncontrados,
+                $habilitados,
+                $noHabilitados
+            );
+        });
+
+        try {
+            $this->previewStore->forget($token);
+        } catch (Throwable $exception) {
+            Log::warning('No se pudo descartar el preview de habilitados tras confirmarlo', [
+                'id_examen' => $examId,
+                'motivo' => $exception->getMessage(),
+            ]);
         }
 
-        usort(
-            $cambios,
-            static fn (array $a, array $b): int =>
-                strcmp($a['codigo_sis'], $b['codigo_sis'])
-        );
-
-        $this->previewStore->forget($token);
-
-        return new EligibleListImportResult(
-            $analysis->totalRows(),
-            $analysis->inconsistentRows(),
-            $noEncontrados,
-            $cambios
-        );
+        return $result;
     }
 
     /**
-     * Aplica los cambios en una transacción.
+     * Aplica cambios puntuales en una transacción.
      *
      * @param array<int, array{
      *     id_estudiante: int,
@@ -262,32 +255,15 @@ class ExamEligibleListService
         }
 
         DB::transaction(function () use ($examId, $cambios, $teacherId): void {
-            $examRow = DB::table('examen')
-                ->where('id_examen', $examId)
-                ->lockForUpdate()
-                ->first(['id_examen', 'estado']);
+            $this->access->lockForWrite($examId, $teacherId);
 
-            if ($examRow === null) {
-                throw new ModelNotFoundException('No existe el examen indicado.');
-            }
-
-            if ($examRow->estado !== Exam::PROGRAMADO) {
-                throw new ExamStateException(
-                    'La lista de habilitados solo puede modificarse mientras el examen está PROGRAMADO.'
-                );
-            }
-
-            $requestedIds = array_map(
+            $requestedIds = array_values(array_unique(array_map(
                 static fn (array $c): int => (int) $c['id_estudiante'],
                 $cambios
-            );
-            $requestedIds = array_values(array_unique($requestedIds));
+            )));
 
-            // La nómina del examen vive en grupo_estudiante ⋈ grupo_examen.
-            // expected() deriva esa nómina con LEFT JOIN a examen_estudiante,
-            // así que un estudiante sin fila también aparece (como HABILITADO).
-            // Validar contra examen_estudiante rechazaría a esos estudiantes
-            // con "no pertenecen al examen" aunque sí pertenezcan.
+            // La nómina vive en grupo_estudiante ⋈ grupo_examen: un estudiante sin fila en
+            // examen_estudiante también pertenece al examen (aparece como HABILITADO).
             $existing = $this->roster->expected($examId)
                 ->whereIn('estudiante.id_estudiante', $requestedIds)
                 ->get([
@@ -298,111 +274,49 @@ class ExamEligibleListService
                 ])
                 ->keyBy('id_estudiante');
 
-            $missing = array_diff($requestedIds, $existing->keys()->map(
-                static fn ($id): int => (int) $id
-            )->all());
-
-            if ($missing !== []) {
+            if (count($requestedIds) !== $existing->count()) {
                 throw ValidationException::withMessages([
-                    'cambios' => [
-                        'Uno o más estudiantes no pertenecen al examen indicado.',
-                    ],
+                    'cambios' => ['Uno o más estudiantes no pertenecen al examen indicado.'],
                 ]);
             }
 
-            $casoEspecialIds = $existing
-                ->filter(static fn ($row): bool => $row->estado_habilitacion === self::CASO_ESPECIAL)
-                ->keys()
-                ->map(static fn ($id): int => (int) $id)
-                ->all();
+            $hasSpecialCase = $existing->contains(
+                static fn ($row): bool => $row->estado_habilitacion === self::CASO_ESPECIAL
+            );
 
-            if ($casoEspecialIds !== []) {
+            if ($hasSpecialCase) {
                 throw ValidationException::withMessages([
-                    'cambios' => [
-                        'No se puede modificar a un estudiante en CASO ESPECIAL desde esta vista.',
-                    ],
+                    'cambios' => ['No se puede modificar a un estudiante en CASO ESPECIAL desde esta vista.'],
                 ]);
             }
 
+            $targets = [];
+            $groupIds = [];
             $before = [];
 
-            foreach ($existing as $row) {
-                $before[(int) $row->id_estudiante] = [
+            foreach ($cambios as $cambio) {
+                $id = (int) $cambio['id_estudiante'];
+                $row = $existing[$id];
+
+                $targets[$id] = (string) $cambio['estado_habilitacion'] === self::HABILITADO
+                    ? ['estado_habilitacion' => self::HABILITADO, 'observacion' => null]
+                    : [
+                        'estado_habilitacion' => self::NO_HABILITADO,
+                        'observacion' => MotivoNoHabilitacion::toObservation(
+                            (string) ($cambio['motivo'] ?? ''),
+                            isset($cambio['detalle']) ? (string) $cambio['detalle'] : null
+                        ),
+                    ];
+                $groupIds[$id] = (int) $row->id_grupo;
+                $before[$id] = [
                     'estado_habilitacion' => $row->estado_habilitacion,
                     'observacion' => $row->observacion,
                 ];
             }
 
-            $after = $before;
+            $this->applyRows($examId, $targets, $groupIds);
 
-            $gruposPorEstudiante = $this->roster->expected($examId)
-                ->whereIn('estudiante.id_estudiante', $requestedIds)
-                ->pluck('id_grupo', 'estudiante.id_estudiante');
-
-            foreach ($cambios as $cambio) {
-                $id = (int) $cambio['id_estudiante'];
-                $estado = (string) $cambio['estado_habilitacion'];
-
-                // Si el estudiante no tenía fila en examen_estudiante (nómina
-                // sin HU-028 previa), la creamos con el id_grupo de la nómina
-                // antes del update. insertOrIgnore no pisa una fila existente
-                // (creada por HU-031 o por el control de ingreso).
-                $idGrupo = isset($existing[$id]) ? (int) $existing[$id]->id_grupo : null;
-
-                if ($idGrupo === null) {
-                    throw ValidationException::withMessages([
-                        'cambios' => [
-                            'Uno o más estudiantes no pertenecen al examen indicado.',
-                        ],
-                    ]);
-                }
-
-                $this->roster->ensureRow($examId, $id, $idGrupo);
-
-                if ($estado === self::HABILITADO) {
-                    $this->roster->ensureRow($examId, $id, (int) $gruposPorEstudiante[$id]);
-                    DB::table('examen_estudiante')
-                        ->where('id_examen', $examId)
-                        ->where('id_estudiante', $id)
-                        ->update(['estado_habilitacion' => self::HABILITADO]);
-
-                    $after[$id]['estado_habilitacion'] = self::HABILITADO;
-                    // La observación no se limpia (por simplicidad, ver P-a).
-
-                    continue;
-                }
-
-                $observacion = MotivoNoHabilitacion::toObservation(
-                    (string) ($cambio['motivo'] ?? ''),
-                    isset($cambio['detalle']) ? (string) $cambio['detalle'] : null
-                );
-
-                $this->roster->ensureRow($examId, $id, (int) $gruposPorEstudiante[$id]);
-                DB::table('examen_estudiante')
-                    ->where('id_examen', $examId)
-                    ->where('id_estudiante', $id)
-                    ->update([
-                        'estado_habilitacion' => self::NO_HABILITADO,
-                        'observacion' => $observacion,
-                    ]);
-
-                $after[$id]['estado_habilitacion'] = self::NO_HABILITADO;
-                $after[$id]['observacion'] = $observacion;
-            }
-
-            $this->auditLog->registrar(
-                'GUARDAR_HABILITADOS',
-                'examen_estudiante',
-                [
-                    'id_examen' => $examId,
-                    'cambios' => $before,
-                ],
-                [
-                    'id_examen' => $examId,
-                    'cambios' => $after,
-                ],
-                $teacherId
-            );
+            $this->registerAudit($examId, $teacherId, 'MANUAL', $before, $targets, []);
         });
     }
 
@@ -410,7 +324,7 @@ class ExamEligibleListService
     {
         $exam = $this->access->getAvailableForRead($examId, $teacherId);
 
-        $editable = $exam->estado === Exam::PROGRAMADO;
+        $editable = $this->access->isWritable($exam);
 
         $rows = $this->roster->expected($examId)
             ->orderBy('estudiante.apellido_paterno')
@@ -451,27 +365,107 @@ class ExamEligibleListService
         return new EligibleListCurrentResult($editable, $exam->estado, $estudiantes);
     }
 
-        /**
-     * Exámenes del docente para el selector de HU-028.
+    /**
+     * Exámenes del docente para el selector de HU-028: solo los que siguen dentro de la ventana de
+     * escritura (PROGRAMADO con el control de ingreso sin abrir). Sin filtro de período activo: un
+     * examen de un período anterior sigue siendo válido mientras no abra el control. Sin paginación:
+     * el docente tiene pocos exámenes en ese estado. Ordenados por fecha ascendente, luego por hora
+     * de inicio y por id.
      *
-     * Solo PROGRAMADO y EN_INGRESO. Sin filtro de período activo: un examen
-     * de un período anterior sigue siendo válido para cargar la lista si
-     * aún no abrió el control de ingreso. Sin paginación: el docente tiene
-     * pocos exámenes en esos dos estados. Ordenados por fecha ascendente
-     * (los más próximos primero), luego por hora de inicio, luego por id.
-     *
-     * @return \Illuminate\Database\Eloquent\Collection<int, \App\Models\Exam>
+     * @return Collection<int, Exam>
      */
-    public function examsForSelector(string $teacherId): \Illuminate\Database\Eloquent\Collection
+    public function examsForSelector(string $teacherId): Collection
     {
-        return Exam::query()
-            ->with(['subject', 'career', 'groups'])
-            ->where('id_usuario_docente', $teacherId)
-            ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_CURSO])
+        return $this->access->applyWritableWindow(
+            Exam::query()
+                ->with(['subject', 'career', 'groups'])
+                ->where('id_usuario_docente', $teacherId)
+        )
             ->orderBy('fecha')
             ->orderBy('hora_inicio')
             ->orderBy('id_examen')
             ->get();
+    }
+
+    /**
+     * Escribe cada fila por ensureRow() (que no pisa estado_ingreso, hora_ingreso ni id_ambiente)
+     * y luego fija su estado de habilitación y su observación.
+     *
+     * @param array<int, array{estado_habilitacion: string, observacion: ?string}> $targets por id de estudiante
+     * @param array<int, int> $groupIds grupo de la nómina por id de estudiante
+     */
+    private function applyRows(int $examId, array $targets, array $groupIds): void
+    {
+        foreach ($targets as $studentId => $target) {
+            $this->roster->ensureRow($examId, $studentId, $groupIds[$studentId]);
+
+            DB::table('examen_estudiante')
+                ->where('id_examen', $examId)
+                ->where('id_estudiante', $studentId)
+                ->update([
+                    'estado_habilitacion' => $target['estado_habilitacion'],
+                    'observacion' => $target['observacion'],
+                ]);
+        }
+    }
+
+    /**
+     * @param array<int, array{estado_habilitacion: string, observacion: ?string}> $before
+     * @param array<int, array{estado_habilitacion: string, observacion: ?string}> $after
+     * @param array<string, int> $counts
+     */
+    private function registerAudit(
+        int $examId,
+        string $teacherId,
+        string $origin,
+        array $before,
+        array $after,
+        array $counts
+    ): void {
+        $this->auditLog->registrar(
+            'GUARDAR_HABILITADOS',
+            'examen_estudiante',
+            [
+                'id_examen' => $examId,
+                'origen' => $origin,
+                'cambios' => $before,
+            ],
+            [
+                'id_examen' => $examId,
+                'origen' => $origin,
+                'total_cambios' => count($after),
+                'cambios' => $after,
+            ] + $counts,
+            $teacherId
+        );
+    }
+
+    private function findPreviewFor(string $token, int $examId, string $teacherId): EligibleListPreview
+    {
+        $preview = $this->previewStore->find($token);
+
+        if ($preview === null) {
+            throw new StudentRosterPreviewUnavailableException(
+                'El preview de la lista no existe o ha expirado.',
+                404
+            );
+        }
+
+        if ($preview->teacherId() !== $teacherId) {
+            throw new StudentRosterPreviewUnavailableException(
+                'El preview no pertenece al docente actual.',
+                403
+            );
+        }
+
+        if ($preview->examId() !== $examId) {
+            throw new StudentRosterPreviewUnavailableException(
+                'El preview no corresponde al examen indicado.',
+                422
+            );
+        }
+
+        return $preview;
     }
 
     /**

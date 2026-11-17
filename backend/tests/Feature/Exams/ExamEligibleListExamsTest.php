@@ -74,15 +74,26 @@ class ExamEligibleListExamsTest extends TestCase
         $this->assertSame($programado->id_examen, $response->json('data.0.id_examen'));
     }
 
-    public function test_devuelve_programados_y_en_curso(): void
+    public function test_devuelve_solo_programados_con_el_control_de_ingreso_sin_abrir(): void
     {
         $this->actAsTeacher($this->docenteId);
 
-        $programado = $this->createExam(['estado' => Exam::PROGRAMADO]);
+        $proximo = $this->createExam(['estado' => Exam::PROGRAMADO]);
+        $despues = $this->createExam([
+            'estado' => Exam::PROGRAMADO,
+            'nombre_examen' => 'Más adelante',
+            'fecha' => $this->futureDate(8),
+        ]);
+        $abierto = $this->createExam([
+            'estado' => Exam::PROGRAMADO,
+            'nombre_examen' => 'Con el control abierto',
+            'fecha' => $this->futureDate(9),
+        ]);
+        $this->putExamInState($abierto->id_examen, 'INGRESO_ABIERTO');
         $enCurso = $this->createExam([
             'estado' => Exam::EN_CURSO,
             'nombre_examen' => 'En curso',
-            'fecha' => $this->futureDate(8),
+            'fecha' => $this->futureDate(10),
         ]);
 
         $response = $this->getJson('/api/examenes/habilitados')
@@ -91,12 +102,11 @@ class ExamEligibleListExamsTest extends TestCase
 
         $ids = array_column($response->json('data'), 'id_examen');
 
-        $this->assertContains($programado->id_examen, $ids);
-        $this->assertContains($enCurso->id_examen, $ids);
+        $this->assertNotContains($abierto->id_examen, $ids);
+        $this->assertNotContains($enCurso->id_examen, $ids);
 
         // Orden ascendente por fecha.
-        $this->assertSame($programado->id_examen, $ids[0]);
-        $this->assertSame($enCurso->id_examen, $ids[1]);
+        $this->assertSame([$proximo->id_examen, $despues->id_examen], $ids);
     }
 
     public function test_devuelve_el_shape_minimo_del_selector(): void

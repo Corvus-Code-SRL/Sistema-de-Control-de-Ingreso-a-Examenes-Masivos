@@ -3,6 +3,7 @@
 namespace Tests\Feature\Exams;
 
 use App\Models\Exam;
+use App\Services\Exams\ExamEligibleListAccess;
 use App\Support\MotivoNoHabilitacion;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -138,8 +139,138 @@ class ExamEligibleListSaveTest extends TestCase
             'id_examen' => $exam->id_examen,
             'id_estudiante' => $studentId,
             'estado_habilitacion' => 'HABILITADO',
-            'observacion' => 'ASISTENCIA_INSUFICIENTE', // no se limpia
+            'observacion' => null,
         ]);
+    }
+
+    public function test_al_habilitar_de_nuevo_el_listado_ya_no_devuelve_el_motivo(): void
+    {
+        $exam = $this->createExamWithRoster(1);
+        $studentId = $this->studentIds($exam)[0];
+
+        $this->putJson("/api/examenes/{$exam->id_examen}/habilitados", [
+            'cambios' => [[
+                'id_estudiante' => $studentId,
+                'estado_habilitacion' => 'NO_HABILITADO',
+                'motivo' => MotivoNoHabilitacion::ASISTENCIA_INSUFICIENTE,
+            ]],
+        ])->assertOk();
+
+        $this->putJson("/api/examenes/{$exam->id_examen}/habilitados", [
+            'cambios' => [['id_estudiante' => $studentId, 'estado_habilitacion' => 'HABILITADO']],
+        ])->assertOk();
+
+        $student = collect($this->getJson("/api/examenes/{$exam->id_examen}/habilitados")->json('data.estudiantes'))
+            ->firstWhere('id_estudiante', $studentId);
+
+        $this->assertSame('HABILITADO', $student['estado_habilitacion']);
+        $this->assertNull($student['motivo']);
+        $this->assertNull($student['detalle']);
+    }
+
+    public function test_un_guardado_con_falla_a_mitad_de_la_escritura_no_deja_filas_ni_bitacora(): void
+    {
+        $exam = $this->createExamWithRoster(2);
+        [$first, $second] = array_slice($this->studentIds($exam), 0, 2);
+        $logsBefore = DB::table('log')->where('tabla_afectada', 'examen_estudiante')->count();
+
+        DB::unprepared("
+            CREATE FUNCTION zz_fallo_guardado_manual() RETURNS trigger LANGUAGE plpgsql AS \$\$
+            BEGIN
+                IF NEW.id_estudiante = {$second} THEN
+                    RAISE EXCEPTION 'fallo forzado a mitad de la escritura';
+                END IF;
+                RETURN NEW;
+            END \$\$;
+            CREATE TRIGGER zz_fallo_guardado_manual BEFORE UPDATE ON examen_estudiante
+                FOR EACH ROW EXECUTE FUNCTION zz_fallo_guardado_manual();
+        ");
+
+        $this->putJson("/api/examenes/{$exam->id_examen}/habilitados", [
+            'cambios' => [
+                [
+                    'id_estudiante' => $first,
+                    'estado_habilitacion' => 'NO_HABILITADO',
+                    'motivo' => MotivoNoHabilitacion::ASISTENCIA_INSUFICIENTE,
+                ],
+                [
+                    'id_estudiante' => $second,
+                    'estado_habilitacion' => 'NO_HABILITADO',
+                    'motivo' => MotivoNoHabilitacion::ASISTENCIA_INSUFICIENTE,
+                ],
+            ],
+        ])->assertStatus(500);
+
+        $this->assertSame(
+            0,
+            DB::table('examen_estudiante')
+                ->where('id_examen', $exam->id_examen)
+                ->where('estado_habilitacion', 'NO_HABILITADO')
+                ->count()
+        );
+        $this->assertSame(
+            $logsBefore,
+            DB::table('log')->where('tabla_afectada', 'examen_estudiante')->count()
+        );
+    }
+
+    public function test_el_guardado_manual_audita_con_origen_manual(): void
+    {
+        $exam = $this->createExamWithRoster(1);
+        $studentId = $this->studentIds($exam)[0];
+
+        $this->putJson("/api/examenes/{$exam->id_examen}/habilitados", [
+            'cambios' => [[
+                'id_estudiante' => $studentId,
+                'estado_habilitacion' => 'NO_HABILITADO',
+                'motivo' => MotivoNoHabilitacion::ASISTENCIA_INSUFICIENTE,
+            ]],
+        ])->assertOk();
+
+        $log = DB::table('log')->where('tabla_afectada', 'examen_estudiante')->orderByDesc('id_log')->first();
+        $nuevo = json_decode($log->nuevo_valor, true);
+
+        $this->assertSame('MANUAL', $nuevo['origen']);
+        $this->assertSame(1, $nuevo['total_cambios']);
+        $this->assertSame('NO_HABILITADO', $nuevo['cambios'][$studentId]['estado_habilitacion']);
+    }
+
+    public function test_con_el_control_de_ingreso_abierto_devuelve_409_y_no_escribe(): void
+    {
+        $exam = $this->createExamWithRoster(1);
+        $studentId = $this->studentIds($exam)[0];
+        $this->putExamInState($exam->id_examen, 'INGRESO_ABIERTO');
+
+        $this->putJson("/api/examenes/{$exam->id_examen}/habilitados", [
+            'cambios' => [[
+                'id_estudiante' => $studentId,
+                'estado_habilitacion' => 'NO_HABILITADO',
+                'motivo' => MotivoNoHabilitacion::ASISTENCIA_INSUFICIENTE,
+            ]],
+        ])
+            ->assertStatus(409)
+            ->assertJsonPath('message', ExamEligibleListAccess::WINDOW_CLOSED_MESSAGE);
+
+        $this->assertDatabaseHas('examen_estudiante', [
+            'id_examen' => $exam->id_examen,
+            'id_estudiante' => $studentId,
+            'estado_habilitacion' => 'HABILITADO',
+        ]);
+    }
+
+    public function test_antes_de_abrir_el_control_el_guardado_funciona(): void
+    {
+        $exam = $this->createExamWithRoster(1);
+        $this->assertNull($exam->fresh()->ingreso_abierto_en);
+        $studentId = $this->studentIds($exam)[0];
+
+        $this->putJson("/api/examenes/{$exam->id_examen}/habilitados", [
+            'cambios' => [[
+                'id_estudiante' => $studentId,
+                'estado_habilitacion' => 'NO_HABILITADO',
+                'motivo' => MotivoNoHabilitacion::ASISTENCIA_INSUFICIENTE,
+            ]],
+        ])->assertOk();
     }
 
     public function test_marca_no_habilitado_a_los_faltantes(): void

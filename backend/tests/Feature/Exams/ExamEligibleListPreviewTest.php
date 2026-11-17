@@ -3,6 +3,7 @@
 namespace Tests\Feature\Exams;
 
 use App\Models\Exam;
+use App\Services\Exams\ExamEligibleListAccess;
 use App\Services\Exams\Importers\EligibleListPreviewResult;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
@@ -117,10 +118,18 @@ class ExamEligibleListPreviewTest extends TestCase
 
         $this->previewCsv($exam, ['300000001'])
             ->assertStatus(409)
-            ->assertJsonPath(
-                'message',
-                'El control de ingreso ya empezó. La lista de habilitados es de solo lectura.'
-            );
+            ->assertJsonPath('message', ExamEligibleListAccess::WINDOW_CLOSED_MESSAGE);
+    }
+
+    public function test_preview_con_el_control_de_ingreso_abierto_devuelve_409(): void
+    {
+        $exam = $this->createExam();
+        $this->seedRoster($exam, 1);
+        $this->putExamInState($exam->id_examen, 'INGRESO_ABIERTO');
+
+        $this->previewCsv($exam, ['300000001'])
+            ->assertStatus(409)
+            ->assertJsonPath('message', ExamEligibleListAccess::WINDOW_CLOSED_MESSAGE);
     }
 
     public function test_preview_cuenta_todos_los_faltantes_cuando_hay_varios(): void
