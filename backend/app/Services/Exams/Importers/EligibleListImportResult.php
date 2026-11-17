@@ -31,6 +31,7 @@ final class EligibleListImportResult
      * @var array<int, array{
      *     id_estudiante: int,
      *     codigo_sis: string,
+     *     nombre_completo: string,
      *     estado_habilitacion: string,
      *     motivo: ?string,
      *     detalle: ?string
@@ -42,6 +43,7 @@ final class EligibleListImportResult
      * @param array<int, array{
      *     id_estudiante: int,
      *     codigo_sis: string,
+     *     nombre_completo: string,
      *     estado_habilitacion: string,
      *     motivo: ?string,
      *     detalle: ?string
@@ -78,6 +80,7 @@ final class EligibleListImportResult
      * @return array<int, array{
      *     id_estudiante: int,
      *     codigo_sis: string,
+     *     nombre_completo: string,
      *     estado_habilitacion: string,
      *     motivo: ?string,
      *     detalle: ?string

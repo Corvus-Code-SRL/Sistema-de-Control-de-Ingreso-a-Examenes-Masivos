@@ -29,7 +29,7 @@ export interface ExamSelectorItem {
   carrera: ExamSelectorRef
   fecha: string
   hora_inicio: string
-  estado: Extract<ExamStatus, 'PROGRAMADO' | 'EN_INGRESO'>
+  estado: Extract<ExamStatus, 'PROGRAMADO' | 'EN_CURSO'>
   grupos: string[]
 }
 
@@ -91,6 +91,7 @@ export interface UploadPreviewData {
 export interface PendingChangeFromUpload {
   id_estudiante: number
   codigo_sis: string
+  nombre_completo: string
   estado_habilitacion: EligibilityStatus
   motivo: NoEligibleReason | null
   detalle: string | null

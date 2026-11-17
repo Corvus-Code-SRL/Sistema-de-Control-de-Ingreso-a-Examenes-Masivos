@@ -18,6 +18,7 @@ class EligibleListImportResource extends JsonResource
                     return [
                         'id_estudiante' => $cambio['id_estudiante'],
                         'codigo_sis' => $cambio['codigo_sis'],
+                        'nombre_completo' => $cambio['nombre_completo'],
                         'estado_habilitacion' => $cambio['estado_habilitacion'],
                         'motivo' => $cambio['motivo'],
                         'detalle' => $cambio['detalle'],
