@@ -60,6 +60,22 @@ describe('VerificationResult fotografía', () => {
   })
 })
 
+describe('VerificationResult estudiante excepcional (HU-023)', () => {
+  it('muestra la marca y el motivo solo cuando el estudiante es excepcional', () => {
+    const { rerender } = render(<VerificationResult
+      result={{ ...result, es_excepcional: true, motivo_excepcional: 'Convalidación aprobada' }}
+      busy={false} onConfirm={() => {}} onReject={() => {}} onNext={() => {}}
+    />)
+    expect(screen.getByText('Excepcional')).toBeInTheDocument()
+    expect(screen.getByText('Motivo: Convalidación aprobada')).toBeInTheDocument()
+
+    rerender(<VerificationResult
+      result={result} busy={false} onConfirm={() => {}} onReject={() => {}} onNext={() => {}}
+    />)
+    expect(screen.queryByText('Excepcional')).not.toBeInTheDocument()
+  })
+})
+
 describe('VerificationResult CI', () => {
   it('muestra el CI coincidente, el grupo y el aula como en la ficha', () => {
     render(<VerificationResult

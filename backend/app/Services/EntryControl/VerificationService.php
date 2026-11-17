@@ -158,6 +158,8 @@ class VerificationService
         $result = $this->emptyResult(IdentificationService::IDENTIFIED);
         $result['estudiante'] = $record['estudiante'];
         $result['grupo'] = $record['grupo'];
+        $result['es_excepcional'] = $record['es_excepcional'] ?? false;
+        $result['motivo_excepcional'] = $record['motivo_excepcional'] ?? null;
         $result['ambiente_asignado'] = $record['ambiente_asignado'];
         $risk = $record['antecedentes'] ?? [];
         $result['antecedentes'] = isset($risk['total']) ? $risk : [

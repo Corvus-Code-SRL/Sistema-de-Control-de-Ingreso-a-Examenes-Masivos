@@ -17,16 +17,16 @@ class ActionSeederTest extends TestCase
         return DB::table('accion')->orderBy('id_accion')->get()->map(fn ($row) => (array) $row)->all();
     }
 
-    public function test_dos_ejecuciones_dejan_veintisiete_acciones_sin_duplicados(): void
+    public function test_dos_ejecuciones_dejan_veintiocho_acciones_sin_duplicados(): void
     {
         $this->seed(ActionSeeder::class);
         $afterFirst = $this->catalog();
 
         $this->seed(ActionSeeder::class);
 
-        $this->assertCount(27, $afterFirst);
+        $this->assertCount(28, $afterFirst);
         $this->assertSame($afterFirst, $this->catalog());
-        $this->assertSame(27, DB::table('accion')->distinct()->count('operacion'));
+        $this->assertSame(28, DB::table('accion')->distinct()->count('operacion'));
     }
 
     public function test_incluye_las_acciones_de_aprobacion_y_rechazo_de_reportes(): void
@@ -108,7 +108,7 @@ class ActionSeederTest extends TestCase
                 ->value('descripcion')
         );
 
-        $this->assertSame(27, DB::table('accion')->count());
+        $this->assertSame(28, DB::table('accion')->count());
     }
 
     public function test_conserva_inicio_y_las_dos_acciones_de_situaciones(): void
@@ -128,16 +128,37 @@ class ActionSeederTest extends TestCase
                 ->pluck('tipo_operacion', 'operacion')
                 ->all()
         );
-        $this->assertSame(27, DB::table('accion')->count());
+        $this->assertSame(28, DB::table('accion')->count());
     }
 
-    public function test_las_acciones_de_invitaciones_van_al_final_del_catalogo(): void
+    public function test_las_acciones_nuevas_van_al_final_del_catalogo(): void
     {
         $this->seed(ActionSeeder::class);
 
-        $lastThree = DB::table('accion')->orderByDesc('id_accion')->limit(3)->pluck('operacion')->reverse()->values()->all();
+        $lastFour = DB::table('accion')->orderByDesc('id_accion')->limit(4)->pluck('operacion')
+            ->reverse()->values()->all();
 
-        $this->assertSame(['GUARDAR_HABILITADOS', 'ACEPTAR_INVITACION', 'RECHAZAR_INVITACION'], $lastThree);
+        $this->assertSame(
+            ['GUARDAR_HABILITADOS', 'ACEPTAR_INVITACION', 'RECHAZAR_INVITACION', 'REGISTRAR_ESTUDIANTE_EXCEPCIONAL'],
+            $lastFour
+        );
+    }
+
+    public function test_sembrar_en_una_base_que_ya_tiene_el_catalogo_agrega_el_excepcional_sin_mover_los_ids(): void
+    {
+        $this->seed(ActionSeeder::class);
+        DB::table('accion')->where('operacion', 'REGISTRAR_ESTUDIANTE_EXCEPCIONAL')->delete();
+        $existing = DB::table('accion')->orderBy('id_accion')->pluck('operacion', 'id_accion')->all();
+
+        $this->seed(ActionSeeder::class);
+        $this->seed(ActionSeeder::class);
+
+        $afterwards = DB::table('accion')->orderBy('id_accion')->pluck('operacion', 'id_accion')->all();
+        $newId = array_search('REGISTRAR_ESTUDIANTE_EXCEPCIONAL', $afterwards, true);
+
+        $this->assertSame($existing, array_diff_key($afterwards, [$newId => true]));
+        $this->assertGreaterThan(max(array_keys($existing)), $newId);
+        $this->assertSame(1, DB::table('accion')->where('operacion', 'REGISTRAR_ESTUDIANTE_EXCEPCIONAL')->count());
     }
 
     public function test_registra_el_retiro_del_examen_sin_duplicados(): void

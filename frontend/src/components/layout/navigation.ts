@@ -342,6 +342,13 @@ export const NAVIGATION: readonly NavSection[] = [
         to: '/situacion-excepcional'
       },
       {
+        id: 'teacher-exceptional-student',
+        label: 'Registrar estudiante excepcional',
+        icon: UserPlus,
+        capability: 'casos-especiales.gestionar',
+        to: '/estudiante-excepcional'
+      },
+      {
         id: 'teacher-report-incident',
         label: 'Reportar incidencia',
         icon: FileWarning,

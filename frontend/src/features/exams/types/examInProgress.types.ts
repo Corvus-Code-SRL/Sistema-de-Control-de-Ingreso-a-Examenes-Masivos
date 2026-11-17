@@ -15,6 +15,9 @@ export interface InProgressStudent {
     id_estudiante: number;
     /** Grupo por el que figura en la nómina; la tabla lo usa si la lista va separada por grupo (HU-027). */
     id_grupo?: number | null;
+    /** Agregado solo a la lista de este examen (HU-023), con el motivo del registro. */
+    es_excepcional?: boolean;
+    motivo_excepcional?: string | null;
     cod_sis: string;
     ci: string | null;
     nombre_completo: string;

@@ -59,6 +59,9 @@ export interface Verification {
   auxiliar?: EntryAssistant | null
   /** `docente` solo viene si la lista del examen va separada por grupo (HU-027). */
   grupo: { id_grupo: number; num_grupo: string; docente?: string | null } | null
+  /** Agregado solo a la lista de este examen (HU-023), con el motivo del registro. */
+  es_excepcional?: boolean
+  motivo_excepcional?: string | null
   ambiente_asignado: EntryRoom | null
   antecedentes: { total: number; latest: { tipo_falta: string; fecha_registro: string } | null }
   ingreso_previo: PreviousEntry | null
