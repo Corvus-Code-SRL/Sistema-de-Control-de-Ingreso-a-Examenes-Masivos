@@ -561,7 +561,13 @@ describe('AppSidebar — entradas y estado activo', () => {
     expect(screen.getByRole('link', { name: 'Programados' })).not.toHaveAttribute('aria-current')
   })
 
-  it.each(['Docente', 'Invitado'] as const)('resalta Controlar tiempo del examen para %s', async (role) => {
+  it('el Invitado no ve Controlar tiempo del examen', async () => {
+    renderSidebar('Invitado', '/examenes/controlar-tiempo')
+    await openAllSections(userEvent.setup())
+    expect(screen.queryByRole('link', { name: 'Controlar tiempo del examen' })).not.toBeInTheDocument()
+  })
+
+  it.each(['Docente'] as const)('resalta Controlar tiempo del examen para %s', async (role) => {
     const user = userEvent.setup()
     renderSidebar(role, '/examenes/controlar-tiempo')
     await openAllSections(user)

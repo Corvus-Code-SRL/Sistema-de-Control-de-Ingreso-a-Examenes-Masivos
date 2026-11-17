@@ -78,7 +78,7 @@ function TeacherLayout() {
   const { capabilities } = useCurrentUser()
   const { pathname } = useLocation()
 
-  if (estado !== 'autenticado' || !usuario || !capabilities.includes('examenes.gestionar')) return <AppLayout />
+  if (estado !== 'autenticado' || !usuario || !capabilities.includes('examenes.controlar-tiempo')) return <AppLayout />
 
   return (
     <ExamTimersProvider key={usuario.id_usuario}>
@@ -193,7 +193,7 @@ function DocenteRoutes() {
 
         <Route
           path="/examenes/controlar-tiempo"
-          element={guarded('examenes.gestionar', <ExamTimerPage />)}
+          element={guarded('examenes.controlar-tiempo', <ExamTimerPage />)}
         />
 
         <Route

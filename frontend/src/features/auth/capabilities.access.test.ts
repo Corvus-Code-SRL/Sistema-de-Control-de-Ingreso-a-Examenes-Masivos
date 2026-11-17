@@ -141,3 +141,13 @@ describe('capacidades del Invitado y del Docente', () => {
     }
   })
 })
+
+
+describe('Control del cronómetro (HU-038)', () => {
+  it('solo el Docente recibe la capacidad independiente', () => {
+    expect(hasCapability('Docente', 'examenes.controlar-tiempo')).toBe(true)
+    for (const role of ['Invitado', 'Administrador', 'Auxiliar', null]) {
+      expect(hasCapability(role, 'examenes.controlar-tiempo')).toBe(false)
+    }
+  })
+})

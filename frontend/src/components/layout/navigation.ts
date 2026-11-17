@@ -322,7 +322,7 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'teacher-exam-timer',
         label: 'Controlar tiempo del examen',
         icon: Clock,
-        capability: 'examenes.gestionar',
+        capability: 'examenes.controlar-tiempo',
         to: '/examenes/controlar-tiempo'
       },
       {
