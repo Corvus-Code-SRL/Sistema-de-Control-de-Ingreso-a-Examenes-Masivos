@@ -6,6 +6,7 @@ use App\Exceptions\Exams\ExamStateException;
 use App\Models\Exam;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Exams\Distribution\RoomDistributionReader;
 use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\Security\UserRoleService;
 use App\Services\Incidents\ExamInProgressSituationService;
@@ -19,7 +20,8 @@ class ExamInProgressQueryService
         private ExamTimingService $timing,
         private UserRoleService $roles,
         private ExamInProgressSituationService $situations,
-        private ExamCollaboratorService $collaborators
+        private ExamCollaboratorService $collaborators,
+        private RoomDistributionReader $distribution
     ) {}
 
     public function show(Exam $exam, User $actor): array
@@ -117,7 +119,7 @@ class ExamInProgressQueryService
             ->orderBy('nomina.id_estudiante')
             ->get();
 
-        $assignedRooms = EntryControlSnapshotService::assignRooms(
+        $assignedRooms = $this->distribution->assignedRooms($examId) ?? EntryControlSnapshotService::assignRooms(
             $roster->pluck('id_estudiante')
                 ->map(fn ($id) => (int) $id)
                 ->all(),
