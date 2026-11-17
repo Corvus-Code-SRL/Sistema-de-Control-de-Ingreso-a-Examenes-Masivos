@@ -4,43 +4,66 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { exceptionalStudentService } from '../services/exceptionalStudentService'
-import type { ExceptionalOptions } from '../types/exceptional-student.types'
 import { useExceptionalStudentFlow } from '../hooks/useExceptionalStudentFlow'
-import type { ExceptionalExam, RegisterExceptionalInput } from '../types/exceptional-student.types'
+import { exceptionalStudentService } from '../services/exceptionalStudentService'
+import type {
+  ExceptionalExam,
+  ExceptionalOptions,
+  RegisterExceptionalInput
+} from '../types/exceptional-student.types'
 import { ExceptionalRegistrationForm } from './ExceptionalRegistrationForm'
-import { EXCEPTIONAL_MESSAGES } from './exceptionalStudentMessages'
+import { EXCEPTIONAL_MESSAGES, SIS_PATTERN } from './exceptionalStudentMessages'
+
+interface ExceptionalStudentWorkspaceProps {
+  exam: ExceptionalExam
+  /** El servidor informó que el examen cambió de estado: la vista recarga sus exámenes. */
+  onExamChanged: (message: string) => void
+}
 
 /**
  * Búsqueda por código SIS y registro del estudiante en el examen elegido. Se monta con `key` del
  * examen: al cambiar de examen se empieza de cero.
  */
-export function ExceptionalStudentWorkspace({ exam }: { exam: ExceptionalExam }) {
-  const flow = useExceptionalStudentFlow(exam)
+export function ExceptionalStudentWorkspace({ exam, onExamChanged }: ExceptionalStudentWorkspaceProps) {
+  const flow = useExceptionalStudentFlow(exam, onExamChanged)
   const [options, setOptions] = useState<ExceptionalOptions | null>(null)
   const [optionsError, setOptionsError] = useState('')
-  useEffect(() => {
-    const controller = new AbortController()
-    exceptionalStudentService.options(exam.id_examen, controller.signal)
-      .then(({ data }) => { if (!controller.signal.aborted) setOptions(data) })
-      .catch(() => { if (!controller.signal.aborted) setOptionsError('No se pudieron cargar grupos, carreras y ambientes.') })
-    return () => controller.abort()
-  }, [exam.id_examen])
   const [code, setCode] = useState('')
   const [codeError, setCodeError] = useState('')
-  const blocked = !exam.permitido
   const searching = flow.search.status === 'searching'
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    exceptionalStudentService
+      .options(exam.id_examen, controller.signal)
+      .then(({ data }) => {
+        if (!controller.signal.aborted) setOptions(data)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setOptionsError(EXCEPTIONAL_MESSAGES.optionsFailed)
+      })
+
+    return () => controller.abort()
+  }, [exam.id_examen])
 
   function handleSearch(event: FormEvent) {
     event.preventDefault()
 
-    if (code.trim() === '') {
+    const trimmed = code.trim()
+
+    if (trimmed === '') {
       setCodeError(EXCEPTIONAL_MESSAGES.sisRequired)
       return
     }
 
+    if (!SIS_PATTERN.test(trimmed)) {
+      setCodeError(EXCEPTIONAL_MESSAGES.sisInvalid)
+      return
+    }
+
     setCodeError('')
-    void flow.find(code)
+    void flow.find(trimmed)
   }
 
   async function handleRegister(input: RegisterExceptionalInput) {
@@ -58,12 +81,6 @@ export function ExceptionalStudentWorkspace({ exam }: { exam: ExceptionalExam })
 
   return (
     <div className="space-y-4">
-      {blocked && (
-        <p role="status" className="rounded-lg border p-3 text-sm text-warn-fg">
-          {EXCEPTIONAL_MESSAGES.notAllowed}
-        </p>
-      )}
-
       {flow.success && (
         <p role="status" className="text-sm font-medium text-brand">
           {flow.success}
@@ -77,13 +94,13 @@ export function ExceptionalStudentWorkspace({ exam }: { exam: ExceptionalExam })
             <Input
               id="exceptional-sis"
               value={code}
-              maxLength={30}
-              disabled={blocked}
+              maxLength={9}
+              inputMode="numeric"
               onChange={(event) => setCode(event.target.value)}
               aria-invalid={codeError !== ''}
               className="h-11 sm:w-72"
             />
-            <Button type="submit" disabled={blocked || searching}>
+            <Button type="submit" disabled={searching}>
               <Search aria-hidden="true" className="size-4" />
               {searching ? 'Buscando…' : 'Buscar'}
             </Button>
@@ -115,10 +132,6 @@ export function ExceptionalStudentWorkspace({ exam }: { exam: ExceptionalExam })
             <div>
               <dt className="text-muted-foreground">Nombre completo</dt>
               <dd className="font-medium">{flow.search.candidate.nombre_completo}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">CI</dt>
-              <dd>{flow.search.candidate.ci}</dd>
             </div>
             <div>
               <dt className="text-muted-foreground">Código SIS</dt>

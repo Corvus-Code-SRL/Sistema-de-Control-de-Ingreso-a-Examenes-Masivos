@@ -28,9 +28,13 @@ function failureMessage(cause: unknown, fallback: string): string {
  * Búsqueda y registro de un estudiante excepcional en un examen.
  *
  * Una búsqueda nueva cancela la anterior y una respuesta tardía nunca pisa a la más nueva. Registrar
- * no se repite mientras hay un registro en curso.
+ * no se repite mientras hay un registro en curso. Si el servidor responde que el examen ya no está En curso
+ * (409), avisa con `onExamChanged` y el mensaje del servidor para que la vista vuelva a cargar la lista.
  */
-export function useExceptionalStudentFlow(exam: ExceptionalExam) {
+export function useExceptionalStudentFlow(
+  exam: ExceptionalExam,
+  onExamChanged: (message: string) => void
+) {
   const [search, setSearch] = useState<SearchState>({ status: 'idle' })
   const [registering, setRegistering] = useState(false)
   const [formError, setFormError] = useState('')
@@ -101,7 +105,11 @@ export function useExceptionalStudentFlow(exam: ExceptionalExam) {
 
         return true
       } catch (cause) {
-        setFormError(failureMessage(cause, EXCEPTIONAL_MESSAGES.registerFailed))
+        const message = failureMessage(cause, EXCEPTIONAL_MESSAGES.registerFailed)
+
+        setFormError(message)
+
+        if (cause instanceof ApiError && cause.status === 409) onExamChanged(message)
 
         return false
       } finally {
@@ -109,7 +117,7 @@ export function useExceptionalStudentFlow(exam: ExceptionalExam) {
         setRegistering(false)
       }
     },
-    [exam.id_examen]
+    [exam.id_examen, onExamChanged]
   )
 
   /** Descarta la búsqueda sin agregar nada. */

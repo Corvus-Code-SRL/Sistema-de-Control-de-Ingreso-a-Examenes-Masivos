@@ -1,4 +1,4 @@
-/** Examen del docente. `permitido`: el examen todavía admite estudiantes excepcionales. */
+/** Examen En curso del docente responsable, en el que se puede registrar un estudiante excepcional. */
 export interface ExceptionalExam {
   id_examen: number
   nombre_examen: string
@@ -7,7 +7,6 @@ export interface ExceptionalExam {
   /** Hora de inicio, HH:MM. */
   hora_inicio: string
   estado: string
-  permitido: boolean
 }
 
 export interface ExceptionalStudentCareer {
@@ -19,7 +18,6 @@ export interface ExceptionalStudentCareer {
 export interface ExceptionalCandidate {
   id_estudiante: number
   cod_sis: string
-  ci: string
   nombre_completo: string
   /** Carrera de su inscripción más reciente; nula si no tiene ninguna. */
   carrera: ExceptionalStudentCareer | null
@@ -42,7 +40,8 @@ export interface ExceptionalRegistration {
 }
 
 export interface ExceptionalOptions {
-  grupos: { id_grupo: number; nombre: string; carrera_principal: number }[]
+  grupos: { id_grupo: number; nombre: string }[]
+  /** Carreras que ofrece cada grupo del examen. */
   carreras: { id_grupo: number; id_carrera: number; nombre: string }[]
   ambientes: { id_ambiente: number; nombre: string; capacidad: number; ocupados: number }[]
 }

@@ -9,7 +9,7 @@ import type {
 
 /** Registro de estudiantes excepcionales (HU-023) mediante el cliente autenticado compartido. */
 export const exceptionalStudentService = {
-  /** Exámenes del docente que se pueden elegir, con el aviso de si admiten excepcionales. */
+  /** Exámenes En curso del docente responsable. */
   exams(signal?: AbortSignal): Promise<{ data: ExceptionalExam[] }> {
     return apiClient('/docente/estudiantes-excepcionales/examenes', { signal })
   },
