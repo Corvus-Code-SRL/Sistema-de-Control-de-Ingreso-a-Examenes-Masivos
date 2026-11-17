@@ -111,4 +111,22 @@ class MotivoNoHabilitacionTest extends TestCase
     {
         $this->assertSame('NO_EXISTE', MotivoNoHabilitacion::label('NO_EXISTE'));
     }
+
+    public function test_el_motivo_fijo_del_archivo_tiene_etiqueta_y_se_deserializa(): void
+    {
+        $this->assertSame(
+            'No figura en la lista cargada',
+            MotivoNoHabilitacion::label(MotivoNoHabilitacion::NO_FIGURA_EN_LISTA)
+        );
+        $this->assertSame(
+            ['motivo' => MotivoNoHabilitacion::NO_FIGURA_EN_LISTA, 'detalle' => null],
+            MotivoNoHabilitacion::fromObservation(MotivoNoHabilitacion::NO_FIGURA_EN_LISTA)
+        );
+    }
+
+    public function test_el_motivo_fijo_no_es_elegible_a_mano(): void
+    {
+        $this->assertNotContains(MotivoNoHabilitacion::NO_FIGURA_EN_LISTA, MotivoNoHabilitacion::all());
+        $this->assertFalse(MotivoNoHabilitacion::isValid(MotivoNoHabilitacion::NO_FIGURA_EN_LISTA));
+    }
 }

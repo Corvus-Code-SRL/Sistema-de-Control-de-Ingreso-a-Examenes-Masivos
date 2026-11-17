@@ -270,4 +270,34 @@ class VerificationEvaluateTest extends TestCase
         $this->assertSame(VerificationService::NOT_ENABLED, $result['veredicto']);
         $this->assertStringContainsString('Motivo: Documento pendiente', $result['motivo']);
     }
+
+    public function test_estudiante_que_no_figura_en_la_lista_cargada_muestra_su_motivo(): void
+    {
+        $record = [
+            'estudiante' => [
+                'id_estudiante' => 1,
+                'cod_sis' => '202210443',
+                'ci' => '12345678',
+                'ci_pendiente' => false,
+                'nombre_completo' => 'Álvarez Rojas, Camila',
+                'carrera' => 'Sistemas',
+                'foto_url' => null,
+            ],
+            'grupo' => ['id_grupo' => 2, 'num_grupo' => '2'],
+            'estado_habilitacion' => 'NO_HABILITADO',
+            'observacion' => 'NO_FIGURA_EN_LISTA',
+            'ambiente_asignado' => ['id_ambiente' => 1, 'nro_aula' => 'A-101'],
+            'antecedentes' => ['total' => 0, 'latest' => null],
+            'ingreso_previo' => null,
+        ];
+
+        $result = (new VerificationService(
+            $this->createMock(EntryControlSnapshotService::class),
+            $this->createMock(IdentificationService::class),
+            $this->createMock(RiskCenterQueryService::class),
+        ))->evaluate($record, [], 1);
+
+        $this->assertSame(VerificationService::NOT_ENABLED, $result['veredicto']);
+        $this->assertStringContainsString('Motivo: No figura en la lista cargada.', $result['motivo']);
+    }
 }

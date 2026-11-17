@@ -19,7 +19,13 @@ final class MotivoNoHabilitacion
     public const NO_CUMPLE_PRERREQUISITO  = 'NO_CUMPLE_PRERREQUISITO';
     public const OTRO                     = 'OTRO';
 
-    /** @return array<int, string> */
+    /**
+     * Motivo fijo que el sistema asigna al reemplazar la lista con un archivo.
+     * No forma parte de all(): el docente no lo elige a mano.
+     */
+    public const NO_FIGURA_EN_LISTA       = 'NO_FIGURA_EN_LISTA';
+
+    /** @return array<int, string> motivos que el docente puede elegir a mano */
     public static function all(): array
     {
         return [
@@ -93,7 +99,7 @@ final class MotivoNoHabilitacion
             return null;
         }
 
-        foreach (self::all() as $motivo) {
+        foreach ([...self::all(), self::NO_FIGURA_EN_LISTA] as $motivo) {
             if ($observation === $motivo) {
                 return ['motivo' => $motivo, 'detalle' => null];
             }
@@ -119,6 +125,7 @@ final class MotivoNoHabilitacion
             self::NO_ENTREGO_TRABAJO_FINAL => 'No entregó el trabajo final',
             self::NO_CUMPLE_PRERREQUISITO => 'No cumple prerrequisito',
             self::OTRO => 'Otro',
+            self::NO_FIGURA_EN_LISTA => 'No figura en la lista cargada',
             default => $motivo,
         };
     }
