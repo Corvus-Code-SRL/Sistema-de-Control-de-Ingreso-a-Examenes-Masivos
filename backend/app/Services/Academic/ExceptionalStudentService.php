@@ -3,89 +3,84 @@
 namespace App\Services\Academic;
 
 use App\Exceptions\Exams\ExamStateException;
-use App\Models\Group;
+use App\Models\Exam;
 use App\Models\Student;
-use App\Services\Exams\ExamRosterLockService;
+use App\Services\Exams\ExamParticipantService;
 use App\Services\Security\AuditLogService;
 use App\Support\RecordStatus;
 use App\Support\SisCode;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 
 /**
- * Estudiantes excepcionales (HU-023): un estudiante que no figura en la nómina de un grupo
- * (convalidación, inscripción tardía aprobada) entra al grupo con la marca «Excepcional» y su motivo.
+ * Estudiantes excepcionales (HU-023): un estudiante que no figura en la lista de un examen
+ * (convalidación, inscripción tardía aprobada) se agrega SOLO a la lista de ese examen.
  *
- * Solo escribe su propia fila en grupo_estudiante: no recarga la nómina, y la carga de nómina (021)
- * solo inserta con ON CONFLICT DO NOTHING, así que nunca la borra. Con el examen PROGRAMADO el
- * estudiante pasa a ser esperado (los participantes se derivan de grupo_estudiante); con uno en
- * ingreso o en curso el registro se rechaza (409).
+ * No toca el padrón del grupo (grupo_estudiante) ni la nómina: ni la HU-020 ni la HU-021 lo ven, y
+ * los demás exámenes del mismo grupo quedan intactos. La lista de esperados de un examen se deriva
+ * del padrón (ExamParticipantService::expected()), por eso un estudiante «ya está en el examen»
+ * cuando esa consulta lo devuelve.
+ *
+ * PENDIENTE (decisión 1 con el líder): dónde se guarda el registro. Ver persist().
  */
 class ExceptionalStudentService
 {
-    private StudentRosterGroupAccess $groupAccess;
+    /** Estados de examen que se ofrecen en el desplegable (con su aviso si no admiten registro). */
+    private const OFFERED_STATES = [Exam::PROGRAMADO, Exam::EN_CURSO];
 
-    private ExamRosterLockService $rosterLock;
+    /** Estados en los que el examen admite un estudiante excepcional (decisión 2 con el líder). */
+    private const REGISTRABLE_STATES = [Exam::PROGRAMADO];
 
-    private GroupCareerService $groupCareers;
-
-    private AssistantService $assistants;
+    private ExamParticipantService $participants;
 
     private AuditLogService $auditLog;
 
-    public function __construct(
-        StudentRosterGroupAccess $groupAccess,
-        ExamRosterLockService $rosterLock,
-        GroupCareerService $groupCareers,
-        AssistantService $assistants,
-        AuditLogService $auditLog
-    ) {
-        $this->groupAccess = $groupAccess;
-        $this->rosterLock = $rosterLock;
-        $this->groupCareers = $groupCareers;
-        $this->assistants = $assistants;
+    public function __construct(ExamParticipantService $participants, AuditLogService $auditLog)
+    {
+        $this->participants = $participants;
         $this->auditLog = $auditLog;
     }
 
     /**
-     * Grupos del docente en el período vigente, con las carreras que atiende cada uno y si hoy están
-     * bloqueados por un examen en ingreso o en curso.
+     * Exámenes propios del docente que se pueden elegir, del más próximo al más lejano, con el
+     * aviso de si hoy admiten estudiantes excepcionales.
      *
      * @return array<int, object>
      */
-    public function teacherGroups(string $teacherId): array
+    public function teacherExams(string $teacherId): array
     {
-        $options = $this->assistants->listTeacherGroups($teacherId);
-
-        if ($options->isEmpty()) {
-            return [];
-        }
-
-        $models = Group::query()
-            ->whereIn('id_grupo', $options->pluck('id_grupo')->all())
+        return Exam::query()
+            ->where('id_usuario_docente', $teacherId)
+            ->whereIn('estado', self::OFFERED_STATES)
+            ->orderBy('fecha')
+            ->orderBy('hora_inicio')
+            ->orderBy('id_examen')
             ->get()
-            ->keyBy('id_grupo');
-
-        return $options->map(function ($option) use ($models): object {
-            $group = $models->get($option->id_grupo);
-
-            return (object) [
-                'id_grupo' => (int) $option->id_grupo,
-                'num_grupo' => (string) $option->num_grupo,
-                'label' => (string) $option->label,
-                'carreras' => $group === null ? [] : $this->groupCareers->careersOf($group),
-                'bloqueado' => $this->rosterLock->isLocked((int) $option->id_grupo),
-            ];
-        })->values()->all();
+            ->map(function (Exam $exam): object {
+                return (object) [
+                    'id_examen' => (int) $exam->id_examen,
+                    'nombre_examen' => (string) $exam->nombre_examen,
+                    'fecha' => $exam->fecha->format('Y-m-d'),
+                    'hora_inicio' => substr((string) $exam->hora_inicio, 0, 5),
+                    'estado' => (string) $exam->estado,
+                    'permitido' => $this->admits($exam),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**
      * Busca al estudiante por código SIS, en la misma tabla que usa la carga de nómina.
      * Devuelve null si no hay un estudiante activo con ese código.
+     *
+     * @throws AuthorizationException si el examen no es del docente
      */
-    public function search(int $groupId, string $teacherId, string $sisCode): ?object
+    public function search(int $examId, string $teacherId, string $sisCode): ?object
     {
-        $group = $this->groupAccess->getOwnedActive($groupId, $teacherId);
+        $exam = $this->ownedExam($examId, $teacherId);
 
         $student = Student::query()
             ->where('cod_sis', SisCode::normalize($sisCode))
@@ -100,39 +95,34 @@ class ExceptionalStudentService
             'id_estudiante' => (int) $student->id_estudiante,
             'cod_sis' => (string) $student->cod_sis,
             'nombre_completo' => $student->nombre_completo,
-            'ci' => $student->ci === null ? null : (string) $student->ci,
             'carrera' => $this->latestCareer((int) $student->id_estudiante),
-            'ya_inscrito' => $this->isEnrolled((int) $group->id_grupo, (int) $student->id_estudiante),
+            'ya_en_examen' => $this->isExpected((int) $exam->id_examen, (int) $student->id_estudiante),
         ];
     }
 
     /**
-     * Inscribe al estudiante como excepcional. Una sola transacción con el grupo bloqueado, para que
-     * dos registros o una carga de nómina simultáneos no se pisen.
+     * Agrega al estudiante a la lista del examen como excepcional. Una sola transacción con el
+     * examen bloqueado, para que dos registros simultáneos no se pisen.
      *
-     * @throws ExamStateException si un examen del grupo está en ingreso o en curso
-     * @throws ValidationException si ya está inscrito, no existe o la carrera no es del grupo
+     * @throws AuthorizationException si el examen no es del docente
+     * @throws ExamStateException si el examen ya no admite estudiantes excepcionales
+     * @throws ValidationException si el estudiante no existe o ya está en la lista del examen
      */
-    public function register(
-        int $groupId,
-        string $teacherId,
-        int $studentId,
-        string $reason,
-        ?int $careerId
-    ): object {
-        $group = $this->groupAccess->getOwnedActive($groupId, $teacherId);
+    public function register(int $examId, string $teacherId, int $studentId, string $reason): object
+    {
+        $this->ownedExam($examId, $teacherId);
 
-        return DB::transaction(function () use ($group, $teacherId, $studentId, $reason, $careerId): object {
-            DB::table('grupo')
-                ->where('id_grupo', $group->id_grupo)
+        return DB::transaction(function () use ($examId, $teacherId, $studentId, $reason): object {
+            DB::table('examen')
+                ->where('id_examen', $examId)
                 ->lockForUpdate()
-                ->value('id_grupo');
+                ->value('id_examen');
 
-            if ($this->rosterLock->isLocked((int) $group->id_grupo)) {
-                throw new ExamStateException(
-                    'No se puede registrar un estudiante excepcional mientras el grupo '
-                    . 'tiene un examen en ingreso o en curso.'
-                );
+            // El estado se lee de nuevo con el examen bloqueado: pudo cambiar desde la comprobación.
+            $exam = Exam::query()->findOrFail($examId);
+
+            if (! $this->admits($exam)) {
+                throw new ExamStateException('El examen ya no admite estudiantes excepcionales.');
             }
 
             $student = Student::query()
@@ -145,66 +135,72 @@ class ExceptionalStudentService
                 ]);
             }
 
-            if ($this->isEnrolled((int) $group->id_grupo, $studentId)) {
+            if ($this->isExpected($examId, $studentId)) {
                 throw ValidationException::withMessages([
-                    'id_estudiante' => ['Ya está inscrito en este grupo'],
+                    'id_estudiante' => ['Ya figura en la lista de estudiantes de este examen'],
                 ]);
             }
 
-            $career = $this->resolveCareer($group, $careerId);
             $motivo = trim($reason);
-            $fecha = now()->toDateString();
 
-            DB::table('grupo_estudiante')->insert([
-                'id_grupo' => (int) $group->id_grupo,
-                'id_estudiante' => $studentId,
-                'fecha_inscripcion' => $fecha,
-                'estado' => RecordStatus::ACTIVE,
-                'id_carrera' => (int) $career['id_carrera'],
-                'es_excepcional' => true,
-                'motivo_excepcional' => $motivo,
-            ]);
-
-            $this->auditLog->registrar(
-                'REGISTRAR_ESTUDIANTE_EXCEPCIONAL',
-                'grupo_estudiante',
-                null,
-                [
-                    'id_grupo' => (int) $group->id_grupo,
-                    'id_estudiante' => $studentId,
-                    'id_carrera' => (int) $career['id_carrera'],
-                    'es_excepcional' => true,
-                    'motivo_excepcional' => $motivo,
-                ],
-                $teacherId
-            );
+            $this->persist($exam, $student, $motivo, $teacherId);
 
             return (object) [
-                'id_grupo' => (int) $group->id_grupo,
+                'id_examen' => $examId,
                 'id_estudiante' => $studentId,
                 'cod_sis' => (string) $student->cod_sis,
                 'nombre_completo' => $student->nombre_completo,
-                'carrera' => [
-                    'id_carrera' => (int) $career['id_carrera'],
-                    'nombre' => (string) $career['nombre'],
-                ],
-                'es_excepcional' => true,
+                'carrera' => $this->latestCareer($studentId),
                 'motivo_excepcional' => $motivo,
-                'fecha_inscripcion' => $fecha,
+                'fecha_registro' => now()->toIso8601String(),
             ];
         });
     }
 
-    private function isEnrolled(int $groupId, int $studentId): bool
+    /**
+     * PENDIENTE (decisión 1 con el líder): guardar al estudiante en la lista de ESTE examen, sin
+     * escribir en grupo_estudiante, y registrar la bitácora REGISTRAR_ESTUDIANTE_EXCEPCIONAL con
+     * id_examen, id_estudiante, motivo y el docente.
+     *
+     * Se completa cuando se elija el almacenamiento (examen_estudiante con 'CASO ESPECIAL',
+     * tabla nueva por examen o mixta). Se llama dentro de la transacción de register(), con el
+     * examen bloqueado.
+     */
+    private function persist(Exam $exam, Student $student, string $reason, string $teacherId): void
     {
-        return DB::table('grupo_estudiante')
-            ->where('id_grupo', $groupId)
-            ->where('id_estudiante', $studentId)
+        throw new LogicException(
+            'Falta definir dónde se guarda el estudiante excepcional (decisión 1 de la HU-023).'
+        );
+    }
+
+    /** El examen debe ser del docente: uno inexistente responde 404 y uno ajeno, 403. */
+    private function ownedExam(int $examId, string $teacherId): Exam
+    {
+        $exam = Exam::query()->findOrFail($examId);
+
+        if (strtolower((string) $exam->id_usuario_docente) !== strtolower($teacherId)) {
+            throw new AuthorizationException('No tiene acceso a este examen.');
+        }
+
+        return $exam;
+    }
+
+    private function admits(Exam $exam): bool
+    {
+        return in_array($exam->estado, self::REGISTRABLE_STATES, true);
+    }
+
+    /** Si el estudiante ya figura en la lista de esperados del examen (derivada del padrón). */
+    private function isExpected(int $examId, int $studentId): bool
+    {
+        return DB::query()
+            ->fromSub($this->participants->expected($examId), 'participantes')
+            ->where('participantes.id_estudiante', $studentId)
             ->exists();
     }
 
     /**
-     * Carrera de la inscripción más reciente del estudiante en otro grupo, o null si no tiene.
+     * Carrera de la inscripción más reciente del estudiante, o null si no tiene.
      *
      * @return array{id_carrera: int, nombre: string}|null
      */
@@ -225,35 +221,5 @@ class ExceptionalStudentService
             'id_carrera' => (int) $row->id_carrera,
             'nombre' => (string) $row->nombre,
         ];
-    }
-
-    /**
-     * La carrera debe ser una de las que atiende el grupo; con una sola, se toma sin preguntar.
-     *
-     * @return array{id_carrera: int, nombre: string}
-     */
-    private function resolveCareer(Group $group, ?int $careerId): array
-    {
-        $careers = $this->groupCareers->careersOf($group);
-
-        if ($careerId === null) {
-            if (count($careers) === 1) {
-                return $careers[0];
-            }
-
-            throw ValidationException::withMessages([
-                'id_carrera' => ['Elija la carrera con la que el estudiante está en el grupo.'],
-            ]);
-        }
-
-        foreach ($careers as $career) {
-            if ((int) $career['id_carrera'] === $careerId) {
-                return $career;
-            }
-        }
-
-        throw ValidationException::withMessages([
-            'id_carrera' => ['La carrera elegida no la atiende el grupo.'],
-        ]);
     }
 }

@@ -11,9 +11,9 @@ use Illuminate\Foundation\Http\FormRequest;
  * Base de las peticiones de estudiantes excepcionales (HU-023).
  *
  * Quien los registra es una cuenta activa cuyo rol ejerce la función special_cases (casos
- * especiales, config sciem.access): el Docente, también el colaborador de un examen, pero solo en
- * sus propios grupos. Un Docente invitado (sin código SIS), un Auxiliar, un Administrador o una
- * cuenta sin rol o inactiva reciben 403. Que el grupo sea del docente lo decide el servicio.
+ * especiales, config sciem.access): el Docente. Un Docente invitado (sin código SIS), un Auxiliar,
+ * un Administrador o una cuenta sin rol o inactiva reciben 403. Que el examen sea del docente lo
+ * decide el servicio.
  */
 abstract class ExceptionalStudentRequest extends FormRequest
 {

@@ -4,7 +4,7 @@ import { EXCEPTIONAL_MESSAGES } from '../components/exceptionalStudentMessages'
 import { exceptionalStudentService } from '../services/exceptionalStudentService'
 import type {
   ExceptionalCandidate,
-  ExceptionalGroup,
+  ExceptionalExam,
   RegisterExceptionalInput
 } from '../types/exceptional-student.types'
 
@@ -25,12 +25,12 @@ function failureMessage(cause: unknown, fallback: string): string {
 }
 
 /**
- * Búsqueda y registro de un estudiante excepcional en un grupo.
+ * Búsqueda y registro de un estudiante excepcional en un examen.
  *
  * Una búsqueda nueva cancela la anterior y una respuesta tardía nunca pisa a la más nueva. Registrar
  * no se repite mientras hay un registro en curso.
  */
-export function useExceptionalStudentFlow(group: ExceptionalGroup) {
+export function useExceptionalStudentFlow(exam: ExceptionalExam) {
   const [search, setSearch] = useState<SearchState>({ status: 'idle' })
   const [registering, setRegistering] = useState(false)
   const [formError, setFormError] = useState('')
@@ -56,7 +56,7 @@ export function useExceptionalStudentFlow(group: ExceptionalGroup) {
 
       try {
         const { data } = await exceptionalStudentService.search(
-          group.id_grupo,
+          exam.id_examen,
           code.trim(),
           controller.signal
         )
@@ -80,7 +80,7 @@ export function useExceptionalStudentFlow(group: ExceptionalGroup) {
         })
       }
     },
-    [group.id_grupo]
+    [exam.id_examen]
   )
 
   /** Devuelve si el registro se hizo, para que la vista limpie lo que escribió. */
@@ -94,7 +94,7 @@ export function useExceptionalStudentFlow(group: ExceptionalGroup) {
       setSuccess('')
 
       try {
-        const result = await exceptionalStudentService.register(group.id_grupo, input)
+        const result = await exceptionalStudentService.register(exam.id_examen, input)
 
         setSuccess(result.mensaje ?? EXCEPTIONAL_MESSAGES.registered)
         setSearch({ status: 'idle' })
@@ -109,7 +109,7 @@ export function useExceptionalStudentFlow(group: ExceptionalGroup) {
         setRegistering(false)
       }
     },
-    [group.id_grupo]
+    [exam.id_examen]
   )
 
   /** Descarta la búsqueda sin agregar nada. */

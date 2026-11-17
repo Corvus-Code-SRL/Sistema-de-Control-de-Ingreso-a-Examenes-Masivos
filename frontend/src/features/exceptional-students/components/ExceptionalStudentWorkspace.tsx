@@ -5,19 +5,19 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useExceptionalStudentFlow } from '../hooks/useExceptionalStudentFlow'
-import type { ExceptionalGroup, RegisterExceptionalInput } from '../types/exceptional-student.types'
+import type { ExceptionalExam, RegisterExceptionalInput } from '../types/exceptional-student.types'
 import { ExceptionalRegistrationForm } from './ExceptionalRegistrationForm'
 import { EXCEPTIONAL_MESSAGES } from './exceptionalStudentMessages'
 
 /**
- * Búsqueda por código SIS y registro del estudiante en el grupo elegido. Se monta con `key` del
- * grupo: al cambiar de grupo se empieza de cero.
+ * Búsqueda por código SIS y registro del estudiante en el examen elegido. Se monta con `key` del
+ * examen: al cambiar de examen se empieza de cero.
  */
-export function ExceptionalStudentWorkspace({ group }: { group: ExceptionalGroup }) {
-  const flow = useExceptionalStudentFlow(group)
+export function ExceptionalStudentWorkspace({ exam }: { exam: ExceptionalExam }) {
+  const flow = useExceptionalStudentFlow(exam)
   const [code, setCode] = useState('')
   const [codeError, setCodeError] = useState('')
-  const blocked = group.bloqueado
+  const blocked = !exam.permitido
   const searching = flow.search.status === 'searching'
 
   function handleSearch(event: FormEvent) {
@@ -49,7 +49,7 @@ export function ExceptionalStudentWorkspace({ group }: { group: ExceptionalGroup
     <div className="space-y-4">
       {blocked && (
         <p role="status" className="rounded-lg border p-3 text-sm text-warn-fg">
-          {EXCEPTIONAL_MESSAGES.blocked}
+          {EXCEPTIONAL_MESSAGES.notAllowed}
         </p>
       )}
 
@@ -110,19 +110,15 @@ export function ExceptionalStudentWorkspace({ group }: { group: ExceptionalGroup
               <dd className="sciem-tnum">{flow.search.candidate.cod_sis}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">CI</dt>
-              <dd>{flow.search.candidate.ci ?? EXCEPTIONAL_MESSAGES.noCi}</dd>
-            </div>
-            <div>
               <dt className="text-muted-foreground">Carrera según los registros de SCIEM</dt>
               <dd>{flow.search.candidate.carrera?.nombre ?? EXCEPTIONAL_MESSAGES.noCareer}</dd>
             </div>
           </dl>
 
-          {flow.search.candidate.ya_inscrito ? (
+          {flow.search.candidate.ya_en_examen ? (
             <div className="space-y-3">
               <p role="alert" className="text-sm text-destructive">
-                {EXCEPTIONAL_MESSAGES.alreadyEnrolled}
+                {EXCEPTIONAL_MESSAGES.alreadyInExam}
               </p>
               <Button type="button" variant="outline" onClick={handleCancel}>
                 Buscar otro código
@@ -130,7 +126,6 @@ export function ExceptionalStudentWorkspace({ group }: { group: ExceptionalGroup
             </div>
           ) : (
             <ExceptionalRegistrationForm
-              group={group}
               candidate={flow.search.candidate}
               registering={flow.registering}
               error={flow.formError}
