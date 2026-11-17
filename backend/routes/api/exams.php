@@ -4,6 +4,7 @@ use App\Http\Controllers\Exams\ExamInProgressController;
 use App\Http\Controllers\Exams\AssistantClassroomController;
 use App\Http\Controllers\Exams\CollaboratorInvitationController;
 use App\Http\Controllers\Exams\ExamController;
+use App\Http\Controllers\Exams\ExamTimerController;
 use App\Http\Controllers\Exams\ExamHistoryController;
 use App\Http\Controllers\Exams\ExamGroupController;
 use App\Http\Controllers\Exams\GroupExamController;
@@ -57,6 +58,13 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
 
     Route::post('/', [ExamController::class, 'store'])
         ->name('store');
+
+    Route::get('/cronometros', [ExamTimerController::class, 'index'])
+        ->withoutMiddleware('throttle:api')->middleware('throttle:polling')->name('cronometros');
+    Route::get('/{exam}/cronometro', [ExamTimerController::class, 'show'])
+        ->where('exam', '[0-9]{1,9}')->name('cronometro.show');
+    Route::match(['post', 'put'], '/{exam}/cronometro', [ExamTimerController::class, 'save'])
+        ->where('exam', '[0-9]{1,9}')->name('cronometro.save');
 
     Route::get('/{exam}', [ExamController::class, 'show'])
         ->where('exam', '[0-9]{1,9}')

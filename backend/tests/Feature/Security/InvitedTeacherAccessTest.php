@@ -6,6 +6,7 @@ use App\Models\Exam;
 use App\Models\Role;
 use App\Services\EntryControl\RoomAssignmentService;
 use App\Services\Security\UserRoleService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\AssignsIncidentRole;
@@ -38,19 +39,19 @@ class InvitedTeacherAccessTest extends TestCase
         $this->assignRole($userId, Role::INVITADO);
     }
 
-    public function test_el_mapa_de_acceso_define_las_diez_funciones_con_la_decision_del_invitado(): void
+    public function test_el_mapa_de_acceso_define_las_funciones_con_la_decision_del_invitado(): void
     {
         $access = config('sciem.access');
 
         $this->assertSame([
             'teaching', 'exam_assistants', 'incidents', 'risk_center',
-            'group_assistants', 'report_assistant', 'special_cases', 'invite_teachers', 'audit_log', 'risk_rectify',
+            'group_assistants', 'report_assistant', 'special_cases', 'invite_teachers', 'audit_log', 'risk_rectify', 'exam_timer',
         ], array_keys($access));
 
         $allowed = [
             'teaching' => true, 'exam_assistants' => true, 'incidents' => true, 'risk_center' => false,
             'group_assistants' => false, 'report_assistant' => false, 'special_cases' => false,
-            'invite_teachers' => false,
+            'invite_teachers' => false, 'exam_timer' => true,
         ];
 
         foreach ($allowed as $feature => $invitedCan) {
@@ -70,6 +71,20 @@ class InvitedTeacherAccessTest extends TestCase
         $this->postJson('/api/examenes', $this->validPayload())
             ->assertCreated()
             ->assertJsonPath('data.id_usuario_docente', $this->docenteId);
+    }
+
+    public function test_invitado_creador_inicia_el_cronometro_de_su_examen(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-17T14:10:00-04:00'));
+        $exam = $this->createExam([
+            'fecha' => '2026-11-17', 'hora_inicio' => '14:00', 'duracion' => 120, 'estado' => Exam::EN_CURSO,
+        ]);
+
+        $this->postJson("/api/examenes/{$exam->id_examen}/cronometro", ['minutos' => 60])
+            ->assertOk()
+            ->assertJsonPath('data.examen.cronometro_vence_en', '2026-11-17T19:10:00+00:00');
+        $this->getJson('/api/examenes/cronometros')->assertOk()->assertJsonCount(1, 'data.examenes');
+        $this->travelBack();
     }
 
     public function test_invitado_cierra_el_ingreso_ordinario_de_su_examen(): void

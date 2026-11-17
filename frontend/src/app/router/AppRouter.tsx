@@ -28,6 +28,9 @@ import {
   EditExamPage,
   ExamDetailPage,
   ExamInProgressPage,
+  ExamTimerPage,
+  ExamTimerCard,
+  ExamTimersProvider,
   ExamsPage,
   FinalReportPage,
   InProgressExamsPage,
@@ -72,6 +75,20 @@ function guarded(capability: Capability, element: ReactElement) {
   return <ProtectedRoute capability={capability}>{element}</ProtectedRoute>
 }
 
+function TeacherLayout() {
+  const { estado, usuario } = useAuth()
+  const { capabilities } = useCurrentUser()
+  const { pathname } = useLocation()
+
+  if (estado !== 'autenticado' || !usuario || !capabilities.includes('examenes.controlar-tiempo')) return <AppLayout />
+
+  return (
+    <ExamTimersProvider key={usuario.id_usuario}>
+      <AppLayout outsideOutlet={pathname === '/examenes/controlar-tiempo' ? null : <ExamTimerCard />} />
+    </ExamTimersProvider>
+  )
+}
+
 /**
  * Rutas de la gestión académica del docente.
  *
@@ -81,7 +98,7 @@ function guarded(capability: Capability, element: ReactElement) {
 function DocenteRoutes() {
   return (
     <Routes>
-      <Route element={<AppLayout />}>
+      <Route element={<TeacherLayout />}>
         <Route path="/" element={<Navigate to="/materias" replace />} />
         <Route path="/materias" element={guarded('grupos.gestionar', <SubjectsPage />)} />
         <Route
@@ -183,6 +200,11 @@ function DocenteRoutes() {
         <Route
           path="/examenes/:examId/control-ingreso"
           element={guarded('ingreso.operar', <EntryControlPage />)}
+        />
+
+        <Route
+          path="/examenes/controlar-tiempo"
+          element={guarded('examenes.controlar-tiempo', <ExamTimerPage />)}
         />
 
         <Route

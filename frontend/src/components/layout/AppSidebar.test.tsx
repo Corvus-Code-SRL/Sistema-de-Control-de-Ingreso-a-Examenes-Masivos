@@ -502,6 +502,7 @@ describe('AppSidebar — entradas y estado activo', () => {
       ['Cargar lista de habilitados', '/examenes/habilitados'],
       ['Distribuir habilitados', '/examenes/distribucion'],
       ['Control de ingreso', '/control-ingreso'],
+      ['Controlar tiempo del examen', '/examenes/controlar-tiempo'],
       ['En curso', '/examenes/en-curso'],
       ['Registrar estudiante con retraso', '/retrasos'],
       ['Registrar situación excepcional', '/situacion-excepcional'],
@@ -565,6 +566,17 @@ describe('AppSidebar — entradas y estado activo', () => {
     await openAllSections(user)
 
     expect(screen.getByRole('link', { name: 'Registrar estudiante con retraso' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Programados' })).not.toHaveAttribute('aria-current')
+  })
+
+  it.each(['Docente', 'Invitado'] as const)('resalta Controlar tiempo del examen para %s', async (role) => {
+    const user = userEvent.setup()
+    renderSidebar(role, '/examenes/controlar-tiempo')
+    await openAllSections(user)
+
+    const timer = screen.getByRole('link', { name: 'Controlar tiempo del examen' })
+    expect(timer).toHaveAttribute('href', '/examenes/controlar-tiempo')
+    expect(timer).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Programados' })).not.toHaveAttribute('aria-current')
   })
 

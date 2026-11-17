@@ -29,6 +29,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property \Carbon\Carbon|null $ingreso_abierto_en
  * @property \Carbon\Carbon|null $ingreso_ordinario_cerrado_en
  * @property \Carbon\Carbon|null $fin_real_en
+ * @property \Carbon\Carbon|null $cronometro_iniciado_en
+ * @property \Carbon\Carbon|null $cronometro_vence_en
  */
 class Exam extends Model
 {
@@ -56,6 +58,8 @@ class Exam extends Model
         'ingreso_abierto_en' => 'datetime',
         'ingreso_ordinario_cerrado_en' => 'datetime',
         'fin_real_en' => 'datetime',
+        'cronometro_iniciado_en' => 'datetime',
+        'cronometro_vence_en' => 'datetime',
         'fin_automatico' => 'boolean',
     ];
 
