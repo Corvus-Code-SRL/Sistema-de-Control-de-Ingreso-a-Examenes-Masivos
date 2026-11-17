@@ -254,7 +254,7 @@ class DatabaseRestoreTest extends DatabaseBackupTestCase
         $this->assertCount(1, $restore);
         $this->assertContains('--clean', $restore[0]['command']);
         $this->assertContains('--single-transaction', $restore[0]['command']);
-        $this->assertSame($this->directory . '/' . self::FILE, end($restore[0]['command']));
+        $this->assertSame($this->directory . DIRECTORY_SEPARATOR . self::FILE, end($restore[0]['command']));
         $this->assertStringContainsString('TABLE public accion', (string) $restore[0]['list']);
         $this->assertStringNotContainsString('SCHEMA - public', (string) $restore[0]['list']);
         $this->assertStringNotContainsString('COMMENT - SCHEMA public', (string) $restore[0]['list']);
@@ -292,7 +292,7 @@ class DatabaseRestoreTest extends DatabaseBackupTestCase
         // El más viejo (el que se restauró) y el respaldo previo siguen ahí; solo sobra el intermedio.
         $this->assertSame(['sciem_20261101_031500.dump', 'sciem_20261111_031500.dump'], $this->files());
         $command = $this->restoreCalls()[0]['command'];
-        $this->assertSame($this->directory . '/sciem_20261101_031500.dump', end($command));
+        $this->assertSame($this->directory . DIRECTORY_SEPARATOR . 'sciem_20261101_031500.dump', end($command));
     }
 
     public function test_el_respaldo_previo_sobrevive_aunque_sea_el_de_nombre_mas_antiguo(): void

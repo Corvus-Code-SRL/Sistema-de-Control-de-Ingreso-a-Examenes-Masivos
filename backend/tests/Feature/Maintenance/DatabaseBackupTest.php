@@ -187,7 +187,7 @@ class DatabaseBackupTest extends DatabaseBackupTestCase
             ->prune([$this->directory . '/sciem_20261101_031500.dump']);
 
         $this->assertSame(['sciem_20261101_031500.dump', 'sciem_20261103_031500.dump'], $this->files());
-        $this->assertSame([$this->directory . '/sciem_20261102_031500.dump'], $removed);
+        $this->assertSame([$this->directory . DIRECTORY_SEPARATOR . 'sciem_20261102_031500.dump'], $removed);
     }
 
     public function test_dos_respaldos_en_el_mismo_segundo_no_se_pisan(): void

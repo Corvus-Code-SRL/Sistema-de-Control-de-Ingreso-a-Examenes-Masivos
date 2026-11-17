@@ -56,6 +56,37 @@ class ExternalProcessTest extends TestCase
         $this->assertStringContainsString('/no existe/pg_dump_inexistente', $result->errorOutput);
     }
 
+    public function test_en_windows_una_ruta_sin_extension_encuentra_el_ejecutable(): void
+    {
+        $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'sciem_programa_' . bin2hex(random_bytes(4));
+        mkdir($directory);
+        $program = $directory . DIRECTORY_SEPARATOR . 'pg_dump';
+        touch($program . '.exe');
+
+        try {
+            // Como cmd.exe: «...\pg_dump» vale si existe «...\pg_dump.exe».
+            $this->assertTrue(ExternalProcess::programExists($program, true, '.COM;.EXE;.BAT;.CMD'));
+            $this->assertTrue(ExternalProcess::programExists($program, true));
+            $this->assertTrue(ExternalProcess::programExists($program . '.exe', true));
+            // Fuera de Windows la ruta debe ser exacta.
+            $this->assertFalse(ExternalProcess::programExists($program, false));
+            // Una ruta con otra extensión no se completa.
+            $this->assertFalse(ExternalProcess::programExists($program . '.bin', true));
+            $this->assertFalse(ExternalProcess::programExists($directory . DIRECTORY_SEPARATOR . 'otro', true));
+        } finally {
+            unlink($program . '.exe');
+            rmdir($directory);
+        }
+    }
+
+    public function test_un_nombre_suelto_se_busca_en_el_path(): void
+    {
+        $this->assertTrue(ExternalProcess::programExists(basename(PHP_BINARY), DIRECTORY_SEPARATOR === '\\')
+            || ExternalProcess::programExists(PHP_BINARY, DIRECTORY_SEPARATOR === '\\'));
+        $this->assertFalse(ExternalProcess::programExists('pg_dump_inexistente_sciem', false));
+        $this->assertFalse(ExternalProcess::programExists('', false));
+    }
+
     public function test_supera_el_tiempo_maximo_y_devuelve_124(): void
     {
         $result = (new ExternalProcess())->run([PHP_BINARY, '-r', 'sleep(5);'], [], 1);
