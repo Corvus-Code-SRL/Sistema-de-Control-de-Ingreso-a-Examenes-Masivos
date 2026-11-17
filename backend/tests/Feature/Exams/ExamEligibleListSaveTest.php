@@ -117,7 +117,7 @@ class ExamEligibleListSaveTest extends TestCase
             'estado_habilitacion' => 'CASO ESPECIAL',
         ]);
     }
-
+    
     public function test_resetea_no_habilitado_a_habilitado(): void
     {
         $exam = $this->createExamWithRoster(1);

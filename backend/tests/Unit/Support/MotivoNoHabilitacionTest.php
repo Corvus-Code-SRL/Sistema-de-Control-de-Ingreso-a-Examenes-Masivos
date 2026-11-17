@@ -98,7 +98,7 @@ class MotivoNoHabilitacionTest extends TestCase
             )
         );
     }
-
+    
     public function test_label_devuelve_la_etiqueta_legible(): void
     {
         $this->assertSame('Asistencia insuficiente', MotivoNoHabilitacion::label(MotivoNoHabilitacion::ASISTENCIA_INSUFICIENTE));
