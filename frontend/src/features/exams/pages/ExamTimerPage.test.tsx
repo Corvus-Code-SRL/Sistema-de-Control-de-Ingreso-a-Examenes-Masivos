@@ -92,6 +92,15 @@ describe('HU-038 — Controlar tiempo del examen', () => {
     expect(screen.queryByRole('button', { name: 'Iniciar cronómetro' })).not.toBeInTheDocument()
   })
 
+  it('propone como minutos los que quedan hasta el límite si la duración completa no cabe', async () => {
+    mockBackend()
+    mountPage()
+    // Son las 14:20 y el límite es 16:00: quedan menos de 100 minutos (el reloj avanza unos ms) de los 120 previstos.
+    const field = await screen.findByRole('spinbutton', { name: 'Minutos concedidos' })
+    await vi.waitFor(() => expect(Number((field as HTMLInputElement).value)).toBeLessThanOrEqual(100))
+    expect(Number((field as HTMLInputElement).value)).toBeGreaterThanOrEqual(99)
+  })
+
   it('muestra el 422 de minutos sin ofrecer reducir el tiempo', async () => {
     const { calls } = mockBackend()
     vi.spyOn(examTimerService, 'save').mockRejectedValueOnce(new ApiError(422, 'Validación fallida', {

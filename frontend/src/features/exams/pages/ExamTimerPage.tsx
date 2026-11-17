@@ -33,6 +33,7 @@ function ExamCountdown({ exam }: { exam: ExamTimer }) {
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const requestRef = useRef<AbortController | null>(null)
+  const seededRef = useRef(false)
   const duration = exam.duracion
   const limit = Date.parse(exam.fin_permitido_en ?? '')
   const limitSeconds = useExamTimerRemaining({ ...exam, cronometro_vence_en: exam.fin_permitido_en }, clock)
@@ -42,6 +43,15 @@ function ExamCountdown({ exam }: { exam: ExamTimer }) {
   const validMinutes = Number.isInteger(count) && count >= 1 && count <= MAX_MINUTES
 
   useEffect(() => () => requestRef.current?.abort(), [])
+
+  // Los minutos por defecto son los que quedan hasta el límite, sin pasar de la duración prevista: si el
+  // docente empieza tarde, la duración completa no cabe. Se fija una sola vez, con la hora del servidor.
+  useEffect(() => {
+    if (seededRef.current || timer || !clock || !duration || !Number.isFinite(limit)) return
+    seededRef.current = true
+    const available = Math.floor((limit - (clock.serverNowMs + performance.now() - clock.sampledMonoMs)) / MINUTE_MS)
+    if (available >= 1 && available < duration) setMinutes(String(available))
+  }, [clock, timer, duration, limit])
 
   function openAdjustment() {
     if (!timer) return
