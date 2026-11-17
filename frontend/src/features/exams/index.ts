@@ -25,6 +25,7 @@ export { EXAM_STATUS } from './types/exams.types';
 export { useInProgressExams } from './hooks/useInProgressExams';
 export { examInProgressService } from './services/examInProgressService';
 export { ExamEligibleListPage } from './pages/ExamEligibleListPage'
+export { RoomDistributionPage } from './pages/RoomDistributionPage'
 export { useEligibleList } from './hooks/useEligibleList'
 export { useEligibleListUpload } from './hooks/useEligibleListUpload'
 export { eligibleListService } from './services/eligibleListService'
