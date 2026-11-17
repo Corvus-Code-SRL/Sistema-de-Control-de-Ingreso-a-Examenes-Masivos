@@ -120,12 +120,24 @@ class CollaboratorInvitationService
      * invitación no se cruza con la apertura del control de ingreso (que bloquea la misma fila). El índice
      * único parcial de la tabla es el respaldo si algo se saltara el bloqueo.
      */
-    public function send(Exam $exam, string $teacherId, string $invitedId, bool $allowGroups): ExamInvitation
-    {
+    public function send(
+        Exam $exam,
+        string $teacherId,
+        string $invitedId,
+        bool $allowGroups,
+        bool $listByGroup = false
+    ): ExamInvitation {
         $this->assertTeacherGiven($teacherId);
 
+        // La lista separada por grupo (HU-027) solo tiene sentido si el colaborador puede sumar sus grupos.
+        if ($listByGroup && ! $allowGroups) {
+            throw ValidationException::withMessages([
+                'lista_por_grupo' => ['Solo puede separar la lista por grupo si permite agregar grupos.'],
+            ]);
+        }
+
         try {
-            $invitation = DB::transaction(function () use ($exam, $teacherId, $invitedId, $allowGroups) {
+            $invitation = DB::transaction(function () use ($exam, $teacherId, $invitedId, $allowGroups, $listByGroup) {
                 $locked = Exam::query()->whereKey($exam->id_examen)->lockForUpdate()->firstOrFail();
 
                 $this->assertCanInvite($locked, $teacherId);
@@ -151,6 +163,7 @@ class CollaboratorInvitationService
                     'fecha_invitacion' => Carbon::now(),
                     'estado' => ExamInvitation::PENDIENTE,
                     'permite_agregar_grupos' => $allowGroups,
+                    'lista_por_grupo' => $listByGroup,
                 ]);
 
                 $this->auditLog->registrar(
@@ -163,6 +176,7 @@ class CollaboratorInvitationService
                         'id_docente_invitado' => (string) $invited->id_usuario,
                         'estado' => ExamInvitation::PENDIENTE,
                         'permite_agregar_grupos' => $allowGroups,
+                        'lista_por_grupo' => $listByGroup,
                     ],
                     $teacherId
                 );

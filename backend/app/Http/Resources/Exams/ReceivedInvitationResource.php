@@ -25,6 +25,7 @@ class ReceivedInvitationResource extends JsonResource
             'fecha_respuesta' => $this->fecha_respuesta ? $this->fecha_respuesta->toIso8601String() : null,
             'fecha_sin_efecto' => $this->fecha_sin_efecto ? $this->fecha_sin_efecto->toIso8601String() : null,
             'permite_agregar_grupos' => (bool) $this->permite_agregar_grupos,
+            'lista_por_grupo' => (bool) $this->lista_por_grupo,
             'examen' => [
                 'id_examen' => $exam->id_examen,
                 'nombre_examen' => $exam->nombre_examen,
