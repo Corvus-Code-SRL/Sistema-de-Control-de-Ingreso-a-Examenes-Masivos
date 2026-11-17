@@ -6,7 +6,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Examen del docente como opción para registrar un estudiante excepcional (HU-023).
- * `permitido` avisa de antemano si el examen todavía admite excepcionales.
+ * Solo se ofrecen los exámenes En curso del docente responsable.
  */
 class ExceptionalExamResource extends JsonResource
 {
@@ -18,7 +18,6 @@ class ExceptionalExamResource extends JsonResource
             'fecha' => (string) $this->fecha,
             'hora_inicio' => (string) $this->hora_inicio,
             'estado' => (string) $this->estado,
-            'permitido' => (bool) $this->permitido,
         ];
     }
 }

@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Academic;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Academic\ExceptionalOptionsRequest;
 use App\Http\Requests\Academic\ListExceptionalExamsRequest;
 use App\Http\Requests\Academic\SearchExceptionalStudentRequest;
 use App\Http\Requests\Academic\StoreExceptionalStudentRequest;
 use App\Http\Resources\Academic\ExceptionalExamResource;
 use App\Http\Resources\Academic\ExceptionalStudentCandidateResource;
 use App\Http\Resources\Academic\ExceptionalStudentResource;
+use App\Services\Academic\ExceptionalStudentData;
 use App\Services\Academic\ExceptionalStudentService;
 use App\Support\ApiResponse;
 use App\Support\CurrentUser;
@@ -39,7 +41,7 @@ class ExceptionalStudentController extends Controller
     }
 
     /** GET /api/docente/examenes/{id_examen}/estudiantes-excepcionales/opciones */
-    public function options(\App\Http\Requests\Academic\ExceptionalOptionsRequest $request): JsonResponse
+    public function options(ExceptionalOptionsRequest $request): JsonResponse
     {
         return response()->json(['data' => $this->service->options(
             $request->examId(), $this->currentUser->teacherId()
@@ -65,7 +67,7 @@ class ExceptionalStudentController extends Controller
     /** POST /api/docente/examenes/{id_examen}/estudiantes-excepcionales */
     public function store(StoreExceptionalStudentRequest $request): JsonResponse
     {
-        $registered = $this->service->register(
+        $registered = $this->service->register(new ExceptionalStudentData(
             $request->examId(),
             $this->currentUser->teacherId(),
             $request->studentId(),
@@ -73,7 +75,7 @@ class ExceptionalStudentController extends Controller
             $request->groupId(),
             $request->careerId(),
             $request->roomId()
-        );
+        ));
 
         return (new ExceptionalStudentResource($registered))
             ->additional(['mensaje' => 'Estudiante excepcional registrado.'])

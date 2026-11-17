@@ -15,7 +15,6 @@ class ExceptionalStudentCandidateResource extends JsonResource
         return [
             'id_estudiante' => (int) $this->id_estudiante,
             'cod_sis' => (string) $this->cod_sis,
-            'ci' => (string) ($this->ci ?? ''),
             'nombre_completo' => (string) $this->nombre_completo,
             'carrera' => $this->carrera,
             'ya_en_examen' => (bool) $this->ya_en_examen,

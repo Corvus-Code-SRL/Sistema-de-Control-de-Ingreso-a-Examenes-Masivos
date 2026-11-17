@@ -11,7 +11,7 @@ class SearchExceptionalStudentRequest extends ExceptionalStudentRequest
     {
         return [
             'id_examen' => ['required', 'integer', 'min:1', 'max:' . self::MAX_ID],
-            'cod_sis' => ['required', 'string', 'max:30'],
+            'cod_sis' => ['required', 'string', 'regex:' . self::SIS_PATTERN],
         ];
     }
 
@@ -36,7 +36,8 @@ class SearchExceptionalStudentRequest extends ExceptionalStudentRequest
             'id_examen.min' => 'El identificador del examen no es válido.',
             'id_examen.max' => 'El identificador del examen no es válido.',
             'cod_sis.required' => 'Ingrese el código SIS del estudiante.',
-            'cod_sis.max' => 'El código SIS es demasiado largo.',
+            'cod_sis.string' => 'El código SIS debe ser un texto.',
+            'cod_sis.regex' => 'El código SIS debe tener entre 8 y 9 dígitos.',
         ];
     }
 
