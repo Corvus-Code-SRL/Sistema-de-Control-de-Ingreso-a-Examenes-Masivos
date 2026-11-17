@@ -1,6 +1,6 @@
 # Distribución de habilitados por ambiente (HU-031)
 
-Contrato de la fase 2. El frontend y la integración con el control de ingreso se implementan en sus fases posteriores.
+Contrato de HU-031, con vista del Docente e integración de lectura en el control de ingreso.
 
 ## Acceso y formato
 
@@ -497,16 +497,91 @@ Esta limitación se conserva deliberadamente: no hay asignaciones vigentes que p
 confirmación vacía. Si luego se habilitan estudiantes, aparecen sin ambiente y el PUT vuelve a
 exigir la nómina actual completa, independientemente de que conserve la versión vacía.
 
-## Alcance pendiente de fase 4
+## Integración con el control de ingreso (A3)
 
-HU-031 no cambia cómo abre ni valida el control de ingreso. Hay una carrera preexistente entre
-la importación de nómina y la apertura: StudentRosterConfirmationService comprueba disponibilidad
-antes de la transacción de confirmación; StudentRosterConfirmer bloquea el grupo, mientras que
-RoomAssignmentService abre con el examen bloqueado sin bloquear sus grupos. Una importación
-ya autorizada puede completarse después de que la apertura leyó la nómina. Este ajuste de
-coordinación entre otras HU queda reportado, sin modificarlas aquí.
+`RoomDistributionReader::assignedRooms(id_examen)` es una lectura sin escrituras ni bitácora
+adicional. Lo consumen `EntryControlSnapshotService::stage()`, `recordFor()` (también usado
+por ingreso con retraso) y `ExamInProgressQueryService`:
 
-Antes de integrar se debe verificar el registro efectivo de HU-023 y preservar su ambiente:
-en exámenes no finalizados `ExamRosterService::expected()` parte de los grupos, por lo que no
-basta como única fuente de un excepcional que verdaderamente esté fuera de esa nómina.
-No se implementa aquí esa integración ni se presupone que esos casos ya estén cubiertos.
+1. Sin filas en `distribucion_ambiente`, devuelve `null`. Los tres consumidores conservan
+   su cálculo anterior por ID y capacidades. Una confirmación vacía también devuelve `null`,
+   por la decisión de no agregar un marcador para cero habilitados.
+2. Con filas guardadas, obtiene la nómina habilitada única y ordenada de
+   `DistributionRosterQuery`, reutilizando `ExamRosterService` y `SurnameDistributor`.
+3. Consulta directamente los `CASO ESPECIAL` de `examen_estudiante` con ambiente operativo.
+   Sus ambientes prevalecen sobre el plan y reservan lugares antes de ubicar al resto.
+4. `DistributionReconciler` conserva las asignaciones guardadas válidas respecto de la
+   nómina, los ambientes actuales y su capacidad restante. Deshabilitar un estudiante libera
+   su lugar; retirar un ambiente planificado deja su asignación pendiente de reubicación.
+5. Solo los habilitados pendientes se distribuyen por apellido, proporcionalmente a los
+   lugares que siguen libres. No se redistribuye toda la nómina ni se modifica la planificación.
+
+El resultado es un mapa por estudiante con `{ id_ambiente: integer, nro_aula: string }`.
+Un estudiante excedente no tiene entrada en el mapa. **Un mapa vacío no es `null`**: existe
+planificación y no se activa el cálculo anterior, que podría reemplazar silenciosamente el plan.
+GET de HU-031 sigue mostrando los nuevos habilitados sin ambiente hasta que el Docente guarde;
+la ubicación operativa al abrir no escribe filas nuevas en `distribucion_ambiente` ni avanza su versión.
+
+### Capacidad insuficiente después del guardado
+
+La lectura conserva las asignaciones que caben, ubica pendientes solo en plazas libres y deja
+el excedente con `ambiente_asignado: null` en el snapshot y `id_ambiente: null` / `ambiente: null`
+en examen en curso. No lanza un nuevo error de apertura ni introduce otro bloqueo.
+
+El contrato existente de verificación ya rechaza al estudiante sin ambiente con
+`veredicto: "AULA_NO_ASIGNADA"`, `autorizado: false` y
+`motivo: "No se pudo determinar un ambiente para el estudiante."`. La integración reutiliza
+ese contrato sin agregar códigos ni cambiar la precedencia de otros motivos de rechazo.
+
+**La apertura ya tenía una comprobación independiente:** `RoomAssignmentService::prepare()`
+compara la capacidad con toda la nómina de grupos, incluidos NO_HABILITADO, y puede devolver
+`CAPACIDAD_INSUFICIENTE` antes de generar el snapshot. Ese comportamiento se conserva.
+Las pruebas de excedentes ejercitan `stage()` directamente para verificar el contrato de lectura;
+no eliminan ni evaden esa comprobación en el flujo real de apertura.
+
+Si una reducción de capacidad ya dejó más excepcionales con ambiente operativo que plazas,
+se conservan esos ambientes por A3. El lector no agrega estudiantes a ese ambiente y limita
+su capacidad disponible a cero; no traslada excepcionales ni corrige silenciosamente ese exceso
+preexistente. Su resolución corresponde al responsable del ingreso y requiere una decisión aparte.
+
+### HU-023 y ambientes operativos
+
+En esta revisión del repositorio no hay un servicio de alta de HU-023. La representación
+existente es `examen_estudiante.estado_habilitacion = 'CASO ESPECIAL'` y su `id_ambiente`;
+hay fixtures y pruebas de habilitación/verificación para ese estado. El lector consulta esas
+filas directamente, sin depender de que `ExamRosterService::expected()` las incluya.
+Un CASO ESPECIAL sin ambiente operativo participa del plan como cualquier otro habilitado.
+
+Las claves foráneas actuales exigen que `examen_estudiante` pertenezca a `grupo_examen` y
+`grupo_estudiante`. Por eso un excepcional verdaderamente fuera de esos grupos no se puede
+crear con el esquema vigente. La prueba de independencia de la nómina simula únicamente su
+omisión en la consulta, manteniendo las FK activas. No se implementa un nuevo mecanismo de alta.
+La FK `fk_ingreso_examen_ambiente` también impide retirar un ambiente operativo ya referenciado;
+los casos de ambientes retirados se refieren a la planificación, que deliberadamente carece de esa FK.
+
+En examen en curso sigue prevaleciendo el `id_ambiente` operativo de `examen_estudiante` sobre
+la asignación calculada, preservando el comportamiento de ingreso y de situaciones excepcionales.
+HU-031 no modifica el registro ni la sincronización de esos cambios de ambiente.
+
+### Avisos de la vista
+
+En edición y con capacidad suficiente se advierte que los pendientes se ubicarán al abrir
+si siguen existiendo lugares. Con capacidad insuficiente no se promete su asignación.
+En solo lectura el aviso se limita a consultar los casos con el docente responsable: no ofrece
+ubicar ni guardar, ni promete una asignación futura cuando el control podría estar abierto.
+
+## Hallazgos preexistentes fuera del alcance
+
+- **A4, NO_HABILITADO:** `EntryControlSnapshotService::assignRooms()` no filtra habilitación.
+  Sin distribución guardada sigue asignando ambientes por ID a toda la nómina, consumiendo
+  plazas también para NO_HABILITADO. La verificación los rechaza posteriormente. No se cambia
+  ese cálculo. Con una distribución HU-031 el lector sí usa únicamente habilitados, como exige CA-3.
+- **Importación y apertura:** `StudentRosterConfirmationService` comprueba disponibilidad antes
+  de la transacción; `StudentRosterConfirmer` bloquea el grupo, mientras `RoomAssignmentService`
+  abre con el examen bloqueado sin bloquear sus grupos. Una importación ya autorizada puede
+  completarse después de que la apertura leyó la nómina. La coordinación sigue pendiente de sus HU.
+- El snapshot es operativo y se fija al abrir, mientras `recordFor()` y examen en curso consultan
+  PostgreSQL. Una modificación externa de nómina o capacidades después de la apertura puede
+  provocar divergencia; HU-031 no modifica los protocolos de otras HU ni reconstruye snapshots.
+
+Escenario manual preparado, sin ejecutar: [QA local de HU-031](../qa/hu031-distribucion.md).
