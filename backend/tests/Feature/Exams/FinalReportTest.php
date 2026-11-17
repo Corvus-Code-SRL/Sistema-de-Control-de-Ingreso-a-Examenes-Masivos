@@ -321,8 +321,8 @@ class FinalReportTest extends TestCase
 
         $this->assertCount(2, $attendance['grupos']);
 
-        $keys = ['inscritos', 'a_tiempo', 'con_retraso', 'ausentes', 'sin_clasificar'];
-        $expected = [[35, 21, 7, 7, 0], [20, 12, 4, 4, 0]];
+        $keys = ['inscritos', 'a_tiempo', 'con_retraso', 'ausentes', 'no_habilitados', 'sin_clasificar'];
+        $expected = [[35, 21, 7, 7, 0, 0], [20, 12, 4, 4, 0, 0]];
 
         foreach ($attendance['grupos'] as $index => $group) {
             $this->assertSame(
@@ -331,13 +331,46 @@ class FinalReportTest extends TestCase
             );
             $this->assertSame(
                 $group['inscritos'],
-                $group['a_tiempo'] + $group['con_retraso'] + $group['ausentes'] + $group['sin_clasificar']
+                $group['a_tiempo'] + $group['con_retraso'] + $group['ausentes']
+                    + $group['no_habilitados'] + $group['sin_clasificar']
             );
         }
 
         $totals = $attendance['totales'];
 
-        $this->assertSame(array_combine($keys, [55, 33, 11, 11, 0]), $totals);
+        $this->assertSame(array_combine($keys, [55, 33, 11, 11, 0, 0]), $totals);
+    }
+
+    public function test_los_no_habilitados_tienen_su_propio_total_y_no_son_ausentes(): void
+    {
+        $rows = collect();
+
+        foreach ([
+            ['INGRESO', 'HABILITADO', 3],
+            ['CON_RETRASO', 'HABILITADO', 1],
+            ['NO_INGRESO', 'HABILITADO', 2],
+            ['NO_INGRESO', 'NO_HABILITADO', 4],
+        ] as [$entry, $enabled, $quantity]) {
+            for ($i = 0; $i < $quantity; $i++) {
+                $rows->push((object) [
+                    'id_grupo' => 1,
+                    'num_grupo' => '1',
+                    'estado_ingreso' => $entry,
+                    'estado_habilitacion' => $enabled,
+                ]);
+            }
+        }
+
+        $totals = $this->callPrivate(app(FinalReportService::class), 'attendanceByGroup', [$rows])['totales'];
+
+        $this->assertSame(10, $totals['inscritos']);
+        $this->assertSame(2, $totals['ausentes']);
+        $this->assertSame(4, $totals['no_habilitados']);
+        $this->assertSame(
+            $totals['inscritos'],
+            $totals['a_tiempo'] + $totals['con_retraso'] + $totals['ausentes']
+                + $totals['no_habilitados'] + $totals['sin_clasificar']
+        );
     }
 
     private function callPrivate(object $object, string $method, array $arguments): mixed
@@ -376,6 +409,49 @@ class FinalReportTest extends TestCase
             'No se registraron incidencias en este examen',
             $spreadsheet->getSheetByName('Incidencias')->getCell('A2')->getValue()
         );
+    }
+
+    public function test_con_un_no_habilitado_el_reporte_y_el_excel_muestran_su_total_aparte(): void
+    {
+        $exam = $this->finishedExam();
+        $notEnabled = $this->groupStudentIds()[1];
+        DB::table('examen_estudiante')
+            ->where('id_examen', $exam->id_examen)
+            ->where('id_estudiante', $notEnabled)
+            ->update(['estado_habilitacion' => 'NO_HABILITADO', 'observacion' => 'NO_FIGURA_EN_LISTA']);
+
+        $totals = $this->getJson($this->url($exam))->assertOk()->json('data.asistencia.totales');
+
+        $this->assertSame(0, $totals['ausentes']);
+        $this->assertSame(1, $totals['no_habilitados']);
+        $this->assertSame(
+            $totals['inscritos'],
+            $totals['a_tiempo'] + $totals['con_retraso'] + $totals['ausentes']
+                + $totals['no_habilitados'] + $totals['sin_clasificar']
+        );
+
+        $spreadsheet = $this->loadSpreadsheet($this->get($this->url($exam) . '/excel')->assertOk()->getContent());
+        $rows = $spreadsheet->getSheetByName('Resumen')->toArray();
+        $header = collect($rows)->first(fn ($row) => $row[0] === 'Grupo');
+        $total = collect($rows)->first(fn ($row) => $row[0] === 'Total');
+
+        $this->assertEquals(
+            ['Grupo', 'Inscritos', 'A tiempo', 'Con retraso', 'Ausentes', 'No habilitados'],
+            array_slice($header, 0, 6)
+        );
+        $this->assertEquals(['Total', 2, 1, 0, 0, 1], array_slice($total, 0, 6));
+        $this->get($this->url($exam) . '/pdf')->assertOk();
+    }
+
+    public function test_sin_no_habilitados_el_excel_no_agrega_la_columna(): void
+    {
+        $exam = $this->finishedExam();
+
+        $rows = $this->loadSpreadsheet($this->get($this->url($exam) . '/excel')->assertOk()->getContent())
+            ->getSheetByName('Resumen')->toArray();
+        $header = collect($rows)->first(fn ($row) => $row[0] === 'Grupo');
+
+        $this->assertNotContains('No habilitados', $header);
     }
 
     public function test_un_texto_que_empieza_con_igual_no_se_guarda_como_formula_en_el_excel(): void

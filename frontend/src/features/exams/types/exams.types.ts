@@ -72,6 +72,8 @@ export interface Exam {
   id_carrera: number;
   id_materia: number;
   id_usuario_docente: string;
+  /** El docente que creó el examen lo administra; un colaborador (HU-027) solo lo ve y lo controla. */
+  es_creador: boolean;
   tipo_examen?: ExamType;
   materia?: { id_materia: number; nombre: string; codigo: string };
   carrera?: { id_carrera: number; nombre: string };

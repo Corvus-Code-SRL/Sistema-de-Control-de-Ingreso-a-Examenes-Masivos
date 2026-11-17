@@ -21,13 +21,14 @@ interface InviteConfirmDialogProps {
   sending: boolean
   /** Rechazo del servidor del último envío (409, 403…), con su mensaje. */
   error: ApiError | null
-  onConfirm: (allowGroups: boolean) => void
+  onConfirm: (allowGroups: boolean, listByGroup: boolean) => void
   onCancel: () => void
 }
 
 /**
- * Confirmación del envío: muestra el docente, el examen y si podrá agregar sus grupos. La invitación solo
- * se envía al confirmar; cancelar o cerrar no envía nada.
+ * Confirmación del envío: muestra el docente, el examen, si podrá agregar sus grupos y, en ese caso, si la
+ * lista del examen se verá dividida por grupo. La invitación solo se envía al confirmar; cancelar o cerrar
+ * no envía nada.
  */
 export function InviteConfirmDialog({ teacher, exam, sending, error, onConfirm, onCancel }: InviteConfirmDialogProps) {
   const open = teacher !== null && exam !== null
@@ -59,6 +60,13 @@ interface InviteFormProps extends Omit<InviteConfirmDialogProps, 'teacher' | 'ex
 function InviteForm({ teacher, exam, sending, error, onConfirm, onCancel }: InviteFormProps) {
   // La opción vuelve a nacer marcada cada vez que se abre el diálogo para un docente.
   const [allowGroups, setAllowGroups] = useState(true)
+  // Lista dividida por grupo (HU-027): solo se habilita si permite agregar grupos; nace desmarcada.
+  const [listByGroup, setListByGroup] = useState(false)
+
+  function changeAllowGroups(checked: boolean) {
+    setAllowGroups(checked)
+    if (!checked) setListByGroup(false)
+  }
 
   return (
     <>
@@ -90,7 +98,7 @@ function InviteForm({ teacher, exam, sending, error, onConfirm, onCancel }: Invi
         <Checkbox
           id="collaborator-allow-groups"
           checked={allowGroups}
-          onCheckedChange={(checked) => setAllowGroups(checked === true)}
+          onCheckedChange={(checked) => changeAllowGroups(checked === true)}
           disabled={sending}
           className="mt-0.5"
         />
@@ -100,6 +108,27 @@ function InviteForm({ teacher, exam, sending, error, onConfirm, onCancel }: Invi
       </div>
       <p className="-mt-2 text-xs text-muted-foreground">
         Si acepta, podrá sumar sus propios grupos de esta materia para unir las listas de estudiantes del control de ingreso.
+      </p>
+
+      <div className="flex items-start gap-2">
+        <Checkbox
+          id="collaborator-list-by-group"
+          checked={listByGroup}
+          onCheckedChange={(checked) => setListByGroup(checked === true)}
+          disabled={sending || !allowGroups}
+          className="mt-0.5"
+        />
+        <Label
+          htmlFor="collaborator-list-by-group"
+          className={`text-sm font-normal leading-snug${allowGroups ? '' : ' text-muted-foreground'}`}
+        >
+          Mostrar la lista separada por grupo
+        </Label>
+      </div>
+      <p className="-mt-2 text-xs text-muted-foreground">
+        {allowGroups
+          ? 'En el control de ingreso y durante el examen la lista se verá dividida por grupo, con su docente. Si no la marca, la lista va junta.'
+          : 'Se habilita al permitir que agregue sus grupos.'}
       </p>
 
       {error && (
@@ -112,7 +141,7 @@ function InviteForm({ teacher, exam, sending, error, onConfirm, onCancel }: Invi
         <Button type="button" variant="outline" onClick={onCancel} disabled={sending}>
           Cancelar
         </Button>
-        <Button type="button" onClick={() => onConfirm(allowGroups)} disabled={sending}>
+        <Button type="button" onClick={() => onConfirm(allowGroups, allowGroups && listByGroup)} disabled={sending}>
           {sending ? 'Enviando…' : 'Enviar invitación'}
         </Button>
       </DialogFooter>

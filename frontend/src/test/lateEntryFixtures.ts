@@ -54,7 +54,7 @@ export function makeExamInProgress(overrides: Partial<ExamInProgress> = {}): Exa
     nombre_examen: 'Primer parcial',
     materia: 'Bases de Datos I',
     estado: 'EN_CURSO',
-    rol_controlador: 'DOCENTE',
+    rol_controlador: 'DOCENTE', es_creador: true,
     id_ambiente_asignado: null,
     ambientes: [
       { id_ambiente: 5, nro_aula: '691A', capacidad: 40 },
@@ -65,7 +65,7 @@ export function makeExamInProgress(overrides: Partial<ExamInProgress> = {}): Exa
     fin_automatico: false,
     fin_programado_en: '2026-10-31T16:00:00+00:00',
     hora_servidor_en: '2026-10-31T14:10:00+00:00',
-    totales: { a_tiempo: 1, con_retraso: 0, ausentes: 1, presentes: 1, total: 2, incidencias_pendientes: 0 },
+    totales: { a_tiempo: 1, con_retraso: 0, ausentes: 1, no_habilitados: 0, presentes: 1, total: 2, incidencias_pendientes: 0 },
     estudiantes: [],
     ...overrides,
   }

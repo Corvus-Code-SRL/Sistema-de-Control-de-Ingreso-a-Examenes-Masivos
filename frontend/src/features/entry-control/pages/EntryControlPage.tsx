@@ -81,7 +81,7 @@ function EntryControlContent({ examId }: { examId: number }) {
   const canCloseOrdinary =
     open &&
     context?.estado === 'EN_CURSO' &&
-    context?.rol_controlador === 'DOCENTE' &&
+    context?.es_creador === true &&
     status !== null &&
     statusError === null
 
@@ -221,7 +221,7 @@ function EntryControlContent({ examId }: { examId: number }) {
               <TabsTrigger value="entries">Ingresos</TabsTrigger>
               <TabsTrigger value="rejections">Rechazos{rejectionCount !== null ? ` · ${rejectionCount}` : ''}</TabsTrigger>
             </TabsList>
-            <TabsContent value="entries"><RecentEntries entries={status?.ultimos_ingresos ?? []} /></TabsContent>
+            <TabsContent value="entries"><RecentEntries entries={status?.ultimos_ingresos ?? []} groups={status?.por_grupo} /></TabsContent>
             <TabsContent value="rejections">
               {hasRoom && roomId !== null && <RecentRejectedAttempts
                 key={roomId} examId={examId} examName={context.nombre_examen} roomId={roomId}

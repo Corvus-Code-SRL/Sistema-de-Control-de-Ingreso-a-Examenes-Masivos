@@ -59,7 +59,8 @@ class CollaboratorInvitationController extends Controller
             $exam,
             $this->currentUser->teacherId(),
             $data['id_docente'],
-            (bool) ($data['permite_agregar_grupos'] ?? true)
+            (bool) ($data['permite_agregar_grupos'] ?? true),
+            (bool) ($data['lista_por_grupo'] ?? false)
         );
 
         return ApiResponse::created(new SentInvitationResource($invitation), 'Invitación enviada correctamente.');

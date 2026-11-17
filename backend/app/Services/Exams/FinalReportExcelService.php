@@ -72,9 +72,14 @@ class FinalReportExcelService
         $row++;
 
         $totals = $report['asistencia']['totales'];
+        $showNotEnabled = $totals['no_habilitados'] > 0;
         $showUnclassified = $totals['sin_clasificar'] > 0;
 
         $labels = ['Grupo', 'Inscritos', 'A tiempo', 'Con retraso', 'Ausentes'];
+
+        if ($showNotEnabled) {
+            $labels[] = 'No habilitados';
+        }
 
         if ($showUnclassified) {
             $labels[] = 'Sin clasificar';
@@ -91,6 +96,10 @@ class FinalReportExcelService
                 $group['ausentes'],
             ];
 
+            if ($showNotEnabled) {
+                $values[] = $group['no_habilitados'];
+            }
+
             if ($showUnclassified) {
                 $values[] = $group['sin_clasificar'];
             }
@@ -106,12 +115,16 @@ class FinalReportExcelService
             $totals['ausentes'],
         ];
 
+        if ($showNotEnabled) {
+            $values[] = $totals['no_habilitados'];
+        }
+
         if ($showUnclassified) {
             $values[] = $totals['sin_clasificar'];
         }
 
         $this->valuesRow($sheet, $row, $values, true);
-        $this->widths($sheet, [20, 40, 12, 14, 12, 16]);
+        $this->widths($sheet, [20, 40, 12, 14, 12, 16, 16]);
     }
 
     private function studentsSheet(Worksheet $sheet, array $students): void

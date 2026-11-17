@@ -31,6 +31,7 @@
         <tr><td>Reporte generado:</td><td>{{ \Carbon\Carbon::parse($c['generado_en'])->format('d/m/Y H:i') }}</td></tr>
     </table>
 
+    @php($showNotEnabled = $report['asistencia']['totales']['no_habilitados'] > 0)
     @php($showUnclassified = $report['asistencia']['totales']['sin_clasificar'] > 0)
 
     <h2>Asistencia por grupo</h2>
@@ -42,6 +43,9 @@
                 <th class="num">A tiempo</th>
                 <th class="num">Con retraso</th>
                 <th class="num">Ausentes</th>
+                @if ($showNotEnabled)
+                    <th class="num">No habilitados</th>
+                @endif
                 @if ($showUnclassified)
                     <th class="num">Sin clasificar</th>
                 @endif
@@ -55,6 +59,9 @@
                     <td class="num">{{ $group['a_tiempo'] }}</td>
                     <td class="num">{{ $group['con_retraso'] }}</td>
                     <td class="num">{{ $group['ausentes'] }}</td>
+                    @if ($showNotEnabled)
+                        <td class="num">{{ $group['no_habilitados'] }}</td>
+                    @endif
                     @if ($showUnclassified)
                         <td class="num">{{ $group['sin_clasificar'] }}</td>
                     @endif
@@ -66,6 +73,9 @@
                 <td class="num">{{ $report['asistencia']['totales']['a_tiempo'] }}</td>
                 <td class="num">{{ $report['asistencia']['totales']['con_retraso'] }}</td>
                 <td class="num">{{ $report['asistencia']['totales']['ausentes'] }}</td>
+                @if ($showNotEnabled)
+                    <td class="num">{{ $report['asistencia']['totales']['no_habilitados'] }}</td>
+                @endif
                 @if ($showUnclassified)
                     <td class="num">{{ $report['asistencia']['totales']['sin_clasificar'] }}</td>
                 @endif

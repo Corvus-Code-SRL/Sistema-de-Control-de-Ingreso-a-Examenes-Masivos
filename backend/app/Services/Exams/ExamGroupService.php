@@ -121,6 +121,49 @@ class ExamGroupService
         });
     }
 
+    /**
+     * Suma al examen los grupos de un colaborador que acepta la invitación (HU-027).
+     *
+     * No abre transacción ni bloquea el examen: lo llama ExamInvitationResponseService dentro de la suya, con la
+     * fila del examen ya bloqueada y el estado PROGRAMADO comprobado. Valida los grupos con la misma regla que
+     * assignGroups (propios del colaborador, activos, del período vigente, de la materia del examen y con nómina)
+     * y además que ningún estudiante quede repetido con los grupos que el examen ya tenía. Los grupos ya
+     * vinculados no se duplican.
+     *
+     * @param array<int, int> $groupIds
+     * @return array<int, int> ids de los grupos que quedaron vinculados por esta llamada
+     */
+    public function attachCollaboratorGroups(Exam $lockedExam, array $groupIds, string $collaboratorId): array
+    {
+        $groupIds = array_values(array_unique(array_map('intval', $groupIds)));
+
+        if ($groupIds === []) {
+            return [];
+        }
+
+        $groups = $this->lockGroups($groupIds);
+        $this->assertGroupsMatchExam($lockedExam, $groups, $groupIds, $collaboratorId);
+
+        $newEnrollments = $this->enrollments($groupIds);
+        $this->assertEveryGroupHasRoster($groups, $newEnrollments);
+
+        $currentGroupIds = $lockedExam->groups()
+            ->pluck('grupo.id_grupo')
+            ->map(fn ($groupId) => (int) $groupId)
+            ->all();
+        $groupsToAttach = array_values(array_diff($groupIds, $currentGroupIds));
+
+        $this->assertStudentsAreNotRepeated(
+            $this->enrollments(array_merge($currentGroupIds, $groupsToAttach))
+        );
+
+        if ($groupsToAttach !== []) {
+            $lockedExam->groups()->attach($groupsToAttach);
+        }
+
+        return $groupsToAttach;
+    }
+
     private function assertExamCanBeConfigured(Exam $exam, string $teacherId): void
     {
         if ((string) $exam->id_usuario_docente !== $teacherId) {

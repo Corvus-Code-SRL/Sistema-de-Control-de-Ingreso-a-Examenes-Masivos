@@ -22,7 +22,7 @@ function makeExam(overrides: Partial<Exam> = {}): Exam {
     id_tipo_examen: 1,
     id_carrera: 2,
     id_materia: 3,
-    id_usuario_docente: 'DOC-1',
+    id_usuario_docente: 'DOC-1', es_creador: true,
     materia: { id_materia: 3, nombre: 'Cálculo II', codigo: 'MAT-102' },
     carrera: { id_carrera: 2, nombre: 'Ingenieria de Sistemas' },
     ambientes: [{ id_ambiente: 5, nro_aula: '691A', capacidad: 40 }],
@@ -82,6 +82,27 @@ describe('ExamsPage', () => {
     expect(within(scheduled).getByText('Programado')).toBeInTheDocument()
     expect(within(scheduled).queryByRole('button', { name: /controlar ingreso/i })).not.toBeInTheDocument()
     expect(within(scheduled).getByRole('button', { name: 'Configurar' })).toBeInTheDocument()
+  })
+
+  it('marca con «Colaborador» el examen ajeno y lo deja en solo lectura', async () => {
+    mockApiOnce({
+      body: {
+        data: [
+          makeExam({ id_examen: 1, nombre_examen: 'Propio' }),
+          makeExam({ id_examen: 2, nombre_examen: 'Ajeno', es_creador: false }),
+        ],
+      },
+    })
+
+    renderWithRouter(<ExamsPage />, { route: '/examenes/programados' })
+    await waitForLoad()
+
+    const [own, collaborating] = screen.getAllByRole('row').slice(1)
+    expect(within(own).queryByText('Colaborador')).not.toBeInTheDocument()
+    expect(within(own).getByRole('button', { name: 'Configurar' })).toBeInTheDocument()
+    expect(within(collaborating).getByText('Colaborador')).toBeInTheDocument()
+    expect(within(collaborating).queryByRole('button', { name: 'Configurar' })).not.toBeInTheDocument()
+    expect(within(collaborating).getByRole('button', { name: 'Ver detalle' })).toBeInTheDocument()
   })
 
   it('muestra el estado vacío cuando no tiene examenes', async () => {

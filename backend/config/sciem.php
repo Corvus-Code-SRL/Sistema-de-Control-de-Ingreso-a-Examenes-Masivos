@@ -279,7 +279,10 @@ return [
             'CAMBIAR_AMBIENTE' => 'Cambiar ambiente',
             'OBSERVAR_IDENTIDAD' => 'Observar identidad',
             'RECTIFICAR_REGISTRO' => 'Rectificar registro',
+            'GUARDAR_HABILITADOS' => 'Guardar habilitados',
             'INVITAR_COLABORADOR' => 'Invitar colaborador',
+            'ACEPTAR_INVITACION' => 'Aceptar invitación',
+            'RECHAZAR_INVITACION' => 'Rechazar invitación',
         ],
 
         'etiquetas_campo' => [

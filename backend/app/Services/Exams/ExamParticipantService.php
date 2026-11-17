@@ -15,6 +15,12 @@ use Illuminate\Support\Facades\DB;
  */
 class ExamParticipantService
 {
+    private ExamRosterService $roster;
+
+    public function __construct(ExamRosterService $roster)
+    {
+        $this->roster = $roster;
+    }
     /**
      * Un estudiante inscrito en varios grupos del examen aparece una sola vez.
      * Su id_grupo corresponde al menor de esos grupos.
@@ -25,22 +31,18 @@ class ExamParticipantService
         $exam = Exam::query()->findOrFail($examId);
 
         if ($exam->estado === Exam::FINALIZADO) {
-            return DB::table('estudiante')
-                ->join('examen_estudiante', 'examen_estudiante.id_estudiante', '=', 'estudiante.id_estudiante')
-                ->where('examen_estudiante.id_examen', $examId)
-                ->select('estudiante.*', 'examen_estudiante.id_grupo');
-        }
+        return $this->roster->expected($examId);
+}
 
-        $regular = DB::table('estudiante')
-            ->join('grupo_estudiante', 'grupo_estudiante.id_estudiante', '=', 'estudiante.id_estudiante')
-            ->join('grupo_examen', 'grupo_examen.id_grupo', '=', 'grupo_estudiante.id_grupo')
-            ->where('grupo_examen.id_examen', $examId)
-            ->select('estudiante.*')
-            ->selectRaw('MIN(grupo_estudiante.id_grupo) AS id_grupo')
-            ->groupBy('estudiante.id_estudiante');
+        $regular = $this->roster->expected($examId);
 
         $exceptional = DB::table('estudiante')
             ->join('examen_estudiante_excepcional as ex', 'ex.id_estudiante', '=', 'estudiante.id_estudiante')
+            ->join('grupo', 'grupo.id_grupo', '=', 'ex.id_grupo')
+            ->leftJoin('examen_estudiante as ee', function ($join) use ($examId): void {
+                 $join->on('ee.id_estudiante', '=', 'estudiante.id_estudiante')
+                 ->where('ee.id_examen', '=', $examId);
+    })
             ->where('ex.id_examen', $examId)
             ->whereNotExists(function (Builder $query) use ($examId): void {
                 $query->selectRaw('1')
@@ -49,7 +51,13 @@ class ExamParticipantService
                     ->where('gx.id_examen', $examId)
                     ->whereColumn('ge.id_estudiante', 'estudiante.id_estudiante');
             })
-            ->select('estudiante.*', 'ex.id_grupo');
+           ->select('estudiante.*', 'ex.id_grupo')
+           ->selectRaw('grupo.num_grupo AS num_grupo')
+           ->selectRaw("COALESCE(ee.estado_habilitacion, 'HABILITADO') AS estado_habilitacion")
+           ->selectRaw("COALESCE(ee.estado_ingreso, 'NO_INGRESO') AS estado_ingreso")
+           ->selectRaw('ee.observacion AS observacion')
+           ->selectRaw('ee.hora_ingreso AS hora_ingreso')
+           ->selectRaw('ee.id_ambiente AS id_ambiente');
 
         return DB::query()->fromSub($regular->unionAll($exceptional), 'estudiante');
     }

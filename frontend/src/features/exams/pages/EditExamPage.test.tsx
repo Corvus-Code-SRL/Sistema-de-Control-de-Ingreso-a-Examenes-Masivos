@@ -31,7 +31,7 @@ function makeExam(estado: ExamStatus, groups: Group[] = []): Exam {
     id_tipo_examen: 1,
     id_carrera: 2,
     id_materia: 3,
-    id_usuario_docente: 'DOC-1',
+    id_usuario_docente: 'DOC-1', es_creador: true,
     tipo_examen: {
       id_tipo_examen: 1,
       nombre: 'Parcial',

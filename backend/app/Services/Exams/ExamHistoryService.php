@@ -10,18 +10,28 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-/** Consultas de solo lectura del historial de exámenes de un docente. */
+/**
+ * Consultas de solo lectura del historial de exámenes de un docente: los que creó y aquellos en los que colaboró
+ * tras aceptar la invitación (HU-027).
+ */
 class ExamHistoryService
 {
+    private ExamCollaboratorService $collaborators;
+
+    public function __construct(ExamCollaboratorService $collaborators)
+    {
+        $this->collaborators = $collaborators;
+    }
+
     public function index(string $teacherId, array $filters): array
     {
         $base = Exam::query()
-            ->where('id_usuario_docente', $teacherId)
+            ->where(fn ($query) => $this->collaborators->whereTaughtBy($query, $teacherId))
             ->where('estado', Exam::FINALIZADO);
 
         $subjects = DB::table('materia as m')
             ->join('examen as e', 'e.id_materia', '=', 'm.id_materia')
-            ->where('e.id_usuario_docente', $teacherId)
+            ->where(fn ($query) => $this->collaborators->whereTaughtBy($query, $teacherId, 'e'))
             ->where('e.estado', Exam::FINALIZADO)
             ->distinct()
             ->orderBy('m.nombre')
@@ -70,7 +80,7 @@ class ExamHistoryService
 
     public function show(Exam $exam, string $teacherId): array
     {
-        abort_unless($exam->id_usuario_docente === $teacherId, 403, 'No tiene acceso a este examen.');
+        abort_unless($this->collaborators->isTeacherOf($exam, $teacherId), 403, 'No tiene acceso a este examen.');
         abort_unless($exam->estado === Exam::FINALIZADO, 404);
 
         $exam->load('subject:id_materia,nombre');
@@ -252,6 +262,7 @@ class ExamHistoryService
                 'a_tiempo' => $counts['a_tiempo'],
                 'con_retraso' => $counts['con_retraso'],
                 'ausentes' => $counts['ausentes'],
+                'no_habilitados' => $counts['no_habilitados'],
                 'sin_clasificar' => $counts['sin_clasificar'],
                 'incidencias' => $counts['incidencias'],
             ],
@@ -289,10 +300,12 @@ class ExamHistoryService
             ->selectRaw("id_examen, count(*) as esperados,
                 count(*) filter (where estado_ingreso = ?) as a_tiempo,
                 count(*) filter (where estado_ingreso = ?) as con_retraso,
-                count(*) filter (where estado_ingreso = ?) as ausentes,
+                count(*) filter (where estado_ingreso = ? and coalesce(estado_habilitacion, 'HABILITADO') <> 'NO_HABILITADO') as ausentes,
+                count(*) filter (where estado_ingreso = ? and estado_habilitacion = 'NO_HABILITADO') as no_habilitados,
                 count(*) filter (where estado_ingreso is null or estado_ingreso not in (?, ?, ?)) as sin_clasificar", [
                 StudentExam::INGRESO,
                 StudentExam::CON_RETRASO,
+                StudentExam::NO_INGRESO,
                 StudentExam::NO_INGRESO,
                 ...$known,
             ])
@@ -304,6 +317,7 @@ class ExamHistoryService
             'a_tiempo' => (int) $row->a_tiempo,
             'con_retraso' => (int) $row->con_retraso,
             'ausentes' => (int) $row->ausentes,
+            'no_habilitados' => (int) $row->no_habilitados,
             'sin_clasificar' => (int) $row->sin_clasificar,
             'presentes' => (int) $row->a_tiempo + (int) $row->con_retraso,
             'incidencias' => 0,
@@ -349,6 +363,7 @@ class ExamHistoryService
             'a_tiempo' => 0,
             'con_retraso' => 0,
             'ausentes' => 0,
+            'no_habilitados' => 0,
             'sin_clasificar' => 0,
             'presentes' => 0,
             'incidencias' => 0,

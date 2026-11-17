@@ -1,0 +1,88 @@
+/**
+ * HU-027: bandeja de invitaciones recibidas. El docente invitado lee y responde las invitaciones que
+ * le envió el docente responsable de un examen (HU-026); el estado es el mismo registro que ve quien
+ * invitó.
+ */
+
+/** Estado guardado. SIN_EFECTO: el examen abrió el control de ingreso sin respuesta (se muestra «Vencida»). */
+export type InvitationState = 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA' | 'SIN_EFECTO'
+
+/** Pestañas de la bandeja. «Cerradas» agrupa las rechazadas y las vencidas. */
+export type InvitationTab = 'pendientes' | 'aceptadas' | 'cerradas'
+
+export interface InvitationExam {
+  id_examen: number
+  nombre_examen: string
+  materia: string
+  carrera: string | null
+  /** «2/2026». */
+  periodo: string | null
+  /** Fecha local del examen, «AAAA-MM-DD». */
+  fecha: string
+  /** Hora local, «HH:MM» o «HH:MM:SS». */
+  hora_inicio: string
+  hora_fin: string | null
+}
+
+export interface InvitationPerson {
+  nombre_completo: string
+}
+
+/** Una fila de la bandeja. */
+export interface InvitationSummary {
+  id_invitacion: number
+  estado: InvitationState
+  /** ISO 8601 con desfase (UTC). */
+  fecha_invitacion: string
+  fecha_respuesta: string | null
+  /** Cuándo la invitación quedó sin efecto (el examen abrió el control de ingreso sin respuesta). */
+  fecha_sin_efecto: string | null
+  /** Si al aceptar puede sumar sus grupos (lo decide quien invita, HU-026). Si es false se acepta sin grupos. */
+  permite_agregar_grupos: boolean
+  /** Si quien invita pidió la lista del examen dividida por grupo (solo con permite_agregar_grupos). */
+  lista_por_grupo: boolean
+  examen: InvitationExam
+  invitante: InvitationPerson
+}
+
+export interface InvitationRoom {
+  id_ambiente: number
+  nro_aula: string
+  capacidad: number
+}
+
+export interface InvitationGroup {
+  id_grupo: number
+  num_grupo: string
+  inscritos: number
+}
+
+/** Un grupo del docente invitado en la materia del examen, en el período vigente. */
+export interface MyInvitationGroup extends InvitationGroup {
+  /** Si puede sumarlo (p. ej. un grupo sin nómina no se puede). */
+  seleccionable: boolean
+  /** Por qué no es seleccionable, en una frase corta («sin nómina»). */
+  motivo: string | null
+  /** Si ya forma parte del examen (invitación aceptada). */
+  sumado: boolean
+}
+
+/** La invitación no guarda mensaje ni motivo de rechazo: invitacion_examen no tiene esas columnas. */
+export interface InvitationDetail extends InvitationSummary {
+  ambientes: InvitationRoom[]
+  grupos_examen: InvitationGroup[]
+  mis_grupos: MyInvitationGroup[]
+}
+
+export interface InvitationListResponse {
+  data: InvitationSummary[]
+  meta?: {
+    total_pendientes?: number
+    total_aceptadas?: number
+    total_cerradas?: number
+  }
+}
+
+export interface InvitationDetailResponse {
+  data: InvitationDetail
+}

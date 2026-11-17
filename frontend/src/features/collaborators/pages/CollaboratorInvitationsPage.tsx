@@ -40,12 +40,13 @@ export function CollaboratorInvitationsPage() {
     sending.clearError()
   }
 
-  async function confirm(allowGroups: boolean) {
+  async function confirm(allowGroups: boolean, listByGroup: boolean) {
     if (!candidate || !selectedExam || sending.sending) return
 
     const created = await sending.send(selectedExam.id_examen, {
       id_docente: candidate.id_usuario,
       permite_agregar_grupos: allowGroups,
+      lista_por_grupo: allowGroups && listByGroup,
     })
 
     if (created === null) return
@@ -134,7 +135,7 @@ export function CollaboratorInvitationsPage() {
         exam={selectedExam}
         sending={sending.sending}
         error={sending.error}
-        onConfirm={(allowGroups) => void confirm(allowGroups)}
+        onConfirm={(allowGroups, listByGroup) => void confirm(allowGroups, listByGroup)}
         onCancel={closeDialog}
       />
 

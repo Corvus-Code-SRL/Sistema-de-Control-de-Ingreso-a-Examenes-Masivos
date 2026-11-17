@@ -22,6 +22,7 @@ class GestionPeriodoMigrationTest extends TestCase
 
     /** Depende de oferta_academica: se revierte antes que ella (HU-021 multicarrera). */
     private const GROUP_OFFERING = '2026_11_06_000001_create_grupo_oferta_and_add_carrera_to_grupo_estudiante.php';
+    private const EXCEPTIONAL = '2026_11_17_000001_create_examen_estudiante_excepcional.php';
 
     private int $careerId;
     private int $calculusId;
@@ -36,6 +37,7 @@ class GestionPeriodoMigrationTest extends TestCase
         require_once database_path('migrations/' . self::OFFERING);
         require_once database_path('migrations/' . self::RENAME);
         require_once database_path('migrations/' . self::GROUP_OFFERING);
+        require_once database_path('migrations/' . self::EXCEPTIONAL);
     }
 
     protected function tearDown(): void
@@ -48,7 +50,12 @@ class GestionPeriodoMigrationTest extends TestCase
 
     private function migrateDown(): void
     {
+        // HU-023 depende de grupo_oferta (HU-021): revertir primero HU-023.
+        (new \CreateExamenEstudianteExcepcional())->down();
+
+        // DespuÃ©s se puede revertir HU-021.
         (new \CreateGrupoOfertaAndAddCarreraToGrupoEstudiante())->down();
+
         (new \RenameActivoToVigente())->down();
         (new \CreateOfertaAcademica())->down();
         (new \NormalizeGestionAndPeriodo())->down();
@@ -69,6 +76,12 @@ class GestionPeriodoMigrationTest extends TestCase
         (new \NormalizeGestionAndPeriodo())->up();
         (new \CreateOfertaAcademica())->up();
         (new \RenameActivoToVigente())->up();
+
+        // HU-021 crea grupo_oferta, requerida por HU-023.
+        (new \CreateGrupoOfertaAndAddCarreraToGrupoEstudiante())->up();
+
+        // Restaurar HU-023 despuÃ©s de su dependencia.
+        (new \CreateExamenEstudianteExcepcional())->up();
     }
 
     private function seedLegacyPeriods(array $periods): void
@@ -354,7 +367,9 @@ class GestionPeriodoMigrationTest extends TestCase
 
         try {
             $this->toLegacyShape();
-            $this->migrateUp();
+            (new \NormalizeGestionAndPeriodo())->up();
+            (new \CreateOfertaAcademica())->up();
+            (new \RenameActivoToVigente())->up();
             $fromMigrations = $this->schemaSignature();
         } finally {
             DB::rollBack();

@@ -43,7 +43,9 @@ export function SentInvitationsTable({ invitations }: SentInvitationsTableProps)
                 </p>
               </td>
               <td className="whitespace-nowrap px-3 py-2.5">{formatSentAt(invitation.fecha_invitacion)}</td>
-              <td className="px-3 py-2.5">{invitation.permite_agregar_grupos ? 'Sí' : 'No'}</td>
+              <td className="px-3 py-2.5">
+                {invitation.permite_agregar_grupos ? (invitation.lista_por_grupo ? 'Sí · lista por grupo' : 'Sí') : 'No'}
+              </td>
               <td className="px-3 py-2.5">
                 <CollaboratorInvitationStateBadge state={invitation.estado} />
               </td>

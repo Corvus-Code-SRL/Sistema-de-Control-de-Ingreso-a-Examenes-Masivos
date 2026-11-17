@@ -1888,3 +1888,29 @@ ALTER TABLE public.examen
 
 ALTER TABLE public.examen
     ADD CONSTRAINT chk_examen_estado_sin_en_ingreso CHECK (estado <> 'EN_INGRESO');
+
+-- Versión 17: lista separada por grupo en la invitación a colaborar (HU-026 la elige, HU-027 la aplica)
+--             (2026_11_17_000001_add_lista_por_grupo_to_invitacion_examen)
+--   * Las acciones de bitácora ACEPTAR_INVITACION y RECHAZAR_INVITACION (HU-027) no van en el esquema: las
+--     siembra ActionSeeder, que debe correr después de migrar.
+--   * Un colaborador es la invitación en estado ACEPTADA; el rechazo no guarda motivo.
+--   * invitacion_examen.lista_por_grupo: si quien invita pide que, cuando el colaborador sume sus grupos, la
+--     lista del examen se muestre dividida por grupo (con su docente) en el control de ingreso y durante el
+--     examen. Por defecto false: la lista va junta. La nómina es la misma en los dos casos.
+--   * Solo puede ser true si la invitación permite agregar grupos.
+
+ALTER TABLE public.invitacion_examen
+    ADD COLUMN IF NOT EXISTS lista_por_grupo boolean NOT NULL DEFAULT false;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'chk_invitacion_examen_lista_por_grupo'
+          AND conrelid = 'public.invitacion_examen'::regclass
+    ) THEN
+        ALTER TABLE public.invitacion_examen
+            ADD CONSTRAINT chk_invitacion_examen_lista_por_grupo
+            CHECK (NOT lista_por_grupo OR permite_agregar_grupos);
+    END IF;
+END $$;
