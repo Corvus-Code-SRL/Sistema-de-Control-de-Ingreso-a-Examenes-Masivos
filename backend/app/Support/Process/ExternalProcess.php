@@ -4,6 +4,7 @@ namespace App\Support\Process;
 
 use Symfony\Component\Process\Exception\ExceptionInterface;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
+use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 /**
@@ -28,6 +29,12 @@ class ExternalProcess
      */
     public function run(array $command, array $env, int $timeoutSeconds): ProcessResult
     {
+        // Se revisa antes de lanzarlo: en Windows Symfony pasa por cmd.exe y un programa inexistente devuelve 1
+        // («no se reconoce como un comando…»), no 127 como en Linux.
+        if (! $this->exists((string) ($command[0] ?? ''))) {
+            return new ProcessResult(self::NOT_FOUND, $this->notFound($command));
+        }
+
         $process = new Process($command, null, $env, null, $timeoutSeconds);
 
         try {
@@ -51,6 +58,47 @@ class ExternalProcess
             trim($process->getErrorOutput()),
             $process->getOutput()
         );
+    }
+
+    private function exists(string $program): bool
+    {
+        return self::programExists($program, DIRECTORY_SEPARATOR === '\\', (string) getenv('PATHEXT'));
+    }
+
+    /**
+     * Una ruta (con / o \) debe ser un archivo; un nombre suelto (pg_dump) debe estar en el PATH.
+     *
+     * En Windows, una ruta sin extensión (C:\...\bin\pg_dump) también vale si existe con alguna extensión de
+     * PATHEXT (pg_dump.exe), como la resuelve cmd.exe. Es pública y estática para probar el caso de Windows
+     * desde cualquier sistema.
+     */
+    public static function programExists(string $program, bool $windows, string $pathExt = ''): bool
+    {
+        if ($program === '') {
+            return false;
+        }
+
+        if (! str_contains($program, '/') && ! str_contains($program, '\\')) {
+            return (new ExecutableFinder())->find($program) !== null;
+        }
+
+        if (is_file($program)) {
+            return true;
+        }
+
+        if (! $windows || pathinfo($program, PATHINFO_EXTENSION) !== '') {
+            return false;
+        }
+
+        $extensions = $pathExt !== '' ? $pathExt : '.COM;.EXE;.BAT;.CMD';
+        // PATHEXT viene en mayúsculas (.EXE); Windows no distingue mayúsculas, pero las pruebas en Linux sí.
+        foreach (explode(';', $extensions) as $extension) {
+            if ($extension !== '' && (is_file($program . $extension) || is_file($program . strtolower($extension)))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @param  array<int, string>  $command */

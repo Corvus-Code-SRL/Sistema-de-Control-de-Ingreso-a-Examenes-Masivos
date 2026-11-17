@@ -90,6 +90,23 @@ describe('FinalReportPage (HU-051)', () => {
     vi.restoreAllMocks()
   })
 
+  it('marca como «Excepcional» con su motivo al estudiante agregado solo a este examen', async () => {
+    const report = makeReport()
+    report.estudiantes[2] = {
+      ...report.estudiantes[2],
+      es_excepcional: true,
+      motivo_excepcional: 'Inscripción tardía aprobada'
+    }
+    mockReport(report)
+    await renderReport()
+
+    const row = screen.getByText('Pedro Zeballos Mamani').closest('tr') as HTMLElement
+
+    expect(within(row).getByText('Excepcional')).toBeInTheDocument()
+    expect(within(row).getByText('Motivo: Inscripción tardía aprobada')).toBeInTheDocument()
+    expect(screen.getAllByText('Excepcional')).toHaveLength(1)
+  })
+
   it('muestra la cabecera, la asistencia por grupo y los estudiantes', async () => {
     mockReport()
     await renderReport()

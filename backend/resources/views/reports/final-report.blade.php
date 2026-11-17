@@ -98,7 +98,7 @@
             @foreach ($report['estudiantes'] as $student)
                 <tr>
                     <td>{{ $student['cod_sis'] }}</td>
-                    <td>{{ $student['nombre'] }}</td>
+                    <td>{{ $student['nombre'] }}@if ($student['es_excepcional'] ?? false) (Excepcional)@endif</td>
                     <td>{{ $student['ambiente'] ?? '—' }}</td>
                     <td>{{ $student['hora_ingreso'] ?? '—' }}</td>
                     <td>{{ $student['estado'] }}</td>

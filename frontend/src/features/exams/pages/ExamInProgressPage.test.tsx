@@ -80,6 +80,40 @@ afterEach(() => {
   if (hidden) Object.defineProperty(document, 'hidden', hidden);
 });
 
+describe('HU-023: estudiante excepcional en En curso', () => {
+  it('marca como «Excepcional» con su motivo al estudiante agregado solo a este examen', async () => {
+    vi.mocked(examInProgressService.get).mockResolvedValue({
+      ...exam,
+      estudiantes: [
+        ...exam.estudiantes,
+        {
+          id_estudiante: 12,
+          cod_sis: '202300300',
+          ci: '1111111',
+          nombre_completo: 'Ana Quispe',
+          estado_ingreso: 'INGRESO',
+          hora_ingreso: '09:40',
+          id_ambiente: 1,
+          ambiente: '692C',
+          es_excepcional: true,
+          motivo_excepcional: 'Convalidación aprobada',
+        },
+      ],
+    });
+
+    renderWithRouter(<ExamInProgressPage />, {
+      route: '/examenes/8/en-curso',
+      path: '/examenes/:examId/en-curso',
+    });
+
+    const row = (await screen.findByText('Ana Quispe')).closest('tr') as HTMLElement;
+
+    expect(within(row).getByText('Excepcional')).toBeInTheDocument();
+    expect(within(row).getByText('Motivo: Convalidación aprobada')).toBeInTheDocument();
+    expect(screen.getAllByText('Excepcional')).toHaveLength(1);
+  });
+});
+
 describe('HU-038-A: puntos de extensión de En curso', () => {
   it('permite inyectar los tres puntos sin modificar la página', async () => {
     const headerActions = vi.fn((value: ExamInProgress) => (

@@ -108,19 +108,21 @@ class FinalReportService
     {
         return DB::table('examen_estudiante as ee')
             ->join('estudiante as e', 'e.id_estudiante', '=', 'ee.id_estudiante')
-            ->join('grupo as g', 'g.id_grupo', '=', 'ee.id_grupo')
+            ->join('grupo as g', 'g.id_grupo', '=', 'ee.id_grupo_efectivo')
             ->leftJoin('ambiente as a', 'a.id_ambiente', '=', 'ee.id_ambiente')
             ->where('ee.id_examen', $examId)
             ->orderBy('e.apellido_paterno')
             ->orderBy('e.apellido_materno')
             ->orderBy('e.nombre')
             ->get([
-                'ee.id_grupo',
+                'ee.id_grupo_efectivo as id_grupo',
                 'g.num_grupo',
                 'ee.estado_ingreso',
                 'ee.estado_habilitacion',
                 'ee.hora_ingreso',
                 'ee.expulsado_en',
+                'ee.es_excepcional',
+                'ee.motivo_excepcional',
                 'e.cod_sis',
                 'e.nombre',
                 'e.apellido_paterno',
@@ -171,6 +173,8 @@ class FinalReportService
         return $rows->map(fn ($row) => [
             'cod_sis' => $row->cod_sis,
             'nombre' => trim("{$row->nombre} {$row->apellido_paterno} {$row->apellido_materno}"),
+            'es_excepcional' => (bool) ($row->es_excepcional ?? false),
+            'motivo_excepcional' => $row->motivo_excepcional ?? null,
             'ambiente' => $row->nro_aula,
             'hora_ingreso' => $this->shortTime($row->hora_ingreso),
             'estado' => ($row->expulsado_en ?? null) !== null

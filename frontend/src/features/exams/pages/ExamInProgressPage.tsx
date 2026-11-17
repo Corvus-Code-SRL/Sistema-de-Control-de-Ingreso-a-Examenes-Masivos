@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
+import { ExceptionalMark } from '@/components/common/ExceptionalMark';
 import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/api-client';
 import { normalizeSearch } from '@/lib/text';
@@ -213,7 +214,10 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
         className="border-b last:border-0"
       >
         <td className="px-3 py-3">{student.cod_sis}</td>
-        <td className="px-3 py-3">{student.nombre_completo}</td>
+        <td className="px-3 py-3">
+          {student.nombre_completo}
+          {student.es_excepcional && <ExceptionalMark reason={student.motivo_excepcional} />}
+        </td>
         <td className="px-3 py-3">{student.ambiente ?? '—'}</td>
         <td className="px-3 py-3">{student.hora_ingreso ?? '—'}</td>
         <td className="px-3 py-3">{entryLabel(student)}</td>

@@ -6,8 +6,8 @@ use App\Exceptions\Exams\ExamStateException;
 use App\Models\Exam;
 use App\Models\Role;
 use App\Models\User;
-use App\Services\Exams\Distribution\RoomDistributionReader;
 use App\Services\EntryControl\EntryControlSnapshotService;
+use App\Services\Exams\Distribution\RoomDistributionReader;
 use App\Services\Security\UserRoleService;
 use App\Services\Incidents\ExamInProgressSituationService;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -110,6 +110,8 @@ class ExamInProgressQueryService
                 'nomina.apellido_paterno',
                 'nomina.apellido_materno',
                 'nomina.id_grupo',
+                'nomina.es_excepcional',
+                'nomina.motivo_excepcional',
                 'ee.estado_ingreso',
                 'ee.estado_habilitacion',
                 'ee.hora_ingreso',
@@ -119,8 +121,11 @@ class ExamInProgressQueryService
             ->orderBy('nomina.id_estudiante')
             ->get();
 
-        $assignedRooms = $this->distribution->assignedRooms($examId) ?? EntryControlSnapshotService::assignRooms(
-            $roster->pluck('id_estudiante')
+        // El reparto automático de aulas solo considera la nómina: el excepcional conserva el aula que se le eligió.
+        $assignedRooms = $this->distribution->assignedRooms($examId)
+            ?? EntryControlSnapshotService::assignRooms(
+            $roster->reject(fn ($student) => (bool) $student->es_excepcional)
+                ->pluck('id_estudiante')
                 ->map(fn ($id) => (int) $id)
                 ->all(),
             $rooms
@@ -148,6 +153,8 @@ class ExamInProgressQueryService
                 'id_estudiante' => $studentId,
                 // Grupo por el que figura en la nómina; la vista lo usa si la lista va separada por grupo.
                 'id_grupo' => $student->id_grupo === null ? null : (int) $student->id_grupo,
+                'es_excepcional' => (bool) $student->es_excepcional,
+                'motivo_excepcional' => $student->motivo_excepcional,
                 'cod_sis' => $student->cod_sis,
                 'ci' => $student->ci,
                 'nombre_completo' => trim(implode(' ', array_filter([

@@ -99,7 +99,7 @@ export function EligibleListUploadFlow({
                 tabIndex={0}
                 onClick={() => inputRef.current?.click()}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click() }}
-                className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-border-strong 
+                className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-border-strong
                 bg-sunken p-8 text-center cursor-pointer hover:bg-muted"
               >
                 <span className="flex size-12 items-center justify-center rounded-full bg-brand-soft text-brand">

@@ -32,19 +32,28 @@ class RoomDistributionReader
         }
 
         $rooms = $this->roster->rooms($examId);
-        $assigned = $this->exceptionalRooms($examId);
+        $fixed = $this->exceptionalRooms($examId);
+        $registered = array_filter($fixed, fn (array $room): bool => $room['es_excepcional']);
+        $legacy = array_filter($fixed, fn (array $room): bool => !$room['es_excepcional']);
+        $assigned = array_map(fn (array $room): array => [
+            'id_ambiente' => $room['id_ambiente'],
+            'nro_aula' => $room['nro_aula'],
+        ], $fixed);
         $students = array_values(array_filter(
             $this->roster->eligibleStudents($examId),
             fn (array $student): bool => !isset($assigned[$student['id_estudiante']])
         ));
-        $available = $this->remainingRooms($rooms, array_column($assigned, 'id_ambiente'));
+        $available = $this->remainingRooms($rooms, array_column($legacy, 'id_ambiente'));
         $reconciled = $this->reconciler->reconcile(array_column($students, 'id_estudiante'), $available, $saved);
         $valid = array_filter($reconciled, fn (?int $roomId): bool => $roomId !== null);
         $pending = array_values(array_filter(
             $students,
             fn (array $student): bool => !isset($valid[$student['id_estudiante']])
         ));
-        $freeRooms = $this->remainingRooms($available, array_values($valid));
+        $freeRooms = $this->remainingRooms($available, array_merge(
+            array_values($valid),
+            array_column($registered, 'id_ambiente')
+        ));
         $new = $this->distributor->distribute($pending, $freeRooms)['assignments'];
         $roomNames = array_column($rooms, 'nro_aula', 'id_ambiente');
 
@@ -55,19 +64,23 @@ class RoomDistributionReader
         return $assigned;
     }
 
-    /** @return array<int, array{id_ambiente:int, nro_aula:string}> */
+    /** @return array<int, array{id_ambiente:int, nro_aula:string, es_excepcional:bool}> */
     private function exceptionalRooms(int $examId): array
     {
         // HU-023 se consulta fuera de expected(): su ambiente operativo prevalece sobre la planificación.
         return DB::table('examen_estudiante as ee')
             ->join('ambiente as a', 'a.id_ambiente', '=', 'ee.id_ambiente')
             ->where('ee.id_examen', $examId)
-            ->where('ee.estado_habilitacion', self::SPECIAL_STATE)
+            ->where(function ($query): void {
+                $query->where('ee.es_excepcional', true)
+                    ->orWhere('ee.estado_habilitacion', self::SPECIAL_STATE);
+            })
             ->orderBy('ee.id_estudiante')
-            ->get(['ee.id_estudiante', 'ee.id_ambiente', 'a.nro_aula'])
+            ->get(['ee.id_estudiante', 'ee.id_ambiente', 'a.nro_aula', 'ee.es_excepcional'])
             ->mapWithKeys(fn (stdClass $row): array => [(int) $row->id_estudiante => [
                 'id_ambiente' => (int) $row->id_ambiente,
                 'nro_aula' => (string) $row->nro_aula,
+                'es_excepcional' => (bool) $row->es_excepcional,
             ]])->all();
     }
 

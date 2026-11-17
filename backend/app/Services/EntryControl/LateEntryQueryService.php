@@ -94,11 +94,17 @@ class LateEntryQueryService
         }
 
         $query = DB::table('estudiante as est')
-            ->whereExists(fn (Builder $roster) => $roster
-                ->from('grupo_estudiante as gs')
-                ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
-                ->whereColumn('gs.id_estudiante', 'est.id_estudiante')
-                ->where('gx.id_examen', $exam->id_examen))
+            ->where(fn (Builder $expected) => $expected
+                ->whereExists(fn (Builder $roster) => $roster
+                    ->from('grupo_estudiante as gs')
+                    ->join('grupo_examen as gx', 'gx.id_grupo', '=', 'gs.id_grupo')
+                    ->whereColumn('gs.id_estudiante', 'est.id_estudiante')
+                    ->where('gx.id_examen', $exam->id_examen))
+                ->orWhereExists(fn (Builder $exceptional) => $exceptional
+                    ->from('examen_estudiante as ee')
+                    ->whereColumn('ee.id_estudiante', 'est.id_estudiante')
+                    ->where('ee.id_examen', $exam->id_examen)
+                    ->where('ee.es_excepcional', true)))
             ->select(['est.id_estudiante', 'est.cod_sis', 'est.ci'])
             ->selectRaw(self::FULL_NAME . ' as nombre_completo')
             ->limit(self::SEARCH_LIMIT);

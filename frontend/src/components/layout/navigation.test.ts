@@ -114,6 +114,7 @@ describe('menú por capacidades', () => {
           ['En curso', '/examenes/en-curso'],
           ['Registrar estudiante con retraso', '/retrasos'],
           ['Registrar situación excepcional', '/situacion-excepcional'],
+          ['Registrar estudiante excepcional', '/estudiante-excepcional'],
           ['Reportar incidencia', '/reportar-incidencia']
         ]
       },
@@ -245,10 +246,28 @@ describe('menú por capacidades', () => {
     expect(adminEntries).not.toContain('Registrar situación excepcional')
   })
 
-  it('«Registrar estudiante excepcional» ya no existe en ningún menú', () => {
-    const labels = NAVIGATION.flatMap((section) => section.items.map((item) => item.label))
+  it('«Registrar estudiante excepcional» es solo del Docente, con la capacidad de casos especiales', () => {
+    const entries = NAVIGATION.flatMap((section) => section.items).filter(
+      (item) => item.label === 'Registrar estudiante excepcional'
+    )
 
-    expect(labels).not.toContain('Registrar estudiante excepcional')
+    expect(entries.map((item) => [item.to, item.capability])).toEqual([
+      ['/estudiante-excepcional', 'casos-especiales.gestionar']
+    ])
+    const inEntryControl = menuOf('Docente').find(
+      (section) => section.label === 'Control de ingreso y examen en curso'
+    )
+
+    expect(inEntryControl?.items).toContainEqual([
+      'Registrar estudiante excepcional',
+      '/estudiante-excepcional'
+    ])
+
+    for (const role of ['Invitado', 'Auxiliar', 'Administrador'] as const) {
+      const labels = menuOf(role).flatMap((section) => section.items.map(([label]) => label))
+
+      expect(labels).not.toContain('Registrar estudiante excepcional')
+    }
   })
 
   it('la entrada de situaciones no depende de un examen: solo de la capacidad', () => {

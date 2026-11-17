@@ -67,6 +67,47 @@ class LateEntrySearchTest extends TestCase
             ->assertJsonPath('data.0.ci', $ci);
     }
 
+    public function test_encuentra_al_estudiante_excepcional_de_este_examen_y_no_al_de_otro(): void
+    {
+        $group = DB::table('grupo')->where('id_grupo', $this->grupoPropioId)->first();
+        DB::table('grupo_oferta')->insertOrIgnore([
+            'id_grupo' => $this->grupoPropioId,
+            'id_carrera' => $group->id_carrera,
+            'id_materia' => $group->id_materia,
+            'id_gestion_periodo' => $group->id_gestion_periodo,
+        ]);
+        $exceptionalId = (int) DB::table('estudiante')->insertGetId([
+            'cod_sis' => '202600999', 'ci' => '5550001', 'nombre' => 'Eva', 'apellido_paterno' => 'Mena',
+            'estado' => 'ACTIVO',
+        ], 'id_estudiante');
+        DB::table('examen_estudiante')->insert([
+            'id_examen' => $this->exam->id_examen,
+            'id_estudiante' => $exceptionalId,
+            'id_grupo' => null,
+            'estado_habilitacion' => 'HABILITADO',
+            'estado_ingreso' => 'NO_INGRESO',
+            'es_excepcional' => true,
+            'motivo_excepcional' => 'Convalidación aprobada',
+            'id_usuario_docente_excepcional' => $this->docenteId,
+            'id_grupo_excepcional' => $this->grupoPropioId,
+            'id_carrera_excepcional' => $group->id_carrera,
+        ]);
+
+        $this->search(['sis' => '202600999'])
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id_estudiante', $exceptionalId);
+        $this->search(['nombre' => 'Eva Mena'])->assertOk()->assertJsonPath('data.0.id_estudiante', $exceptionalId);
+
+        $otherExam = $this->createExam(
+            array_merge(['estado' => Exam::EN_CURSO], $this->entryOpen(true)),
+            [$this->aulaId]
+        );
+        DB::table('grupo_examen')->insert(['id_examen' => $otherExam->id_examen, 'id_grupo' => $this->grupoPropioId]);
+        $this->getJson($this->lateEntryUrl('buscar', $otherExam) . '?sis=202600999')
+            ->assertOk()->assertJsonCount(0, 'data');
+    }
+
     public function test_devuelve_como_maximo_cinco_y_excluye_a_estudiantes_de_otro_examen(): void
     {
         $this->enrollStudents($this->grupoPropioId, 5);

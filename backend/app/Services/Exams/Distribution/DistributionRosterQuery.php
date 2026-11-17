@@ -29,10 +29,9 @@ class DistributionRosterQuery
     /** @return list<DistributionStudent> */
     public function eligibleStudents(int $examId): array
     {
-        $rows = $this->roster->expected($examId)
-            ->whereRaw('COALESCE(examen_estudiante.estado_habilitacion, ?) IN (?, ?)', [
-                StudentExam::HABILITADO, ...self::ELIGIBLE_STATES,
-            ])
+        $rows = DB::query()
+            ->fromSub($this->roster->expected($examId), 'nomina')
+            ->whereIn('nomina.estado_habilitacion', self::ELIGIBLE_STATES)
             ->get()->keyBy('id_estudiante')->values()
             ->map(fn (stdClass $row): array => [
                 'id_estudiante' => (int) $row->id_estudiante,

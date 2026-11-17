@@ -23,6 +23,9 @@ class GestionPeriodoMigrationTest extends TestCase
     /** Depende de oferta_academica: se revierte antes que ella (HU-021 multicarrera). */
     private const GROUP_OFFERING = '2026_11_06_000001_create_grupo_oferta_and_add_carrera_to_grupo_estudiante.php';
 
+    /** Depende de grupo_oferta (FK del grupo excepcional): se revierte antes que ella (HU-023). */
+    private const EXCEPTIONAL = '2026_11_17_000002_add_excepcional_to_examen_estudiante.php';
+
     private int $careerId;
     private int $calculusId;
     private int $algebraId;
@@ -36,6 +39,7 @@ class GestionPeriodoMigrationTest extends TestCase
         require_once database_path('migrations/' . self::OFFERING);
         require_once database_path('migrations/' . self::RENAME);
         require_once database_path('migrations/' . self::GROUP_OFFERING);
+        require_once database_path('migrations/' . self::EXCEPTIONAL);
     }
 
     protected function tearDown(): void
@@ -48,6 +52,11 @@ class GestionPeriodoMigrationTest extends TestCase
 
     private function migrateDown(): void
     {
+        // migrateUp() no la vuelve a aplicar: solo se revierte si sigue vigente.
+        if (Schema::hasColumn('examen_estudiante', 'es_excepcional')) {
+            (new \AddExcepcionalToExamenEstudiante())->down();
+        }
+
         (new \CreateGrupoOfertaAndAddCarreraToGrupoEstudiante())->down();
         (new \RenameActivoToVigente())->down();
         (new \CreateOfertaAcademica())->down();

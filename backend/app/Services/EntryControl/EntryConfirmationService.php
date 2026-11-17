@@ -101,7 +101,6 @@ class EntryConfirmationService
                 $instant = Carbon::now('UTC');
                 $local = $instant->copy()->setTimezone(config('sciem.zona_horaria'));
                 $attributes = [
-                    'id_grupo' => $verdict['grupo']['id_grupo'],
                     'estado_habilitacion' => 'HABILITADO',
                     'estado_ingreso' => 'INGRESO',
                     'hora_ingreso' => $local->format('H:i:s'),
@@ -114,6 +113,7 @@ class EntryConfirmationService
                     DB::table('examen_estudiante')->insert($attributes + [
                         'id_examen' => $exam->id_examen,
                         'id_estudiante' => $student->id_estudiante,
+                        'id_grupo' => $verdict['grupo']['id_grupo'],
                     ]);
                 } else {
                     DB::table('examen_estudiante')

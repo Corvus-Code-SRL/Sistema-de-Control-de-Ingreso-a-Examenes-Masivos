@@ -505,6 +505,7 @@ describe('AppSidebar — entradas y estado activo', () => {
       ['En curso', '/examenes/en-curso'],
       ['Registrar estudiante con retraso', '/retrasos'],
       ['Registrar situación excepcional', '/situacion-excepcional'],
+      ['Registrar estudiante excepcional', '/estudiante-excepcional'],
       ['Reportar incidencia', '/reportar-incidencia'],
       ['Revisar reportes de incidencias', '/incidencias'],
       ['Central de riesgo', '/central-riesgo'],
@@ -522,7 +523,13 @@ describe('AppSidebar — entradas y estado activo', () => {
 
       expect(screen.getByRole('link', { name: 'Registrar situación excepcional' }))
         .toHaveAttribute('href', '/situacion-excepcional')
-      expect(screen.queryByText('Registrar estudiante excepcional')).not.toBeInTheDocument()
+
+      if (role === 'Docente') {
+        expect(screen.getByRole('link', { name: 'Registrar estudiante excepcional' }))
+          .toHaveAttribute('href', '/estudiante-excepcional')
+      } else {
+        expect(screen.queryByText('Registrar estudiante excepcional')).not.toBeInTheDocument()
+      }
     }
   )
 
