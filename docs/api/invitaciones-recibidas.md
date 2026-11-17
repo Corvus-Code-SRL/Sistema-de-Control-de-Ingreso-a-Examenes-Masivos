@@ -122,18 +122,41 @@ El conteo por grupo se arma al abrir el control de ingreso (el snapshot); como s
 
 ## Qué puede hacer el colaborador
 
-Un colaborador es la invitación **ACEPTADA** (no hay otra tabla; ver `ExamCollaboratorService`). Es docente del examen en:
+El creador **administra** el examen y el colaborador lo **controla**. Un colaborador es la invitación **ACEPTADA** (no hay otra tabla; ver `ExamCollaboratorService`). Es docente del examen en:
 
 | HU | Qué |
 |---|---|
-| 032 | Ve el examen en el control de ingreso con `rol_controlador: DOCENTE` y controla todos los ambientes |
+| 032 | Ve el examen en el control de ingreso con `rol_controlador: DOCENTE` y controla todos los ambientes; confirma y rechaza ingresos |
 | 037 | Solicitudes y registro de ingreso con retraso, como docente |
 | 038 | Vista del examen en curso |
-| 042 / 057 | Situaciones e incidencias del examen |
+| 042 / 057 | Incidencias y situaciones del examen |
 | 051 | Reporte final del examen finalizado |
 | 052 | Historial: el examen aparece entre los suyos |
 
-Siguen siendo **solo del creador**: editar, cancelar, asignar grupos y auxiliares, invitar, iniciar y terminar el examen, y revisar los reportes de falta. El examen tampoco aparece en su lista de exámenes programados.
+También ve el examen en **Programados** (`GET /api/examenes`, con `?vista=programados` o sin ella) y su detalle (`GET /api/examenes/{id}`), **solo para leer**: la interfaz lo marca con la insignia «Colaborador». El examen donde solo colabora **no** aparece en el desplegable de HU-026 (`GET /api/docente/invitaciones/examenes`): no puede invitar a otros.
+
+### `es_creador`
+
+Los recursos que alimentan la interfaz traen `es_creador` (`true` solo para el docente que creó el examen): el listado y el detalle de `/api/examenes`, `GET /api/control-ingreso/examenes`, `GET /api/control-ingreso/examenes/{id}/contexto` y `GET /api/examenes/{id}/en-curso`. Con `es_creador: false` la interfaz oculta lo que el servidor responde con **403**; `rol_controlador` sigue diciendo si se controla como docente o como auxiliar y ya no se usa para saber quién creó el examen.
+
+### Solo del creador (403 para un colaborador)
+
+| Acción | Ruta |
+|---|---|
+| Modificar el examen | `PUT /api/examenes/{id}` |
+| Cancelar | `POST /api/examenes/{id}/cancelar` |
+| Asignar grupos al examen | `POST /api/examenes/{id}/grupos` |
+| Cerrar el ingreso ordinario | `POST /api/control-ingreso/examenes/{id}/cerrar-ingreso-ordinario` |
+| Terminar el examen | `POST /api/examenes/{id}/finalizar` |
+| Lista de habilitados (028) y habilitar auxiliares (029/030) | `/api/examenes/{id}/habilitados`, `/api/examenes/{id}/auxiliares` |
+| Revisar los reportes de falta (045) | `/api/docente/incidencias` |
+| Invitar docentes (HU-026) | `/api/docente/invitaciones/*` |
+
+## Decisiones del PR
+
+- **Invitado (temporal).** El rol «Docente invitado (temporal)» puede recibir y responder invitaciones (función `teaching`); solo el rol Docente puede invitar (`invite_teachers`).
+- **Invitación ajena.** Una invitación dirigida a otro docente responde 404, no 403, para no revelar que existe.
+- **Lista por grupo.** Si **alguna** invitación aceptada del examen tiene `lista_por_grupo: true`, todo el examen usa la lista por grupo, también para los colaboradores que aceptaron una invitación sin esa opción.
 
 ## Datos de QA
 
