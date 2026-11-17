@@ -27,6 +27,11 @@ class ExamTimingService
         return $this->startsAt($exam)->addMinutes((int) $exam->duracion);
     }
 
+    public function resolutionLimit(Exam $exam): Carbon
+    {
+        return $this->endsAt($exam);
+    }
+
     public function finishesAutomaticallyAt(Exam $exam): Carbon
     {
         // Los exámenes que quedaron sin iniciar conservan el plazo de recuperación.
