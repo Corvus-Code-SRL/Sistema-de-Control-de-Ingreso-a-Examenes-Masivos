@@ -64,7 +64,8 @@ class CollaboratorMembershipTest extends TestCase
 
     public function test_el_colaborador_ve_el_examen_en_el_control_de_ingreso_como_docente(): void
     {
-        $this->exam->update(['estado' => Exam::EN_INGRESO]);
+        // HU-038: con el control de ingreso abierto el examen sigue PROGRAMADO.
+        $this->exam->forceFill(['ingreso_abierto_en' => now()])->save();
         $this->actAsTeacher($this->otroDocenteId);
 
         $this->getJson('/api/control-ingreso/examenes')->assertOk()->assertJsonCount(0, 'data');

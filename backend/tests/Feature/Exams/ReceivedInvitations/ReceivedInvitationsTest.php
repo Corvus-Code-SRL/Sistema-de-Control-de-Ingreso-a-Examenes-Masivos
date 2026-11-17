@@ -49,9 +49,13 @@ class ReceivedInvitationsTest extends TestCase
             $this->otroDocenteId,
             ExamInvitation::SIN_EFECTO
         );
-        // Pendiente escrita, pero su examen ya abrió el control: se muestra sin efecto, en Cerradas.
+        // Pendiente escrita, pero su examen ya abrió el control (sigue PROGRAMADO): se muestra sin efecto, en Cerradas.
         $stale = $this->createInvitation(
-            $this->createExam(['nombre_examen' => 'Ya abrió', 'hora_inicio' => '16:00', 'estado' => Exam::EN_INGRESO]),
+            $this->createExam([
+                'nombre_examen' => 'Ya abrió',
+                'hora_inicio' => '16:00',
+                'ingreso_abierto_en' => '2026-11-01 15:50:00-04',
+            ]),
             $this->otroDocenteId
         );
 

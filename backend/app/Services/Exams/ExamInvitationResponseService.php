@@ -21,14 +21,15 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * Invitaciones recibidas por un docente y su respuesta (HU-027).
  *
  * El docente invitado ve las invitaciones dirigidas a él y las acepta o rechaza mientras están PENDIENTES y el
- * examen sigue PROGRAMADO. Al aceptar puede sumar sus propios grupos de la materia, si la invitación lo
- * permite, y desde ese momento es docente del examen (ver ExamCollaboratorService). Enviar invitaciones es de
- * HU-026 (CollaboratorInvitationService).
+ * examen sigue PROGRAMADO sin haber abierto el control de ingreso (examen.ingreso_abierto_en nulo, HU-038).
+ * Al aceptar puede sumar sus propios grupos de la materia, si la invitación lo permite, y desde ese momento es
+ * docente del examen (ver ExamCollaboratorService). Enviar invitaciones es de HU-026
+ * (CollaboratorInvitationService).
  *
  * Pestañas de la bandeja, según el estado que se muestra (ExamInvitation::effectiveState()):
- * - pendientes: PENDIENTE con el examen PROGRAMADO.
+ * - pendientes: PENDIENTE con el examen PROGRAMADO y el control de ingreso sin abrir.
  * - aceptadas: ACEPTADA.
- * - cerradas: RECHAZADA, SIN_EFECTO y la PENDIENTE cuyo examen ya salió de PROGRAMADO.
+ * - cerradas: RECHAZADA, SIN_EFECTO y la PENDIENTE cuyo examen ya abrió el control o salió de PROGRAMADO.
  */
 class ExamInvitationResponseService
 {
@@ -185,7 +186,7 @@ class ExamInvitationResponseService
             throw new ExamStateException(self::ALREADY_ANSWERED_MESSAGE);
         }
 
-        if ($exam->estado !== Exam::PROGRAMADO) {
+        if ($exam->estado !== Exam::PROGRAMADO || $exam->ingreso_abierto_en !== null) {
             throw new ExamStateException(self::EXAM_NOT_SCHEDULED_MESSAGE);
         }
 
@@ -226,7 +227,8 @@ class ExamInvitationResponseService
 
         if ($tab === 'pendientes') {
             $query->where('invitacion_examen.estado', ExamInvitation::PENDIENTE)
-                ->where('examen.estado', Exam::PROGRAMADO);
+                ->where('examen.estado', Exam::PROGRAMADO)
+                ->whereNull('examen.ingreso_abierto_en');
 
             return;
         }
@@ -234,7 +236,8 @@ class ExamInvitationResponseService
         $query->whereIn('invitacion_examen.estado', [ExamInvitation::RECHAZADA, ExamInvitation::SIN_EFECTO])
             ->orWhere(function (Builder $stale) {
                 $stale->where('invitacion_examen.estado', ExamInvitation::PENDIENTE)
-                    ->where('examen.estado', '<>', Exam::PROGRAMADO);
+                    ->where(fn (Builder $exam) => $exam->where('examen.estado', '<>', Exam::PROGRAMADO)
+                        ->orWhereNotNull('examen.ingreso_abierto_en'));
             });
     }
 

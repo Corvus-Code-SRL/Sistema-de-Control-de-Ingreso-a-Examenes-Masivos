@@ -189,10 +189,10 @@ class RespondInvitationTest extends TestCase
         ];
     }
 
-    /** @dataProvider closedExamStates */
-    public function test_si_el_examen_ya_no_esta_programado_responde_409(string $examState): void
+    /** @dataProvider closedExams */
+    public function test_si_el_examen_ya_abrio_el_control_o_no_esta_programado_responde_409(array $examChanges): void
     {
-        $this->exam->update(['estado' => $examState]);
+        $this->exam->forceFill($examChanges)->save();
 
         $this->accept([$this->grupoAjenoId])
             ->assertStatus(409)
@@ -206,11 +206,13 @@ class RespondInvitationTest extends TestCase
         $this->assertSame([$this->grupoPropioId], $this->examGroupIds());
     }
 
-    public static function closedExamStates(): array
+    public static function closedExams(): array
     {
+        // HU-038: con el control de ingreso abierto el examen sigue PROGRAMADO; lo marca ingreso_abierto_en.
         return [
-            'en ingreso' => [Exam::EN_INGRESO],
-            'cancelado' => [Exam::CANCELADO],
+            'control de ingreso abierto' => [['ingreso_abierto_en' => '2026-11-01 07:50:00-04']],
+            'en curso' => [['estado' => Exam::EN_CURSO, 'ingreso_abierto_en' => '2026-11-01 07:50:00-04']],
+            'cancelado' => [['estado' => Exam::CANCELADO]],
         ];
     }
 

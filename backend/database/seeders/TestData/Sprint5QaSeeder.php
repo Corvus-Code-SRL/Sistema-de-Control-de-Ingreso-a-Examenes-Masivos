@@ -41,15 +41,15 @@ use Illuminate\Support\Facades\DB;
  *   - «HU-026 Final Cálculo I» (9812) ya abrió el control de ingreso: no sale en el desplegable y su invitación a Carmen quedó
  *     SIN_EFECTO. Las fechas son futuras (diciembre de 2026) para que el planificador no cierre estos exámenes.
  * Volver a correrlo devuelve estos exámenes y sus invitaciones a su estado inicial. La bitácora no se toca.
- * 
+ *
  * Escenario HU-027 (responder invitaciones). Rosario Salazar (10487) entra y ve su bandeja en los cuatro estados:
  *   - Pendientes: la de «HU-026 Parcial Cálculo I» (9811) y la de «HU-027 Parcial aula chica»
  *     (9821), que se rinde en el aula QA-8 (8 lugares) y ya tiene el grupo 1 (7 inscritos): al marcar su grupo 2
  *     (5 inscritos) la pantalla avisa que se supera la capacidad, sin impedir aceptar. Esta invitación pide la
  *     lista separada por grupo: tras aceptar con el grupo 2, al abrir el control de ingreso y durante el examen
  *     la lista se ve dividida en «Grupo 1 · Marcelo» y «Grupo 2 · Rosario».
- *   - Aceptada: «HU-027 Final Cálculo I» (9822), ya EN_INGRESO y sin permitir grupos; Rosario lo ve en el
- *     control de ingreso como docente.
+ *   - Aceptada: «HU-027 Final Cálculo I» (9822), PROGRAMADO con el control de ingreso ya abierto y sin
+ *     permitir grupos; Rosario lo ve en el control de ingreso como docente.
  *   - Rechazada: «HU-027 Recuperatorio» (9823), PROGRAMADO.
  *   - Sin efecto: la de «HU-026 Final Cálculo I» (9812), que abrió el control sin respuesta.
  *
@@ -221,7 +221,7 @@ class Sprint5QaSeeder extends Seeder
             $this->invitationExam(self::EXAM_RESPONSE_SMALL_ROOM, 'HU-027 Parcial aula chica', '2026-12-14',
                 '08:00:00', '09:30:00', 90, 'PROGRAMADO'),
             $this->invitationExam(self::EXAM_RESPONSE_ACCEPTED, 'HU-027 Final Cálculo I', '2026-12-15', '10:00:00',
-                '12:00:00', 120, 'EN_INGRESO'),
+                '12:00:00', 120, 'PROGRAMADO', '2026-12-15 09:50:00-04'),
             $this->invitationExam(self::EXAM_RESPONSE_REJECTED, 'HU-027 Recuperatorio', '2026-12-16',
                 '14:00:00', '15:30:00', 90, 'PROGRAMADO'),
         ], ['id_examen']);

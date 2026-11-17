@@ -19,13 +19,13 @@ Una cuenta **activa** con rol **Docente o Invitado** (función `teaching` de `co
 
 ## Estado que se muestra y pestañas
 
-`estado` es el que ve el docente (`ExamInvitation::effectiveState()`): una invitación **PENDIENTE** cuyo examen ya no está **PROGRAMADO** se muestra **SIN_EFECTO** aunque el ciclo de vida todavía no la haya escrito así.
+`estado` es el que ve el docente (`ExamInvitation::effectiveState()`): una invitación **PENDIENTE** cuyo examen ya **abrió el control de ingreso** (`examen.ingreso_abierto_en`, HU-038: el examen sigue PROGRAMADO) o ya no está **PROGRAMADO** se muestra **SIN_EFECTO** aunque el ciclo de vida todavía no la haya escrito así.
 
 | Pestaña | Contiene |
 |---|---|
-| `pendientes` (por defecto) | PENDIENTE con el examen PROGRAMADO |
+| `pendientes` (por defecto) | PENDIENTE con el examen PROGRAMADO y el control de ingreso sin abrir |
 | `aceptadas` | ACEPTADA |
-| `cerradas` | RECHAZADA, SIN_EFECTO y la PENDIENTE cuyo examen ya salió de PROGRAMADO |
+| `cerradas` | RECHAZADA, SIN_EFECTO y la PENDIENTE cuyo examen ya abrió el control o salió de PROGRAMADO |
 
 Otro valor de `estado` responde **422**. El orden es de la más reciente a la más antigua.
 
@@ -41,6 +41,7 @@ Otro valor de `estado` responde **422**. El orden es de la más reciente a la m�
       "fecha_respuesta": null,
       "fecha_sin_efecto": null,
       "permite_agregar_grupos": true,
+      "lista_por_grupo": false,
       "examen": {
         "id_examen": 9821,
         "nombre_examen": "HU-027 Parcial aula chica",
@@ -95,7 +96,7 @@ Reglas, en este orden y dentro de una transacción:
 
 1. Se bloquea la fila del **examen** (`FOR UPDATE`, como la apertura del control de ingreso y el envío de invitaciones) y luego la de la invitación.
 2. La invitación debe estar **PENDIENTE**; si no, **409** («La invitación ya fue respondida o quedó sin efecto.»).
-3. El examen debe estar **PROGRAMADO**; si no, **409** («La invitación ya no se puede responder: el examen ya abrió el control de ingreso o no está programado.»).
+3. El examen debe estar **PROGRAMADO** y **sin el control de ingreso abierto** (`ingreso_abierto_en` nulo); si no, **409** («La invitación ya no se puede responder: el examen ya abrió el control de ingreso o no está programado.»).
 4. Si `permite_agregar_grupos` es `false` y llegan grupos, **422** en `grupos` («Esta invitación no permite agregar grupos al examen.»).
 5. Los grupos se validan con la regla de `ExamGroupService` (**422** en `grupos`): propios del invitado, ACTIVOS, del período vigente y de la materia del examen; con nómina («El grupo N no tiene nómina cargada.»); y sin estudiantes repetidos con los grupos que el examen ya tenía («Un estudiante figura en más de uno de los grupos seleccionados.»).
 6. Se vinculan los grupos (`grupo_examen`), la invitación pasa a **ACEPTADA** con `fecha_respuesta` y `fecha_sin_efecto` queda `null`.
@@ -106,6 +107,18 @@ Si cualquier paso falla no cambia nada.
 ## POST /api/invitaciones/{id_invitacion}/rechazar
 
 Sin cuerpo. Mismos pasos 1 a 3; la invitación pasa a **RECHAZADA** con `fecha_respuesta`, el examen no cambia y se registra `RECHAZAR_INVITACION`. Responde **200** con `mensaje: "Invitación rechazada."`.
+
+## Lista junta o dividida por grupo
+
+Quien invita elige en HU-026 (`lista_por_grupo`, segundo checkbox, solo si permite agregar grupos). La **nómina es la misma** en los dos casos: los grupos sumados se vinculan al examen y sus estudiantes entran en la misma lista. Solo cambia cómo se muestra, y lo decide `ExamCollaboratorService::listsByGroup()`: basta una invitación **ACEPTADA** con `lista_por_grupo: true`.
+
+| Dónde | Lista junta (por defecto) | Lista dividida por grupo |
+|---|---|---|
+| `GET /api/control-ingreso/examenes/{id}/estado` (032) | `ingresados`, `pendientes`, `total` | Además `por_grupo: [{id_grupo, num_grupo, docente, total, ingresados}]`; cada fila de `ultimos_ingresos` trae `id_grupo` |
+| `POST …/verificar` (032) | `grupo: {id_grupo, num_grupo, carrera}` | `grupo` trae además `docente` |
+| `GET /api/examenes/{id}/en-curso` (038) | `lista_por_grupo: false` | `lista_por_grupo: true`; la vista agrupa `estudiantes` por `id_grupo` usando `grupos: [{id_grupo, num_grupo, docente}]` |
+
+El conteo por grupo se arma al abrir el control de ingreso (el snapshot); como solo se acepta antes de que se abra el control, no cambia después.
 
 ## Qué puede hacer el colaborador
 
@@ -125,4 +138,3 @@ Siguen siendo **solo del creador**: editar, cancelar, asignar grupos y auxiliare
 ## Datos de QA
 
 `Sprint5QaSeeder`: Rosario Salazar (10487) tiene invitaciones en los cuatro estados; la del examen 9821 («HU-027 Parcial aula chica», aula QA-8 de 8 lugares) sirve para ver el aviso de capacidad al marcar su grupo 2. Ver el comentario del seeder.
-````
