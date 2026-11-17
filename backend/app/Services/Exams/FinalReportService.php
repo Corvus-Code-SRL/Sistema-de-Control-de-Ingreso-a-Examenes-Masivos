@@ -132,6 +132,10 @@ class FinalReportService
                     ->where('estado_ingreso', 'NO_INGRESO')
                     ->where('estado_habilitacion', '!=', 'NO_HABILITADO')
                     ->count(),
+                'no_habilitados' => $group
+                    ->where('estado_ingreso', 'NO_INGRESO')
+                    ->where('estado_habilitacion', 'NO_HABILITADO')
+                    ->count(),
                 'sin_clasificar' => $group
                     ->whereNotIn('estado_ingreso', array_keys(self::ENTRY_LABELS))
                     ->count(),
@@ -146,6 +150,7 @@ class FinalReportService
                 'a_tiempo' => $groups->sum('a_tiempo'),
                 'con_retraso' => $groups->sum('con_retraso'),
                 'ausentes' => $groups->sum('ausentes'),
+                'no_habilitados' => $groups->sum('no_habilitados'),
                 'sin_clasificar' => $groups->sum('sin_clasificar'),
             ],
         ];
