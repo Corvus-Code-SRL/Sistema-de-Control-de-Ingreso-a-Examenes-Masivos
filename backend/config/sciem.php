@@ -282,6 +282,7 @@ return [
             'INVITAR_COLABORADOR' => 'Invitar colaborador',
             'ACEPTAR_INVITACION' => 'Aceptar invitación',
             'RECHAZAR_INVITACION' => 'Rechazar invitación',
+            'GUARDAR_DISTRIBUCION' => 'Guardar distribución',
         ],
 
         'etiquetas_campo' => [
