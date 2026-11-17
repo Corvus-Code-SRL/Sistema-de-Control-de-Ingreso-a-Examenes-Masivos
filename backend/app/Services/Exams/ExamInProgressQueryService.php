@@ -110,6 +110,7 @@ class ExamInProgressQueryService
                 'nomina.nombre',
                 'nomina.apellido_paterno',
                 'nomina.apellido_materno',
+                'nomina.id_grupo',
                 'ee.estado_ingreso',
                 'ee.hora_ingreso',
                 'ee.id_ambiente',
@@ -145,6 +146,8 @@ class ExamInProgressQueryService
 
             $students[] = [
                 'id_estudiante' => $studentId,
+                // Grupo por el que figura en la nómina; la vista lo usa si la lista va separada por grupo.
+                'id_grupo' => $student->id_grupo === null ? null : (int) $student->id_grupo,
                 'cod_sis' => $student->cod_sis,
                 'ci' => $student->ci,
                 'nombre_completo' => trim(implode(' ', array_filter([
@@ -234,6 +237,9 @@ class ExamInProgressQueryService
             'hora_servidor_en' => now('UTC')->toIso8601String(),
             'totales' => $counts,
             'estudiantes' => $students,
+            // HU-027: el docente que invitó pidió ver la lista separada por grupo (con su docente).
+            'lista_por_grupo' => $this->collaborators->listsByGroup($examId),
+            'grupos' => $this->collaborators->examGroups($examId),
             'incidencias_habilitadas' => $exam->id_carrera !== null,
             'situaciones_habilitadas' => $situationData['enabled'],
             'total_situaciones' => $situationData['revision'],

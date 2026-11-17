@@ -6,6 +6,7 @@ use App\Models\Exam;
 use App\Models\ExamInvitation;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Docentes de un examen (HU-027): el docente que lo creó y los colaboradores que aceptaron su invitación.
@@ -55,6 +56,45 @@ class ExamCollaboratorService
             ->orderBy('id_invitacion')
             ->pluck('id_docente_invitado')
             ->map(fn ($id) => (string) $id)
+            ->all();
+    }
+
+    /**
+     * Si la lista del examen se muestra separada por grupo: algún colaborador aceptó una invitación cuyo docente
+     * creador marcó «lista separada por grupo» (HU-026/027). La nómina es la misma; solo cambia cómo se muestra.
+     */
+    public function listsByGroup(int $examId): bool
+    {
+        return ExamInvitation::query()
+            ->where('id_examen', $examId)
+            ->where('estado', ExamInvitation::ACEPTADA)
+            ->where('lista_por_grupo', true)
+            ->exists();
+    }
+
+    /**
+     * Grupos del examen con su docente, ordenados por número de grupo.
+     *
+     * @return array<int, array{id_grupo: int, num_grupo: string, docente: string|null}>
+     */
+    public function examGroups(int $examId): array
+    {
+        return DB::table('grupo_examen as gx')
+            ->join('grupo as g', 'g.id_grupo', '=', 'gx.id_grupo')
+            ->leftJoin('usuario as u', 'u.id_usuario', '=', 'g.id_usuario_docente')
+            ->where('gx.id_examen', $examId)
+            // «2» antes que «10»: primero por largo y luego por texto.
+            ->orderByRaw('length(g.num_grupo), g.num_grupo')
+            ->get(['g.id_grupo', 'g.num_grupo', 'u.nombre', 'u.apellido_paterno', 'u.apellido_materno'])
+            ->map(fn ($row) => [
+                'id_grupo' => (int) $row->id_grupo,
+                'num_grupo' => (string) $row->num_grupo,
+                'docente' => $row->nombre === null ? null : trim(implode(' ', array_filter([
+                    $row->nombre,
+                    $row->apellido_paterno,
+                    $row->apellido_materno,
+                ]))),
+            ])
             ->all();
     }
 
