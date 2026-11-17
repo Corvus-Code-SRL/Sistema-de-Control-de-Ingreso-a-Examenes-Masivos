@@ -2,12 +2,11 @@
 export type ExamCategory = 'REGULAR' | 'MESA' | 'ADMISION';
 
 /** Valores de public.estado_examen. */
-export type ExamStatus = 'PROGRAMADO' | 'EN_INGRESO' | 'EN_CURSO' | 'FINALIZADO' | 'CANCELADO';
+export type ExamStatus = 'PROGRAMADO' | 'EN_CURSO' | 'FINALIZADO' | 'CANCELADO';
 
 /** Los mismos valores en tiempo de ejecución, para comparar sin literales sueltos. */
 export const EXAM_STATUS = {
   PROGRAMADO: 'PROGRAMADO',
-  EN_INGRESO: 'EN_INGRESO',
   EN_CURSO: 'EN_CURSO',
   FINALIZADO: 'FINALIZADO',
   CANCELADO: 'CANCELADO',
@@ -60,9 +59,14 @@ export interface Exam {
   minutos_apertura?: number;
   normas: string | null;
   estado: ExamStatus;
-  inicio_real_en?: string | null;
+  /** Fecha y hora programadas de inicio (fecha + hora_inicio), en ISO 8601. */
+  inicio_programado?: string | null;
+  /** Cuándo se abrió el control de ingreso; null mientras no abre. */
+  ingreso_abierto_en?: string | null;
+  ingreso_ordinario_cerrado_en?: string | null;
+  /** Control abierto: con apertura, sin cierre ordinario y el examen PROGRAMADO o EN_CURSO. */
+  control_ingreso_abierto?: boolean;
   fin_real_en?: string | null;
-  inicio_automatico?: boolean;
   fin_automatico?: boolean;
   id_tipo_examen: number;
   id_carrera: number;

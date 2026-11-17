@@ -378,7 +378,7 @@ class AssignGroupsTest extends TestCase
 
     public function test_rechaza_modificar_grupos_si_el_examen_ya_no_esta_programado(): void
     {
-        $exam = $this->createExam(['estado' => Exam::EN_INGRESO]);
+        $exam = $this->createExam($this->examStateAttributes('INGRESO_ABIERTO'));
 
         $this->postJson("/api/examenes/{$exam->id_examen}/grupos", [
             'grupos' => [$this->grupoPropioId],

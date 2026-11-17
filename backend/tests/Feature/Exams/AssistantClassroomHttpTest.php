@@ -65,9 +65,9 @@ class AssistantClassroomHttpTest extends TestCase
             ->assertJsonPath('data.auxiliares.1.ambiente.nro_aula', '692B');
     }
 
-    public function test_desde_en_ingreso_responde_409_y_el_listado_queda_de_solo_lectura(): void
+    public function test_desde_que_abre_el_control_responde_409_y_el_listado_queda_de_solo_lectura(): void
     {
-        $exam = $this->examWithAssistants(['estado' => Exam::EN_INGRESO], $this->aulaId);
+        $exam = $this->examWithAssistants($this->examStateAttributes('INGRESO_ABIERTO'), $this->aulaId);
 
         $this->assign($exam, $this->mariaId, $this->otraAulaId)
             ->assertStatus(409)
@@ -181,13 +181,14 @@ class AssistantClassroomHttpTest extends TestCase
 
     public function test_el_ambiente_por_defecto_se_ve_tambien_con_el_ingreso_abierto(): void
     {
-        $exam = $this->createExam(['estado' => Exam::EN_INGRESO], [$this->aulaId]);
+        $exam = $this->createExam($this->examStateAttributes('INGRESO_ABIERTO'), [$this->aulaId]);
         $this->enableAssistant($exam, $this->mariaId);
         $this->actingAs(User::findOrFail($this->mariaId));
 
         $this->getJson('/api/auxiliar/examenes')
             ->assertOk()
-            ->assertJsonPath('data.0.estado', Exam::EN_INGRESO)
+            ->assertJsonPath('data.0.estado', Exam::PROGRAMADO)
+            ->assertJsonPath('data.0.control_ingreso_abierto', true)
             ->assertJsonPath('data.0.ambiente.nro_aula', '691A');
     }
 

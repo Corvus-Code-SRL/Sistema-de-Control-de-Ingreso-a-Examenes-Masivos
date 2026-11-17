@@ -46,12 +46,12 @@ class GroupExamsTest extends TestCase
     public function test_incluye_los_examenes_de_cualquier_estado(): void
     {
         $this->examOfGroup($this->grupoPropioId, ['estado' => Exam::CANCELADO, 'fecha' => $this->futureDate(1)]);
-        $this->examOfGroup($this->grupoPropioId, ['estado' => Exam::EN_INGRESO, 'fecha' => $this->futureDate(2)]);
+        $this->examOfGroup($this->grupoPropioId, array_merge($this->entryOpen(), ['fecha' => $this->futureDate(2)]));
 
         $this->getJson($this->url($this->grupoPropioId))
             ->assertOk()
             ->assertJsonPath('data.0.estado', Exam::CANCELADO)
-            ->assertJsonPath('data.1.estado', Exam::EN_INGRESO);
+            ->assertJsonPath('data.1.estado', Exam::PROGRAMADO);
     }
 
     public function test_un_grupo_sin_examenes_responde_data_vacio(): void

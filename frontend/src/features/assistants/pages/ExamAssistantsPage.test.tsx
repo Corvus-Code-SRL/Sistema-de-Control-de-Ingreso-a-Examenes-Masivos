@@ -253,10 +253,10 @@ describe('ExamAssistantsPage', () => {
     ).toBeVisible()
   })
 
-  it('permite consultar pero no modificar auxiliares en EN_INGRESO', async () => {
+  it('permite consultar pero no modificar auxiliares con el control de ingreso abierto', async () => {
     listExamAssistants.mockResolvedValue(
       examData({
-        estado: 'EN_INGRESO',
+        estado: 'PROGRAMADO',
         editable: false,
         auxiliares: [enabledAssistant],
       })

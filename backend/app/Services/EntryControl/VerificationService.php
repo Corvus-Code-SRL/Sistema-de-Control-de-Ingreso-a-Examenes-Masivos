@@ -67,7 +67,13 @@ class VerificationService
             return $result;
         }
 
-        return $this->evaluate($this->withBackground($identified['registro']), $input, $roomId);
+        $result = $this->evaluate($this->withBackground($identified['registro']), $input, $roomId);
+        $result['reporte_pendiente'] = $this->snapshots->hasPendingReport(
+            $examId,
+            (int) $result['estudiante']['id_estudiante']
+        );
+
+        return $result;
     }
 
     /**

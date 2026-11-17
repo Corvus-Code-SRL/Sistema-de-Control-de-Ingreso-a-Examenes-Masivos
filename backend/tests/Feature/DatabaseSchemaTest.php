@@ -227,18 +227,41 @@ class DatabaseSchemaTest extends TestCase
         DB::table('examen')->where('id_examen', $scheduled)->update(['estado' => 'CANCELADO']);
         $this->assertSame('CANCELADO', DB::table('examen')->where('id_examen', $scheduled)->value('estado'));
 
-        $entering = $this->insertExam($teacher, ['estado' => 'EN_INGRESO']);
-        $this->assertRejected(
-            fn () => DB::table('examen')->where('id_examen', $entering)->update(['estado' => 'CANCELADO'])
-        );
-
         $running = $this->insertExam($teacher, ['estado' => 'EN_CURSO']);
         $this->assertRejected(
             fn () => DB::table('examen')->where('id_examen', $running)->update(['estado' => 'CANCELADO'])
         );
 
-        DB::table('examen')->where('id_examen', $entering)->update(['estado' => 'EN_CURSO']);
-        $this->assertSame('EN_CURSO', DB::table('examen')->where('id_examen', $entering)->value('estado'));
+        $opened = $this->insertExam($teacher, ['ingreso_abierto_en' => '2026-10-01 11:50:00+00']);
+        DB::table('examen')->where('id_examen', $opened)->update(['estado' => 'EN_CURSO']);
+        $this->assertSame('EN_CURSO', DB::table('examen')->where('id_examen', $opened)->value('estado'));
+    }
+
+    public function testTheRetiredEntryStateCannotBeStored(): void
+    {
+        $teacher = $this->insertUser('docente');
+
+        $this->assertRejected(fn () => $this->insertExam($teacher, ['estado' => 'EN_INGRESO']));
+
+        $scheduled = $this->insertExam($teacher);
+        $this->assertRejected(
+            fn () => DB::table('examen')->where('id_examen', $scheduled)->update(['estado' => 'EN_INGRESO'])
+        );
+        $this->assertSame('PROGRAMADO', DB::table('examen')->where('id_examen', $scheduled)->value('estado'));
+    }
+
+    public function testTheEntryControlTimestampsExistAndAreNullableTimestamptz(): void
+    {
+        $columns = DB::table('information_schema.columns')
+            ->where('table_name', 'examen')
+            ->whereIn('column_name', ['ingreso_abierto_en', 'ingreso_ordinario_cerrado_en'])
+            ->pluck('data_type', 'column_name')
+            ->all();
+
+        $this->assertSame([
+            'ingreso_abierto_en' => 'timestamp with time zone',
+            'ingreso_ordinario_cerrado_en' => 'timestamp with time zone',
+        ], $columns);
     }
 
     public function testAuxiliaryTablesHaveCompositePrimaryKeysAndTheirForeignKeys(): void

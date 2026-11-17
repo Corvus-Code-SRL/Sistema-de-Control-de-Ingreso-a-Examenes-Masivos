@@ -168,7 +168,7 @@ class SendInvitationTest extends TestCase
 
     public function test_un_examen_que_ya_abrio_el_ingreso_responde_409(): void
     {
-        $this->exam->update(['estado' => Exam::EN_INGRESO]);
+        $this->exam->forceFill($this->examStateAttributes('INGRESO_ABIERTO'))->save();
 
         $this->send()
             ->assertStatus(409)

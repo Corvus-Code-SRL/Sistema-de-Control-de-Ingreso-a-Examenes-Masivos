@@ -94,9 +94,9 @@ describe('AssistantClassroomManager: HU-030', () => {
     expect(within(modal).queryByRole('button', { name: 'Guardar cambios' })).not.toBeInTheDocument()
   })
 
-  it('al iniciar el ingreso, permite consultar sin modificar', async () => {
+  it('al abrir el control de ingreso, permite consultar sin modificar', async () => {
     const user = userEvent.setup()
-    mockBackend(examAssistantsData({ estado: 'EN_INGRESO', editable: false }))
+    mockBackend(examAssistantsData({ estado: 'PROGRAMADO', editable: false }))
     render(<AssistantClassroomManager examId={7} />)
 
     await user.click(await screen.findByRole('button', { name: 'Ver ambientes' }))

@@ -24,7 +24,7 @@ export const examsService = {
   },
 
   /**
-   * Vista Programados: solo los exámenes vigentes (PROGRAMADO o EN_INGRESO del período activo,
+   * Vista Programados: exámenes vigentes con estado PROGRAMADO del período activo,
    * incluido el recién creado que aún no tiene grupos), del más próximo al más lejano. Lo decide
    * el backend con `?vista=programados`.
    */
@@ -50,15 +50,6 @@ export const examsService = {
 
   async cancelExam(examId: number): Promise<Exam> {
     const response = await apiPost<DataResponse<Exam>>(`/examenes/${examId}/cancelar`, {});
-    return response.data;
-  },
-
-  async startExam(examId: number): Promise<Exam> {
-    const response = await apiPost<DataResponse<Exam>>(
-      `/examenes/${examId}/iniciar`,
-      {}
-    );
-
     return response.data;
   },
 

@@ -1869,7 +1869,27 @@ INSERT INTO public.accion (operacion, tipo_operacion, descripcion)
 SELECT 'INVITAR_COLABORADOR', 'INSERT', 'Invitación de un docente colaborador a un examen'
 WHERE NOT EXISTS (SELECT 1 FROM public.accion WHERE operacion = 'INVITAR_COLABORADOR');
 
--- Versión 16: aceptar o rechazar una invitación a colaborar (HU-027)
+-- Versión 16: estado persistente del control de ingreso (HU-038)
+--             (2026_11_16_000000_add_entry_control_timestamps_to_examen y
+--              2026_11_17_000000_retire_estado_en_ingreso_examen)
+--   * La apertura y el cierre ordinario se consultan en examen; la bitácora conserva el historial.
+--   * La migración rellena estas fechas desde los eventos existentes de la bitácora.
+--   * EN_INGRESO deja de usarse: el valor sigue en el enum estado_examen (PostgreSQL no permite quitarlo),
+--     pero un CHECK impide asignarlo. El control abierto es ingreso_abierto_en NOT NULL con
+--     ingreso_ordinario_cerrado_en NULL y el examen PROGRAMADO o EN_CURSO.
+--   * En una base con datos, la migración pasa los EN_INGRESO a PROGRAMADO (si aún no llega la hora de
+--     inicio) o EN_CURSO, y cierra el ingreso ordinario de los EN_CURSO y FINALIZADO heredados (en develop
+--     iniciar el examen cerraba el control) antes de agregar el CHECK. En una base nueva no hay nada que convertir.
+--   * inicio_real_en e inicio_automatico ya no se escriben; las columnas se conservan.
+
+ALTER TABLE public.examen
+    ADD COLUMN ingreso_abierto_en timestamp with time zone,
+    ADD COLUMN ingreso_ordinario_cerrado_en timestamp with time zone;
+
+ALTER TABLE public.examen
+    ADD CONSTRAINT chk_examen_estado_sin_en_ingreso CHECK (estado <> 'EN_INGRESO');
+
+-- Versión 17: aceptar o rechazar una invitación a colaborar (HU-027)
 --             (2026_11_17_000000_add_invitation_response_actions)
 --   * Se registran las acciones de bitácora ACEPTAR_INVITACION y RECHAZAR_INVITACION (solo si faltan).
 --   * No hay columnas nuevas: permite_agregar_grupos y fecha_sin_efecto son de la versión 15 y el rechazo
@@ -1883,7 +1903,7 @@ INSERT INTO public.accion (operacion, tipo_operacion, descripcion)
 SELECT 'RECHAZAR_INVITACION', 'UPDATE', 'Rechazo de una invitación a colaborar en un examen'
 WHERE NOT EXISTS (SELECT 1 FROM public.accion WHERE operacion = 'RECHAZAR_INVITACION');
 
--- Versión 17: lista separada por grupo en la invitación a colaborar (HU-026 la elige, HU-027 la aplica)
+-- Versión 18: lista separada por grupo en la invitación a colaborar (HU-026 la elige, HU-027 la aplica)
 --             (2026_11_17_000001_add_lista_por_grupo_to_invitacion_examen)
 --   * invitacion_examen.lista_por_grupo: si quien invita pide que, cuando el colaborador sume sus grupos, la
 --     lista del examen se muestre dividida por grupo (con su docente) en el control de ingreso y durante el

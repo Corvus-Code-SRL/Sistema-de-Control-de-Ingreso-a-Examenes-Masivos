@@ -307,17 +307,21 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
 
               <div className="rounded-lg bg-sunken p-4">
                 <p className="text-sm text-muted-foreground">
-                  Inicio del examen
+                  Inicio programado
                 </p>
                 <p className="mt-1 text-lg font-semibold">
-                  {data.inicio_real_en
-                    ? localTime(data.inicio_real_en)
-                    : 'No registrado'}
+                  {localTime(data.inicio_programado)}
                 </p>
 
-                {data.inicio_automatico && (
+                {data.ingreso_abierto_en && (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Apertura del control: {localTime(data.ingreso_abierto_en)}
+                  </p>
+                )}
+
+                {data.estado === 'EN_CURSO' && data.ingreso_abierto_en && !data.ingreso_ordinario_cerrado_en && (
                   <p className="mt-2 text-sm text-brand-deep">
-                    Inicio automático
+                    Ingreso ordinario abierto
                   </p>
                 )}
 

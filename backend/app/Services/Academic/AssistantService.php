@@ -508,8 +508,8 @@ class AssistantService
      *
      * Reglas:
      *  - El examen debe ser del docente.
-     *  - El examen debe estar PROGRAMADO: desde que se abre el control de
-     *    ingreso, las habilitaciones quedan fijas.
+     *  - El examen debe estar PROGRAMADO y sin abrir el control de ingreso: desde
+     *    que se abre, las habilitaciones quedan fijas.
      *  - El auxiliar debe tener cuenta ACTIVA y rol Auxiliar vigente.
      *  - No se requiere pertenencia previa a grupos académicos.
      *  - El auxiliar no debe estar entre los estudiantes esperados del examen.
@@ -530,7 +530,7 @@ class AssistantService
 
             $exam = $this->lockOwnExamOrFail($examId, $teacherId);
 
-            if ($exam->estado !== Exam::PROGRAMADO) {
+            if ($exam->estado !== Exam::PROGRAMADO || $exam->ingreso_abierto_en !== null) {
                 throw ValidationException::withMessages([
                     'id_examen' => [
                         'Solo se pueden habilitar auxiliares mientras el examen está PROGRAMADO.',
@@ -641,8 +641,8 @@ class AssistantService
      *
      * Reglas:
      *  - El examen debe ser del docente.
-     *  - El examen debe estar PROGRAMADO: desde que se abre el control de
-     *    ingreso, las habilitaciones quedan fijas.
+     *  - El examen debe estar PROGRAMADO y sin abrir el control de ingreso: desde
+     *    que se abre, las habilitaciones quedan fijas.
      */
     public function removeFromExam(int $examId, string $assistantId, string $teacherId): void
     {
@@ -651,7 +651,7 @@ class AssistantService
         DB::transaction(function () use ($examId, $assistantId, $teacherId) {
             $exam = $this->lockOwnExamOrFail($examId, $teacherId);
 
-            if ($exam->estado !== Exam::PROGRAMADO) {
+            if ($exam->estado !== Exam::PROGRAMADO || $exam->ingreso_abierto_en !== null) {
                 throw ValidationException::withMessages([
                     'id_examen' => [
                         'Solo se pueden modificar los auxiliares mientras el examen está PROGRAMADO.',
@@ -771,7 +771,8 @@ class AssistantService
     }
 
     /**
-     * Exámenes PROGRAMADOS del docente vinculados a los grupos, por grupo y ordenados por fecha.
+     * Exámenes PROGRAMADOS sin control de ingreso abierto, del docente, vinculados a los grupos,
+     * por grupo y ordenados por fecha.
      *
      * @param array<int, int> $groupIds
      * @return SupportCollection<int, SupportCollection<int, object>>
@@ -783,6 +784,7 @@ class AssistantService
             ->whereIn('grupo_examen.id_grupo', $groupIds)
             ->where('examen.id_usuario_docente', $teacherId)
             ->where('examen.estado', Exam::PROGRAMADO)
+            ->whereNull('examen.ingreso_abierto_en')
             ->orderBy('examen.fecha')
             ->orderBy('examen.id_examen')
             ->select('examen.id_examen', 'examen.nombre_examen', 'examen.fecha', 'grupo_examen.id_grupo')
@@ -791,7 +793,7 @@ class AssistantService
     }
 
     /**
-     * Exámenes PROGRAMADOS del docente donde cada auxiliar ya está habilitado.
+     * Exámenes PROGRAMADOS sin control de ingreso abierto, del docente, donde cada auxiliar ya está habilitado.
      *
      * @param array<int, string> $assistantIds
      * @return SupportCollection<string, SupportCollection<int, object>>
@@ -803,6 +805,7 @@ class AssistantService
             ->whereIn('examen_auxiliar.id_usuario', $assistantIds)
             ->where('examen.id_usuario_docente', $teacherId)
             ->where('examen.estado', Exam::PROGRAMADO)
+            ->whereNull('examen.ingreso_abierto_en')
             ->orderBy('examen.fecha')
             ->orderBy('examen.id_examen')
             ->select('examen_auxiliar.id_usuario', 'examen.id_examen', 'examen.nombre_examen', 'examen.fecha')

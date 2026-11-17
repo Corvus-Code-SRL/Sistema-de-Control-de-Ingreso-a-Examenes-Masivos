@@ -5,6 +5,7 @@ namespace App\Services\Exams;
 use App\Exceptions\Exams\ExamOwnershipException;
 use App\Exceptions\Exams\ExamStateException;
 use App\Models\Exam;
+use App\Services\EntryControl\CloseOrdinaryEntryService;
 use App\Models\Group;
 use App\Services\Academic\SubjectCatalogService;
 use App\Support\RecordStatus;
@@ -169,7 +170,7 @@ class ExamGroupService
             throw new ExamOwnershipException();
         }
 
-        if ($exam->estado !== Exam::PROGRAMADO) {
+        if ($exam->estado !== Exam::PROGRAMADO || CloseOrdinaryEntryService::hasOpened((int) $exam->id_examen)) {
             throw new ExamStateException(
                 'Los grupos solo pueden modificarse mientras el examen está programado.'
             );

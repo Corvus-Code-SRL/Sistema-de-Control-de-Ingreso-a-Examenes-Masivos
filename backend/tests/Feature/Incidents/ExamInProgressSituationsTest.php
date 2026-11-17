@@ -52,7 +52,7 @@ class ExamInProgressSituationsTest extends TestCase
 
     public function test_situations_registered_during_entry_open_appear_once_the_exam_starts(): void
     {
-        $this->situationExam->update(['estado' => Exam::EN_INGRESO]);
+        $this->situationExam->forceFill($this->examStateAttributes('INGRESO_ABIERTO'))->save();
         $this->postJson($this->situationUrl(), $this->situationPayload())->assertCreated();
         $this->postJson($this->situationUrl(), [
             'tipo' => 'IDENTIFICACION',
@@ -78,7 +78,7 @@ class ExamInProgressSituationsTest extends TestCase
 
     public function test_assistant_of_the_destination_room_sees_a_room_change_made_during_entry_open(): void
     {
-        $this->situationExam->update(['estado' => Exam::EN_INGRESO]);
+        $this->situationExam->forceFill($this->examStateAttributes('INGRESO_ABIERTO'))->save();
         $this->postJson($this->situationUrl(), $this->situationPayload())->assertCreated();
         $this->situationExam->update(['estado' => Exam::EN_CURSO]);
 

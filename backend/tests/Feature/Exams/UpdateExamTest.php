@@ -207,10 +207,13 @@ class UpdateExamTest extends TestCase
         $this->assertDatabaseHas('examen', ['id_examen' => $exam->id_examen, 'id_carrera' => $this->sistemasId]);
     }
 
-    public function test_criterio_11_desde_en_ingreso_la_informacion_general_queda_bloqueada(): void
+    public function test_criterio_11_desde_que_abre_el_control_la_informacion_general_queda_bloqueada(): void
     {
-        foreach ([Exam::EN_INGRESO, Exam::EN_CURSO, Exam::FINALIZADO] as $status) {
-            $exam = $this->createExam(['nombre_examen' => "Examen {$status}", 'estado' => $status], [$this->aulaId]);
+        foreach (['INGRESO_ABIERTO', Exam::EN_CURSO, Exam::FINALIZADO] as $status) {
+            $exam = $this->createExam(
+                array_merge(['nombre_examen' => "Examen {$status}"], $this->examStateAttributes($status)),
+                [$this->aulaId]
+            );
 
             $this->putJson($this->url($exam), $this->validPayload([
                 'nombre_examen' => 'Cambiado',
@@ -233,7 +236,7 @@ class UpdateExamTest extends TestCase
                 'duracion'      => 90,
                 'id_carrera'    => $this->sistemasId,
                 'id_materia'    => $this->calculoId,
-                'estado'        => $status,
+                'estado'        => $exam->estado,
             ]);
         }
     }
@@ -317,10 +320,7 @@ class UpdateExamTest extends TestCase
     public function test_modificacion_rechazada_no_genera_bitacora(): void
     {
         $exam = $this->createExam(
-            [
-                'nombre_examen' => 'Primer parcial',
-                'estado' => Exam::EN_INGRESO,
-            ],
+            array_merge(['nombre_examen' => 'Primer parcial'], $this->examStateAttributes('INGRESO_ABIERTO')),
             [$this->aulaId]
         );
 

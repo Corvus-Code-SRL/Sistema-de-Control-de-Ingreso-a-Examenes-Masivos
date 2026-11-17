@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '@/lib/api-client'
-import { throttleNotice, throttleWaitSeconds } from '@/lib/throttle'
+import { throttleNotice } from '@/lib/throttle'
 import { ENTRY_CONTROL_POLL_MS as NORMAL_POLL_MS } from '../constants'
 import { entryControlService, isFullStatus, isPendingStatus } from '../services/entryControlService'
 import type { EntryContext, EntryOpeningFailure, EntryStatus } from '../types/entry-control.types'
 
-const FIRST_RETRY_MS = 3000
+const FIRST_RETRY_MS = NORMAL_POLL_MS
 const MAX_RETRY_MS = 30000
 
 function message(error: unknown): string {
@@ -36,6 +36,16 @@ export function useEntryStatus(examId: number) {
   const inFlight = useRef(false)
   const networkFailures = useRef(0)
   const endedRef = useRef(false)
+
+  const pauseForRateLimit = useCallback((cause: unknown): boolean => {
+    if (!(cause instanceof ApiError) || !cause.isTooManyRequests) return false
+    const seconds = Math.max(NORMAL_POLL_MS / 1000, Math.ceil(cause.retryAfter ?? 0))
+    networkFailures.current = 0
+    setPollDelay(seconds * 1000)
+    setStatusError(throttleNotice(seconds))
+    setLastUpdatedAt((previous) => previous ?? Date.now())
+    return true
+  }, [])
 
   const refresh = useCallback(async (force = false) => {
     if (inFlight.current || endedRef.current) return
@@ -68,15 +78,7 @@ export function useEntryStatus(examId: number) {
         setStatusError(null)
         return
       }
-      if (cause instanceof ApiError && cause.isTooManyRequests) {
-        // El sondeo sigue vivo: solo espera lo que pide el servidor antes de volver a consultar.
-        const seconds = throttleWaitSeconds(cause)
-        networkFailures.current = 0
-        setPollDelay(seconds * 1000)
-        setStatusError(throttleNotice(seconds))
-        setLastUpdatedAt((previous) => previous ?? Date.now())
-        return
-      }
+      if (pauseForRateLimit(cause)) return
       if (cause instanceof ApiError && cause.isNetworkFailure) {
         networkFailures.current += 1
         setPollDelay(Math.min(FIRST_RETRY_MS * 2 ** (networkFailures.current - 1), MAX_RETRY_MS))
@@ -89,7 +91,7 @@ export function useEntryStatus(examId: number) {
     } finally {
       inFlight.current = false
     }
-  }, [examId])
+  }, [examId, pauseForRateLimit])
 
   const load = useCallback(async () => {
     endedRef.current = false
@@ -102,7 +104,7 @@ export function useEntryStatus(examId: number) {
     try {
       const nextContext = await entryControlService.context(examId)
       setContext(nextContext)
-      if (nextContext.estado === 'EN_INGRESO' || nextContext.estado === 'PROGRAMADO') {
+      if (!nextContext.ingreso_ordinario_cerrado && (nextContext.estado === 'PROGRAMADO' || nextContext.estado === 'EN_CURSO')) {
         await refresh(true)
       } else {
         version.current = undefined
@@ -126,44 +128,24 @@ export function useEntryStatus(examId: number) {
   }, [load])
 
   useEffect(() => {
-    if (context?.estado !== 'EN_INGRESO' || ended) return
+    if (!context || context.ingreso_ordinario_cerrado || ended) return
 
     let active = true
-    let timer: number
-    const poll = async () => {
-      if (!document.hidden) await refresh()
-      if (active && !endedRef.current) timer = window.setTimeout(poll, pollDelay)
-    }
-    timer = window.setTimeout(poll, pollDelay)
-
-    return () => { active = false; window.clearTimeout(timer) }
-  }, [context?.estado, ended, pollDelay, refresh])
-
-  useEffect(() => {
-    if (context?.estado !== 'PROGRAMADO' || ended) return
-
-    let active = true
-    let checking = false
     const timer = window.setInterval(async () => {
-      if (document.hidden || checking) return
-      checking = true
+      if (document.hidden || inFlight.current) return
       try {
         const nextContext = await entryControlService.context(examId)
-        if (active) {
-          if (nextContext.estado !== 'PROGRAMADO') setContext(nextContext)
-          if (nextContext.estado === 'EN_INGRESO' || nextContext.estado === 'PROGRAMADO') {
-            await refresh(true)
-          }
-        }
-      } catch {
-        // El siguiente ciclo vuelve a consultar; el botón Actualizar sigue disponible.
-      } finally {
-        checking = false
+        if (!active) return
+        setContext(nextContext)
+        if (!nextContext.ingreso_ordinario_cerrado) await refresh()
+      } catch (cause) {
+        if (!active) return
+        pauseForRateLimit(cause)
       }
-    }, 15000)
+    }, pollDelay)
 
     return () => { active = false; window.clearInterval(timer) }
-  }, [context?.estado, ended, examId, refresh])
+  }, [context?.ingreso_ordinario_cerrado, context?.estado, ended, examId, pauseForRateLimit, pollDelay, refresh])
 
   return { context, status, openingFailure, loading, error, statusError, lastUpdatedAt, ended, refresh, reload: load }
 }

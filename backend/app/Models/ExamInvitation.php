@@ -65,12 +65,13 @@ class ExamInvitation extends Model
     }
 
     /**
-     * Estado que se muestra: una invitación PENDIENTE cuyo examen ya no está PROGRAMADO está sin efecto aunque
+     * Estado que se muestra: una invitación PENDIENTE cuyo examen ya no está PROGRAMADO o ya abrió el control está sin efecto aunque
      * el ciclo de vida todavía no la haya escrito así. Requiere el examen (se carga si falta).
      */
     public function effectiveState(): string
     {
-        if ($this->estado === self::PENDIENTE && $this->exam->estado !== Exam::PROGRAMADO) {
+        if ($this->estado === self::PENDIENTE
+            && ($this->exam->estado !== Exam::PROGRAMADO || $this->exam->ingreso_abierto_en !== null)) {
             return self::SIN_EFECTO;
         }
 

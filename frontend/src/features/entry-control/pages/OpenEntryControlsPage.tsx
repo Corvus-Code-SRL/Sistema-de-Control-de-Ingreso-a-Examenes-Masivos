@@ -17,7 +17,7 @@ function timeLabel(value: string): string {
 
 function openingMessage(exam: OpenEntryExam, now: number): string {
   const time = timeLabel(exam.apertura_programada_en)
-  if (exam.estado === 'EN_INGRESO') return `Apertura programada: ${time}`
+  if (exam.control_abierto) return `Apertura programada: ${time}`
   const minutes = Math.ceil((new Date(exam.apertura_programada_en).getTime() - now) / 60_000)
   if (minutes <= 0) return `La apertura automática estaba prevista a las ${time}.`
   const remaining = minutes >= 1440
@@ -97,12 +97,12 @@ export function OpenEntryControlsPage() {
         return <li key={exam.id_examen} className="flex min-w-0 flex-col rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0"><p className="text-sm text-muted-foreground">{[exam.materia, exam.carrera].filter(Boolean).join(' · ')}</p><h2 className="mt-1 text-lg font-semibold">{exam.nombre_examen}</h2></div>
-            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${failed ? 'bg-danger-soft text-danger-fg' : exam.estado === 'EN_INGRESO' ? 'bg-ok-soft text-ok-fg' : 'bg-warn-soft text-warn-fg'}`}>{failed ? 'No se pudo abrir' : exam.estado === 'EN_INGRESO' ? 'Ingreso abierto' : 'Programado'}</span>
+            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${failed ? 'bg-danger-soft text-danger-fg' : exam.control_abierto ? 'bg-ok-soft text-ok-fg' : 'bg-warn-soft text-warn-fg'}`}>{failed ? 'No se pudo abrir' : exam.control_abierto ? 'Ingreso abierto' : 'Programado'}</span>
           </div>
           <div className="mt-3 space-y-1.5 text-sm text-muted-foreground">
             <p className="flex items-center gap-2"><Clock3 className="size-4 shrink-0" aria-hidden="true" />{exam.fecha ?? '—'} · examen {exam.hora_inicio ?? '—'}</p>
             <p className="flex items-center gap-2"><MapPin className="size-4 shrink-0" aria-hidden="true" />{exam.rol_controlador === 'AUXILIAR' ? `Usted controla en ${exam.ambiente_asignado ?? 'su ambiente asignado'}` : exam.ambientes.join(', ') || 'Ambiente pendiente'}</p>
-            {exam.estado === 'EN_INGRESO' && <p className="flex items-center gap-2"><Users className="size-4 shrink-0" aria-hidden="true" />{exam.ingresados} de {exam.total} ingresaron · {exam.pendientes} pendientes</p>}
+            {exam.control_abierto && <p className="flex items-center gap-2"><Users className="size-4 shrink-0" aria-hidden="true" />{exam.ingresados} de {exam.total} ingresaron · {exam.pendientes} pendientes</p>}
             {!failed && <p>{openingMessage(exam, now)}</p>}
           </div>
           {failed && <div role="alert" className="mt-3 flex gap-3 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger-fg">
@@ -111,7 +111,7 @@ export function OpenEntryControlsPage() {
               {exam.motivo_apertura?.codigo === 'CAPACIDAD_INSUFICIENTE' && <p className="mt-1 text-xs">Agregue un ambiente al examen para que el control se abra.</p>}
             </div>
           </div>}
-          <Button className="mt-4 h-11 w-full sm:w-auto sm:self-start" asChild><Link to={`/examenes/${exam.id_examen}/control-ingreso`}>{exam.estado === 'EN_INGRESO' ? 'Controlar ingreso' : failed ? 'Ver detalle del examen' : 'Ver estado del control'} <ArrowRight className="size-4" /></Link></Button>
+          <Button className="mt-4 h-11 w-full sm:w-auto sm:self-start" asChild><Link to={failed && exam.rol_controlador === 'DOCENTE' ? `/examenes/${exam.id_examen}/editar` : `/examenes/${exam.id_examen}/control-ingreso`}>{exam.control_abierto ? 'Controlar ingreso' : failed && exam.rol_controlador === 'DOCENTE' ? 'Modificar examen' : failed ? 'Ver detalle del examen' : 'Ver estado del control'} <ArrowRight className="size-4" /></Link></Button>
         </li>
       })}
     </ul>}

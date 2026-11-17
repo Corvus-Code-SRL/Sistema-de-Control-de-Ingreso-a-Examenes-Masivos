@@ -133,6 +133,7 @@ export function VerificationResult({
     {actions.recordsAttempt && !allowed && !isAssistant && result.veredicto !== 'AULA_NO_ASIGNADA' && <p className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground">Intento registrado con hora, ambiente y controlador.</p>}
     <StudentDetails result={result} presentedCi={presentedCi} subjectName={subjectName} />
     <AssistantDetails result={result} />
+    {result.reporte_pendiente && <p role="status" className="flex items-center gap-2 rounded-lg border border-warn-border bg-warn-soft p-3 text-sm font-medium text-warn-fg"><ShieldAlert className="size-4" />Este estudiante tiene un reporte pendiente en este examen.</p>}
     {result.ambiente_asignado && result.veredicto === 'AULA_INCORRECTA' && <p className="flex items-center gap-2 rounded-lg border border-warn-border bg-warn-soft p-3 text-sm font-medium text-warn-fg"><DoorOpen className="size-4" />Dirija al estudiante a {result.ambiente_asignado.nro_aula}.</p>}
     {result.ingreso_previo && <div className="rounded-lg border border-danger/25 bg-card p-4 text-sm"><p className="font-semibold text-danger-fg">Ingreso ya registrado</p><p className="mt-1">Hora: {result.ingreso_previo.hora_ingreso ?? '—'} · Ambiente: {result.ingreso_previo.nro_aula ?? '—'}</p><p className="text-muted-foreground">Controló: {result.ingreso_previo.controlador || '—'}</p></div>}
     {result.antecedentes.total > 0 && <div className="rounded-lg border border-warn-border bg-warn-soft p-4 text-sm">

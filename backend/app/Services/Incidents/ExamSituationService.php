@@ -6,6 +6,7 @@ use App\Exceptions\Exams\ExamStateException;
 use App\Models\Exam;
 use App\Models\ExamSituation;
 use App\Models\User;
+use App\Services\EntryControl\CloseOrdinaryEntryService;
 use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\Exams\ExamExpulsionService;
 use App\Services\Security\AuditLogService;
@@ -93,7 +94,7 @@ class ExamSituationService
 
                 $action = 'CAMBIAR_AMBIENTE';
 
-                if ($exam->estado === Exam::EN_INGRESO) {
+                if (CloseOrdinaryEntryService::isOpen($exam)) {
                     $syncedRoomId = $destinationRoomId;
                 }
             }

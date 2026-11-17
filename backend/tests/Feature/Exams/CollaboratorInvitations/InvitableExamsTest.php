@@ -53,7 +53,7 @@ class InvitableExamsTest extends TestCase
     public function test_solo_ofrece_examenes_programados_propios(): void
     {
         $programmed = $this->createExam(['nombre_examen' => 'Programado']);
-        $this->createExam(['nombre_examen' => 'En ingreso', 'estado' => Exam::EN_INGRESO]);
+        $this->createExam(array_merge(['nombre_examen' => 'Ingreso abierto'], $this->entryOpen()));
         $this->createExam(['nombre_examen' => 'En curso', 'estado' => Exam::EN_CURSO]);
         $this->createExam(['nombre_examen' => 'Finalizado', 'estado' => Exam::FINALIZADO]);
         $this->createExam(['nombre_examen' => 'Cancelado', 'estado' => Exam::CANCELADO]);
@@ -77,7 +77,7 @@ class InvitableExamsTest extends TestCase
 
     public function test_sin_examenes_programados_devuelve_una_lista_vacia(): void
     {
-        $this->createExam(['estado' => Exam::EN_INGRESO]);
+        $this->createExam($this->examStateAttributes('INGRESO_ABIERTO'));
 
         $this->getJson(self::URL)->assertOk()->assertExactJson(['data' => []]);
     }
@@ -87,7 +87,7 @@ class InvitableExamsTest extends TestCase
         $exam = $this->createExam();
         $this->getJson(self::URL)->assertOk()->assertJsonCount(1, 'data');
 
-        $exam->update(['estado' => Exam::EN_INGRESO]);
+        $exam->forceFill($this->examStateAttributes('INGRESO_ABIERTO'))->save();
 
         $this->getJson(self::URL)->assertOk()->assertJsonCount(0, 'data');
     }

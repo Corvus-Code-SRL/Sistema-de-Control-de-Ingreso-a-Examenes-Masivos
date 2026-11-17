@@ -72,7 +72,8 @@ class ExamInvitationExpiryTest extends TestCase
     {
         app(RoomAssignmentService::class)->prepare((int) $this->exam->id_examen);
 
-        $this->assertSame(Exam::EN_INGRESO, $this->exam->fresh()->estado);
+        $this->assertSame(Exam::PROGRAMADO, $this->exam->fresh()->estado);
+        $this->assertNotNull($this->exam->fresh()->ingreso_abierto_en);
         $this->assertPendingVoided();
     }
 

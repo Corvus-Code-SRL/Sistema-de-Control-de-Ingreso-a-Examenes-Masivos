@@ -254,7 +254,7 @@ php artisan serve        # http://localhost:8000
 
 **No ejecutar `php artisan migrate` a ciegas contra la base compartida.** El esquema ya está cargado; las migraciones nuevas se aplican después de un `git pull` y coordinando con el equipo.
 
-**Control de ingreso (HU-10 y HU-11).** Todas sus rutas exigen iniciar sesión: no hay usuario de desarrollo implícito. Un examen pasa a `EN_INGRESO` solo por el planificador de Laravel (`php artisan schedule:work`), que abre el control según `minutos_apertura` de cada examen (10 minutos por defecto). **Nunca ejecutes el planificador con el `.env` de la base compartida**: movería exámenes reales de estado. Los pasos para correrlo contra una base local están en [`deployment/docker/README.md`](deployment/docker/README.md#apertura-automática-de-ingreso). El servicio `scheduler` de Docker no arranca con `up -d`: pertenece al perfil opcional `scheduler`.
+**Control de ingreso (HU-10 y HU-11).** Todas sus rutas exigen iniciar sesión: no hay usuario de desarrollo implícito. El control de ingreso de un examen se abre solo por el planificador de Laravel (`php artisan schedule:work`), según `minutos_apertura` de cada examen (10 minutos por defecto), sin cambiar su estado (`PROGRAMADO` con `ingreso_abierto_en`). **Nunca ejecutes el planificador con el `.env` de la base compartida**: abriría controles y movería exámenes reales de estado. Los pasos para correrlo contra una base local están en [`deployment/docker/README.md`](deployment/docker/README.md#apertura-automática-de-ingreso). El servicio `scheduler` de Docker no arranca con `up -d`: pertenece al perfil opcional `scheduler`.
 
 > Usar `composer install`, **nunca** `composer update`, para respetar las versiones de `composer.lock`.
 
@@ -384,7 +384,7 @@ Los códigos SIS siguen el formato de cada tipo de cuenta: el Administrador es a
 | Exámenes propios y ajenos en el mismo par | 9801 (Marcelo) y 9803 (Rosario), Cálculo I/Sistemas, 15-10-2026 a las 08:00 | HU-06 |
 | Misma materia en otra facultad | 9802, Final Cálculo ECO, 20-11-2026 a las 10:00 | HU-06 |
 | Examen cancelado, sin reserva efectiva de horario | 9804, Base de Datos I/Sistemas, 16-10-2026 a las 14:00 | HU-06 |
-| Estados que bloquean edición y cancelación | 9805 EN_INGRESO, 9806 EN_CURSO, 9807 FINALIZADO | HU-06 |
+| Estados que bloquean edición y cancelación | 9805 PROGRAMADO con el control de ingreso abierto, 9806 EN_CURSO, 9807 FINALIZADO | HU-06 |
 | Examen que cruza medianoche | 9808, Programación/Sistemas, 17-10-2026 de 23:00 a 01:00 (120 minutos) | HU-06 |
 | Intento de ingreso rechazado con reporte | 9901–9909: cada uno originó un reporte (9921–9929) de los exámenes 9807 y 9805, controlados por Daniela Ferrufino e Iván Choque | HU-042 |
 | Intento rechazado de un estudiante identificado, sin reporte | 9910, Diego Delgadillo en el examen 9807 | HU-042 |

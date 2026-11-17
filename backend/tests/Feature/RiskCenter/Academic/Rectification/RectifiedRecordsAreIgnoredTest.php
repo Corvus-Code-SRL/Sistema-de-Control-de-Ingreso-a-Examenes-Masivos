@@ -212,7 +212,7 @@ class RectifiedRecordsAreIgnoredTest extends TestCase
             ->value('id_estudiante');
         $recordId = $this->insertApprovedRecord(array_merge($this->context, ['id_estudiante' => $studentId]))
             ['id_cr_estudiante'];
-        DB::table('examen')->where('id_examen', $exam->id_examen)->update(['estado' => Exam::EN_INGRESO]);
+        $this->putExamInState((int) $exam->id_examen, 'INGRESO_ABIERTO');
         app(RoomAssignmentService::class)->prepare($exam->id_examen);
         $snapshots = app(EntryControlSnapshotService::class);
         $examId = (int) $exam->id_examen;

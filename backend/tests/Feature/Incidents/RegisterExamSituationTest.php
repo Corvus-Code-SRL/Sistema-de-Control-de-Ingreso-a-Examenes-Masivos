@@ -185,12 +185,12 @@ class RegisterExamSituationTest extends TestCase
 
     public static function registrableStates(): array
     {
-        return [[Exam::EN_INGRESO], [Exam::EN_CURSO]];
+        return [[Exam::PROGRAMADO], [Exam::EN_CURSO]];
     }
 
     public function testAssistantCanRegisterDuringEntryOpen(): void
     {
-        $this->situationExam->update(['estado' => Exam::EN_INGRESO]);
+        $this->situationExam->forceFill($this->examStateAttributes('INGRESO_ABIERTO'))->save();
         $this->actAsSituationAssistant($this->aulaId);
 
         $this->postJson($this->situationUrl(), $this->situationPayload())->assertCreated()
@@ -199,7 +199,7 @@ class RegisterExamSituationTest extends TestCase
 
     public function testPresentStudentIsRequiredDuringEntryOpen(): void
     {
-        $this->situationExam->update(['estado' => Exam::EN_INGRESO]);
+        $this->situationExam->forceFill($this->examStateAttributes('INGRESO_ABIERTO'))->save();
         DB::table('examen_estudiante')->where('id_examen', $this->situationExam->id_examen)->update([
             'estado_ingreso' => 'NO_INGRESO', 'hora_ingreso' => null,
             'id_usuario_controlador' => null, 'registrado_en' => null,
@@ -232,7 +232,19 @@ class RegisterExamSituationTest extends TestCase
 
     public static function closedStates(): array
     {
-        return [[Exam::PROGRAMADO], [Exam::FINALIZADO], [Exam::CANCELADO]];
+        return [[Exam::FINALIZADO], [Exam::CANCELADO]];
+    }
+
+    public function testScheduledExamWithoutEntryOpenRejectsSituations(): void
+    {
+        $this->situationExam->forceFill(['estado' => Exam::PROGRAMADO, 'ingreso_abierto_en' => null])->save();
+
+        $this->postJson($this->situationUrl(), $this->situationPayload())->assertStatus(409)
+            ->assertJsonPath(
+                'message',
+                'Solo se pueden registrar situaciones con el ingreso abierto o con el examen en curso.'
+            );
+        $this->assertSame(0, DB::table('situacion_examen')->count());
     }
 
     public function testAbsentStudentCannotReceiveASituation(): void

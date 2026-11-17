@@ -53,10 +53,12 @@ class CollaboratorInvitationService
         $this->auditLog = $auditLog;
     }
 
-    /** Exámenes PROGRAMADOS del docente: los únicos a los que todavía puede invitar colaboradores. */
+    /** Exámenes PROGRAMADOS del docente que aún no abren el control: los únicos a los que puede invitar. */
     public function listInvitableExams(string $teacherId): Collection
     {
-        return $this->exams->listScheduledForTeacher($teacherId, [Exam::PROGRAMADO]);
+        return $this->exams->listScheduledForTeacher($teacherId, [Exam::PROGRAMADO])
+            ->filter(fn (Exam $exam) => $exam->ingreso_abierto_en === null)
+            ->values();
     }
 
     /**
@@ -262,7 +264,7 @@ class CollaboratorInvitationService
             throw new CollaboratorInvitationOwnershipException();
         }
 
-        if ($exam->estado !== Exam::PROGRAMADO) {
+        if ($exam->estado !== Exam::PROGRAMADO || $exam->ingreso_abierto_en !== null) {
             throw new ExamStateException(
                 $exam->estado === Exam::CANCELADO
                     ? 'El examen está cancelado: ya no se puede invitar docentes.'
