@@ -7,7 +7,7 @@ import { examInProgressExtensions } from './examInProgressExtensions'
 
 const exam: ExamInProgress = {
   id_examen: 7, nombre_examen: 'Parcial', materia: 'Programación', estado: 'EN_CURSO',
-  rol_controlador: 'DOCENTE', id_ambiente_asignado: null,
+  rol_controlador: 'DOCENTE', es_creador: true, id_ambiente_asignado: null,
   ambientes: [{ id_ambiente: 5, nro_aula: '691A', capacidad: 100 }],
   inicio_programado: '2026-10-30T12:00:00Z', ingreso_abierto_en: null, ingreso_ordinario_cerrado_en: null, fin_real_en: null, fin_automatico: false,
   fin_programado_en: '2026-10-30T14:00:00Z', hora_servidor_en: '2026-10-30T12:30:00Z',

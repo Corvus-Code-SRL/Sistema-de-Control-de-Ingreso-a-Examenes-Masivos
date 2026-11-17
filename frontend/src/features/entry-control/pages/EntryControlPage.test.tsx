@@ -13,7 +13,7 @@ const context: EntryContext = {
   id_examen: 7, nombre_examen: 'Primer parcial', fecha: '2026-09-29',
   hora_inicio: '08:00', hora_fin: '10:00', estado: 'EN_CURSO', ingreso_ordinario_cerrado: false,
   materia: 'Bases de Datos I', carrera: 'Ing. de Sistemas', grupos: ['1'],
-  rol_controlador: 'AUXILIAR', id_ambiente_asignado: 5,
+  rol_controlador: 'AUXILIAR', es_creador: false, id_ambiente_asignado: 5,
   ambientes: [{ id_ambiente: 5, nro_aula: '691A' }, { id_ambiente: 6, nro_aula: '692B' }],
 }
 const status = { ingresados: 0, pendientes: 1, total: 1, ultimos_ingresos: [], version: '1', conectados: [] }
@@ -38,7 +38,7 @@ function routes(verdict: Verification = allowed, examContext = context): Paramet
 describe('EntryControlPage', () => {
   it('conserva el ambiente elegido por el docente al actualizar el control', async () => {
     const teacherContext: EntryContext = {
-      ...context, rol_controlador: 'DOCENTE', id_ambiente_asignado: null,
+      ...context, rol_controlador: 'DOCENTE', es_creador: true, id_ambiente_asignado: null,
     }
     const { calls } = mockApiWith(({ url }) => {
       if (url.endsWith('/contexto')) return { body: { data: { ...teacherContext } } }
@@ -515,7 +515,7 @@ describe('EntryControlPage', () => {
   })
 
   it('permite al creador consultar un examen programado sin intentar verificar', async () => {
-    mockApi(routes(allowed, { ...context, rol_controlador: 'DOCENTE', estado: 'PROGRAMADO', ingreso_ordinario_cerrado: false }))
+    mockApi(routes(allowed, { ...context, rol_controlador: 'DOCENTE', es_creador: true, estado: 'PROGRAMADO', ingreso_ordinario_cerrado: false }))
     renderWithRouter(<EntryControlPage />, { route: '/examenes/7/control-ingreso', path: '/examenes/:examId/control-ingreso' })
 
     expect(await screen.findByText(/El control de ingreso no está abierto/)).toBeInTheDocument()
@@ -671,7 +671,7 @@ describe('EntryControlPage', () => {
   it('no ofrece cerrar el ingreso ordinario mientras el examen sigue PROGRAMADO con el control abierto', async () => {
     const docenteContext: EntryContext = {
       ...context,
-      rol_controlador: 'DOCENTE',
+      rol_controlador: 'DOCENTE', es_creador: true,
       id_ambiente_asignado: null,
       estado: 'PROGRAMADO',
     }
@@ -689,10 +689,27 @@ describe('EntryControlPage', () => {
     expect(screen.queryByRole('button', { name: 'Cerrar ingreso ordinario' })).not.toBeInTheDocument()
   })
 
+  it('no ofrece cerrar el ingreso ordinario a un colaborador, aunque controle como docente', async () => {
+    mockApi(routes(allowed, {
+      ...context,
+      estado: 'EN_CURSO',
+      rol_controlador: 'DOCENTE', es_creador: false,
+      id_ambiente_asignado: null,
+    }))
+
+    renderWithRouter(<EntryControlPage />, {
+      route: '/examenes/7/control-ingreso',
+      path: '/examenes/:examId/control-ingreso',
+    })
+
+    expect(await screen.findByText('Ingreso abierto')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cerrar ingreso ordinario' })).not.toBeInTheDocument()
+  })
+
   it('permite cancelar el cierre del ingreso ordinario', async () => {
     const docenteContext: EntryContext = {
       ...context,
-      rol_controlador: 'DOCENTE',
+      rol_controlador: 'DOCENTE', es_creador: true,
       id_ambiente_asignado: null,
     }
 
@@ -739,7 +756,7 @@ describe('EntryControlPage', () => {
   it('cierra el ingreso ordinario y navega a retrasos', async () => {
     const docenteContext: EntryContext = {
       ...context,
-      rol_controlador: 'DOCENTE',
+      rol_controlador: 'DOCENTE', es_creador: true,
       id_ambiente_asignado: null,
     }
 

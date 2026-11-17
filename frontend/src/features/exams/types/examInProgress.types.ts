@@ -50,6 +50,7 @@ export interface ExamInProgress {
     materia: string | null;
     estado: 'PROGRAMADO' | 'EN_CURSO' | 'FINALIZADO';
     rol_controlador: 'DOCENTE' | 'AUXILIAR';
+    es_creador: boolean;
     id_ambiente_asignado: number | null;
     ambientes: {
     id_ambiente: number;

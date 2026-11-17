@@ -25,7 +25,7 @@ const exam: ExamInProgress = {
   nombre_examen: 'Tercer Parcial',
   materia: 'Álgebra Lineal',
   estado: 'EN_CURSO',
-  rol_controlador: 'DOCENTE',
+  rol_controlador: 'DOCENTE', es_creador: true,
   id_ambiente_asignado: null,
   ambientes: [{ id_ambiente: 1, nro_aula: '692C', capacidad: 50 }],
   inicio_programado: '2026-10-29T13:00:00Z',
@@ -372,7 +372,15 @@ describe('HU-038-B: terminar examen desde En curso', () => {
   });
 
   it('oculta la acción a los auxiliares', async () => {
-    vi.mocked(examInProgressService.get).mockResolvedValue({ ...exam, rol_controlador: 'AUXILIAR' });
+    vi.mocked(examInProgressService.get).mockResolvedValue({ ...exam, rol_controlador: 'AUXILIAR', es_creador: false });
+    renderExam();
+
+    expect(await screen.findByText(exam.nombre_examen)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: finishLabel })).not.toBeInTheDocument();
+  });
+
+  it('oculta la acción a un colaborador: terminar el examen es del docente que lo creó', async () => {
+    vi.mocked(examInProgressService.get).mockResolvedValue({ ...exam, rol_controlador: 'DOCENTE', es_creador: false });
     renderExam();
 
     expect(await screen.findByText(exam.nombre_examen)).toBeInTheDocument();

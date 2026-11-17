@@ -30,7 +30,7 @@ describe('useInProgressExams', () => {
       {
         id_examen: 8, nombre_examen: 'Tercer Parcial', estado: 'EN_CURSO', fecha: '2026-10-29',
         hora_inicio: '10:00', hora_fin: '12:00', duracion: 120, normas: null, id_tipo_examen: 1,
-        id_carrera: 1, id_materia: 1, id_usuario_docente: 'docente',
+        id_carrera: 1, id_materia: 1, id_usuario_docente: 'docente', es_creador: true,
         materia: { id_materia: 1, nombre: 'Álgebra Lineal', codigo: 'MAT101' },
         ambientes: [
           { id_ambiente: 1, nro_aula: '691A', capacidad: 40 },
@@ -40,7 +40,7 @@ describe('useInProgressExams', () => {
       {
         id_examen: 9, nombre_examen: 'Examen futuro', estado: 'PROGRAMADO', fecha: '2026-11-01',
         hora_inicio: '10:00', hora_fin: '11:00', duracion: 60, normas: null, id_tipo_examen: 1,
-        id_carrera: 1, id_materia: 1, id_usuario_docente: 'docente',
+        id_carrera: 1, id_materia: 1, id_usuario_docente: 'docente', es_creador: true,
       },
     ])
 

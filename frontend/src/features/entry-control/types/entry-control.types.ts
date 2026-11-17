@@ -15,6 +15,7 @@ export interface EntryContext {
   carrera: string | null
   grupos: string[]
   rol_controlador: 'DOCENTE' | 'AUXILIAR'
+  es_creador: boolean
   id_ambiente_asignado: number | null
   ambientes: EntryRoom[]
 }
@@ -149,6 +150,7 @@ export interface OpenEntryExam {
   carrera: string | null
   ambientes: string[]
   rol_controlador: 'DOCENTE' | 'AUXILIAR'
+  es_creador: boolean
   id_ambiente_asignado: number | null
   ambiente_asignado: string | null
   apertura_programada_en: string

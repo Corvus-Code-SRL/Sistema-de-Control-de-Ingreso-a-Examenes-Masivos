@@ -24,7 +24,7 @@ export function FinishExamAction({ exam }: { exam: ExamInProgress }) {
     );
   }
 
-  return exam.estado === 'EN_CURSO' && exam.rol_controlador === 'DOCENTE'
+  return exam.estado === 'EN_CURSO' && exam.es_creador
     ? <FinishExamDialog exam={exam} />
     : null;
 }
