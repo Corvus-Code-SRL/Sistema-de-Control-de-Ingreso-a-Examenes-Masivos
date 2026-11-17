@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Clock } from 'lucide-react'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAsyncResource } from '@/hooks/useAsyncResource'
+import { ApiError } from '@/lib/api-client'
 import { ExamStatusBadge } from '../components/ExamStatusBadge'
 import { examsService } from '../services/examsService'
 import { EXAM_STATUS, type Exam, type ExamStatus } from '../types/exams.types'
@@ -33,11 +34,59 @@ function formatCountdown(seconds: number) {
   return [hours, minutes, seconds % 60].map((part) => String(part).padStart(2, '0')).join(':')
 }
 
-function ExamCountdown({ exam }: { exam: Exam }) {
+function isValidDuration(duration: number) {
+  return Number.isInteger(duration) && duration > 0
+}
+
+function ExamCountdown({ exam: initialExam }: { exam: Exam }) {
+  const [exam, setExam] = useState(initialExam)
   const duration = exam.duracion
-  const hasDuration = Number.isInteger(duration) && duration > 0
+  const hasDuration = isValidDuration(duration)
   const [deadline, setDeadline] = useState<number | null>(null)
   const [remaining, setRemaining] = useState(hasDuration ? duration * 60 : 0)
+  const [checking, setChecking] = useState(false)
+  const [startError, setStartError] = useState<string | null>(null)
+  const startRequest = useRef<AbortController | null>(null)
+
+  useEffect(() => () => startRequest.current?.abort(), [])
+
+  async function startCountdown() {
+    if (startRequest.current || !hasDuration || deadline !== null) return
+
+    const request = new AbortController()
+    startRequest.current = request
+    setChecking(true)
+    setStartError(null)
+
+    try {
+      const latestExam = await examsService.getExam(exam.id_examen, request.signal)
+      if (request.signal.aborted) return
+
+      if (!AVAILABLE_STATES.has(latestExam.estado)) {
+        setStartError('El examen ya no está disponible para iniciar el cronómetro.')
+        return
+      }
+
+      if (!isValidDuration(latestExam.duracion)) {
+        setStartError('El examen no tiene una duración válida para iniciar el cronómetro.')
+        return
+      }
+
+      const seconds = latestExam.duracion * 60
+      setExam(latestExam)
+      setRemaining(seconds)
+      setDeadline(performance.now() + seconds * 1000)
+    } catch (error) {
+      if (request.signal.aborted) return
+
+      setStartError(error instanceof ApiError && (error.isUnauthorized || error.isForbidden)
+        ? 'No tiene autorización para consultar este examen.'
+        : 'No se pudo verificar el estado del examen. Intente nuevamente.')
+    } finally {
+      startRequest.current = null
+      if (!request.signal.aborted) setChecking(false)
+    }
+  }
 
   useEffect(() => {
     if (deadline === null) return
@@ -101,20 +150,24 @@ function ExamCountdown({ exam }: { exam: Exam }) {
             <Button
               type="button"
               className="mt-4 h-11 w-full sm:w-auto"
-              disabled={!hasDuration}
-              onClick={() => setDeadline(performance.now() + duration * 60_000)}
+              disabled={!hasDuration || checking}
+              onClick={startCountdown}
             >
               <Clock className="size-4" aria-hidden="true" />
               Iniciar tiempo
             </Button>
           )}
           <div role="status">
+            {checking && <p className="mt-3 text-sm text-muted-foreground">Verificando estado del examen…</p>}
             {notice && (
               <p className="mt-3 rounded-lg border border-warn-border bg-warn-soft p-3 text-sm font-medium text-warn-fg">
                 {notice}
               </p>
             )}
           </div>
+          {startError && (
+            <p role="alert" className="mt-3 text-sm font-medium text-danger-fg">{startError}</p>
+          )}
         </div>
       </div>
     </section>
