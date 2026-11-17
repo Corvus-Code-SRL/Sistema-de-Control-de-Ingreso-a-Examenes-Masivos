@@ -9,6 +9,7 @@ import { examInProgressService } from '../services/examInProgressService';
 import type { ExamInProgressExtensions } from '../components/ExamInProgressExtensions';
 import type {
   ExamInProgress,
+  InProgressGroup,
   InProgressStudent,
 } from '../types/examInProgress.types';
 import {
@@ -16,7 +17,7 @@ import {
   type ExamClockSync,
 } from '../utils/examClock';
 
-type Filter = 'presentes' | 'retraso' | 'ausentes' | 'expulsados' | 'todos';
+type Filter = 'presentes' | 'retraso' | 'ausentes' | 'no_habilitados' | 'expulsados' | 'todos';
 
 const CAMPUS_TIME_ZONE = 'America/La_Paz';
 
@@ -39,11 +40,20 @@ function localTime(value: string): string {
   }).format(new Date(value));
 }
 
+/** Un no habilitado que no ingresó no cuenta como ausente: tiene su propio total. */
+function isNotEnabled(student: InProgressStudent): boolean {
+  return student.estado_ingreso === 'NO_INGRESO' && student.estado_habilitacion === 'NO_HABILITADO';
+}
+
+function isAbsent(student: InProgressStudent): boolean {
+  return student.estado_ingreso === 'NO_INGRESO' && !isNotEnabled(student);
+}
+
 function entryLabel(student: InProgressStudent): string {
   if (student.expulsado_en) return `Expulsado · ${localTime(student.expulsado_en)}`;
   if (student.estado_ingreso === 'INGRESO') return 'A tiempo';
   if (student.estado_ingreso === 'CON_RETRASO') return 'Con retraso';
-  return 'Ausente';
+  return isNotEnabled(student) ? 'No habilitado' : 'Ausente';
 }
 
 interface ExamInProgressPageProps {
@@ -155,6 +165,11 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
       count: data?.totales.ausentes ?? 0,
     },
     {
+      value: 'no_habilitados',
+      label: 'No habilitados',
+      count: data?.totales.no_habilitados ?? 0,
+    },
+    {
       value: 'expulsados',
       label: 'Expulsados',
       count: data?.totales.expulsados ?? 0,
@@ -174,7 +189,8 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
       (filter === 'expulsados' && !!student.expulsado_en) ||
       (filter === 'presentes' && !student.expulsado_en && student.estado_ingreso !== 'NO_INGRESO') ||
       (filter === 'retraso' && !student.expulsado_en && student.estado_ingreso === 'CON_RETRASO') ||
-      (filter === 'ausentes' && !student.expulsado_en && student.estado_ingreso === 'NO_INGRESO');
+      (filter === 'ausentes' && !student.expulsado_en && isAbsent(student)) ||
+      (filter === 'no_habilitados' && !student.expulsado_en && isNotEnabled(student));
 
     const matchesSearch = normalizeSearch([
       student.nombre_completo,
@@ -185,6 +201,32 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
     return matchesStatus && matchesSearch;
   });
 
+  // HU-027: si quien invitó pidió la lista separada por grupo, la tabla se divide por grupo (con su docente).
+  const groupSections = data?.lista_por_grupo && data.grupos && data.grupos.length > 0
+    ? splitByGroup(students, data.grupos)
+    : null;
+
+  function renderStudentRow(student: InProgressStudent) {
+    return (
+      <tr
+        key={student.id_estudiante}
+        className="border-b last:border-0"
+      >
+        <td className="px-3 py-3">{student.cod_sis}</td>
+        <td className="px-3 py-3">{student.nombre_completo}</td>
+        <td className="px-3 py-3">{student.ambiente ?? '—'}</td>
+        <td className="px-3 py-3">{student.hora_ingreso ?? '—'}</td>
+        <td className="px-3 py-3">{entryLabel(student)}</td>
+        {extensions?.studentActions && data && (
+          <td className="px-3 py-3">
+            {/* HU-042 y HU-057: acciones por estudiante */}
+            {extensions.studentActions(student, data)}
+          </td>
+        )}
+      </tr>
+    );
+  }
+
   const emptyMessage = search.trim()
     ? 'No hay estudiantes que coincidan con la búsqueda.'
     : filter === 'presentes'
@@ -193,6 +235,8 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
         ? 'No hay estudiantes con retraso.'
         : filter === 'ausentes'
           ? 'No hay estudiantes ausentes.'
+          : filter === 'no_habilitados'
+            ? 'No hay estudiantes no habilitados.'
           : filter === 'expulsados'
             ? 'No hay estudiantes expulsados.'
             : 'No hay estudiantes registrados en la nómina.';
@@ -319,11 +363,12 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
 
           </section>
 
-          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {([
               ['A tiempo', data.totales.a_tiempo],
               ['Con retraso', data.totales.con_retraso],
               ['Ausentes', data.totales.ausentes],
+              ['No habilitados', data.totales.no_habilitados],
               ['Expulsados', data.totales.expulsados ?? 0],
             ] as const).map(([label, value]) => (
               <div
@@ -400,26 +445,25 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
                   </tr>
                 </thead>
 
-                <tbody>
-                  {students.map((student) => (
-                    <tr
-                      key={student.id_estudiante}
-                      className="border-b last:border-0"
-                    >
-                      <td className="px-3 py-3">{student.cod_sis}</td>
-                      <td className="px-3 py-3">{student.nombre_completo}</td>
-                      <td className="px-3 py-3">{student.ambiente ?? '—'}</td>
-                      <td className="px-3 py-3">{student.hora_ingreso ?? '—'}</td>
-                      <td className="px-3 py-3">{entryLabel(student)}</td>
-                      {extensions?.studentActions && (
-                        <td className="px-3 py-3">
-                          {/* HU-042 y HU-057: acciones por estudiante */}
-                          {extensions.studentActions(student, data)}
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
+                {groupSections ? (
+                  // HU-027: lista separada por grupo, con su docente. Mismos estudiantes y filtros.
+                  groupSections.map((section) => (
+                    <tbody key={section.key} aria-label={section.title}>
+                      <tr className="border-b bg-muted/40">
+                        <th
+                          scope="rowgroup"
+                          colSpan={extensions?.studentActions ? 6 : 5}
+                          className="px-3 py-2 text-xs font-semibold text-muted-foreground"
+                        >
+                          {section.title} · {section.items.length}
+                        </th>
+                      </tr>
+                      {section.items.map(renderStudentRow)}
+                    </tbody>
+                  ))
+                ) : (
+                  <tbody>{students.map(renderStudentRow)}</tbody>
+                )}
               </table>
             </div>
 
@@ -440,4 +484,19 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
       )}
     </AppShell>
   );
+}
+
+/** Reparte los estudiantes (ya filtrados) por grupo, en el orden de los grupos; omite los grupos vacíos. */
+function splitByGroup(students: InProgressStudent[], groups: InProgressGroup[]) {
+  const sections = groups
+    .map((group) => ({
+      key: String(group.id_grupo),
+      title: `Grupo ${group.num_grupo}${group.docente ? ` · ${group.docente}` : ''}`,
+      items: students.filter((student) => student.id_grupo === group.id_grupo),
+    }))
+    .filter((section) => section.items.length > 0);
+  const known = new Set(groups.map((group) => group.id_grupo));
+  const others = students.filter((student) => student.id_grupo == null || !known.has(student.id_grupo));
+  if (others.length > 0) sections.push({ key: 'otros', title: 'Sin grupo', items: others });
+  return sections;
 }

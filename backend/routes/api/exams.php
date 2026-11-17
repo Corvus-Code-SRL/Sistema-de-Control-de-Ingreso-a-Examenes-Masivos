@@ -7,9 +7,11 @@ use App\Http\Controllers\Exams\ExamController;
 use App\Http\Controllers\Exams\ExamHistoryController;
 use App\Http\Controllers\Exams\ExamGroupController;
 use App\Http\Controllers\Exams\GroupExamController;
+use App\Http\Controllers\Exams\ReceivedInvitationController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Exams\ClassroomController;
 use App\Http\Controllers\Exams\FinalReportController;
+use App\Http\Controllers\Exams\ExamEligibleListController;
 
 // ...
 
@@ -33,6 +35,11 @@ Route::prefix('historial/examenes')->name('historial.examenes.')->group(function
 Route::prefix('examenes')->name('examenes.')->group(function () {
     Route::get('/formulario', [ExamController::class, 'formOptions'])
          ->name('formulario');
+
+    // HU-028 — selector de exámenes para "Habilitar estudiantes".
+    // Debe ir antes de GET /{exam} para no chocar con el binding.
+    Route::get('/habilitados', [ExamEligibleListController::class, 'exams'])
+        ->name('habilitados.selector');
 
     Route::get('/', [ExamController::class, 'index'])
          ->name('index');
@@ -61,6 +68,24 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
     Route::post('/{exam}/finalizar', [ExamController::class, 'finish'])
         ->where('exam', '[0-9]{1,9}')
         ->name('finalizar');
+
+    Route::prefix('{exam}/habilitados')->name('habilitados.')->group(function () {
+        Route::get('/', [ExamEligibleListController::class, 'current'])
+            ->where('exam', '[0-9]{1,9}')
+            ->name('current');
+
+        Route::put('/', [ExamEligibleListController::class, 'save'])
+            ->where('exam', '[0-9]{1,9}')
+            ->name('save');
+
+        Route::post('/preview', [ExamEligibleListController::class, 'preview'])
+            ->where('exam', '[0-9]{1,9}')
+            ->name('preview');
+
+        Route::post('/confirm', [ExamEligibleListController::class, 'confirm'])
+            ->where('exam', '[0-9]{1,9}')
+            ->name('confirm');
+    });
 
     Route::get('/{exam}/reporte-final', [FinalReportController::class, 'show'])
         ->where('exam', '[0-9]{1,9}')
@@ -114,4 +139,22 @@ Route::prefix('docente/invitaciones')->name('docente.invitaciones.')->group(func
     Route::post('/examenes/{exam}', [CollaboratorInvitationController::class, 'store'])
         ->where('exam', '[0-9]{1,9}')
         ->name('store');
+});
+
+// HU-027 — invitaciones recibidas: el docente invitado las consulta y las acepta (sumando sus grupos) o rechaza.
+Route::prefix('invitaciones')->name('invitaciones.')->group(function () {
+    Route::get('/', [ReceivedInvitationController::class, 'index'])
+        ->name('index');
+
+    Route::get('/{invitation}', [ReceivedInvitationController::class, 'show'])
+        ->where('invitation', '[0-9]{1,9}')
+        ->name('show');
+
+    Route::post('/{invitation}/aceptar', [ReceivedInvitationController::class, 'accept'])
+        ->where('invitation', '[0-9]{1,9}')
+        ->name('aceptar');
+
+    Route::post('/{invitation}/rechazar', [ReceivedInvitationController::class, 'reject'])
+        ->where('invitation', '[0-9]{1,9}')
+        ->name('rechazar');
 });

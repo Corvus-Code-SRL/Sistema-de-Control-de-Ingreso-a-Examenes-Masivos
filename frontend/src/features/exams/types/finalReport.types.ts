@@ -16,6 +16,7 @@ export interface FinalReportAttendance {
   a_tiempo: number
   con_retraso: number
   ausentes: number
+  no_habilitados: number
   sin_clasificar: number
 }
 

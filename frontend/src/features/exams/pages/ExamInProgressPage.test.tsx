@@ -23,7 +23,7 @@ const exam: ExamInProgress = {
   nombre_examen: 'Tercer Parcial',
   materia: 'Álgebra Lineal',
   estado: 'EN_CURSO',
-  rol_controlador: 'DOCENTE',
+  rol_controlador: 'DOCENTE', es_creador: true,
   id_ambiente_asignado: null,
   ambientes: [{ id_ambiente: 1, nro_aula: '692C', capacidad: 50 }],
   inicio_programado: '2026-10-29T13:00:00Z',
@@ -37,6 +37,7 @@ const exam: ExamInProgress = {
     a_tiempo: 1,
     con_retraso: 0,
     ausentes: 1,
+    no_habilitados: 0,
     presentes: 1,
     total: 2,
     incidencias_pendientes: 0,
@@ -189,6 +190,44 @@ describe('HU-038-A: consulta y filtros de En curso', () => {
     await user.clear(search);
     expect(screen.getByText('Juan López')).toBeInTheDocument();
     expect(screen.queryByText('Álvaro Núñez')).not.toBeInTheDocument();
+  });
+
+  it('un no habilitado no es ausente: tiene su propio total y su propio filtro', async () => {
+    const user = userEvent.setup();
+    vi.mocked(examInProgressService.get).mockResolvedValue({
+      ...exam,
+      totales: { ...exam.totales, no_habilitados: 1, total: 3 },
+      estudiantes: [
+        ...exam.estudiantes,
+        {
+          id_estudiante: 12,
+          cod_sis: '202300300',
+          ci: '9876543',
+          nombre_completo: 'Rosa Quispe',
+          estado_ingreso: 'NO_INGRESO',
+          estado_habilitacion: 'NO_HABILITADO',
+          hora_ingreso: null,
+          id_ambiente: null,
+          ambiente: null,
+        },
+      ],
+    });
+
+    renderWithRouter(<ExamInProgressPage />, {
+      route: '/examenes/8/en-curso',
+      path: '/examenes/:examId/en-curso',
+    });
+
+    await screen.findByText('María Pérez');
+
+    await user.click(screen.getByRole('button', { name: 'Ausentes (1)' }));
+    expect(screen.getByText('Juan López')).toBeInTheDocument();
+    expect(screen.queryByText('Rosa Quispe')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'No habilitados (1)' }));
+    expect(screen.getByText('Rosa Quispe')).toBeInTheDocument();
+    expect(screen.queryByText('Juan López')).not.toBeInTheDocument();
+    expect(screen.getByText('No habilitado')).toBeInTheDocument();
   });
 
   it('con el filtro Todos, la búsqueda deja solo al estudiante que coincide', async () => {
@@ -346,5 +385,63 @@ describe('En curso: cronómetro y estado del examen', () => {
     expect(screen.getByText('En curso', { exact: true })).toBeInTheDocument();
     expect(examInProgressService.get).toHaveBeenCalledTimes(1);
     expect(finish).not.toHaveBeenCalled();
+  });
+});
+
+describe('HU-027: lista separada por grupo', () => {
+  const byGroup: ExamInProgress = {
+    ...exam,
+    lista_por_grupo: true,
+    grupos: [
+      { id_grupo: 1, num_grupo: '1', docente: 'Ana Rojas' },
+      { id_grupo: 3, num_grupo: '3', docente: 'Luis Vargas' },
+    ],
+    estudiantes: [
+      { ...exam.estudiantes[0], id_grupo: 3 },
+      { ...exam.estudiantes[1], id_grupo: 1, estado_ingreso: 'INGRESO', hora_ingreso: '09:31' },
+    ],
+  };
+
+  function renderPage() {
+    renderWithRouter(<ExamInProgressPage />, {
+      route: '/examenes/8/en-curso',
+      path: '/examenes/:examId/en-curso',
+    });
+  }
+
+  it('divide la tabla por grupo, con su docente, en el orden de los grupos', async () => {
+    vi.mocked(examInProgressService.get).mockResolvedValue(byGroup);
+    renderPage();
+
+    const first = await screen.findByRole('rowgroup', { name: 'Grupo 1 · Ana Rojas' });
+    expect(within(first).getByText('Grupo 1 · Ana Rojas · 1')).toBeInTheDocument();
+    expect(within(first).getByText('Juan López')).toBeInTheDocument();
+    const second = screen.getByRole('rowgroup', { name: 'Grupo 3 · Luis Vargas' });
+    expect(within(second).getByText('María Pérez')).toBeInTheDocument();
+    expect(within(second).queryByText('Juan López')).not.toBeInTheDocument();
+  });
+
+  it('el filtro sigue aplicando y oculta los grupos sin estudiantes que mostrar', async () => {
+    const user = userEvent.setup();
+    vi.mocked(examInProgressService.get).mockResolvedValue({
+      ...byGroup,
+      estudiantes: [byGroup.estudiantes[0], { ...byGroup.estudiantes[1], estado_ingreso: 'NO_INGRESO', hora_ingreso: null }],
+    });
+    renderPage();
+
+    expect(await screen.findByRole('rowgroup', { name: 'Grupo 3 · Luis Vargas' })).toBeInTheDocument();
+    expect(screen.queryByRole('rowgroup', { name: 'Grupo 1 · Ana Rojas' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Ausentes/ }));
+    expect(await screen.findByRole('rowgroup', { name: 'Grupo 1 · Ana Rojas' })).toBeInTheDocument();
+    expect(screen.queryByRole('rowgroup', { name: 'Grupo 3 · Luis Vargas' })).not.toBeInTheDocument();
+  });
+
+  it('con la lista junta no divide la tabla', async () => {
+    vi.mocked(examInProgressService.get).mockResolvedValue({ ...byGroup, lista_por_grupo: false });
+    renderPage();
+
+    expect(await screen.findByText('María Pérez')).toBeInTheDocument();
+    expect(screen.queryByRole('rowgroup', { name: /Grupo 1/ })).not.toBeInTheDocument();
   });
 });

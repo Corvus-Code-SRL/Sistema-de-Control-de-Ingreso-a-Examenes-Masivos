@@ -190,6 +190,7 @@ export function ExamDetailPage() {
         subtitle={exam && <ExamStatusBadge status={exam.estado} entryOpen={exam.control_ingreso_abierto} />}
         actions={
           exam && isProgramado ? (
+            exam.es_creador ? (
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
@@ -210,6 +211,7 @@ export function ExamDetailPage() {
                 Cancelar examen
               </Button>
             </div>
+            ) : null
           ) : exam?.estado === 'PROGRAMADO' && exam.control_ingreso_abierto ? (
             <Button
               type="button"
@@ -259,6 +261,16 @@ export function ExamDetailPage() {
 
       {!loading && !loadError && exam && (
         <div className="mx-auto max-w-5xl space-y-6">
+          {!exam.es_creador && (
+            <div
+              role="status"
+              className="rounded-xl border border-border-soft bg-surface p-4 text-sm text-muted-foreground"
+            >
+              Usted colabora en este examen: puede consultarlo y controlar el ingreso, pero solo el docente que lo
+              creó puede modificarlo, cancelarlo o habilitar auxiliares.
+            </div>
+          )}
+
           {!isProgramado && (
             <div
               role="status"
@@ -365,6 +377,7 @@ export function ExamDetailPage() {
             </dl>
           </section>
 
+          {exam.es_creador && (
           <section
             aria-label="Personal del control de ingreso"
             className="space-y-4 rounded-xl border border-border-soft bg-surface p-6"
@@ -396,10 +409,11 @@ export function ExamDetailPage() {
               />
             )}
           </section>
+          )}
         </div>
       )}
 
-      {exam && (
+      {exam && exam.es_creador && (
         <Dialog
           open={showCancelDialog}
           onOpenChange={setShowCancelDialog}

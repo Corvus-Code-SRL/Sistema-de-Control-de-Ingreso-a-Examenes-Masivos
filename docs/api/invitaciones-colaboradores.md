@@ -63,6 +63,7 @@ Devuelve hasta 20 docentes, ordenados por apellido. Sin coincidencias responde *
 |---|---|
 | `id_docente` | Obligatorio, uuid del docente a invitar. Un docente que no existe responde **404**; uno que no es invitable (sin grupos de la materia en el período vigente, inactivo, sin rol docente, o el propio docente) responde **422** en `errors.id_docente`. |
 | `permite_agregar_grupos` | Opcional, booleano; por omisión `true`. Si el colaborador, al aceptar, puede sumar **sus propios grupos** de la materia al examen para unir las listas del control de ingreso. HU-026 solo lo guarda y lo muestra: **HU-027 lo hace cumplir**. |
+| `lista_por_grupo` | Opcional, booleano; por omisión `false`. Si la lista del examen se muestra **dividida por grupo** (con su docente) en el control de ingreso y durante el examen, en lugar de junta. Solo con `permite_agregar_grupos: true`; si no, **422** en `lista_por_grupo` («Solo puede separar la lista por grupo si permite agregar grupos.»). En la pantalla es un segundo checkbox que se habilita al marcar «permitir agregar grupos». |
 
 Responde **201** con la invitación (mismo formato que la lista de enviadas) y `mensaje: "Invitación enviada correctamente."`. Todo ocurre en una transacción que **bloquea la fila del examen**, así que dos envíos simultáneos se ordenan y un envío no se cruza con la apertura del control de ingreso; el índice único parcial de la base es el respaldo (también responde 409). Queda registrada en la bitácora la acción `INVITAR_COLABORADOR` sobre `invitacion_examen`, con el docente que invita, la fecha y la hora, y los datos de la invitación.
 
@@ -80,6 +81,7 @@ Las invitaciones que **envió** el docente, de todos sus exámenes, de la más r
       "fecha_respuesta": null,
       "fecha_sin_efecto": null,
       "permite_agregar_grupos": true,
+      "lista_por_grupo": false,
       "examen": {
         "id_examen": 9811, "nombre_examen": "HU-026 Parcial Cálculo I", "materia": "Cálculo I",
         "carrera": "Ingeniería de Sistemas", "fecha": "2026-12-10", "hora_inicio": "08:00", "hora_fin": "09:30",
@@ -117,6 +119,7 @@ HU-026 **posee** la escritura de `SIN_EFECTO`, el enum, el CHECK, el índice y l
 | `estado` | enum `estado_invitacion` | `PENDIENTE`, `ACEPTADA`, `RECHAZADA` y **`SIN_EFECTO`** (nuevo). Constantes en `ExamInvitation`. |
 | `fecha_respuesta` | timestamptz | La escribe HU-027 al aceptar o rechazar. |
 | **`permite_agregar_grupos`** | boolean, NOT NULL, por omisión `true` | **Nuevo.** Si el colaborador puede sumar sus grupos al aceptar. **HU-027 debe respetarlo:** con `false`, aceptar no admite grupos. |
+| **`lista_por_grupo`** | boolean, NOT NULL, por omisión `false` | **Versión 17.** Lista dividida por grupo en el control de ingreso y durante el examen. CHECK `chk_invitacion_examen_lista_por_grupo`: solo `true` si `permite_agregar_grupos`. |
 | `fecha_sin_efecto` | timestamptz | **Nuevo.** La escribe `ExamInvitationExpiryService`. |
 
 **CHECK `chk_invitacion_examen_estado`** (cada estado fija qué fechas existen):

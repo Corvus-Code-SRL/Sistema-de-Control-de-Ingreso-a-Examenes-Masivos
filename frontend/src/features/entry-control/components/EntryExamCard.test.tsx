@@ -7,7 +7,7 @@ const context: EntryContext = {
   id_examen: 7, nombre_examen: 'Primer parcial', fecha: '2026-10-16',
   hora_inicio: '10:00', hora_fin: '12:00', estado: 'PROGRAMADO',
   materia: 'Cálculo I', carrera: 'Ing. de Sistemas', grupos: ['1'],
-  rol_controlador: 'AUXILIAR', id_ambiente_asignado: 5,
+  rol_controlador: 'AUXILIAR', es_creador: false, id_ambiente_asignado: 5,
   ambientes: [{ id_ambiente: 5, nro_aula: '691A' }],
 }
 const status: EntryStatus = {

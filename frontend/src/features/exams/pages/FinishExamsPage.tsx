@@ -19,14 +19,15 @@ interface FinishFeedback {
 }
 
 export function FinishExamsPage() {
-  // La consulta del servidor devuelve únicamente los exámenes del titular autenticado.
   const { data, status, error, reload } = useAsyncResource(examsService.listExams, []);
   const [results, setResults] = useState<FinishFeedback[]>([]);
   const feedbackRef = useRef<HTMLDivElement>(null);
   const feedback = results[results.length - 1];
 
   const candidates = (data ?? []).filter(
-    (exam) => exam.estado === EXAM_STATUS.EN_CURSO && !results.some(({ examId }) => examId === exam.id_examen)
+    (exam) => exam.es_creador
+      && exam.estado === EXAM_STATUS.EN_CURSO
+      && !results.some(({ examId }) => examId === exam.id_examen)
   );
 
   useEffect(() => {

@@ -59,6 +59,7 @@ function invitation(id: number, estado: SentInvitation['estado'], name: string):
     fecha_respuesta: null,
     fecha_sin_efecto: null,
     permite_agregar_grupos: true,
+    lista_por_grupo: false,
     examen: {
       id_examen: 9811,
       nombre_examen: 'Parcial Cálculo I',
@@ -173,6 +174,9 @@ describe('HU-026: invitar docentes colaboradores', () => {
     expect(
       within(dialog).getByRole('checkbox', { name: 'Permitir que agregue sus grupos al examen' })
     ).toBeChecked()
+    const listByGroup = within(dialog).getByRole('checkbox', { name: 'Mostrar la lista separada por grupo' })
+    expect(listByGroup).not.toBeChecked()
+    expect(listByGroup).toBeEnabled()
 
     await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
 
@@ -191,13 +195,14 @@ describe('HU-026: invitar docentes colaboradores', () => {
     await user.click(await screen.findByRole('button', { name: /Invitar/ }))
 
     const dialog = await screen.findByRole('dialog')
-    await user.click(within(dialog).getByRole('checkbox'))
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Permitir que agregue sus grupos al examen' }))
     await user.click(within(dialog).getByRole('button', { name: 'Enviar invitación' }))
 
     await waitFor(() =>
       expect(service.sendInvitation).toHaveBeenCalledWith(9811, {
         id_docente: 'u-rolando',
         permite_agregar_grupos: false,
+        lista_por_grupo: false,
       })
     )
     expect(await screen.findByText('Invitación enviada a Rolando Vega Méndez.')).toBeInTheDocument()
@@ -205,6 +210,42 @@ describe('HU-026: invitar docentes colaboradores', () => {
 
     const row = screen.getByText('Rolando Vega Méndez').closest('li') as HTMLElement
     expect(within(row).getByText('Ya invitado')).toBeInTheDocument()
+  })
+
+  it('la lista separada por grupo solo se habilita al permitir grupos y se envía con la invitación', async () => {
+    const user = userEvent.setup()
+    service.searchTeachers.mockResolvedValue([ROLANDO])
+    service.sendInvitation.mockResolvedValue(invitation(1, 'PENDIENTE', ROLANDO.nombre_completo))
+    renderPage()
+
+    await chooseExam(user)
+    await searchFor(user, 'rolando')
+    await user.click(await screen.findByRole('button', { name: /Invitar/ }))
+
+    const dialog = await screen.findByRole('dialog')
+    const allowGroups = within(dialog).getByRole('checkbox', { name: 'Permitir que agregue sus grupos al examen' })
+    const listByGroup = within(dialog).getByRole('checkbox', { name: 'Mostrar la lista separada por grupo' })
+
+    await user.click(listByGroup)
+    expect(listByGroup).toBeChecked()
+
+    // Al quitar «permitir grupos» se desmarca y deshabilita la lista separada.
+    await user.click(allowGroups)
+    expect(listByGroup).not.toBeChecked()
+    expect(listByGroup).toBeDisabled()
+    expect(within(dialog).getByText('Se habilita al permitir que agregue sus grupos.')).toBeInTheDocument()
+
+    await user.click(allowGroups)
+    await user.click(listByGroup)
+    await user.click(within(dialog).getByRole('button', { name: 'Enviar invitación' }))
+
+    await waitFor(() =>
+      expect(service.sendInvitation).toHaveBeenCalledWith(9811, {
+        id_docente: 'u-rolando',
+        permite_agregar_grupos: true,
+        lista_por_grupo: true,
+      })
+    )
   })
 
   it('un rechazo del servidor (409) se muestra en la confirmación y no la cierra', async () => {

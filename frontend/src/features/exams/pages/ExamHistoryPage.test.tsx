@@ -25,7 +25,7 @@ const summary: HistorySummary = {
   id_examen: 7, nombre_examen: 'Examen diagnóstico', fecha: '2026-10-28',
   materia: 'Cálculo II', total_estudiantes: 55, inicio_programado: '2026-10-29T12:00:00Z', ingreso_abierto_en: null,
   fin_real_en: null, fin_automatico: false,
-  totales: { a_tiempo: 52, con_retraso: 1, ausentes: 2, sin_clasificar: 0, incidencias: 2 },
+  totales: { a_tiempo: 52, con_retraso: 1, ausentes: 2, no_habilitados: 0, sin_clasificar: 0, incidencias: 2 },
   linea_tiempo: [{ tipo: 'retraso', fecha_hora: '2026-10-28 08:20:00',
     descripcion: 'Ingreso con retraso: Luis Pérez', detalle: 'Autorizó: Ana Rojas' }],
   ambientes: [{ id_ambiente: 1, nro_aula: '691A', presentes: 54, auxiliares: ['Ana Rojas'] }],

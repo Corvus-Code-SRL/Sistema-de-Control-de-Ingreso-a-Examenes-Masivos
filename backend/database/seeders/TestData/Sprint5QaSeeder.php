@@ -10,8 +10,8 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Escenarios de QA del Sprint 5. Cubre HU-062 (rectificar un registro de la Central de Riesgo) y HU-026
- * (invitar docentes colaboradores).
+ * Escenarios de QA del Sprint 5. Cubre HU-062 (rectificar un registro de la Central de Riesgo), HU-026
+ * (invitar docentes colaboradores) y HU-027 (aceptar o rechazar la invitación).
  *
  * Primero carga TestDataSeeder (cuentas, catálogo, grupos, exámenes y Central de Riesgo base) y después
  * agrega los estudiantes y registros que hacen probable la búsqueda y la rectificación. Se ejecuta a mano,
@@ -41,6 +41,17 @@ use Illuminate\Support\Facades\DB;
  *   - «HU-026 Final Cálculo I» (9812) ya abrió el control de ingreso: no sale en el desplegable y su invitación a Carmen quedó
  *     SIN_EFECTO. Las fechas son futuras (diciembre de 2026) para que el planificador no cierre estos exámenes.
  * Volver a correrlo devuelve estos exámenes y sus invitaciones a su estado inicial. La bitácora no se toca.
+ *
+ * Escenario HU-027 (responder invitaciones). Rosario Salazar (10487) entra y ve su bandeja en los cuatro estados:
+ *   - Pendientes: la de «HU-026 Parcial Cálculo I» (9811) y la de «HU-027 Parcial aula chica»
+ *     (9821), que se rinde en el aula QA-8 (8 lugares) y ya tiene el grupo 1 (7 inscritos): al marcar su grupo 2
+ *     (5 inscritos) la pantalla avisa que se supera la capacidad, sin impedir aceptar. Esta invitación pide la
+ *     lista separada por grupo: tras aceptar con el grupo 2, al abrir el control de ingreso y durante el examen
+ *     la lista se ve dividida en «Grupo 1 · Marcelo» y «Grupo 2 · Rosario».
+ *   - Aceptada: «HU-027 Final Cálculo I» (9822), PROGRAMADO con el control de ingreso ya abierto y sin
+ *     permitir grupos; Rosario lo ve en el control de ingreso como docente.
+ *   - Rechazada: «HU-027 Recuperatorio» (9823), PROGRAMADO.
+ *   - Sin efecto: la de «HU-026 Final Cálculo I» (9812), que abrió el control sin respuesta.
  *
  * Ids propios en el rango 9000–9999, sin pisar los de TestDataIds ni los de Sprint3QaSeeder.
  */
@@ -77,12 +88,22 @@ class Sprint5QaSeeder extends Seeder
     // examen.id_examen
     public const EXAM_INVITE_SCHEDULED = 9811;
     public const EXAM_INVITE_ENTRY = 9812;
+    public const EXAM_RESPONSE_SMALL_ROOM = 9821;
+    public const EXAM_RESPONSE_ACCEPTED = 9822;
+    public const EXAM_RESPONSE_REJECTED = 9823;
+
+    // ambiente.id_ambiente: aula pequeña para el aviso de capacidad de HU-027
+    public const CLASSROOM_SMALL = 9607;
 
     // invitacion_examen.id_invitacion
     public const INVITATION_PENDING = 9970;
     public const INVITATION_ACCEPTED = 9971;
     public const INVITATION_REJECTED = 9972;
     public const INVITATION_VOID = 9973;
+    public const INVITATION_RESPONSE_PENDING = 9974;
+    public const INVITATION_RESPONSE_ACCEPTED = 9975;
+    public const INVITATION_RESPONSE_REJECTED = 9976;
+    public const INVITATION_RESPONSE_VOID = 9977;
 
     private const EXAM_FINISHED = 9807;
 
@@ -99,6 +120,7 @@ class Sprint5QaSeeder extends Seeder
             $this->seedStudents();
             $this->seedRecords();
             $this->seedCollaboratorInvitations();
+            $this->seedInvitationResponses();
         });
     }
 
@@ -185,6 +207,62 @@ class Sprint5QaSeeder extends Seeder
         ]);
     }
 
+    private function seedInvitationResponses(): void
+    {
+        DB::table('ambiente')->upsert([[
+            'id_ambiente' => self::CLASSROOM_SMALL,
+            'nro_aula' => 'QA-8',
+            'capacidad' => 8,
+            'ubicacion' => 'Aula de prueba para el aviso de capacidad',
+            'estado' => 'ACTIVO',
+        ]], ['id_ambiente']);
+
+        DB::table('examen')->upsert([
+            $this->invitationExam(self::EXAM_RESPONSE_SMALL_ROOM, 'HU-027 Parcial aula chica', '2026-12-14',
+                '08:00:00', '09:30:00', 90, 'PROGRAMADO'),
+            $this->invitationExam(self::EXAM_RESPONSE_ACCEPTED, 'HU-027 Final Cálculo I', '2026-12-15', '10:00:00',
+                '12:00:00', 120, 'PROGRAMADO', '2026-12-15 09:50:00-04'),
+            $this->invitationExam(self::EXAM_RESPONSE_REJECTED, 'HU-027 Recuperatorio', '2026-12-16',
+                '14:00:00', '15:30:00', 90, 'PROGRAMADO'),
+        ], ['id_examen']);
+
+        $examIds = [self::EXAM_RESPONSE_SMALL_ROOM, self::EXAM_RESPONSE_ACCEPTED, self::EXAM_RESPONSE_REJECTED];
+
+        // El examen chico vuelve a tener solo el grupo 1, aunque QA haya aceptado sumando el grupo 2.
+        DB::table('examen_ambiente')->whereIn('id_examen', $examIds)->delete();
+        DB::table('grupo_examen')->whereIn('id_examen', $examIds)->delete();
+
+        DB::table('examen_ambiente')->insert([
+            ['id_examen' => self::EXAM_RESPONSE_SMALL_ROOM, 'id_ambiente' => self::CLASSROOM_SMALL],
+            ['id_examen' => self::EXAM_RESPONSE_ACCEPTED, 'id_ambiente' => 9605],
+            ['id_examen' => self::EXAM_RESPONSE_REJECTED, 'id_ambiente' => 9603],
+        ]);
+        DB::table('grupo_examen')->insert(array_map(
+            fn (int $examId) => ['id_examen' => $examId, 'id_grupo' => Ids::GROUP_CALCULUS_SYS_1],
+            $examIds
+        ));
+
+        $invitationIds = [
+            self::INVITATION_RESPONSE_PENDING,
+            self::INVITATION_RESPONSE_ACCEPTED,
+            self::INVITATION_RESPONSE_REJECTED,
+            self::INVITATION_RESPONSE_VOID,
+        ];
+
+        DB::table('invitacion_examen')->whereIn('id_invitacion', $invitationIds)->delete();
+
+        DB::table('invitacion_examen')->insert([
+            $this->invitation(self::INVITATION_RESPONSE_PENDING, self::EXAM_RESPONSE_SMALL_ROOM, Ids::TEACHER_2,
+                'PENDIENTE', '2026-11-14 09:00:00-04', null, null, true, true),
+            $this->invitation(self::INVITATION_RESPONSE_ACCEPTED, self::EXAM_RESPONSE_ACCEPTED, Ids::TEACHER_2,
+                'ACEPTADA', '2026-11-10 11:00:00-04', '2026-11-10 15:20:00-04', null, false),
+            $this->invitation(self::INVITATION_RESPONSE_REJECTED, self::EXAM_RESPONSE_REJECTED, Ids::TEACHER_2,
+                'RECHAZADA', '2026-11-12 08:30:00-04', '2026-11-12 18:05:00-04'),
+            $this->invitation(self::INVITATION_RESPONSE_VOID, self::EXAM_INVITE_ENTRY, Ids::TEACHER_2,
+                'SIN_EFECTO', '2026-11-10 17:05:00-04', null, '2026-11-11 08:00:00-04'),
+        ]);
+    }
+
     /** @return array<string, mixed> */
     private function teacher(
         string $id,
@@ -257,7 +335,8 @@ class Sprint5QaSeeder extends Seeder
         string $sentAt,
         ?string $respondedAt = null,
         ?string $voidedAt = null,
-        bool $allowGroups = true
+        bool $allowGroups = true,
+        bool $listByGroup = false
     ): array {
         return [
             'id_invitacion' => $id,
@@ -269,6 +348,7 @@ class Sprint5QaSeeder extends Seeder
             'fecha_sin_efecto' => $voidedAt,
             'estado' => $status,
             'permite_agregar_grupos' => $allowGroups,
+            'lista_por_grupo' => $listByGroup,
         ];
     }
 

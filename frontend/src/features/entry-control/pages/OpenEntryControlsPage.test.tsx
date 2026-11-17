@@ -8,7 +8,7 @@ const exam = {
   id_examen: 7, nombre_examen: 'Primer parcial', estado: 'PROGRAMADO' as 'PROGRAMADO' | 'EN_CURSO',
   fecha: '2026-10-20', hora_inicio: '08:00', materia: 'Bases de Datos I',
   carrera: 'Ingeniería de Sistemas', ambientes: ['691A', '692B'],
-  rol_controlador: 'DOCENTE' as const, id_ambiente_asignado: null, ambiente_asignado: null,
+  rol_controlador: 'DOCENTE' as const, es_creador: true, id_ambiente_asignado: null, ambiente_asignado: null,
   apertura_programada_en: '2026-10-20T07:50:00-04:00', motivo_apertura: null,
   total: 2, ingresados: 0, pendientes: 2, control_abierto: false,
 }
@@ -48,7 +48,7 @@ it.each([
 
 it('muestra el motivo de apertura fallida y el ambiente del auxiliar', async () => {
   mockApiOnce({ body: { data: [{
-    ...exam, rol_controlador: 'AUXILIAR', id_ambiente_asignado: 8,
+    ...exam, rol_controlador: 'AUXILIAR', es_creador: false, id_ambiente_asignado: 8,
     ambiente_asignado: '692B',
     motivo_apertura: { codigo: 'CAPACIDAD_INSUFICIENTE', mensaje: 'Capacidad 1 menor que la nómina de 2.' },
   }] } })
@@ -71,6 +71,19 @@ it('avisa al docente y permite editar si falta capacidad al abrir', async () => 
   expect(await screen.findByText('No se pudo abrir')).toBeInTheDocument()
   expect(screen.getByRole('alert')).toHaveTextContent('Capacidad 1 menor que la nómina de 2.')
   expect(screen.getByRole('link', { name: 'Modificar examen' })).toHaveAttribute('href', '/examenes/7/editar')
+})
+
+it('no ofrece modificar el examen a un colaborador cuando falta capacidad', async () => {
+  mockApiOnce({ body: { data: [{
+    ...exam,
+    es_creador: false,
+    motivo_apertura: { codigo: 'CAPACIDAD_INSUFICIENTE', mensaje: 'Capacidad 1 menor que la nómina de 2.' },
+  }] } })
+  renderWithRouter(<OpenEntryControlsPage />)
+
+  expect(await screen.findByText('No se pudo abrir')).toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: 'Modificar examen' })).not.toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Ver detalle del examen' })).toHaveAttribute('href', '/examenes/7/control-ingreso')
 })
 
 it('actualiza la lista cuando se abre el ingreso', async () => {

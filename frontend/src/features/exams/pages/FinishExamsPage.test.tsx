@@ -24,6 +24,7 @@ const exam: Exam = {
   id_carrera: 2,
   id_materia: 42,
   id_usuario_docente: 'titular',
+  es_creador: true,
   materia: { id_materia: 42, nombre: 'Álgebra Lineal', codigo: 'ALG' },
   ambientes: [{ id_ambiente: 1, nro_aula: '692C', capacidad: 50 }],
 };
@@ -32,6 +33,13 @@ const finishedExam: Exam = {
   ...exam,
   estado: 'FINALIZADO',
   fin_real_en: '2026-10-29T15:03:00Z',
+};
+const collaboratorExam: Exam = {
+  ...exam,
+  id_examen: 13,
+  nombre_examen: 'Examen en colaboración',
+  id_usuario_docente: 'otro-docente',
+  es_creador: false,
 };
 const triggerName = `Terminar examen: ${exam.nombre_examen}`;
 
@@ -50,13 +58,14 @@ async function openConfirmation(user: ReturnType<typeof userEvent.setup>) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('HU-047: Terminar examen', () => {
-  it('consulta los exámenes propios y ofrece el cierre solo para EN_CURSO', async () => {
+  it('ofrece el cierre solo para exámenes propios EN_CURSO, aunque la API incluya colaboraciones', async () => {
     const { calls } = mockApiWith(() => ({
       body: { data: [
         exam,
         { ...exam, id_examen: 9, nombre_examen: 'Siguiente examen', estado: 'PROGRAMADO' },
         { ...finishedExam, id_examen: 10, nombre_examen: 'Examen anterior' },
         { ...exam, id_examen: 11, nombre_examen: 'Examen anulado', estado: 'CANCELADO' },
+        collaboratorExam,
       ] },
     }));
     renderPage();
@@ -65,7 +74,7 @@ describe('HU-047: Terminar examen', () => {
     const list = within(await screen.findByRole('list', { name: 'Exámenes disponibles para finalizar' }));
     expect(list.getAllByRole('listitem')).toHaveLength(1);
     expect(list.getByRole('button', { name: triggerName })).toBeInTheDocument();
-    for (const name of ['Siguiente examen', 'Examen anterior', 'Examen anulado']) {
+    for (const name of ['Siguiente examen', 'Examen anterior', 'Examen anulado', collaboratorExam.nombre_examen]) {
       expect(screen.queryByText(name)).not.toBeInTheDocument();
     }
     expect(calls).toEqual([expect.objectContaining({ url: expect.stringMatching(/\/examenes$/), method: 'GET' })]);
@@ -73,7 +82,7 @@ describe('HU-047: Terminar examen', () => {
   });
 
   it('presenta el estado vacío si ningún examen puede finalizarse', async () => {
-    mockApiWith(() => ({ body: { data: [finishedExam] } }));
+    mockApiWith(() => ({ body: { data: [finishedExam, collaboratorExam] } }));
     renderPage();
 
     expect(await screen.findByText('No tiene exámenes disponibles para finalizar')).toBeInTheDocument();

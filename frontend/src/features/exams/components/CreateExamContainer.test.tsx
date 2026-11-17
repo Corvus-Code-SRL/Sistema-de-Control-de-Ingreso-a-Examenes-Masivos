@@ -18,7 +18,7 @@ const createdExam: Exam = {
   id_tipo_examen: 1,
   id_carrera: 2,
   id_materia: 3,
-  id_usuario_docente: 'DOC-1',
+  id_usuario_docente: 'DOC-1', es_creador: true,
 }
 
 const emptyForm: CreateExamFormData = {

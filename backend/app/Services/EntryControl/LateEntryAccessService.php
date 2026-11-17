@@ -6,6 +6,7 @@ use App\Models\Exam;
 use App\Models\ExamAssistant;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Exams\ExamCollaboratorService;
 use App\Services\Security\UserRoleService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -24,10 +25,12 @@ class LateEntryAccessService
     public const ASSISTANT_ONLY_MESSAGE = 'Solo un auxiliar del examen puede solicitar un ingreso con retraso.';
 
     private UserRoleService $roles;
+    private ExamCollaboratorService $collaborators;
 
-    public function __construct(UserRoleService $roles)
+    public function __construct(UserRoleService $roles, ExamCollaboratorService $collaborators)
     {
         $this->roles = $roles;
+        $this->collaborators = $collaborators;
     }
 
     /**
@@ -40,7 +43,8 @@ class LateEntryAccessService
             throw new AuthorizationException(EntryControlSnapshotService::CONTROL_DENIED_MESSAGE);
         }
 
-        if ((string) $exam->id_usuario_docente === (string) $actor->id_usuario) {
+        // Docente del examen: su creador o un colaborador que aceptó la invitación (HU-027).
+        if ($this->collaborators->isTeacherOf($exam, (string) $actor->id_usuario)) {
             if (! $this->roles->isTeacher($actor->id_usuario)) {
                 throw new AuthorizationException(EntryControlSnapshotService::CONTROL_DENIED_MESSAGE);
             }
