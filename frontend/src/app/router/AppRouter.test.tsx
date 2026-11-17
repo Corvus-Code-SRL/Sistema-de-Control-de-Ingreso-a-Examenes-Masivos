@@ -15,13 +15,17 @@ import { openAllSections } from '@/test/sidebar'
 /**
  * Las áreas salen del rol de la sesión. Sin sesión, toda ruta protegida redirige al login.
  */
-function stubBackend(session: AccountKey | null) {
+function stubBackend(session: AccountKey | 'invitado' | null) {
   if (session) {
     window.localStorage.setItem(TOKEN_STORAGE_KEY, 'tok')
   }
 
   return mockApiWith(({ url }) => {
     if (url.endsWith('/auth/yo')) {
+      if (session === 'invitado') {
+        const body = meBody('docente')
+        return { body: { data: { ...body.data, rol: { id_rol: 4, nombre_rol: 'Invitado' } } } }
+      }
       return session ? { body: meBody(session) } : { status: 401, body: { message: 'Unauthenticated.' } }
     }
 
@@ -199,6 +203,47 @@ describe('AppRouter — control de ingreso por área', () => {
     expect(
       screen.queryByRole('heading', { name: 'Control de ingreso' })
     ).not.toBeInTheDocument()
+  })
+})
+
+describe('AppRouter — Terminar examen (HU-047)', () => {
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  it.each(['docente', 'invitado'] as const)('permite el acceso directo a %s', async (account) => {
+    const { calls } = stubBackend(account)
+    const app = renderApp('/examenes/terminar')
+
+    expect(await screen.findByRole('heading', { name: 'Terminar examen' })).toBeInTheDocument()
+    expect(await screen.findByText('No tiene exámenes disponibles para finalizar')).toBeInTheDocument()
+    expect(app.pathname).toBe('/examenes/terminar')
+    expect(calls.some(({ url, method }) => method === 'GET' && url.endsWith('/api/examenes'))).toBe(true)
+  })
+
+  it.each([
+    ['auxiliar', '/mis-examenes'],
+    ['administrador', '/cuentas/nueva'],
+  ] as const)('redirige a %s sin cargar los candidatos', async (account, home) => {
+    const { calls } = stubBackend(account)
+    const app = renderApp('/examenes/terminar')
+
+    await waitFor(() => expect(app.pathname).toBe(home))
+    expect(screen.queryByRole('heading', { name: 'Terminar examen' })).not.toBeInTheDocument()
+    expect(calls.some(({ url }) => url.endsWith('/api/examenes'))).toBe(false)
+  })
+
+  it('abre la vista independiente desde el enlace del menú del docente', async () => {
+    stubBackend('docente')
+    const user = userEvent.setup()
+    const app = renderApp('/materias')
+    const nav = await screen.findByRole('navigation', { name: 'Navegación principal' })
+
+    await openAllSections(user, nav)
+    await user.click(within(nav).getByRole('link', { name: 'Terminar examen' }))
+
+    expect(await screen.findByRole('heading', { name: 'Terminar examen' })).toBeInTheDocument()
+    expect(app.pathname).toBe('/examenes/terminar')
   })
 })
 

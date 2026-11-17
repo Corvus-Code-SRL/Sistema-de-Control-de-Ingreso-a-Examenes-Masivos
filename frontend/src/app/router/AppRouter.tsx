@@ -28,6 +28,7 @@ import {
   EditExamPage,
   ExamDetailPage,
   ExamInProgressPage,
+  FinishExamsPage,
   ExamsPage,
   FinalReportPage,
   InProgressExamsPage,
@@ -175,6 +176,10 @@ function DocenteRoutes() {
         <Route
           path="/examenes/:examId/en-curso"
           element={guarded('ingreso.operar', <ExamInProgressPage extensions={examInProgressExtensions} />)}
+        />
+        <Route
+          path="/examenes/terminar"
+          element={guarded('examenes.gestionar', <FinishExamsPage />)}
         />
         <Route path={LATE_ENTRY_EXAMS_PATH} element={guarded('ingreso.operar', <LateEntryExamsPage />)} />
         <Route path={LATE_ENTRY_PATH} element={guarded('ingreso.operar', <LateEntryPage />)} />
