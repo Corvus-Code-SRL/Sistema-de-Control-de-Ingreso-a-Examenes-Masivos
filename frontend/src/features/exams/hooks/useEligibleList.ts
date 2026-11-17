@@ -53,6 +53,7 @@ export interface UseEligibleListResult {
   applyDisable: (ids: number[], motivo: NoEligibleReason, detalle?: string) => void
   applyEnable: (ids: number[]) => void
   mergePendingChanges: (changes: EligibleChange[]) => void
+  replacePendingChanges: (changes: EligibleChange[]) => void
   discardChanges: () => void
   saveChanges: () => Promise<boolean>
   reloadList: () => Promise<void>
@@ -241,6 +242,15 @@ export function useEligibleList(): UseEligibleListResult {
     })
   }, [])
 
+  const replacePendingChanges = useCallback((changes: EligibleChange[]): void => {
+    const next = new Map<number, PendingChange>()
+    for (const change of changes) {
+      const { id_estudiante, ...rest } = change
+      next.set(id_estudiante, rest)
+    }
+    setPendingChanges(next)
+  }, [])
+
   const discardChanges = useCallback((): void => {
     setPendingChanges(new Map())
   }, [])
@@ -337,6 +347,7 @@ export function useEligibleList(): UseEligibleListResult {
     applyDisable,
     applyEnable,
     mergePendingChanges,
+    replacePendingChanges,
     discardChanges,
     saveChanges,
     reloadList,

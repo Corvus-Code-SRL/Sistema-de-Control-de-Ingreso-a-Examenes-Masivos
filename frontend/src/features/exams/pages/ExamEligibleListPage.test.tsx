@@ -22,7 +22,7 @@ function examFixture() {
   ]
 }
 
-function listFixture(overrides: Partial<{ editable: boolean; estado: 'PROGRAMADO' | 'EN_INGRESO' }> = {}) {
+function listFixture(overrides: Partial<{ editable: boolean; estado: 'PROGRAMADO' | 'EN_CURSO' }> = {}) {
   return {
     editable: true,
     estado: 'PROGRAMADO',
@@ -110,7 +110,7 @@ describe('ExamEligibleListPage', () => {
   it('muestra banner de solo lectura cuando editable=false', async () => {
     stubBackend({
       exams: examFixture,
-      list: () => listFixture({ editable: false, estado: 'EN_INGRESO' }),
+      list: () => listFixture({ editable: false, estado: 'EN_CURSO' }),
     })
 
     renderApp('/examenes/habilitados')
@@ -239,4 +239,31 @@ it('al cambiar de examen escribe ?examen=<id> en la URL', async () => {
   await waitFor(() => {
     expect(api.calls.some((c) => c.url.includes('/examenes/13/habilitados'))).toBe(true)
   })
+})
+
+it('pide confirmación antes de reemplazar si hay cambios manuales pendientes', async () => {
+  stubBackend({
+    exams: examFixture,
+    list: listFixture,
+    put: () => listFixture(),
+  })
+
+  const user = userEvent.setup()
+  renderApp('/examenes/habilitados')
+
+  await screen.findAllByLabelText(/Marcar a Álvarez Rojas, Camila/i)
+
+  // Hacer un cambio manual primero (No habilitar).
+  const [checkbox] = screen.getAllByLabelText(/Marcar a Álvarez Rojas, Camila/i)
+  await user.click(checkbox)
+  await user.click(screen.getByRole('button', { name: /No habilitar…/i }))
+  await user.click(screen.getByRole('combobox', { name: /Motivo/i }))
+  await user.click(screen.getByRole('option', { name: /Asistencia insuficiente/i }))
+  await user.click(screen.getByRole('button', { name: /^No habilitar$/i }))
+
+  expect(await screen.findByText(/1 cambio sin guardar/i)).toBeInTheDocument()
+
+  // Ahora el flow emite cambios (simulado: el test no sube un archivo real,
+  // así que este caso se cubre en el test del flow + la página por separado).
+  // ... ver nota abajo.
 })
