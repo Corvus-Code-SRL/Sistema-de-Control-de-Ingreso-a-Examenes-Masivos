@@ -39,6 +39,8 @@ export interface InvitationSummary {
   fecha_sin_efecto: string | null
   /** Si al aceptar puede sumar sus grupos (lo decide quien invita, HU-026). Si es false se acepta sin grupos. */
   permite_agregar_grupos: boolean
+  /** Si quien invita pidió la lista del examen dividida por grupo (solo con permite_agregar_grupos). */
+  lista_por_grupo: boolean
   examen: InvitationExam
   invitante: InvitationPerson
 }

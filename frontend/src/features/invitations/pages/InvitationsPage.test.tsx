@@ -233,6 +233,28 @@ describe('InvitationsPage — aceptar (CA-5, CA-7, CA-9)', () => {
   })
 })
 
+describe('InvitationsPage — lista separada por grupo', () => {
+  it('avisa que la lista del examen se verá dividida por grupo', async () => {
+    const user = userEvent.setup()
+    stubInvitationsBackend([{ ...firstPartial, lista_por_grupo: true }])
+    renderPage()
+    await openInvitation(user, /1er Parcial/)
+
+    expect(
+      screen.getByText(/Marcelo pidió la lista separada por grupo: en el control de ingreso y durante el examen/)
+    ).toBeInTheDocument()
+  })
+
+  it('con la lista junta no muestra el aviso', async () => {
+    const user = userEvent.setup()
+    stubInvitationsBackend([firstPartial])
+    renderPage()
+    await openInvitation(user, /1er Parcial/)
+
+    expect(screen.queryByText(/pidió la lista separada por grupo/)).not.toBeInTheDocument()
+  })
+})
+
 describe('InvitationsPage — invitación que no permite sumar grupos', () => {
   it('no ofrece grupos y acepta sin ellos', async () => {
     const user = userEvent.setup()

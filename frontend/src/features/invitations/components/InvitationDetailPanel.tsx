@@ -209,13 +209,21 @@ function InvitationDetailContent({ invitation, onResponded, onBack }: ContentPro
                 : 'Colabora con los grupos que ya tiene el examen.'}
             </p>
           ) : (
-            <MyGroups
-              invitation={invitation}
-              selectedIds={selectedIds}
-              editable={pending}
-              error={groupError}
-              onToggle={toggle}
-            />
+            <>
+              <MyGroups
+                invitation={invitation}
+                selectedIds={selectedIds}
+                editable={pending}
+                error={groupError}
+                onToggle={toggle}
+              />
+              {invitation.lista_por_grupo && (
+                <p role="note" className="rounded-lg border border-border bg-sunken px-3 py-2.5 text-sm">
+                  {owner} pidió la lista separada por grupo: en el control de ingreso y durante el examen se verá
+                  dividida por grupo, con su docente.
+                </p>
+              )}
+            </>
           )}
 
           {invitation.estado !== 'SIN_EFECTO' && <CollaboratorPrivileges />}

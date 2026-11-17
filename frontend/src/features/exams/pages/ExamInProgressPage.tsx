@@ -9,6 +9,7 @@ import { examInProgressService } from '../services/examInProgressService';
 import type { ExamInProgressExtensions } from '../components/ExamInProgressExtensions';
 import type {
   ExamInProgress,
+  InProgressGroup,
   InProgressStudent,
 } from '../types/examInProgress.types';
 import {
@@ -184,6 +185,32 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
 
     return matchesStatus && matchesSearch;
   });
+
+  // HU-027: si quien invitó pidió la lista separada por grupo, la tabla se divide por grupo (con su docente).
+  const groupSections = data?.lista_por_grupo && data.grupos && data.grupos.length > 0
+    ? splitByGroup(students, data.grupos)
+    : null;
+
+  function renderStudentRow(student: InProgressStudent) {
+    return (
+      <tr
+        key={student.id_estudiante}
+        className="border-b last:border-0"
+      >
+        <td className="px-3 py-3">{student.cod_sis}</td>
+        <td className="px-3 py-3">{student.nombre_completo}</td>
+        <td className="px-3 py-3">{student.ambiente ?? '—'}</td>
+        <td className="px-3 py-3">{student.hora_ingreso ?? '—'}</td>
+        <td className="px-3 py-3">{entryLabel(student)}</td>
+        {extensions?.studentActions && data && (
+          <td className="px-3 py-3">
+            {/* HU-042 y HU-057: acciones por estudiante */}
+            {extensions.studentActions(student, data)}
+          </td>
+        )}
+      </tr>
+    );
+  }
 
   const emptyMessage = search.trim()
     ? 'No hay estudiantes que coincidan con la búsqueda.'
@@ -396,26 +423,25 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
                   </tr>
                 </thead>
 
-                <tbody>
-                  {students.map((student) => (
-                    <tr
-                      key={student.id_estudiante}
-                      className="border-b last:border-0"
-                    >
-                      <td className="px-3 py-3">{student.cod_sis}</td>
-                      <td className="px-3 py-3">{student.nombre_completo}</td>
-                      <td className="px-3 py-3">{student.ambiente ?? '—'}</td>
-                      <td className="px-3 py-3">{student.hora_ingreso ?? '—'}</td>
-                      <td className="px-3 py-3">{entryLabel(student)}</td>
-                      {extensions?.studentActions && (
-                        <td className="px-3 py-3">
-                          {/* HU-042 y HU-057: acciones por estudiante */}
-                          {extensions.studentActions(student, data)}
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
+                {groupSections ? (
+                  // HU-027: lista separada por grupo, con su docente. Mismos estudiantes y filtros.
+                  groupSections.map((section) => (
+                    <tbody key={section.key} aria-label={section.title}>
+                      <tr className="border-b bg-muted/40">
+                        <th
+                          scope="rowgroup"
+                          colSpan={extensions?.studentActions ? 6 : 5}
+                          className="px-3 py-2 text-xs font-semibold text-muted-foreground"
+                        >
+                          {section.title} · {section.items.length}
+                        </th>
+                      </tr>
+                      {section.items.map(renderStudentRow)}
+                    </tbody>
+                  ))
+                ) : (
+                  <tbody>{students.map(renderStudentRow)}</tbody>
+                )}
               </table>
             </div>
 
@@ -436,4 +462,19 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
       )}
     </AppShell>
   );
+}
+
+/** Reparte los estudiantes (ya filtrados) por grupo, en el orden de los grupos; omite los grupos vacíos. */
+function splitByGroup(students: InProgressStudent[], groups: InProgressGroup[]) {
+  const sections = groups
+    .map((group) => ({
+      key: String(group.id_grupo),
+      title: `Grupo ${group.num_grupo}${group.docente ? ` · ${group.docente}` : ''}`,
+      items: students.filter((student) => student.id_grupo === group.id_grupo),
+    }))
+    .filter((section) => section.items.length > 0);
+  const known = new Set(groups.map((group) => group.id_grupo));
+  const others = students.filter((student) => student.id_grupo == null || !known.has(student.id_grupo));
+  if (others.length > 0) sections.push({ key: 'otros', title: 'Sin grupo', items: others });
+  return sections;
 }

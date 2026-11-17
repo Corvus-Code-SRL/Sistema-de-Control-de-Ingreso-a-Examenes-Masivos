@@ -18,6 +18,7 @@ export const firstPartial: InvitationDetail = {
   fecha_respuesta: null,
   fecha_sin_efecto: null,
   permite_agregar_grupos: true,
+  lista_por_grupo: false,
   examen: {
     id_examen: 501,
     nombre_examen: '1er Parcial',
@@ -95,6 +96,7 @@ export function summaryOf(invitation: InvitationDetail): InvitationSummary {
     fecha_respuesta,
     fecha_sin_efecto,
     permite_agregar_grupos,
+    lista_por_grupo,
     examen,
     invitante,
   } = invitation
@@ -106,6 +108,7 @@ export function summaryOf(invitation: InvitationDetail): InvitationSummary {
     fecha_respuesta,
     fecha_sin_efecto,
     permite_agregar_grupos,
+    lista_por_grupo,
     examen,
     invitante,
   }
