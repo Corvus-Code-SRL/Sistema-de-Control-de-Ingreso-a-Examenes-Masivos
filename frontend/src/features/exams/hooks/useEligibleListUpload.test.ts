@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/lib/api-client'
 import { useEligibleListUpload } from './useEligibleListUpload'
 import { eligibleListService } from '../services/eligibleListService'
 import type { UploadConfirmData } from '../types/eligibleList.types'
@@ -21,8 +22,22 @@ vi.mock('../services/eligibleListService', () => ({
 const previewMock = vi.mocked(eligibleListService.previewUpload)
 const confirmMock = vi.mocked(eligibleListService.confirmUpload)
 
+const WINDOW_CLOSED =
+  'La lista de habilitados ya no se puede modificar: el control de ingreso del examen ya se abrió.'
+
 function makeFile(name = 'lista.csv'): File {
   return new File(['codigo_sis\n202210443'], name)
+}
+
+function previewOf(totalRows: number) {
+  return {
+    token: 't'.repeat(64),
+    total_filas: totalRows,
+    filas_validas: totalRows,
+    filas_inconsistentes: 0,
+    faltantes: 0,
+    filas: [],
+  }
 }
 
 describe('useEligibleListUpload', () => {
@@ -64,27 +79,17 @@ describe('useEligibleListUpload', () => {
     expect(result.current.preview?.token).toHaveLength(64)
   })
 
-  it('al confirmar marca result y devuelve los cambios pendientes', async () => {
-    previewMock.mockResolvedValue({
-      token: 't'.repeat(64),
-      total_filas: 1,
-      filas_validas: 1,
-      filas_inconsistentes: 0,
-      faltantes: 0,
-      filas: [],
-    })
+  it('al confirmar reemplaza la lista en una sola llamada y marca result', async () => {
+    previewMock.mockResolvedValue(previewOf(1))
     confirmMock.mockResolvedValue({
       total_filas: 1,
       filas_inconsistentes: 0,
       no_encontrados: 0,
-      cambios_pendientes: [
-        {
-          id_estudiante: 1,
-          codigo_sis: '202210443',
-          estado_habilitacion: 'NO_HABILITADO',
-          motivo: null,
-          detalle: null,
-        },
+      habilitados: 1,
+      total_no_habilitados: 1,
+      motivo: 'NO_FIGURA_EN_LISTA',
+      no_habilitados: [
+        { id_estudiante: 1, codigo_sis: '202210443', nombre_completo: 'Álvarez Rojas, Camila' },
       ],
     })
 
@@ -94,26 +99,40 @@ describe('useEligibleListUpload', () => {
     })
     await waitFor(() => expect(result.current.step).toBe('preview'))
 
-    let applied: UploadConfirmData | null = null
+    let replaced: UploadConfirmData | null = null
     await act(async () => {
-      applied = await result.current.applyToPending('ASISTENCIA_INSUFICIENTE')
+      replaced = await result.current.confirmReplacement()
     })
 
-    expect(applied).not.toBeNull()
-    expect(applied!.cambios_pendientes).toHaveLength(1)
+    expect(confirmMock).toHaveBeenCalledTimes(1)
+    expect(confirmMock).toHaveBeenCalledWith(1, 't'.repeat(64), expect.any(AbortSignal))
+    expect(replaced).not.toBeNull()
     expect(result.current.step).toBe('result')
-    expect(result.current.result?.cambios_pendientes).toHaveLength(1)
+    expect(result.current.result?.total_no_habilitados).toBe(1)
+    expect(result.current.result?.no_habilitados).toHaveLength(1)
+  })
+
+  it('si el servidor rechaza el reemplazo vuelve al preview con el mensaje', async () => {
+    previewMock.mockResolvedValue(previewOf(1))
+    confirmMock.mockRejectedValue(new ApiError(409, WINDOW_CLOSED))
+
+    const { result } = renderHook(() => useEligibleListUpload(1))
+    await act(async () => {
+      result.current.startUpload(makeFile())
+    })
+    await waitFor(() => expect(result.current.step).toBe('preview'))
+
+    await act(async () => {
+      await result.current.confirmReplacement()
+    })
+
+    expect(result.current.step).toBe('preview')
+    expect(result.current.result).toBeNull()
+    expect(result.current.errorMessage).toBe(WINDOW_CLOSED)
   })
 
   it('reset vuelve a idle', async () => {
-    previewMock.mockResolvedValue({
-      token: 't'.repeat(64),
-      total_filas: 0,
-      filas_validas: 0,
-      filas_inconsistentes: 0,
-      faltantes: 0,
-      filas: [],
-    })
+    previewMock.mockResolvedValue(previewOf(0))
     const { result } = renderHook(() => useEligibleListUpload(1))
     await act(async () => {
       result.current.startUpload(makeFile())

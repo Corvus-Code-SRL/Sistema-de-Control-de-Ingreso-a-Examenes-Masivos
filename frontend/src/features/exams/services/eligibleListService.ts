@@ -6,7 +6,6 @@ import type {
   UploadConfirmData,
   UploadPreviewData,
 } from '../types/eligibleList.types'
-import type { NoEligibleReason } from '../types/eligibleList.types'
 
 interface DataResponse<T> {
   data: T
@@ -62,13 +61,11 @@ export const eligibleListService = {
   async confirmUpload(
     examId: number,
     token: string,
-    motivo: NoEligibleReason,
-    detalle?: string,
     signal?: AbortSignal
   ): Promise<UploadConfirmData> {
     const response = await apiPost<DataResponse<UploadConfirmData>>(
       `/examenes/${examId}/habilitados/confirm`,
-      { token, motivo, detalle },
+      { token },
       { signal }
     )
     return response.data

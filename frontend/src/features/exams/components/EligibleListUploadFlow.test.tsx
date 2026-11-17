@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/lib/api-client'
 import { EligibleListUploadFlow } from './EligibleListUploadFlow'
 import { eligibleListService } from '../services/eligibleListService'
 
@@ -19,20 +20,30 @@ vi.mock('../services/eligibleListService', () => ({
 const previewMock = vi.mocked(eligibleListService.previewUpload)
 const confirmMock = vi.mocked(eligibleListService.confirmUpload)
 
+const WINDOW_CLOSED =
+  'La lista de habilitados ya no se puede modificar: el control de ingreso del examen ya se abrió.'
+
 function makeFile(): File {
   return new File(['codigo_sis\n202210443'], 'lista.csv')
+}
+
+function simplePreview(missing = 0) {
+  return {
+    token: 't'.repeat(64),
+    total_filas: 1,
+    filas_validas: 1,
+    filas_inconsistentes: 0,
+    faltantes: missing,
+    filas: [],
+  }
 }
 
 describe('EligibleListUploadFlow', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('flujo completo: upload → preview → motivo → aplicar', async () => {
+  it('flujo completo: archivo → vista previa → reemplazar → resumen del servidor', async () => {
     previewMock.mockResolvedValue({
-      token: 't'.repeat(64),
-      total_filas: 1,
-      filas_validas: 1,
-      filas_inconsistentes: 0,
-      faltantes: 0,
+      ...simplePreview(1),
       filas: [
         {
           numero_fila: 2,
@@ -48,19 +59,15 @@ describe('EligibleListUploadFlow', () => {
       total_filas: 1,
       filas_inconsistentes: 0,
       no_encontrados: 0,
-      cambios_pendientes: [
-        {
-          id_estudiante: 1,
-          codigo_sis: '202210443',
-          nombre_completo: 'Álvarez Rojas, Camila',
-          estado_habilitacion: 'NO_HABILITADO',
-          motivo: null,
-          detalle: null,
-        },
+      habilitados: 1,
+      total_no_habilitados: 1,
+      motivo: 'NO_FIGURA_EN_LISTA',
+      no_habilitados: [
+        { id_estudiante: 7, codigo_sis: '202210999', nombre_completo: 'Pérez Soto, Luis' },
       ],
     })
 
-    const onPendingChanges = vi.fn()
+    const onReplaced = vi.fn()
     const onClose = vi.fn()
     const user = userEvent.setup({ pointerEventsCheck: 0 })
 
@@ -68,45 +75,87 @@ describe('EligibleListUploadFlow', () => {
       <EligibleListUploadFlow
         open
         examId={1}
+        replacesCurrentList={false}
         onClose={onClose}
-        onPendingChanges={onPendingChanges}
+        onReplaced={onReplaced}
       />
     )
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     await user.upload(input, makeFile())
 
-    // El preview ya no muestra una tabla con el código SIS; muestra 3 cards
-    // con los conteos de coincidentes, no habilitados por no figurar y ajenos.
     await waitFor(() =>
       expect(screen.getByText('Coinciden con la nómina')).toBeInTheDocument()
     )
     expect(screen.getByText('De la nómina no figuran')).toBeInTheDocument()
     expect(screen.getByText('No están en la nómina')).toBeInTheDocument()
 
-    await user.click(
-      await screen.findByRole('combobox', { name: /Motivo para los que no figuran/i })
-    )
-    await user.click(await screen.findByRole('option', { name: /Asistencia insuficiente/i }))
+    // El motivo es fijo: no se pide elegirlo y, sin lista previa, no hay aviso de reemplazo.
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(screen.getByText(/No figura en la lista cargada/)).toBeInTheDocument()
+    expect(screen.queryByText(/Se reemplazará la lista actual/)).not.toBeInTheDocument()
 
-    await user.click(await screen.findByRole('button', { name: /Aplicar a la lista/i }))
+    await user.click(await screen.findByRole('button', { name: /Reemplazar la lista/i }))
 
-    await waitFor(() => {
-      expect(onPendingChanges).toHaveBeenCalledWith([
-        expect.objectContaining({ id_estudiante: 1, estado_habilitacion: 'NO_HABILITADO' }),
-      ])
-    })
-    // El panel NO se cierra al aplicar: muestra el resumen.
+    await waitFor(() => expect(onReplaced).toHaveBeenCalledTimes(1))
+    expect(confirmMock).toHaveBeenCalledTimes(1)
+    expect(confirmMock).toHaveBeenCalledWith(1, 't'.repeat(64), expect.any(AbortSignal))
+    // El panel NO se cierra al reemplazar: muestra el resumen.
     expect(onClose).not.toHaveBeenCalled()
 
-    // El resumen lista al no habilitado con nombre y SIS.
-    expect(await screen.findByText('Quedarán no habilitados')).toBeInTheDocument()
-    expect(screen.getByText('202210443')).toBeInTheDocument()
-    expect(screen.getByText('Álvarez Rojas, Camila')).toBeInTheDocument()
+    // El resumen sale de la respuesta del servidor: nombre y SIS de quien quedó no habilitado.
+    expect(await screen.findByText('Quedaron no habilitados')).toBeInTheDocument()
+    expect(screen.getByText('202210999')).toBeInTheDocument()
+    expect(screen.getByText('Pérez Soto, Luis')).toBeInTheDocument()
 
-    // "Listo" cierra el panel.
     await user.click(screen.getByRole('button', { name: /Listo/i }))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('avisa que se reemplaza la lista actual si hay no habilitados guardados o cambios sin guardar', async () => {
+    previewMock.mockResolvedValue(simplePreview())
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(
+      <EligibleListUploadFlow
+        open
+        examId={1}
+        replacesCurrentList
+        onClose={vi.fn()}
+        onReplaced={vi.fn()}
+      />
+    )
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, makeFile())
+
+    expect(
+      await screen.findByText('Se reemplazará la lista actual, incluidos los ajustes manuales.')
+    ).toBeInTheDocument()
+  })
+
+  it('si el servidor rechaza el reemplazo muestra el motivo y no avisa a la página', async () => {
+    previewMock.mockResolvedValue(simplePreview())
+    confirmMock.mockRejectedValue(new ApiError(409, WINDOW_CLOSED))
+
+    const onReplaced = vi.fn()
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(
+      <EligibleListUploadFlow
+        open
+        examId={1}
+        replacesCurrentList={false}
+        onClose={vi.fn()}
+        onReplaced={onReplaced}
+      />
+    )
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, makeFile())
+    await user.click(await screen.findByRole('button', { name: /Reemplazar la lista/i }))
+
+    expect(await screen.findByText(WINDOW_CLOSED)).toBeInTheDocument()
+    expect(onReplaced).not.toHaveBeenCalled()
   })
 
   it('muestra las filas con error y las duplicadas del preview', async () => {
@@ -117,7 +166,7 @@ describe('EligibleListUploadFlow', () => {
       filas_inconsistentes: 3,
       faltantes: 0,
       filas: [
-                {
+        {
           numero_fila: 3,
           codigo_sis: '202210443',
           apellidos: 'ALVAREZ',
@@ -149,8 +198,9 @@ describe('EligibleListUploadFlow', () => {
       <EligibleListUploadFlow
         open
         examId={1}
+        replacesCurrentList={false}
         onClose={vi.fn()}
-        onPendingChanges={vi.fn()}
+        onReplaced={vi.fn()}
       />
     )
 
@@ -163,39 +213,5 @@ describe('EligibleListUploadFlow', () => {
     expect(screen.getByText('código SIS duplicado en el archivo')).toBeInTheDocument()
     expect(screen.getByText('código SIS duplicado con datos distintos')).toBeInTheDocument()
     expect(screen.getByText('sin código SIS')).toBeInTheDocument()
-  })
-
-  it('exige detalle cuando el motivo es OTRO', async () => {
-    previewMock.mockResolvedValue({
-      token: 't'.repeat(64),
-      total_filas: 0,
-      filas_validas: 0,
-      filas_inconsistentes: 0,
-      faltantes: 0,
-      filas: [],
-    })
-
-    const user = userEvent.setup({ pointerEventsCheck: 0 })
-    render(
-      <EligibleListUploadFlow
-        open
-        examId={1}
-        onClose={vi.fn()}
-        onPendingChanges={vi.fn()}
-      />
-    )
-
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement
-    await user.upload(input, makeFile())
-    await waitFor(() => expect(previewMock).toHaveBeenCalled())
-
-    await user.click(
-      await screen.findByRole('combobox', { name: /Motivo para los que no figuran/i })
-    )
-    await user.click(await screen.findByRole('option', { name: /Otro/i }))
-
-    await user.click(await screen.findByRole('button', { name: /Aplicar a la lista/i }))
-    expect(await screen.findByText(/al menos 10 caracteres/i)).toBeInTheDocument()
-    expect(confirmMock).not.toHaveBeenCalled()
   })
 })

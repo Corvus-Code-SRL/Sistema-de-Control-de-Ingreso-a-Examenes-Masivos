@@ -5,7 +5,6 @@ import {
   validateEligibleFile,
 } from '../services/eligibleListService'
 import type {
-  NoEligibleReason,
   UploadConfirmData,
   UploadPreviewData,
 } from '../types/eligibleList.types'
@@ -20,7 +19,7 @@ export interface UseEligibleListUploadResult {
   errorMessage: string | null
   startUpload: (file: File) => void
   retry: () => void
-  applyToPending: (motivo: NoEligibleReason, detalle?: string) => Promise<UploadConfirmData | null>
+  confirmReplacement: () => Promise<UploadConfirmData | null>
   reset: () => void
 }
 
@@ -100,8 +99,8 @@ export function useEligibleListUpload(examId: number | null): UseEligibleListUpl
     if (file !== null) void runPreview(file)
   }, [file, runPreview])
 
-  const applyToPending = useCallback(
-    async (motivo: NoEligibleReason, detalle?: string): Promise<UploadConfirmData | null> => {
+  const confirmReplacement = useCallback(
+    async (): Promise<UploadConfirmData | null> => {
       if (examId === null || preview === null) return null
 
       const controller = startRequest()
@@ -112,14 +111,12 @@ export function useEligibleListUpload(examId: number | null): UseEligibleListUpl
         const data = await eligibleListService.confirmUpload(
           examId,
           preview.token,
-          motivo,
-          detalle,
           controller.signal
         )
         if (!isCurrent(controller)) return null
-          setResult(data)
-          setStep('result')
-          return data
+        setResult(data)
+        setStep('result')
+        return data
       } catch (cause) {
         if (!isCurrent(controller)) return null
         setErrorMessage(toApiError(cause).message ?? NETWORK_FALLBACK)
@@ -148,7 +145,7 @@ export function useEligibleListUpload(examId: number | null): UseEligibleListUpl
     errorMessage,
     startUpload,
     retry,
-    applyToPending,
+    confirmReplacement,
     reset,
   }
 }

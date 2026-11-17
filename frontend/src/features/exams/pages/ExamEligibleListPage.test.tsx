@@ -58,12 +58,20 @@ function stubBackend(handler: {
   exams: () => unknown
   list?: () => unknown
   put?: (body: unknown) => unknown
+  preview?: () => unknown
+  confirm?: () => unknown
 }) {
   window.localStorage.setItem(TOKEN_STORAGE_KEY, 'tok')
 
   return mockApiWith(({ url, method, body }) => {
     if (url.endsWith('/auth/yo')) return { body: meBody('docente') }
     if (url.endsWith('/examenes/habilitados')) return { body: { data: handler.exams() } }
+    if (/\/examenes\/\d+\/habilitados\/preview$/.test(url) && handler.preview) {
+      return { body: { data: handler.preview() } }
+    }
+    if (/\/examenes\/\d+\/habilitados\/confirm$/.test(url) && handler.confirm) {
+      return { body: { data: handler.confirm() } }
+    }
     if (/\/examenes\/\d+\/habilitados$/.test(url)) {
       if (method === 'PUT' && handler.put) return { body: { data: handler.put(body) } }
       if (handler.list) return { body: { data: handler.list() } }
@@ -116,6 +124,18 @@ describe('ExamEligibleListPage', () => {
     renderApp('/examenes/habilitados')
 
     expect(await screen.findByText(/El control de ingreso ya empezó/i)).toBeInTheDocument()
+  })
+
+  it('muestra el aviso de control abierto cuando el examen sigue PROGRAMADO pero la lista ya no es editable', async () => {
+    stubBackend({
+      exams: examFixture,
+      list: () => listFixture({ editable: false, estado: 'PROGRAMADO' }),
+    })
+
+    renderApp('/examenes/habilitados')
+
+    expect(await screen.findByText(/El control de ingreso ya se abrió/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Importar desde archivo/i })).toBeDisabled()
   })
 
   it('aplica "No habilitar" con motivo y guarda', async () => {
@@ -241,29 +261,72 @@ it('al cambiar de examen escribe ?examen=<id> en la URL', async () => {
   })
 })
 
-it('pide confirmación antes de reemplazar si hay cambios manuales pendientes', async () => {
-  stubBackend({
+it('reemplaza la lista con el archivo en una sola petición, avisa y descarta los cambios sin guardar', async () => {
+  let replaced = false
+  const api = stubBackend({
     exams: examFixture,
-    list: listFixture,
-    put: () => listFixture(),
+    list: () =>
+      replaced
+        ? {
+            ...listFixture(),
+            estudiantes: [
+              { ...listFixture().estudiantes[0], estado_habilitacion: 'HABILITADO' },
+              {
+                ...listFixture().estudiantes[1],
+                motivo: 'NO_FIGURA_EN_LISTA',
+              },
+            ],
+          }
+        : listFixture(),
+    preview: () => ({
+      token: 't'.repeat(64),
+      total_filas: 1,
+      filas_validas: 1,
+      filas_inconsistentes: 0,
+      faltantes: 1,
+      filas: [],
+    }),
+    confirm: () => {
+      replaced = true
+      return {
+        total_filas: 1,
+        filas_inconsistentes: 0,
+        no_encontrados: 0,
+        habilitados: 1,
+        total_no_habilitados: 1,
+        motivo: 'NO_FIGURA_EN_LISTA',
+        no_habilitados: [
+          { id_estudiante: 2, codigo_sis: '202111278', nombre_completo: 'Gutiérrez Vela, Andrea' },
+        ],
+      }
+    },
   })
 
-  const user = userEvent.setup()
+  const user = userEvent.setup({ pointerEventsCheck: 0 })
   renderApp('/examenes/habilitados')
 
-  await screen.findAllByLabelText(/Marcar a Álvarez Rojas, Camila/i)
-
-  // Hacer un cambio manual primero (No habilitar).
-  const [checkbox] = screen.getAllByLabelText(/Marcar a Álvarez Rojas, Camila/i)
+  // Un ajuste manual sin guardar: el archivo lo reemplazará.
+  const [checkbox] = await screen.findAllByLabelText(/Marcar a Álvarez Rojas, Camila/i)
   await user.click(checkbox)
   await user.click(screen.getByRole('button', { name: /No habilitar…/i }))
   await user.click(screen.getByRole('combobox', { name: /Motivo/i }))
   await user.click(screen.getByRole('option', { name: /Asistencia insuficiente/i }))
   await user.click(screen.getByRole('button', { name: /^No habilitar$/i }))
-
   expect(await screen.findByText(/1 cambio sin guardar/i)).toBeInTheDocument()
 
-  // Ahora el flow emite cambios (simulado: el test no sube un archivo real,
-  // así que este caso se cubre en el test del flow + la página por separado).
-  // ... ver nota abajo.
+  await user.click(screen.getByRole('button', { name: /Importar desde archivo/i }))
+  const input = document.querySelector('input[type="file"]') as HTMLInputElement
+  await user.upload(input, new File(['codigo_sis\n202210443'], 'lista.csv'))
+
+  expect(
+    await screen.findByText('Se reemplazará la lista actual, incluidos los ajustes manuales.')
+  ).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: /Reemplazar la lista/i }))
+
+  expect(await screen.findByText('Quedaron no habilitados')).toBeInTheDocument()
+  // Solo una petición de confirmación y ningún PUT manual: el reemplazo es atómico en el servidor.
+  expect(api.calls.filter((c) => c.url.endsWith('/habilitados/confirm'))).toHaveLength(1)
+  expect(api.calls.some((c) => c.method === 'PUT')).toBe(false)
+  // Los cambios locales sin guardar se descartan y la lista se recarga desde el servidor.
+  await waitFor(() => expect(screen.queryByText(/cambio sin guardar/i)).not.toBeInTheDocument())
 })

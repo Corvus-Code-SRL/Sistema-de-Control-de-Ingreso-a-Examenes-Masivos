@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { AlertTriangle, CheckCircle2, FileUp, LoaderCircle, Upload, XCircle } from 'lucide-react'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -11,46 +11,34 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { FormSelect } from '@/components/common/FormSelect'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 
 import { useEligibleListUpload } from '../hooks/useEligibleListUpload'
-import type { NoEligibleReason } from '../types/eligibleList.types'
-import { NO_ELIGIBLE_REASONS } from '../types/eligibleList.types'
-import { validateOtroDetalle } from '../utils/eligibleListUtils'
+import { STORED_REASON_LABELS } from '../types/eligibleList.types'
 
 interface EligibleListUploadFlowProps {
   open: boolean
   examId: number | null
+  /** La lista ya tiene no habilitados guardados o hay cambios sin guardar que el archivo reemplazaría. */
+  replacesCurrentList: boolean
   onClose: () => void
-  onPendingChanges: (changes: import('../types/eligibleList.types').EligibleChange[]) => void
+  /** El servidor ya reemplazó la lista: la página debe descartar sus cambios locales y recargar. */
+  onReplaced: () => void
 }
-
-const reasonOptions = (Object.keys(NO_ELIGIBLE_REASONS) as NoEligibleReason[]).map((key) => ({
-  value: key,
-  label: NO_ELIGIBLE_REASONS[key],
-}))
 
 export function EligibleListUploadFlow({
   open,
   examId,
+  replacesCurrentList,
   onClose,
-  onPendingChanges,
+  onReplaced,
 }: EligibleListUploadFlowProps) {
   const upload = useEligibleListUpload(examId)
-  const [motivo, setMotivo] = useState<NoEligibleReason | ''>('')
-  const [detalle, setDetalle] = useState('')
-  const [formError, setFormError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     if (!open) {
       upload.reset()
-      setMotivo('')
-      setDetalle('')
-      setFormError(null)
       if (inputRef.current) {
         inputRef.current.value = ''
       }
@@ -63,34 +51,9 @@ export function EligibleListUploadFlow({
   }
 
   const handleApply = async (): Promise<void> => {
-    if (!motivo) {
-      setFormError('Debe seleccionar un motivo.')
-      return
-    }
-    if (motivo === 'OTRO') {
-      const err = validateOtroDetalle(detalle)
-      if (err) {
-        setFormError(err)
-        return
-      }
-    }
-
-    const applied = await upload.applyToPending(
-      motivo,
-      motivo === 'OTRO' ? detalle : undefined
-    )
-    if (applied) {
-      onPendingChanges(
-        applied.cambios_pendientes.map((c) => ({
-          id_estudiante: c.id_estudiante,
-          estado_habilitacion: c.estado_habilitacion,
-          motivo: c.motivo ?? undefined,
-          detalle: c.detalle ?? undefined,
-        }))
-      )
-      // No cerramos el panel: el hook pasa a step === 'result' y el docente
-      // ve el resumen de no habilitados antes de pulsar "Listo".
-    }
+    const replaced = await upload.confirmReplacement()
+    // No se cierra el panel: el docente ve el resumen de no habilitados antes de pulsar "Listo".
+    if (replaced) onReplaced()
   }
 
   const previewSummary = useMemo(() => {
@@ -107,13 +70,6 @@ export function EligibleListUploadFlow({
     )
     return { coinciden, noEstan, deNominaNoFiguran, conError, duplicadas }
   }, [upload.preview])
-
-  const noHabilitados = useMemo(() => {
-    if (!upload.result) return []
-    return upload.result.cambios_pendientes.filter(
-      (c) => c.estado_habilitacion === 'NO_HABILITADO'
-    )
-  }, [upload.result])
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
@@ -239,46 +195,21 @@ export function EligibleListUploadFlow({
                     {previewSummary?.deNominaNoFiguran === 1 ? 'estudiante quedaría no habilitado' : 'estudiantes quedarían no habilitados'}
                   </AlertTitle>
                   <AlertDescription>
-                    Son los de la nómina que no figuran en el archivo.
+                    Son los de la nómina que no figuran en el archivo. Su motivo será «
+                    {STORED_REASON_LABELS.NO_FIGURA_EN_LISTA}».
                   </AlertDescription>
                 </Alert>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="global-motivo">
-                  Motivo para los que no figuran <span className="text-danger">*</span>
-                </Label>
-                <FormSelect
-                  id="global-motivo"
-                  value={motivo}
-                  placeholder="Seleccione un motivo"
-                  options={reasonOptions}
-                  onValueChange={(v) => { setMotivo(v as NoEligibleReason); setFormError(null) }}
-                  ariaLabel="Motivo para los que no figuran"
-                  invalid={!motivo && !!formError}
-                />
-              </div>
-
-              {motivo === 'OTRO' && (
-                <div className="space-y-2">
-                  <Label htmlFor="global-detalle">Detalle <span className="text-danger">*</span></Label>
-                  <Textarea
-                    id="global-detalle"
-                    value={detalle}
-                    onChange={(e) => { setDetalle(e.target.value); setFormError(null) }}
-                    maxLength={500}
-                    placeholder="Mínimo 10 caracteres"
-                    className="resize-none"
-                  />
-                </div>
-              )}
-
-              {formError && (
-                <Alert variant="destructive">
+              {replacesCurrentList && (
+                <Alert className="border-warn-border bg-warn-soft text-warn-fg">
                   <AlertTriangle aria-hidden="true" />
-                  <AlertDescription>{formError}</AlertDescription>
+                  <AlertDescription>
+                    Se reemplazará la lista actual, incluidos los ajustes manuales.
+                  </AlertDescription>
                 </Alert>
               )}
+
               {upload.errorMessage && (
                 <Alert variant="destructive">
                   <AlertTriangle aria-hidden="true" />
@@ -304,7 +235,7 @@ export function EligibleListUploadFlow({
           {upload.step === 'confirming' && (
             <div className="flex flex-col items-center gap-3 py-12" role="status" aria-live="polite">
               <LoaderCircle className="size-8 animate-spin text-brand" aria-hidden="true" />
-              <p className="sciem-label">Aplicando cambios…</p>
+              <p className="sciem-label">Reemplazando la lista…</p>
             </div>
           )}
           {upload.step === 'result' && upload.result && (
@@ -315,21 +246,21 @@ export function EligibleListUploadFlow({
                 <UploadStat label="Fuera de la nómina" value={upload.result.no_encontrados} tone="warn" />
               </div>
 
-              {noHabilitados.length > 0 ? (
+              {upload.result.no_habilitados.length > 0 ? (
                 <div className="space-y-2 rounded-xl border border-warn-border bg-warn-soft/50 p-3">
                   <div className="flex items-center gap-2 text-sm font-medium text-warn-fg">
                     <AlertTriangle aria-hidden="true" className="size-4" />
-                    Quedarán no habilitados
+                    Quedaron no habilitados
                     <Badge variant="outline" className="border-warn-border bg-card text-warn-fg">
-                      {noHabilitados.length}
+                      {upload.result.total_no_habilitados}
                     </Badge>
                   </div>
                   <p className="text-xs text-warn-fg">
-                    Son los de la nómina que no figuran en el archivo. Si continúa, se aplicarán como
-                    cambios pendientes.
+                    Son los de la nómina que no figuran en el archivo. La lista ya quedó guardada con el
+                    motivo «{STORED_REASON_LABELS[upload.result.motivo]}».
                   </p>
                   <ul className="max-h-48 space-y-1 overflow-y-auto text-sm">
-                    {noHabilitados.map((cambio) => (
+                    {upload.result.no_habilitados.map((cambio) => (
                       <li
                         key={cambio.id_estudiante}
                         className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"
@@ -345,7 +276,7 @@ export function EligibleListUploadFlow({
               ) : (
                 <Alert className="border-ok-border bg-ok-soft text-ok-fg">
                   <CheckCircle2 aria-hidden="true" />
-                  <AlertTitle>Ningún estudiante quedará no habilitado</AlertTitle>
+                  <AlertTitle>Ningún estudiante quedó no habilitado</AlertTitle>
                   <AlertDescription>
                     Todos los estudiantes de la nómina figuran en el archivo.
                   </AlertDescription>
@@ -360,9 +291,9 @@ export function EligibleListUploadFlow({
             <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           )}
           {upload.step === 'preview' && (
-            <Button onClick={() => void handleApply()} disabled={!motivo}>
+            <Button onClick={() => void handleApply()}>
               <CheckCircle2 aria-hidden="true" className="size-4" />
-              Aplicar a la lista
+              Reemplazar la lista
             </Button>
           )}
           {upload.step === 'result' && (

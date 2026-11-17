@@ -7,15 +7,6 @@ import {
   Upload,
   XCircle,
 } from 'lucide-react'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import type { EligibleChange } from '../types/eligibleList.types'
 
 import { AppShell } from '@/components/layout/AppShell'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -47,7 +38,6 @@ export function ExamEligibleListPage() {
   const [disableOpen, setDisableOpen] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [toast, setToast] = useState<ToastState | null>(null)
-  const [pendingReplace, setPendingReplace] = useState<EligibleChange[] | null>(null)
 
   const resetSelection = useCallback(() => setSelectedIds(new Set()), [])
 
@@ -129,27 +119,13 @@ export function ExamEligibleListPage() {
     resetSelection()
   }
 
-  // CA-9: cargar un archivo reemplaza la lista actual, incluidos los ajustes
-  // manuales. Si hay cambios pendientes manuales, se pide confirmación antes
-  // de descartarlos. Si no hay, se reemplaza directo.
-  const handleUploadedChanges = (changes: EligibleChange[]): void => {
-    if (eligible.pendingChanges.size > 0) {
-      setPendingReplace(changes)
-      return
-    }
-    eligible.replacePendingChanges(changes)
-  }
+  // CA-9: el archivo reemplaza la lista actual, incluidos los ajustes manuales. El servidor lo hace en
+  // una sola transacción; aquí solo se descartan los cambios locales y se recarga la lista guardada.
+  const replacesCurrentList = noHabilitadosCount > 0 || eligible.pendingChanges.size > 0
 
-  const confirmReplace = (): void => {
-    if (pendingReplace !== null) {
-      eligible.replacePendingChanges(pendingReplace)
-    }
-    setPendingReplace(null)
-    setUploadOpen(false)
-  }
-
-  const cancelReplace = (): void => {
-    setPendingReplace(null)
+  const handleReplaced = (): void => {
+    resetSelection()
+    void eligible.reloadList()
   }
 
   if (eligible.isLoadingExams) {
@@ -372,38 +348,10 @@ export function ExamEligibleListPage() {
       <EligibleListUploadFlow
         open={uploadOpen}
         examId={eligible.selectedExamId}
+        replacesCurrentList={replacesCurrentList}
         onClose={() => setUploadOpen(false)}
-        onPendingChanges={handleUploadedChanges}
+        onReplaced={handleReplaced}
       />
-
-      <Dialog
-        open={pendingReplace !== null}
-        onOpenChange={(open) => {
-          if (!open) cancelReplace()
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reemplazar la lista de habilitados</DialogTitle>
-            <DialogDescription>
-              Cargar el archivo reemplazará la lista actual, incluidos los{' '}
-              {eligible.pendingChanges.size}{' '}
-              {eligible.pendingChanges.size === 1
-                ? 'ajuste manual que hiciste'
-                : 'ajustes manuales que hiciste'}{' '}
-              y que todavía no guardaste. ¿Desea continuar?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={cancelReplace}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={confirmReplace}>
-              Reemplazar lista
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {toast && (
         <Toast

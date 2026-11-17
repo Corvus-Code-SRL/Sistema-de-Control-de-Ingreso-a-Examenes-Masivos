@@ -1,9 +1,9 @@
-import type { EligibilityStatus, NoEligibleReason } from '../types/eligibleList.types'
-import { NO_ELIGIBLE_REASONS } from '../types/eligibleList.types'
+import type { EligibilityStatus, StoredReason } from '../types/eligibleList.types'
+import { STORED_REASON_LABELS } from '../types/eligibleList.types'
 
 export function motivoLabel(motivo: string | null | undefined): string {
   if (!motivo) return '—'
-  return NO_ELIGIBLE_REASONS[motivo as NoEligibleReason] ?? motivo
+  return STORED_REASON_LABELS[motivo as StoredReason] ?? motivo
 }
 
 /** Normaliza un texto para búsquedas sin distinguir tildes. */
@@ -29,6 +29,11 @@ export interface ReadOnlyMessage {
 
 export function readOnlyMessage(estado: string): ReadOnlyMessage {
   switch (estado) {
+    case 'PROGRAMADO':
+      return {
+        title: 'El control de ingreso ya se abrió',
+        description: 'La lista de habilitados quedó fija. Solo se puede consultar.',
+      }
     case 'EN_CURSO':
       return {
         title: 'El control de ingreso ya empezó',

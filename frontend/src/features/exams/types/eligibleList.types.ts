@@ -15,6 +15,16 @@ export const NO_ELIGIBLE_REASONS: Record<NoEligibleReason, string> = {
   OTRO: 'Otro (especificar)',
 }
 
+/** Motivo fijo que el sistema asigna a quien no figura en el archivo; el docente no lo elige. */
+export const NOT_IN_FILE_REASON = 'NO_FIGURA_EN_LISTA'
+
+export type StoredReason = NoEligibleReason | typeof NOT_IN_FILE_REASON
+
+export const STORED_REASON_LABELS: Record<StoredReason, string> = {
+  ...NO_ELIGIBLE_REASONS,
+  [NOT_IN_FILE_REASON]: 'No figura en la lista cargada',
+}
+
 // --- API Responses ---
 
 export interface ExamSelectorRef {
@@ -41,7 +51,7 @@ export interface EligibleStudent {
   nombre_grupo: string
   estado_habilitacion: EligibilityStatus
   caso_especial: boolean
-  motivo: NoEligibleReason | null
+  motivo: StoredReason | null
   detalle: string | null
 }
 
@@ -88,20 +98,21 @@ export interface UploadPreviewData {
   filas: PreviewRow[]
 }
 
-export interface PendingChangeFromUpload {
+export interface NotEnabledByUpload {
   id_estudiante: number
   codigo_sis: string
   nombre_completo: string
-  estado_habilitacion: EligibilityStatus
-  motivo: NoEligibleReason | null
-  detalle: string | null
 }
 
+/** Resultado de reemplazar la lista con el archivo: ya está guardado en el servidor. */
 export interface UploadConfirmData {
   total_filas: number
   filas_inconsistentes: number
   no_encontrados: number
-  cambios_pendientes: PendingChangeFromUpload[]
+  habilitados: number
+  total_no_habilitados: number
+  motivo: typeof NOT_IN_FILE_REASON
+  no_habilitados: NotEnabledByUpload[]
 }
 
 // --- Client-side State Types ---
