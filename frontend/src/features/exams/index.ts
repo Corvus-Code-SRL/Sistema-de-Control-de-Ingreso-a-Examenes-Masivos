@@ -17,7 +17,7 @@ export { ExamHistoryPage } from './pages/ExamHistoryPage';
 export { ExamHistorySummaryPage } from './pages/ExamHistorySummaryPage';
 export { examDetailPath, examFinalReportPath } from './utils/paths';
 export { ExamInProgressPage } from './pages/ExamInProgressPage';
-export { FinishExamAction } from './components/FinishExamAction';
+export { FinishExamsPage } from './pages/FinishExamsPage';
 export { InProgressExamsPage } from './pages/InProgressExamsPage';
 export type { ExamInProgressExtensions } from './components/ExamInProgressExtensions';
 export type { ExamInProgress, InProgressExamRow, InProgressStudent } from './types/examInProgress.types';

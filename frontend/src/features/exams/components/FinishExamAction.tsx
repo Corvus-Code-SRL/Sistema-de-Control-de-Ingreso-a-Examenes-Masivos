@@ -1,40 +1,26 @@
 import { useRef, useState } from 'react';
-import { Square } from 'lucide-react';
+import { Square, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
 import { ApiError } from '@/lib/api-client';
 import { examsService } from '../services/examsService';
-import type { ExamInProgress } from '../types/examInProgress.types';
+import type { Exam } from '../types/exams.types';
+import { ExamStatusBadge } from './ExamStatusBadge';
 
-const campusTime = new Intl.DateTimeFormat('es-BO', {
-  hour: '2-digit',
-  minute: '2-digit',
-  hourCycle: 'h23',
-  timeZone: 'America/La_Paz',
-});
-
-export function FinishExamAction({ exam }: { exam: ExamInProgress }) {
-  if (exam.estado === 'FINALIZADO') {
-    return exam.fin_real_en && (
-      <span className="text-xs text-muted-foreground">
-        Fin real <time dateTime={exam.fin_real_en}>{campusTime.format(new Date(exam.fin_real_en))}</time>
-      </span>
-    );
-  }
-
-  return exam.estado === 'EN_CURSO' && exam.rol_controlador === 'DOCENTE'
-    ? <FinishExamDialog exam={exam} />
-    : null;
+interface FinishExamActionProps {
+  exam: Exam;
+  onFinished: (exam: Exam) => void;
+  onConflict: () => void;
 }
 
-function FinishExamDialog({ exam }: { exam: ExamInProgress }) {
+export function FinishExamAction({ exam, onFinished, onConflict }: FinishExamActionProps) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
-  const [finished, setFinished] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
+  const cancelButton = useRef<HTMLButtonElement>(null);
 
   function changeOpen(nextOpen: boolean) {
     if (inFlight.current) return;
@@ -43,64 +29,90 @@ function FinishExamDialog({ exam }: { exam: ExamInProgress }) {
   }
 
   async function finish() {
-    if (inFlight.current || finished) return;
+    if (inFlight.current) return;
     inFlight.current = true;
     setPending(true);
     setError(null);
 
     try {
-      await examsService.finishExam(exam.id_examen);
-      setFinished(true);
+      const finishedExam = await examsService.finishExam(exam.id_examen);
       setOpen(false);
+      onFinished(finishedExam);
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'No se pudo terminar el examen. Intente nuevamente.');
+      if (cause instanceof ApiError && cause.status === 409) {
+        setOpen(false);
+        onConflict();
+      } else if (cause instanceof ApiError && cause.isForbidden) {
+        setError('No tiene autorización para finalizar este examen');
+      } else {
+        setError('No se pudo terminar el examen. Intente nuevamente.');
+      }
     } finally {
       inFlight.current = false;
       setPending(false);
     }
   }
 
-  if (finished) {
-    return <p role="status" className="text-sm">Examen finalizado correctamente.</p>;
-  }
-
-  const totals = [
-    ['A tiempo', exam.totales.a_tiempo],
-    ['Con retraso', exam.totales.con_retraso],
-    ['Ausentes', exam.totales.ausentes],
-    ['Incidencias pendientes', exam.totales.incidencias_pendientes],
-  ] as const;
+  const schedule = [exam.hora_inicio, exam.hora_fin].filter(Boolean).join('–');
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild>
-        <Button type="button" variant="danger">
+        <Button type="button" variant="danger" aria-label={`Terminar examen: ${exam.nombre_examen}`}>
           <Square aria-hidden="true" /> Terminar examen
         </Button>
       </DialogTrigger>
-      <DialogContent showCloseButton={false} className="sm:max-w-xl">
-        <DialogHeader className="flex-row items-center gap-3">
-          <span className="rounded-lg bg-destructive/10 p-2 text-destructive">
-            <Square className="size-5" aria-hidden="true" />
-          </span>
+      <DialogContent
+        showCloseButton={false}
+        className="sm:max-w-md"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          cancelButton.current?.focus();
+        }}
+      >
+        <DialogClose asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="absolute right-2 top-2"
+            aria-label="Cerrar confirmación"
+            disabled={pending}
+          >
+            <X aria-hidden="true" />
+          </Button>
+        </DialogClose>
+        <DialogHeader className="pr-8">
           <DialogTitle>¿Terminar el examen?</DialogTitle>
+          <DialogDescription className="break-words font-medium text-foreground">
+            {exam.nombre_examen}
+          </DialogDescription>
         </DialogHeader>
-        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {totals.map(([label, value]) => (
-            <div key={label} className="flex flex-col-reverse justify-end gap-1 rounded-lg bg-sunken p-3">
-              <dt className="text-xs text-muted-foreground">{label}</dt>
-              <dd className="sciem-tnum text-xl font-semibold">{value}</dd>
-            </div>
-          ))}
+        <dl className="grid grid-cols-2 gap-3 rounded-lg bg-sunken p-3">
+          <div className="min-w-0">
+            <dt className="text-xs text-muted-foreground">Materia</dt>
+            <dd className="break-words">{exam.materia?.nombre ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Fecha</dt>
+            <dd>{exam.fecha ? <time dateTime={exam.fecha}>{exam.fecha}</time> : '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Horario programado</dt>
+            <dd>{schedule || '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Estado</dt>
+            <dd><ExamStatusBadge status={exam.estado} /></dd>
+          </div>
         </dl>
-        <DialogDescription>
-          Los estudiantes que no ingresaron quedan como ausentes. Las incidencias pendientes se revisan después.
-        </DialogDescription>
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <DialogFooter>
-          <Button type="button" variant="outline" disabled={pending} onClick={() => changeOpen(false)}>
-            Seguir en curso
-          </Button>
+          <DialogClose asChild>
+            <Button ref={cancelButton} type="button" variant="outline" disabled={pending}>
+              Seguir en curso
+            </Button>
+          </DialogClose>
           <Button type="button" variant="danger" disabled={pending} onClick={() => void finish()}>
             <Square aria-hidden="true" /> {pending ? 'Terminando examen…' : 'Terminar examen'}
           </Button>
