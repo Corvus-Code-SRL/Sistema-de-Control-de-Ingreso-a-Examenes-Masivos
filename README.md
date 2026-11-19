@@ -276,7 +276,7 @@ Para desarrollar sin instalar PHP ni Redis en el sistema, el backend puede ejecu
 
 Si PHP corre en Docker, el contenedor tiene que poder salir a internet por el puerto 5432 para alcanzar la base compartida, y la verificación de la conexión debe hacerse **dentro del contenedor**, no en el host.
 
-El despliegue con un solo contenedor Apache (frontend compilado + API en el mismo origen) sigue pendiente: el `docker-compose.yml` de despliegue, el `Dockerfile` de Apache y `sciem.conf` todavía no existen.
+La configuración de producción usa una imagen Apache con el frontend compilado y la API en el mismo origen, más servicios de PostgreSQL, Redis y scheduler. Archivos, variables, primera instalación y comprobaciones: [`deployment/docker/PRODUCCION.md`](deployment/docker/PRODUCCION.md). La versión para compartir con el equipo está en [`output/pdf/guia-produccion-sciem.pdf`](output/pdf/guia-produccion-sciem.pdf).
 
 ---
 
