@@ -352,4 +352,24 @@ return [
         'timeout' => (int) env('SCIEM_RESPALDO_TIMEOUT', 1800),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Proxies confiables
+    |--------------------------------------------------------------------------
+    |
+    | Los lee App\Http\Middleware\TrustProxies. Detrás de un proxy inverso (HTTPS institucional), Laravel
+    | ve la IP del proxy en cada petición: los límites por IP (RNF-03), la bitácora y las URL HTTPS salen
+    | mal. Con el proxy declarado aquí, Laravel toma la IP real y el esquema de X-Forwarded-For y
+    | X-Forwarded-Proto.
+    |
+    | - Vacío (por defecto): no confía en ningún proxy; para acceso directo, sin proxy.
+    | - IP o rangos separados por coma (10.0.0.5,172.16.0.0/12): solo esos proxies.
+    | - '*': cualquiera que se conecte. Solo si Apache NO es accesible directamente desde la red (por
+    |   ejemplo, publicado en 127.0.0.1 detrás de un proxy en el mismo servidor): si no, un cliente podría
+    |   falsificar su IP con X-Forwarded-For.
+    |
+    */
+
+    'proxies_confiables' => env('SCIEM_PROXIES_CONFIABLES', ''),
+
 ];
