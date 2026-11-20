@@ -111,7 +111,7 @@ export function OpenEntryControlsPage() {
               {exam.motivo_apertura?.codigo === 'CAPACIDAD_INSUFICIENTE' && <p className="mt-1 text-xs">Agregue un ambiente al examen para que el control se abra.</p>}
             </div>
           </div>}
-          <Button className="mt-4 h-11 w-full sm:w-auto sm:self-start" asChild><Link to={failed && exam.rol_controlador === 'DOCENTE' ? `/examenes/${exam.id_examen}/editar` : `/examenes/${exam.id_examen}/control-ingreso`}>{exam.control_abierto ? 'Controlar ingreso' : failed && exam.rol_controlador === 'DOCENTE' ? 'Modificar examen' : failed ? 'Ver detalle del examen' : 'Ver estado del control'} <ArrowRight className="size-4" /></Link></Button>
+          <Button className="mt-4 h-11 w-full sm:w-auto sm:self-start" asChild><Link to={failed && exam.es_creador ? `/examenes/${exam.id_examen}/editar` : `/examenes/${exam.id_examen}/control-ingreso`}>{exam.control_abierto ? 'Controlar ingreso' : failed && exam.es_creador ? 'Modificar examen' : failed ? 'Ver detalle del examen' : 'Ver estado del control'} <ArrowRight className="size-4" /></Link></Button>
         </li>
       })}
     </ul>}

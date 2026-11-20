@@ -32,6 +32,13 @@ class FinalReportService
         ReportStatus::PENDING => 'Pendiente de revisión',
     ];
 
+    private ExamCollaboratorService $collaborators;
+
+    public function __construct(ExamCollaboratorService $collaborators)
+    {
+        $this->collaborators = $collaborators;
+    }
+
     public function build(Exam $exam, string $teacherId): array
     {
         $this->assertTeacherGiven($teacherId);
@@ -55,10 +62,13 @@ class FinalReportService
         }
     }
 
-    /** El examen ajeno y el no finalizado responden igual para no revelar si existe. */
+    /**
+     * El examen ajeno y el no finalizado responden igual para no revelar si existe. El colaborador que aceptó la
+     * invitación (HU-027) ve el reporte como el creador.
+     */
     private function assertAvailable(Exam $exam, string $teacherId): void
     {
-        if ((string) $exam->id_usuario_docente !== $teacherId || $exam->estado !== Exam::FINALIZADO) {
+        if ($exam->estado !== Exam::FINALIZADO || ! $this->collaborators->isTeacherOf($exam, $teacherId)) {
             throw new FinalReportUnavailableException();
         }
     }
@@ -98,18 +108,21 @@ class FinalReportService
     {
         return DB::table('examen_estudiante as ee')
             ->join('estudiante as e', 'e.id_estudiante', '=', 'ee.id_estudiante')
-            ->join('grupo as g', 'g.id_grupo', '=', 'ee.id_grupo')
+            ->join('grupo as g', 'g.id_grupo', '=', 'ee.id_grupo_efectivo')
             ->leftJoin('ambiente as a', 'a.id_ambiente', '=', 'ee.id_ambiente')
             ->where('ee.id_examen', $examId)
             ->orderBy('e.apellido_paterno')
             ->orderBy('e.apellido_materno')
             ->orderBy('e.nombre')
             ->get([
-                'ee.id_grupo',
+                'ee.id_grupo_efectivo as id_grupo',
                 'g.num_grupo',
                 'ee.estado_ingreso',
+                'ee.estado_habilitacion',
                 'ee.hora_ingreso',
                 'ee.expulsado_en',
+                'ee.es_excepcional',
+                'ee.motivo_excepcional',
                 'e.cod_sis',
                 'e.nombre',
                 'e.apellido_paterno',
@@ -127,7 +140,14 @@ class FinalReportService
                 'inscritos' => $group->count(),
                 'a_tiempo' => $group->where('estado_ingreso', 'INGRESO')->count(),
                 'con_retraso' => $group->where('estado_ingreso', 'CON_RETRASO')->count(),
-                'ausentes' => $group->where('estado_ingreso', 'NO_INGRESO')->count(),
+                'ausentes' => $group
+                    ->where('estado_ingreso', 'NO_INGRESO')
+                    ->where('estado_habilitacion', '!=', 'NO_HABILITADO')
+                    ->count(),
+                'no_habilitados' => $group
+                    ->where('estado_ingreso', 'NO_INGRESO')
+                    ->where('estado_habilitacion', 'NO_HABILITADO')
+                    ->count(),
                 'sin_clasificar' => $group
                     ->whereNotIn('estado_ingreso', array_keys(self::ENTRY_LABELS))
                     ->count(),
@@ -142,6 +162,7 @@ class FinalReportService
                 'a_tiempo' => $groups->sum('a_tiempo'),
                 'con_retraso' => $groups->sum('con_retraso'),
                 'ausentes' => $groups->sum('ausentes'),
+                'no_habilitados' => $groups->sum('no_habilitados'),
                 'sin_clasificar' => $groups->sum('sin_clasificar'),
             ],
         ];
@@ -152,12 +173,16 @@ class FinalReportService
         return $rows->map(fn ($row) => [
             'cod_sis' => $row->cod_sis,
             'nombre' => trim("{$row->nombre} {$row->apellido_paterno} {$row->apellido_materno}"),
+            'es_excepcional' => (bool) ($row->es_excepcional ?? false),
+            'motivo_excepcional' => $row->motivo_excepcional ?? null,
             'ambiente' => $row->nro_aula,
             'hora_ingreso' => $this->shortTime($row->hora_ingreso),
             'estado' => ($row->expulsado_en ?? null) !== null
                 ? 'Expulsado · ' . Carbon::parse($row->expulsado_en)
                     ->setTimezone(config('sciem.zona_horaria'))->format('H:i')
-                : (self::ENTRY_LABELS[$row->estado_ingreso] ?? self::UNCLASSIFIED_LABEL),
+                : (($row->estado_habilitacion ?? null) === 'NO_HABILITADO'
+                    ? 'No habilitado'
+                    : (self::ENTRY_LABELS[$row->estado_ingreso] ?? self::UNCLASSIFIED_LABEL)),
         ])->all();
     }
 

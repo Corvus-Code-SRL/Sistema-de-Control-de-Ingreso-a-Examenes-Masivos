@@ -67,5 +67,55 @@ class ActionSeeder extends Seeder
         }
 
         $this->call(ExamSituationActionSeeder::class);
+
+        DB::table('accion')->updateOrInsert(
+            ['operacion' => 'GUARDAR_HABILITADOS'],
+            [
+                'operacion' => 'GUARDAR_HABILITADOS',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Guardado de cambios en la lista de habilitados de un examen',
+            ]
+        );
+
+        // Van al final: los ids existentes no cambian y, en una base nueva, quedan en el mismo orden que en producción.
+        $responses = [
+            [
+                'operacion' => 'ACEPTAR_INVITACION',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Aceptación de una invitación a colaborar en un examen',
+            ],
+            [
+                'operacion' => 'RECHAZAR_INVITACION',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Rechazo de una invitación a colaborar en un examen',
+            ],
+            [
+                'operacion' => 'REGISTRAR_ESTUDIANTE_EXCEPCIONAL',
+                'tipo_operacion' => 'INSERT',
+                'descripcion' => 'Registro de un estudiante excepcional en un examen',
+            ],
+        ];
+
+        foreach ($responses as $response) {
+            DB::table('accion')->updateOrInsert(['operacion' => $response['operacion']], $response);
+        }
+
+        // HU-038: también al final, después de los anteriores, para no mover los ids existentes.
+        $timer = [
+            [
+                'operacion' => 'INICIAR_CRONOMETRO',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Inicio del cronómetro de un examen',
+            ],
+            [
+                'operacion' => 'AJUSTAR_CRONOMETRO',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Ajuste del cronómetro de un examen',
+            ],
+        ];
+
+        foreach ($timer as $action) {
+            DB::table('accion')->updateOrInsert(['operacion' => $action['operacion']], $action);
+        }
     }
 }

@@ -17,6 +17,9 @@ export { ExamHistoryPage } from './pages/ExamHistoryPage';
 export { ExamHistorySummaryPage } from './pages/ExamHistorySummaryPage';
 export { examDetailPath, examFinalReportPath } from './utils/paths';
 export { ExamInProgressPage } from './pages/ExamInProgressPage';
+export { ExamTimerPage } from './pages/ExamTimerPage';
+export { ExamTimerCard } from './components/ExamTimerCard';
+export { ExamTimersProvider } from './hooks/useExamTimers';
 export { FinishExamAction } from './components/FinishExamAction';
 export { InProgressExamsPage } from './pages/InProgressExamsPage';
 export type { ExamInProgressExtensions } from './components/ExamInProgressExtensions';
@@ -24,3 +27,12 @@ export type { ExamInProgress, InProgressExamRow, InProgressStudent } from './typ
 export { EXAM_STATUS } from './types/exams.types';
 export { useInProgressExams } from './hooks/useInProgressExams';
 export { examInProgressService } from './services/examInProgressService';
+export { ExamEligibleListPage } from './pages/ExamEligibleListPage'
+export { useEligibleList } from './hooks/useEligibleList'
+export { useEligibleListUpload } from './hooks/useEligibleListUpload'
+export { eligibleListService } from './services/eligibleListService'
+export { EligibleListCurrentTable } from './components/EligibleListCurrentTable'
+export { DisableStudentsDialog } from './components/DisableStudentsDialog'
+export { EligibleListUploadFlow } from './components/EligibleListUploadFlow'
+export { ChangesBanner } from './components/ChangesBanner'
+export * from './types/eligibleList.types'

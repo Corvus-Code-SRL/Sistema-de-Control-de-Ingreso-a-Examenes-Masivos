@@ -27,6 +27,12 @@ class ExamTimingService
         return $this->startsAt($exam)->addMinutes((int) $exam->duracion);
     }
 
+    public function resolutionLimit(Exam $exam): Carbon
+    {
+        // Punto de extensión para HU-047: hasta entonces rige fecha + hora de inicio + duración.
+        return $this->endsAt($exam);
+    }
+
     public function finishesAutomaticallyAt(Exam $exam): Carbon
     {
         // Los exámenes que quedaron sin iniciar conservan el plazo de recuperación.

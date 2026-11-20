@@ -1888,3 +1888,116 @@ ALTER TABLE public.examen
 
 ALTER TABLE public.examen
     ADD CONSTRAINT chk_examen_estado_sin_en_ingreso CHECK (estado <> 'EN_INGRESO');
+
+-- Versión 17: lista separada por grupo en la invitación a colaborar (HU-026 la elige, HU-027 la aplica)
+--             (2026_11_17_000001_add_lista_por_grupo_to_invitacion_examen)
+--   * Las acciones de bitácora ACEPTAR_INVITACION y RECHAZAR_INVITACION (HU-027) no van en el esquema: las
+--     siembra ActionSeeder, que debe correr después de migrar.
+--   * Un colaborador es la invitación en estado ACEPTADA; el rechazo no guarda motivo.
+--   * invitacion_examen.lista_por_grupo: si quien invita pide que, cuando el colaborador sume sus grupos, la
+--     lista del examen se muestre dividida por grupo (con su docente) en el control de ingreso y durante el
+--     examen. Por defecto false: la lista va junta. La nómina es la misma en los dos casos.
+--   * Solo puede ser true si la invitación permite agregar grupos.
+
+ALTER TABLE public.invitacion_examen
+    ADD COLUMN IF NOT EXISTS lista_por_grupo boolean NOT NULL DEFAULT false;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'chk_invitacion_examen_lista_por_grupo'
+          AND conrelid = 'public.invitacion_examen'::regclass
+    ) THEN
+        ALTER TABLE public.invitacion_examen
+            ADD CONSTRAINT chk_invitacion_examen_lista_por_grupo
+            CHECK (NOT lista_por_grupo OR permite_agregar_grupos);
+    END IF;
+END $$;
+
+-- Versión 18: estudiante excepcional en la lista de UN examen (HU-023)
+--             (2026_11_17_000002_add_excepcional_to_examen_estudiante)
+--   * La acción de bitácora REGISTRAR_ESTUDIANTE_EXCEPCIONAL no va en el esquema: la siembra ActionSeeder, que
+--     debe correr después de migrar (y antes de publicar el código).
+--   * El excepcional es una fila de examen_estudiante con es_excepcional = true: id_grupo queda NULL y su grupo
+--     en id_grupo_excepcional, de modo que fk_examen_estudiante_grupo_estudiante se conserva sin cambios (una
+--     clave compuesta con un componente NULL no se verifica). No se escribe en grupo_estudiante.
+--   * chk_examen_estudiante_excepcional: o es una fila normal (id_grupo y sin datos de excepcional) o es un
+--     excepcional completo (grupo, carrera, docente y motivo). La unicidad por examen y estudiante la da
+--     pk_examen_estudiante.
+--   * id_grupo_efectivo: grupo con el que se cuenta al estudiante en el examen (columna generada).
+
+ALTER TABLE public.examen_estudiante
+    ALTER COLUMN id_grupo DROP NOT NULL,
+    ADD COLUMN es_excepcional boolean NOT NULL DEFAULT false,
+    ADD COLUMN motivo_excepcional varchar(255),
+    ADD COLUMN id_usuario_docente_excepcional uuid,
+    ADD COLUMN id_grupo_excepcional integer,
+    ADD COLUMN id_carrera_excepcional integer;
+
+ALTER TABLE public.examen_estudiante
+    ADD COLUMN id_grupo_efectivo integer
+        GENERATED ALWAYS AS (COALESCE(id_grupo, id_grupo_excepcional)) STORED;
+
+ALTER TABLE public.examen_estudiante
+    ADD CONSTRAINT fk_examen_estudiante_docente_excepcional
+        FOREIGN KEY (id_usuario_docente_excepcional) REFERENCES public.usuario(id_usuario),
+    ADD CONSTRAINT fk_examen_estudiante_grupo_examen_excepcional
+        FOREIGN KEY (id_grupo_excepcional, id_examen) REFERENCES public.grupo_examen(id_grupo, id_examen),
+    ADD CONSTRAINT fk_examen_estudiante_grupo_oferta_excepcional
+        FOREIGN KEY (id_grupo_excepcional, id_carrera_excepcional)
+        REFERENCES public.grupo_oferta(id_grupo, id_carrera),
+    ADD CONSTRAINT chk_examen_estudiante_excepcional
+    CHECK (
+        (
+            es_excepcional = false
+            AND id_grupo IS NOT NULL
+            AND id_grupo_excepcional IS NULL
+            AND id_carrera_excepcional IS NULL
+            AND id_usuario_docente_excepcional IS NULL
+            AND motivo_excepcional IS NULL
+        )
+        OR
+        (
+            es_excepcional = true
+            AND id_grupo IS NULL
+            AND id_grupo_excepcional IS NOT NULL
+            AND id_carrera_excepcional IS NOT NULL
+            AND id_usuario_docente_excepcional IS NOT NULL
+            AND motivo_excepcional IS NOT NULL
+            AND length(btrim(motivo_excepcional)) > 0
+        )
+    );
+
+CREATE INDEX idx_examen_estudiante_excepcional
+    ON public.examen_estudiante(id_examen) WHERE es_excepcional;
+CREATE INDEX idx_examen_estudiante_grupo_efectivo
+    ON public.examen_estudiante(id_grupo_efectivo);
+
+-- Versión 19: cronómetro del examen, independiente de su ciclo de vida (HU-038)
+--             (2026_11_17_120000_add_cronometro_to_examen)
+--   * Las acciones de bitácora INICIAR_CRONOMETRO y AJUSTAR_CRONOMETRO no van en el esquema: las siembra
+--     ActionSeeder, que debe correr después de migrar.
+--   * cronometro_iniciado_en y cronometro_vence_en son nulas hasta que el docente inicia el cronómetro; no
+--     cambian el estado del examen ni el control de ingreso.
+--   * examen_cronometro_fechas_check: o ambas son nulas o ambas existen y el vencimiento es posterior al inicio.
+
+ALTER TABLE public.examen
+    ADD COLUMN IF NOT EXISTS cronometro_iniciado_en timestamp with time zone,
+    ADD COLUMN IF NOT EXISTS cronometro_vence_en timestamp with time zone;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'examen_cronometro_fechas_check'
+          AND conrelid = 'public.examen'::regclass
+    ) THEN
+        ALTER TABLE public.examen
+            ADD CONSTRAINT examen_cronometro_fechas_check CHECK (
+                (cronometro_iniciado_en IS NULL AND cronometro_vence_en IS NULL)
+                OR (cronometro_iniciado_en IS NOT NULL AND cronometro_vence_en IS NOT NULL
+                    AND cronometro_vence_en > cronometro_iniciado_en)
+            );
+    END IF;
+END $$;

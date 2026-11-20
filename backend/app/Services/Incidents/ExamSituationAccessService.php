@@ -7,6 +7,7 @@ use App\Models\Exam;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\EntryControl\CloseOrdinaryEntryService;
+use App\Services\Exams\ExamCollaboratorService;
 use App\Services\Security\UserRoleService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,12 +24,15 @@ class ExamSituationAccessService
 
     private UserRoleService $roles;
 
+    private ExamCollaboratorService $collaborators;
+
     /** Función de sciem.access cuyos roles controlan el examen (HU-057: teaching; HU-042: incidents). */
     private string $feature = 'teaching';
 
-    public function __construct(UserRoleService $roles)
+    public function __construct(UserRoleService $roles, ExamCollaboratorService $collaborators)
     {
         $this->roles = $roles;
+        $this->collaborators = $collaborators;
     }
 
     /** Copia que autoriza con los roles de otra función, sin depender de las capacidades de HU-057. */
@@ -40,7 +44,7 @@ class ExamSituationAccessService
         return $copy;
     }
 
-    /** Devuelve null para el docente responsable, o el ambiente permitido al auxiliar. */
+    /** Devuelve null para un docente del examen (creador o colaborador), o el ambiente permitido al auxiliar. */
     public function roomScope(Exam $exam, User $actor): ?int
     {
         if ($exam->id_carrera === null || $actor->estado !== User::ESTADO_ACTIVO) {
@@ -48,7 +52,7 @@ class ExamSituationAccessService
         }
 
         if (
-            (string) $exam->id_usuario_docente === (string) $actor->id_usuario
+            $this->collaborators->isTeacherOf($exam, (string) $actor->id_usuario)
             && $this->roles->canUse($actor->id_usuario, $this->feature)
         ) {
             return null;
@@ -104,7 +108,9 @@ class ExamSituationAccessService
                 $query->whereRaw('1 = 0');
 
                 if ($isTeacher) {
-                    $query->orWhere('examen.id_usuario_docente', $actor->id_usuario);
+                    $query->orWhere(
+                        fn ($taught) => $this->collaborators->whereTaughtBy($taught, (string) $actor->id_usuario)
+                    );
                 }
 
                 $query->orWhereExists(function ($assignment) use ($actor) {

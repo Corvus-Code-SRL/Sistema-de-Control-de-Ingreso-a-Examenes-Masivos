@@ -38,7 +38,7 @@ import type { Capability } from '@/features/auth'
 export const DISABLED_REASON = 'Disponible próximamente'
 
 /** Contadores que el menú puede mostrar junto a una entrada; el valor lo aporta quien dibuja. */
-export type NavBadge = 'pendingIncidents'
+export type NavBadge = 'pendingIncidents' | 'pendingInvitations'
 
 export interface NavItem {
   /** Estable: lo usan el estado activo, las pruebas y los contadores; nunca el texto visible. */
@@ -281,12 +281,6 @@ export const NAVIGATION: readonly NavSection[] = [
         capability: 'auxiliares.examen'
       },
       {
-        id: 'teacher-upload-eligible',
-        label: 'Cargar nómina de habilitados',
-        icon: FileUp,
-        capability: 'examenes.gestionar'
-      },
-      {
         id: 'teacher-invite-collaborators',
         label: 'Invitar docentes colaboradores',
         icon: UserRoundPlus,
@@ -295,9 +289,18 @@ export const NAVIGATION: readonly NavSection[] = [
       },
       {
         id: 'teacher-exam-invitations',
-        label: 'Invitaciones a otros exámenes',
+        label: 'Invitaciones recibidas',
         icon: MailOpen,
-        capability: 'examenes.gestionar'
+        capability: 'examenes.gestionar',
+        to: '/invitaciones',
+        badge: 'pendingInvitations'
+      },
+      {
+        id: 'teacher-upload-eligible',
+        label: 'Cargar lista de habilitados',
+        icon: UserCheck,
+        capability: 'examenes.gestionar',
+        to: '/examenes/habilitados'
       }
     ]
   },
@@ -314,6 +317,13 @@ export const NAVIGATION: readonly NavSection[] = [
         capability: 'ingreso.operar',
         to: '/control-ingreso',
         matches: ['/examenes/:examId/control-ingreso']
+      },
+      {
+        id: 'teacher-exam-timer',
+        label: 'Controlar tiempo del examen',
+        icon: Clock,
+        capability: 'examenes.controlar-tiempo',
+        to: '/examenes/controlar-tiempo'
       },
       {
         id: 'teacher-exam-in-progress',
@@ -337,6 +347,13 @@ export const NAVIGATION: readonly NavSection[] = [
         icon: AlertTriangle,
         capability: 'situaciones.registrar',
         to: '/situacion-excepcional'
+      },
+      {
+        id: 'teacher-exceptional-student',
+        label: 'Registrar estudiante excepcional',
+        icon: UserPlus,
+        capability: 'casos-especiales.gestionar',
+        to: '/estudiante-excepcional'
       },
       {
         id: 'teacher-report-incident',

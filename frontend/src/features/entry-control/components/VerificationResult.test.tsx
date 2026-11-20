@@ -60,6 +60,22 @@ describe('VerificationResult fotografía', () => {
   })
 })
 
+describe('VerificationResult estudiante excepcional (HU-023)', () => {
+  it('muestra la marca y el motivo solo cuando el estudiante es excepcional', () => {
+    const { rerender } = render(<VerificationResult
+      result={{ ...result, es_excepcional: true, motivo_excepcional: 'Convalidación aprobada' }}
+      busy={false} onConfirm={() => {}} onReject={() => {}} onNext={() => {}}
+    />)
+    expect(screen.getByText('Excepcional')).toBeInTheDocument()
+    expect(screen.getByText('Motivo: Convalidación aprobada')).toBeInTheDocument()
+
+    rerender(<VerificationResult
+      result={result} busy={false} onConfirm={() => {}} onReject={() => {}} onNext={() => {}}
+    />)
+    expect(screen.queryByText('Excepcional')).not.toBeInTheDocument()
+  })
+})
+
 describe('VerificationResult CI', () => {
   it('muestra el CI coincidente, el grupo y el aula como en la ficha', () => {
     render(<VerificationResult
@@ -71,6 +87,16 @@ describe('VerificationResult CI', () => {
     expect(screen.getByText('Carrera').nextElementSibling).toHaveTextContent('Ingeniería de Sistemas')
     expect(screen.getByText('Grupo 1 · Cálculo I')).toBeInTheDocument()
     expect(screen.getByText('Aula 691A')).toBeInTheDocument()
+  })
+
+  it('con la lista separada por grupo muestra también el docente del grupo (HU-027)', () => {
+    render(<VerificationResult
+      result={{ ...result, grupo: { id_grupo: 3, num_grupo: '3', docente: 'Luis Vargas' } }}
+      presentedCi="7100001" subjectName="Cálculo I"
+      busy={false} onConfirm={() => {}} onReject={() => {}} onNext={() => {}}
+    />)
+
+    expect(screen.getByText('Grupo 3 · Cálculo I · Luis Vargas')).toBeInTheDocument()
   })
 
   it('muestra CI no coincide y no ofrece aceptar el ingreso', () => {

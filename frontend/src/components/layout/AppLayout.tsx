@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '@/features/auth'
 import { AppFrame } from './AppFrame'
@@ -12,7 +12,7 @@ import { ShellSlotContext } from './shellContext'
  * Sin sesión (anónima o expirada) no pinta el marco: `ProtectedRoute` redirige al login y el menú
  * no debe verse ni un instante.
  */
-export function AppLayout() {
+export function AppLayout({ outsideOutlet }: { outsideOutlet?: ReactNode } = {}) {
   const { estado } = useAuth()
   const { pathname } = useLocation()
   const [slot, setSlot] = useState<HTMLElement | null>(null)
@@ -52,6 +52,7 @@ export function AppLayout() {
       >
         <Outlet />
       </AppFrame>
+      {outsideOutlet}
     </ShellSlotContext.Provider>
   )
 }

@@ -28,12 +28,16 @@ import {
   EditExamPage,
   ExamDetailPage,
   ExamInProgressPage,
+  ExamTimerPage,
+  ExamTimerCard,
+  ExamTimersProvider,
   ExamsPage,
   FinalReportPage,
   InProgressExamsPage,
   ExamHistoryPage,
   ExamReportsPage,
   ExamHistorySummaryPage,
+  ExamEligibleListPage,
 } from '@/features/exams'
 
 import {
@@ -47,6 +51,7 @@ import {
 import { ClassroomsPage } from '@/features/classrooms'
 import { COLLABORATOR_INVITATIONS_PATH, CollaboratorInvitationsPage } from '@/features/collaborators'
 import { RectifyRiskRecordPage, RiskCenterPage } from '@/features/risk-center/academic'
+import { ExceptionalStudentPage } from '@/features/exceptional-students'
 import { RosterUploadPage } from '@/features/students'
 import {
   AdminSubjectAssignmentsPage,
@@ -62,10 +67,25 @@ import {
 import { examInProgressExtensions } from './examInProgressExtensions'
 import { AlienAttemptsReportPage } from '@/features/reports/academic'
 import { AuditLogPage } from '@/features/audit-log'
+import { INVITATIONS_PATH, InvitationsPage } from '@/features/invitations'
 
 /** Envuelve una pantalla con la capacidad que exige. Sin sesión redirige al login (ver ProtectedRoute). */
 function guarded(capability: Capability, element: ReactElement) {
   return <ProtectedRoute capability={capability}>{element}</ProtectedRoute>
+}
+
+function TeacherLayout() {
+  const { estado, usuario } = useAuth()
+  const { capabilities } = useCurrentUser()
+  const { pathname } = useLocation()
+
+  if (estado !== 'autenticado' || !usuario || !capabilities.includes('examenes.controlar-tiempo')) return <AppLayout />
+
+  return (
+    <ExamTimersProvider key={usuario.id_usuario}>
+      <AppLayout outsideOutlet={pathname === '/examenes/controlar-tiempo' ? null : <ExamTimerCard />} />
+    </ExamTimersProvider>
+  )
 }
 
 /**
@@ -77,7 +97,7 @@ function guarded(capability: Capability, element: ReactElement) {
 function DocenteRoutes() {
   return (
     <Routes>
-      <Route element={<AppLayout />}>
+      <Route element={<TeacherLayout />}>
         <Route path="/" element={<Navigate to="/materias" replace />} />
         <Route path="/materias" element={guarded('grupos.gestionar', <SubjectsPage />)} />
         <Route
@@ -110,6 +130,10 @@ function DocenteRoutes() {
         <Route
           path="/cargar-nomina"
           element={guarded('grupos.gestionar', <RosterUploadPage />)}
+        />
+        <Route
+          path="/estudiante-excepcional"
+          element={guarded('casos-especiales.gestionar', <ExceptionalStudentPage />)}
         />
         <Route path="/grupos/:idGrupo/nomina" element={<RosterUploadRedirect />} />
 
@@ -158,6 +182,11 @@ function DocenteRoutes() {
           element={guarded('examenes.gestionar', <FinalReportPage />)}
         />
 
+        <Route
+          path="/examenes/habilitados"
+          element={guarded('examenes.gestionar', <ExamEligibleListPage />)}
+        />
+
         <Route path="/situacion-excepcional" element={guarded('situaciones.registrar', <ExamSituationsPage />)} />
         <Route path="/reportar-incidencia" element={guarded('incidencias.registrar', <ReportIncidentPage />)} />
         <Route path="/control-ingreso" element={guarded('ingreso.operar', <OpenEntryControlsPage />)} />
@@ -165,6 +194,11 @@ function DocenteRoutes() {
         <Route
           path="/examenes/:examId/control-ingreso"
           element={guarded('ingreso.operar', <EntryControlPage />)}
+        />
+
+        <Route
+          path="/examenes/controlar-tiempo"
+          element={guarded('examenes.controlar-tiempo', <ExamTimerPage />)}
         />
 
         <Route
@@ -182,6 +216,7 @@ function DocenteRoutes() {
         <Route path="/historial" element={guarded('examenes.gestionar', <ExamHistoryPage />)} />
         <Route path="/historial/:id" element={guarded('examenes.gestionar', <ExamHistorySummaryPage />)} />
         <Route path="/incidencias" element={guarded('incidencias.revisar', <IncidentsPage />)} />
+        <Route path={INVITATIONS_PATH} element={guarded('examenes.gestionar', <InvitationsPage />)} />
 
         <Route
           path="/central-riesgo/:id?"

@@ -123,7 +123,7 @@ describe('HU-037: registrar estudiante con retraso', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const sent = makeLateEntryRequest()
     vi.spyOn(examInProgressService, 'get').mockResolvedValue(
-      makeExamInProgress({ rol_controlador: 'AUXILIAR', id_ambiente_asignado: 6 })
+      makeExamInProgress({ rol_controlador: 'AUXILIAR', es_creador: false, id_ambiente_asignado: 6 })
     )
     const verify = vi.spyOn(lateEntryService, 'verify').mockResolvedValue(makeLateEntryVerification())
     const request = vi.spyOn(lateEntryService, 'request').mockResolvedValue(sent)
@@ -146,7 +146,7 @@ describe('HU-037: registrar estudiante con retraso', () => {
   })
 
   it('el auxiliar sin ambiente de control no puede verificar', async () => {
-    vi.spyOn(examInProgressService, 'get').mockResolvedValue(makeExamInProgress({ rol_controlador: 'AUXILIAR' }))
+    vi.spyOn(examInProgressService, 'get').mockResolvedValue(makeExamInProgress({ rol_controlador: 'AUXILIAR', es_creador: false }))
     await renderPage()
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No tiene un ambiente de control asignado.')
@@ -356,7 +356,7 @@ describe('HU-037: registrar estudiante con retraso', () => {
 
   it('el auxiliar no elige ambiente de control: verifica en el suyo', async () => {
     vi.spyOn(examInProgressService, 'get').mockResolvedValue(
-      makeExamInProgress({ rol_controlador: 'AUXILIAR', id_ambiente_asignado: 6 })
+      makeExamInProgress({ rol_controlador: 'AUXILIAR', es_creador: false, id_ambiente_asignado: 6 })
     )
     await renderPage()
 
@@ -367,7 +367,7 @@ describe('HU-037: registrar estudiante con retraso', () => {
   it('con otro examen el auxiliar envía la solicitud de todos modos', async () => {
     const user = userEvent.setup()
     vi.spyOn(examInProgressService, 'get').mockResolvedValue(
-      makeExamInProgress({ rol_controlador: 'AUXILIAR', id_ambiente_asignado: 6 })
+      makeExamInProgress({ rol_controlador: 'AUXILIAR', es_creador: false, id_ambiente_asignado: 6 })
     )
     vi.spyOn(lateEntryService, 'verify').mockResolvedValue(makeLateEntryVerification({
       otro_examen: makeOtherExamWarning(),

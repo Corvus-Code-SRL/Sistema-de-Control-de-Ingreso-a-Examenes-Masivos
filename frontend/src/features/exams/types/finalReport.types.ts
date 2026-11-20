@@ -16,6 +16,7 @@ export interface FinalReportAttendance {
   a_tiempo: number
   con_retraso: number
   ausentes: number
+  no_habilitados: number
   sin_clasificar: number
 }
 
@@ -27,6 +28,9 @@ export interface FinalReportGroup extends FinalReportAttendance {
 export interface FinalReportStudent {
   cod_sis: string
   nombre: string
+  /** Agregado solo a la lista de este examen (HU-023), con el motivo del registro. */
+  es_excepcional?: boolean
+  motivo_excepcional?: string | null
   ambiente: string | null
   hora_ingreso: string | null
   estado: string

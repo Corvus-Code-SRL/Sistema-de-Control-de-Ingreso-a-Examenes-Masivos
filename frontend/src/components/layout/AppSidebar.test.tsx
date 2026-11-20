@@ -12,6 +12,7 @@ const session = vi.hoisted(() => ({
   userId: 'user-1' as string | undefined,
   hasSession: true,
   pending: 0,
+  invitations: 0,
   logout: vi.fn()
 }))
 
@@ -53,6 +54,16 @@ vi.mock('@/features/incidents', () => ({
   }
 }))
 
+const pendingInvitationsSpy = vi.hoisted(() => vi.fn())
+
+vi.mock('@/features/invitations', () => ({
+  usePendingInvitationsCount: (enabled: boolean) => {
+    pendingInvitationsSpy(enabled)
+
+    return enabled ? session.invitations : 0
+  }
+}))
+
 type RoleName = 'Administrador' | 'Docente' | 'Auxiliar' | 'Invitado'
 
 function renderSidebar(
@@ -87,8 +98,10 @@ beforeEach(() => {
   session.userId = 'user-1'
   session.hasSession = true
   session.pending = 0
+  session.invitations = 0
   session.logout.mockReset()
   pendingIncidentsSpy.mockClear()
+  pendingInvitationsSpy.mockClear()
   vi.restoreAllMocks()
 })
 
@@ -485,10 +498,14 @@ describe('AppSidebar — entradas y estado activo', () => {
       ['Programados', '/examenes/programados'],
       ['Registrar examen', '/examenes/nuevo'],
       ['Invitar docentes colaboradores', '/colaboradores/invitar'],
+      ['Invitaciones recibidas', '/invitaciones'],
+      ['Cargar lista de habilitados', '/examenes/habilitados'],
       ['Control de ingreso', '/control-ingreso'],
+      ['Controlar tiempo del examen', '/examenes/controlar-tiempo'],
       ['En curso', '/examenes/en-curso'],
       ['Registrar estudiante con retraso', '/retrasos'],
       ['Registrar situación excepcional', '/situacion-excepcional'],
+      ['Registrar estudiante excepcional', '/estudiante-excepcional'],
       ['Reportar incidencia', '/reportar-incidencia'],
       ['Revisar reportes de incidencias', '/incidencias'],
       ['Central de riesgo', '/central-riesgo'],
@@ -506,7 +523,13 @@ describe('AppSidebar — entradas y estado activo', () => {
 
       expect(screen.getByRole('link', { name: 'Registrar situación excepcional' }))
         .toHaveAttribute('href', '/situacion-excepcional')
-      expect(screen.queryByText('Registrar estudiante excepcional')).not.toBeInTheDocument()
+
+      if (role === 'Docente') {
+        expect(screen.getByRole('link', { name: 'Registrar estudiante excepcional' }))
+          .toHaveAttribute('href', '/estudiante-excepcional')
+      } else {
+        expect(screen.queryByText('Registrar estudiante excepcional')).not.toBeInTheDocument()
+      }
     }
   )
 
@@ -542,6 +565,17 @@ describe('AppSidebar — entradas y estado activo', () => {
     await openAllSections(user)
 
     expect(screen.getByRole('link', { name: 'Registrar estudiante con retraso' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Programados' })).not.toHaveAttribute('aria-current')
+  })
+
+  it.each(['Docente', 'Invitado'] as const)('resalta Controlar tiempo del examen para %s', async (role) => {
+    const user = userEvent.setup()
+    renderSidebar(role, '/examenes/controlar-tiempo')
+    await openAllSections(user)
+
+    const timer = screen.getByRole('link', { name: 'Controlar tiempo del examen' })
+    expect(timer).toHaveAttribute('href', '/examenes/controlar-tiempo')
+    expect(timer).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Programados' })).not.toHaveAttribute('aria-current')
   })
 
@@ -701,6 +735,25 @@ describe('AppSidebar — contador de incidencias', () => {
 
     expect(pendingIncidentsSpy).toHaveBeenCalledWith(false)
     expect(pendingIncidentsSpy).not.toHaveBeenCalledWith(true)
+  })
+})
+
+describe('AppSidebar — contador de invitaciones (HU-027)', () => {
+  it('muestra las invitaciones por responder junto a «Invitaciones recibidas»', async () => {
+    const user = userEvent.setup()
+    session.invitations = 2
+    renderSidebar('Docente', '/invitaciones')
+    await openAllSections(user)
+
+    expect(screen.getByRole('link', { name: /Invitaciones recibidas/ })).toHaveTextContent('2')
+    expect(pendingInvitationsSpy).toHaveBeenCalledWith(true)
+  })
+
+  it('no se pide a quien no ve esa entrada', () => {
+    renderSidebar('Administrador', '/cuentas')
+
+    expect(pendingInvitationsSpy).toHaveBeenCalledWith(false)
+    expect(pendingInvitationsSpy).not.toHaveBeenCalledWith(true)
   })
 })
 

@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { AlertTriangle, CheckCircle2, CircleX, DoorOpen, Flag, RotateCcw, ShieldAlert, UserRound } from 'lucide-react'
+import { ExceptionalMark } from '@/components/common/ExceptionalMark'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import type { EntryStudent, Verification, VerificationActions } from '../types/entry-control.types'
@@ -86,12 +87,13 @@ function StudentDetails({ result, presentedCi, subjectName }: { result: Verifica
       <StudentPhoto key={`${student.id_estudiante}:${student.foto_url ?? ''}`} student={student} />
       <div className="min-w-0 flex-1">
         <p className="break-words text-lg font-semibold">{student.nombre_completo}</p>
+        {result.es_excepcional && <ExceptionalMark reason={result.motivo_excepcional} />}
         {status && <p className="text-xs text-muted-foreground">{status}</p>}
         <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm [&>dd]:break-words">
           <dt className="text-muted-foreground">Código SIS</dt><dd className="sciem-tnum font-medium">{student.cod_sis}</dd>
           <dt className="text-muted-foreground">CI</dt><dd className="sciem-tnum font-medium">{presentedCi ? <>{presentedCi}{student.ci && (presentedCi === student.ci ? <span className="text-ok-fg"> · coincide</span> : <span className="text-danger-fg"> · registrado: {student.ci}</span>)}</> : 'No ingresado'}</dd>
           <dt className="text-muted-foreground">Carrera</dt><dd className="font-medium">{student.carrera ?? 'No disponible'}</dd>
-          <dt className="text-muted-foreground">Grupo</dt><dd className="font-medium">{result.grupo ? `Grupo ${result.grupo.num_grupo}${subjectName ? ` · ${subjectName}` : ''}` : '—'}</dd>
+          <dt className="text-muted-foreground">Grupo</dt><dd className="font-medium">{result.grupo ? `Grupo ${result.grupo.num_grupo}${subjectName ? ` · ${subjectName}` : ''}${result.grupo.docente ? ` · ${result.grupo.docente}` : ''}` : '—'}</dd>
           <dt className="text-muted-foreground">Ambiente</dt><dd className="font-medium">{result.ambiente_asignado ? `Aula ${result.ambiente_asignado.nro_aula}` : '—'}</dd>
         </dl>
       </div>

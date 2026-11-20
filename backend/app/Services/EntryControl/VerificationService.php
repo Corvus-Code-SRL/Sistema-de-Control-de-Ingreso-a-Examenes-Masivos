@@ -4,6 +4,7 @@ namespace App\Services\EntryControl;
 
 use App\Models\User;
 use App\Services\RiskCenter\Academic\RiskCenterQueryService;
+use App\Support\MotivoNoHabilitacion;
 use Carbon\Carbon;
 
 /**
@@ -157,6 +158,8 @@ class VerificationService
         $result = $this->emptyResult(IdentificationService::IDENTIFIED);
         $result['estudiante'] = $record['estudiante'];
         $result['grupo'] = $record['grupo'];
+        $result['es_excepcional'] = $record['es_excepcional'] ?? false;
+        $result['motivo_excepcional'] = $record['motivo_excepcional'] ?? null;
         $result['ambiente_asignado'] = $record['ambiente_asignado'];
         $risk = $record['antecedentes'] ?? [];
         $result['antecedentes'] = isset($risk['total']) ? $risk : [
@@ -173,7 +176,11 @@ class VerificationService
         }
 
         if ($record['estado_habilitacion'] === 'NO_HABILITADO') {
-            return $this->deny($result, self::NOT_ENABLED, self::NOT_ENABLED_MESSAGE);
+            return $this->deny(
+                $result,
+                self::NOT_ENABLED,
+                $this->buildNotEnabledMessage($record['observacion'] ?? null)
+            );
         }
 
         $presentedCi = trim((string) ($input['ci'] ?? ''));
@@ -244,5 +251,21 @@ class VerificationService
         $result['veredicto'] = $code;
         $result['motivo'] = $message;
         return $result;
+    }
+
+    private function buildNotEnabledMessage(?string $observation): string
+    {
+        $base = 'El estudiante no está habilitado para este examen.';
+        $reason = MotivoNoHabilitacion::fromObservation($observation);
+
+        if ($reason === null) {
+            return $base;
+        }
+
+        if ($reason['motivo'] === MotivoNoHabilitacion::OTRO && $reason['detalle'] !== null) {
+            return $base . ' Motivo: ' . $reason['detalle'] . '.';
+        }
+
+        return $base . ' Motivo: ' . MotivoNoHabilitacion::label($reason['motivo']) . '.';
     }
 }

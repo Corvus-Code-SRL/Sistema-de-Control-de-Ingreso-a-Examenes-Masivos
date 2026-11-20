@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Download, FileSpreadsheet, Printer, ShieldAlert } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/common/EmptyState'
+import { ExceptionalMark } from '@/components/common/ExceptionalMark'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
@@ -81,6 +82,7 @@ function HeaderSection({ report }: { report: FinalReport }) {
 
 function AttendanceSection({ report }: { report: FinalReport }) {
   const { grupos, totales } = report.asistencia
+  const showNotEnabled = totales.no_habilitados > 0
   const showUnclassified = totales.sin_clasificar > 0
 
   return (
@@ -93,6 +95,7 @@ function AttendanceSection({ report }: { report: FinalReport }) {
             <TableHead className="text-right">A tiempo</TableHead>
             <TableHead className="text-right">Con retraso</TableHead>
             <TableHead className="text-right">Ausentes</TableHead>
+            {showNotEnabled && <TableHead className="text-right">No habilitados</TableHead>}
             {showUnclassified && <TableHead className="text-right">Sin clasificar</TableHead>}
           </TableRow>
         </TableHeader>
@@ -104,6 +107,9 @@ function AttendanceSection({ report }: { report: FinalReport }) {
               <TableCell className="text-right">{group.a_tiempo}</TableCell>
               <TableCell className="text-right">{group.con_retraso}</TableCell>
               <TableCell className="text-right">{group.ausentes}</TableCell>
+              {showNotEnabled && (
+                <TableCell className="text-right">{group.no_habilitados}</TableCell>
+              )}
               {showUnclassified && (
                 <TableCell className="text-right">{group.sin_clasificar}</TableCell>
               )}
@@ -115,6 +121,9 @@ function AttendanceSection({ report }: { report: FinalReport }) {
             <TableCell className="text-right">{totales.a_tiempo}</TableCell>
             <TableCell className="text-right">{totales.con_retraso}</TableCell>
             <TableCell className="text-right">{totales.ausentes}</TableCell>
+            {showNotEnabled && (
+              <TableCell className="text-right">{totales.no_habilitados}</TableCell>
+            )}
             {showUnclassified && (
               <TableCell className="text-right">{totales.sin_clasificar}</TableCell>
             )}
@@ -142,7 +151,10 @@ function StudentsSection({ report }: { report: FinalReport }) {
           {report.estudiantes.map((student) => (
             <TableRow key={student.cod_sis}>
               <TableCell>{student.cod_sis}</TableCell>
-              <TableCell>{student.nombre}</TableCell>
+              <TableCell>
+                {student.nombre}
+                {student.es_excepcional && <ExceptionalMark reason={student.motivo_excepcional} />}
+              </TableCell>
               <TableCell>{orDash(student.ambiente)}</TableCell>
               <TableCell>{orDash(student.hora_ingreso)}</TableCell>
               <TableCell>{student.estado}</TableCell>

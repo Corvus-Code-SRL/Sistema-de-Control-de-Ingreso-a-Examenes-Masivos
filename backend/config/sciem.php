@@ -148,6 +148,7 @@ return [
         'invite_teachers'  => [Role::DOCENTE],
         'audit_log'        => [Role::ADMINISTRADOR],
         'risk_rectify'     => [Role::ADMINISTRADOR],
+        'exam_timer'       => [Role::DOCENTE, Role::INVITADO],
     ],
 
     /*
@@ -275,13 +276,21 @@ return [
             'RECHAZAR_INGRESO_RETRASO' => 'Rechazar ingreso con retraso',
             'REGISTRAR_INGRESO_RETRASO' => 'Registrar ingreso con retraso',
             'EXPULSAR_ESTUDIANTE' => 'Retirar estudiante',
+            'REGISTRAR_ESTUDIANTE_EXCEPCIONAL' => 'Registrar estudiante excepcional',
             'CAMBIAR_AMBIENTE' => 'Cambiar ambiente',
             'OBSERVAR_IDENTIDAD' => 'Observar identidad',
             'RECTIFICAR_REGISTRO' => 'Rectificar registro',
+            'GUARDAR_HABILITADOS' => 'Guardar habilitados',
             'INVITAR_COLABORADOR' => 'Invitar colaborador',
+            'ACEPTAR_INVITACION' => 'Aceptar invitación',
+            'RECHAZAR_INVITACION' => 'Rechazar invitación',
+            'INICIAR_CRONOMETRO' => 'Iniciar cronómetro',
+            'AJUSTAR_CRONOMETRO' => 'Ajustar cronómetro',
         ],
 
         'etiquetas_campo' => [
+            'cronometro_iniciado_en' => 'Inicio del cronómetro',
+            'cronometro_vence_en' => 'Vencimiento del cronómetro',
             'num_grupo' => 'Número de grupo',
             'id_gestion_periodo' => 'Gestión y período',
             'estado' => 'Estado',

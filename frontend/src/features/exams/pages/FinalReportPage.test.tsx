@@ -28,10 +28,11 @@ function makeReport(overrides: Partial<FinalReport> = {}): FinalReport {
           a_tiempo: 1,
           con_retraso: 1,
           ausentes: 1,
+          no_habilitados: 0,
           sin_clasificar: 0
         }
       ],
-      totales: { inscritos: 3, a_tiempo: 1, con_retraso: 1, ausentes: 1, sin_clasificar: 0 }
+      totales: { inscritos: 3, a_tiempo: 1, con_retraso: 1, ausentes: 1, no_habilitados: 0, sin_clasificar: 0 }
     },
     estudiantes: [
       {
@@ -87,6 +88,23 @@ describe('FinalReportPage (HU-051)', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('marca como «Excepcional» con su motivo al estudiante agregado solo a este examen', async () => {
+    const report = makeReport()
+    report.estudiantes[2] = {
+      ...report.estudiantes[2],
+      es_excepcional: true,
+      motivo_excepcional: 'Inscripción tardía aprobada'
+    }
+    mockReport(report)
+    await renderReport()
+
+    const row = screen.getByText('Pedro Zeballos Mamani').closest('tr') as HTMLElement
+
+    expect(within(row).getByText('Excepcional')).toBeInTheDocument()
+    expect(within(row).getByText('Motivo: Inscripción tardía aprobada')).toBeInTheDocument()
+    expect(screen.getAllByText('Excepcional')).toHaveLength(1)
   })
 
   it('muestra la cabecera, la asistencia por grupo y los estudiantes', async () => {
@@ -172,6 +190,29 @@ describe('FinalReportPage (HU-051)', () => {
     await renderReport()
 
     expect(screen.getByRole('columnheader', { name: /sin clasificar/i })).toBeInTheDocument()
+  })
+
+  it('la columna No habilitados solo aparece cuando hay casos', async () => {
+    mockReport()
+    await renderReport()
+
+    expect(screen.queryByRole('columnheader', { name: /no habilitados/i })).not.toBeInTheDocument()
+  })
+
+  it('muestra la columna No habilitados y las sumas cuadran con los inscritos', async () => {
+    const report = makeReport()
+    report.asistencia.grupos[0].ausentes = 0
+    report.asistencia.grupos[0].no_habilitados = 1
+    report.asistencia.totales.ausentes = 0
+    report.asistencia.totales.no_habilitados = 1
+    mockReport(report)
+    await renderReport()
+
+    expect(screen.getByRole('columnheader', { name: /no habilitados/i })).toBeInTheDocument()
+    const { totales } = report.asistencia
+    expect(totales.a_tiempo + totales.con_retraso + totales.ausentes + totales.no_habilitados).toBe(
+      totales.inscritos
+    )
   })
 
   it('un examen ajeno o no finalizado muestra el mensaje del servidor', async () => {

@@ -15,18 +15,27 @@ import { openAllSections } from '@/test/sidebar'
 /**
  * Las áreas salen del rol de la sesión. Sin sesión, toda ruta protegida redirige al login.
  */
-function stubBackend(session: AccountKey | null) {
+function stubBackend(session: AccountKey | 'invitado' | null, exams: unknown[] = []) {
   if (session) {
     window.localStorage.setItem(TOKEN_STORAGE_KEY, 'tok')
   }
 
   return mockApiWith(({ url }) => {
     if (url.endsWith('/auth/yo')) {
+      if (session === 'invitado') {
+        const body = meBody('docente')
+        body.data.rol = { id_rol: 4, nombre_rol: 'Invitado' }
+        return { body }
+      }
       return session ? { body: meBody(session) } : { status: 401, body: { message: 'Unauthenticated.' } }
     }
 
     if (url.endsWith('/materias')) {
       return { body: { data: [], meta: { total: 0, total_mias: 0, id_periodo_activo: 1 } } }
+    }
+
+    if (url.endsWith('/examenes/cronometros')) {
+      return { body: { data: { examenes: exams, hora_servidor_en: '2026-11-17T18:22:00Z' } } }
     }
 
     return { body: { data: [] } }
@@ -199,6 +208,70 @@ describe('AppRouter — control de ingreso por área', () => {
     expect(
       screen.queryByRole('heading', { name: 'Control de ingreso' })
     ).not.toBeInTheDocument()
+  })
+})
+
+describe('AppRouter — Controlar tiempo del examen (HU-038)', () => {
+  const route = '/examenes/controlar-tiempo'
+  const title = 'Controlar tiempo del examen'
+
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  it.each(['docente', 'invitado'] as const)('permite abrir la ruta a %s', async (account) => {
+    stubBackend(account)
+
+    const app = renderApp(route)
+
+    expect(await screen.findByRole('heading', { name: title })).toBeInTheDocument()
+    expect(app.pathname).toBe(route)
+  })
+
+  it.each([
+    ['auxiliar', '/mis-examenes'],
+    ['administrador', '/cuentas/nueva'],
+    [null, '/login'],
+  ] as const)('redirige la sesión %s fuera de la ruta', async (account, destination) => {
+    const backend = stubBackend(account)
+
+    const app = renderApp(route)
+
+    await waitFor(() => expect(app.pathname).toBe(destination))
+    expect(screen.queryByRole('heading', { name: title })).not.toBeInTheDocument()
+    expect(backend.calls.some(({ url }) => url.endsWith('/examenes') && !url.endsWith('/auxiliar/examenes'))).toBe(false)
+    expect(backend.calls.some(({ url }) => url.endsWith('/examenes/cronometros'))).toBe(false)
+  })
+
+  it('mantiene una tarjeta fuera del contenido al navegar, permite elegir examen y la limpia al salir', async () => {
+    const first = {
+      id_examen: 7, nombre_examen: 'Álgebra', estado: 'EN_CURSO', fecha: '2026-11-17', hora_inicio: '14:00',
+      hora_fin: '16:00', duracion: 120, fin_permitido_en: '2026-11-17T20:00:00Z',
+      cronometro_iniciado_en: '2026-11-17T18:20:00Z', cronometro_vence_en: '2026-11-17T18:45:00Z',
+    }
+    const second = { ...first, id_examen: 9, nombre_examen: 'Física', cronometro_vence_en: '2026-11-17T18:30:00Z' }
+    const backend = stubBackend('docente', [first, second])
+    const app = renderApp('/materias')
+    const user = userEvent.setup()
+    const card = await screen.findByRole('complementary', { name: 'Cronómetro del examen' })
+    expect(screen.getByRole('main')).not.toContainElement(card)
+    expect(within(card).getByRole('timer', { name: 'Tiempo restante de Álgebra' })).toHaveTextContent('00:23:00')
+
+    await user.click(within(card).getByRole('combobox', { name: 'Cronómetro a mostrar' }))
+    await user.click(screen.getByRole('option', { name: /Física/ }))
+    expect(within(card).getByRole('timer', { name: 'Tiempo restante de Física' })).toHaveTextContent('00:08:00')
+
+    const menu = screen.getByRole('navigation', { name: 'Navegación principal' })
+    await openAllSections(user, menu)
+    await user.click(within(menu).getByRole('link', { name: 'Programados' }))
+    await waitFor(() => expect(app.pathname).toBe('/examenes/programados'))
+    expect(screen.getByRole('complementary', { name: 'Cronómetro del examen' })).toBe(card)
+    expect(within(card).getByRole('timer', { name: 'Tiempo restante de Física' })).toBeInTheDocument()
+    await waitFor(() => expect(backend.calls.filter(({ url }) => url.endsWith('/examenes/cronometros'))).toHaveLength(2))
+
+    await user.click(screen.getAllByRole('button', { name: 'Cerrar sesión' })[0])
+    await waitFor(() => expect(app.pathname).toBe('/login'))
+    expect(screen.queryByRole('complementary', { name: 'Cronómetro del examen' })).not.toBeInTheDocument()
   })
 })
 
