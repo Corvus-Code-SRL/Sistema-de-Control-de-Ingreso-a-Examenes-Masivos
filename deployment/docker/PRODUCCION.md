@@ -58,6 +58,38 @@ curl -I http://localhost:18080/
 
 **Después del primer inicio de sesión:** retirar `BOOTSTRAP_ADMIN_PASSWORD` del `.env` privado. El bootstrap detecta que ya existe un administrador humano y no exige esa variable en arranques posteriores. Recrear `app-init` si cambia el `.env`; no usar solo `restart`. El contenedor temporal terminado conserva su antiguo entorno hasta que se elimine o recree, por lo que debe retirarse después de la rotación. No se imprime la contraseña en logs.
 
+## Periodo académico vigente (obligatorio tras la primera instalación)
+
+Una base nueva no tiene ninguna gestión ni periodo. Sin un periodo **vigente**, el catálogo académico, los grupos y los exámenes responden HTTP 500 con «No hay un período académico vigente…». `app-init` lo avisa en su log (`SCIEM_PERIODO_ACTIVO_ID no está definida`). Todavía no hay pantalla para registrarlo.
+
+Después de que `app-init` y `db-finalize` terminen en `Exited (0)`, crear el periodo vigente. El ejemplo crea la gestión 2026, el periodo 2 y lo marca como vigente; se puede repetir sin duplicar datos:
+
+```bash
+docker compose --env-file deployment/docker/.env \
+  -f deployment/docker/docker-compose.yml -p sciem-prod \
+  exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' <<'SQL'
+BEGIN;
+INSERT INTO gestion (anio) VALUES (2026) ON CONFLICT (anio) DO NOTHING;
+INSERT INTO gestion_periodo (id_gestion, id_periodo, vigente, estado)
+SELECT g.id_gestion, p.id_periodo, false, 'ACTIVO'
+  FROM gestion g JOIN periodo p ON p.codigo = 2
+ WHERE g.anio = 2026
+   AND NOT EXISTS (SELECT 1 FROM gestion_periodo gp
+                    WHERE gp.id_gestion = g.id_gestion AND gp.id_periodo = p.id_periodo);
+UPDATE gestion_periodo SET vigente = false WHERE vigente;
+UPDATE gestion_periodo gp SET vigente = true
+  FROM gestion g, periodo p
+ WHERE gp.id_gestion = g.id_gestion AND gp.id_periodo = p.id_periodo
+   AND g.anio = 2026 AND p.codigo = 2;
+COMMIT;
+SELECT p.codigo || '/' || g.anio AS periodo_vigente
+  FROM gestion_periodo gp JOIN gestion g USING (id_gestion) JOIN periodo p USING (id_periodo)
+ WHERE gp.vigente;
+SQL
+```
+
+Debe mostrar `periodo_vigente = 2/2026`. Para otro periodo, cambiar `2026` y `codigo = 2` (por ejemplo `2027` y `codigo = 1` para el 1/2027). Al cambiar de periodo se ejecuta lo mismo con los valores nuevos: queda vigente solo el último.
+
 ## Actualizaciones y datos existentes
 
 `up --build -d` puede repetirse: `migrate` aplica solo migraciones pendientes, los seeders normales son reutilizables, el bootstrap no duplica administradores y `REVOKE` admite repetición. En una actualización real, respaldar primero la base y las evidencias, revisar las nuevas migraciones y cerrar o poner en mantenimiento el tráfico antes de aplicar cambios de esquema. Una migración futura que cree esquemas o extensiones puede requerir permisos adicionales; comprobarlo antes de actualizar.
