@@ -2001,3 +2001,33 @@ BEGIN
             );
     END IF;
 END $$;
+
+-- Versión 20: distribución planificada de habilitados por ambiente (HU-031)
+--             (2026_11_18_000000_create_distribucion_ambiente_table)
+--   * Es independiente del ambiente real registrado en examen_estudiante durante el ingreso.
+--   * No referencia examen_ambiente: quitar un ambiente del examen sigue permitido; la lectura
+--     concilia la planificación con los ambientes y habilitados actuales.
+--   * GUARDAR_DISTRIBUCION se agrega al final de ActionSeeder, después de migrar.
+--   * asignado_en conserva microsegundos para versionar guardados dentro del mismo segundo.
+
+CREATE TABLE public.distribucion_ambiente (
+    id_examen             integer NOT NULL,
+    id_estudiante         integer NOT NULL,
+    id_ambiente           integer NOT NULL,
+    id_usuario_asignador  uuid NOT NULL,
+    asignado_en           timestamp(6) with time zone NOT NULL,
+
+    CONSTRAINT pk_distribucion_ambiente
+        PRIMARY KEY (id_examen, id_estudiante),
+    CONSTRAINT fk_distribucion_ambiente_examen
+        FOREIGN KEY (id_examen) REFERENCES public.examen(id_examen),
+    CONSTRAINT fk_distribucion_ambiente_estudiante
+        FOREIGN KEY (id_estudiante) REFERENCES public.estudiante(id_estudiante),
+    CONSTRAINT fk_distribucion_ambiente_ambiente
+        FOREIGN KEY (id_ambiente) REFERENCES public.ambiente(id_ambiente),
+    CONSTRAINT fk_distribucion_ambiente_usuario
+        FOREIGN KEY (id_usuario_asignador) REFERENCES public.usuario(id_usuario)
+);
+
+CREATE INDEX idx_distribucion_ambiente_examen_ambiente
+    ON public.distribucion_ambiente(id_examen, id_ambiente);

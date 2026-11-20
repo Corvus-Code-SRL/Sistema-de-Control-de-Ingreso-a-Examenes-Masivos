@@ -30,9 +30,16 @@ class ExamEligibleListAccess
     public const WINDOW_CLOSED_MESSAGE =
         'La lista de habilitados ya no se puede modificar: el control de ingreso del examen ya se abrió.';
 
+    private ExamPreparationWindow $window;
+
+    public function __construct(ExamPreparationWindow $window)
+    {
+        $this->window = $window;
+    }
+
     public function isWritable(Exam $exam): bool
     {
-        return $exam->estado === Exam::PROGRAMADO && $exam->ingreso_abierto_en === null;
+        return $this->window->isOpen($exam);
     }
 
     /**
@@ -43,9 +50,7 @@ class ExamEligibleListAccess
      */
     public function applyWritableWindow(Builder $query): Builder
     {
-        return $query
-            ->where('estado', Exam::PROGRAMADO)
-            ->whereNull('ingreso_abierto_en');
+        return $this->window->applyOpen($query);
     }
 
     /** @throws ExamStateException */

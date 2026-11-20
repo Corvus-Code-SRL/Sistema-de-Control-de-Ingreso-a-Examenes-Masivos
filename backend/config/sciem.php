@@ -286,6 +286,7 @@ return [
             'RECHAZAR_INVITACION' => 'Rechazar invitación',
             'INICIAR_CRONOMETRO' => 'Iniciar cronómetro',
             'AJUSTAR_CRONOMETRO' => 'Ajustar cronómetro',
+            'GUARDAR_DISTRIBUCION' => 'Guardar distribución',
         ],
 
         'etiquetas_campo' => [

@@ -4,6 +4,7 @@ namespace App\Services\EntryControl;
 
 use App\Models\Exam;
 use App\Models\User;
+use App\Services\Exams\Distribution\RoomDistributionReader;
 use App\Services\Exams\ExamCollaboratorService;
 use App\Services\Exams\ExamTimingService;
 use App\Services\RiskCenter\Academic\RiskCenterQueryService;
@@ -29,15 +30,18 @@ class EntryControlSnapshotService
     private ExamTimingService $timing;
     private RiskCenterQueryService $riskCenter;
     private ExamCollaboratorService $collaborators;
+    private RoomDistributionReader $distribution;
 
     public function __construct(
         ExamTimingService $timing,
         RiskCenterQueryService $riskCenter,
-        ExamCollaboratorService $collaborators
+        ExamCollaboratorService $collaborators,
+        RoomDistributionReader $distribution
     ) {
         $this->timing = $timing;
         $this->riskCenter = $riskCenter;
         $this->collaborators = $collaborators;
+        $this->distribution = $distribution;
     }
 
     public function stage(Exam $exam): string
@@ -60,7 +64,8 @@ class EntryControlSnapshotService
             }
             unset($membership);
         }
-        $assignedRooms = self::assignRooms($this->rosterStudentIds($membersByStudent), $rooms);
+        $assignedRooms = $this->distribution->assignedRooms($examId)
+            ?? self::assignRooms($this->rosterStudentIds($membersByStudent), $rooms);
         $entries = $this->entries($examId);
         $pendingReports = DB::table('reporte_estudiante')
             ->where('id_examen', $examId)
@@ -707,7 +712,8 @@ class EntryControlSnapshotService
         }
 
         $rooms = $this->rooms($examId);
-        $assignedRooms = self::assignRooms($this->rosterStudentIds($membersByStudent), $rooms);
+        $assignedRooms = $this->distribution->assignedRooms($examId)
+            ?? self::assignRooms($this->rosterStudentIds($membersByStudent), $rooms);
         $entry = $this->entries($examId, $studentId)[$studentId] ?? null;
 
         return $this->studentRecord(

@@ -6,9 +6,11 @@ interface ChangesBannerProps {
   isSaving: boolean
   onSave: () => void
   onDiscard: () => void
+  message?: string
+  showActions?: boolean
 }
 
-export function ChangesBanner({ count, isSaving, onSave, onDiscard }: ChangesBannerProps) {
+export function ChangesBanner({ count, isSaving, onSave, onDiscard, message, showActions = true }: ChangesBannerProps) {
   if (count === 0) return null
 
   return (
@@ -18,16 +20,21 @@ export function ChangesBanner({ count, isSaving, onSave, onDiscard }: ChangesBan
     >
       <AlertTriangle className="size-5 text-warn-fg" aria-hidden="true" />
       <span className="flex-1 text-sm font-medium text-warn-fg">
-        {count} {count === 1 ? 'cambio sin guardar' : 'cambios sin guardar'}. La puerta sigue usando la lista anterior hasta que guarde.
+        {count} {count === 1 ? 'cambio sin guardar' : 'cambios sin guardar'}.{' '}
+        {message ?? 'La puerta sigue usando la lista anterior hasta que guarde.'}
       </span>
-      <Button variant="ghost" size="sm" onClick={onDiscard} disabled={isSaving}>
-        <Undo2 aria-hidden="true" className="size-4" />
-        Descartar
-      </Button>
-      <Button size="sm" onClick={onSave} disabled={isSaving}>
-        <Check aria-hidden="true" className="size-4" />
-        {isSaving ? 'Guardando…' : 'Guardar cambios'}
-      </Button>
+      {showActions && (
+        <>
+          <Button variant="ghost" size="sm" onClick={onDiscard} disabled={isSaving}>
+            <Undo2 aria-hidden="true" className="size-4" />
+            Descartar
+          </Button>
+          <Button size="sm" onClick={onSave} disabled={isSaving}>
+            <Check aria-hidden="true" className="size-4" />
+            {isSaving ? 'Guardando…' : 'Guardar cambios'}
+          </Button>
+        </>
+      )}
     </div>
   )
 }

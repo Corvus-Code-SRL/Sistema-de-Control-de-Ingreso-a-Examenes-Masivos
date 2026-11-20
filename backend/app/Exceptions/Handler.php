@@ -16,6 +16,7 @@ use App\Exceptions\Exams\ExamStateException;
 use App\Exceptions\Exams\ExamTimerLimitException;
 use App\Exceptions\Exams\ExamWarningsException;
 use App\Exceptions\Exams\FinalReportUnavailableException;
+use App\Exceptions\Exams\StaleDistributionException;
 use App\Exceptions\Security\DuplicateAccountException;
 use App\Exceptions\Security\InactiveAccountException;
 use App\Exceptions\Security\InvalidCredentialsException;
@@ -64,6 +65,7 @@ class Handler extends ExceptionHandler
         ExamTimerLimitException::class,
         ExamWarningsException::class,
         FinalReportUnavailableException::class,
+        StaleDistributionException::class,
         DuplicateAccountException::class,
         InactiveAccountException::class,
         InvalidCredentialsException::class,

@@ -500,6 +500,7 @@ describe('AppSidebar — entradas y estado activo', () => {
       ['Invitar docentes colaboradores', '/colaboradores/invitar'],
       ['Invitaciones recibidas', '/invitaciones'],
       ['Cargar lista de habilitados', '/examenes/habilitados'],
+      ['Distribuir habilitados', '/examenes/distribucion'],
       ['Control de ingreso', '/control-ingreso'],
       ['Controlar tiempo del examen', '/examenes/controlar-tiempo'],
       ['En curso', '/examenes/en-curso'],

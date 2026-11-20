@@ -117,5 +117,14 @@ class ActionSeeder extends Seeder
         foreach ($timer as $action) {
             DB::table('accion')->updateOrInsert(['operacion' => $action['operacion']], $action);
         }
+
+        DB::table('accion')->updateOrInsert(
+            ['operacion' => 'GUARDAR_DISTRIBUCION'],
+            [
+                'operacion' => 'GUARDAR_DISTRIBUCION',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Guardado de la distribución de habilitados por ambiente',
+            ]
+        );
     }
 }

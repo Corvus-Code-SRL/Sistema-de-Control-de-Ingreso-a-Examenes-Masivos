@@ -273,7 +273,17 @@ class ExamenEstudianteExcepcionalMigrationTest extends TestCase
         $script = str_replace("\r\n", "\n", file_get_contents(base_path('../docs/database/creation-script.sql')));
         $start = strpos($script, '-- Versión 18:');
         $this->assertNotFalse($start, 'El script no tiene el bloque de la Versión 18.');
-        $block = substr($script, $start);
+        $hasNextVersion = preg_match(
+            '/^-- Versión \d+:/m',
+            $script,
+            $nextVersion,
+            PREG_OFFSET_CAPTURE,
+            $start + 1
+        );
+
+        $block = $hasNextVersion
+            ? substr($script, $start, $nextVersion[0][1] - $start)
+            : substr($script, $start);
 
         $fromMigration = $this->signature();
 

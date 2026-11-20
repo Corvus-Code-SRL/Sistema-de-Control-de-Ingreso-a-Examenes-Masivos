@@ -23,6 +23,7 @@ import {
   ScanSearch,
   ScrollText,
   ShieldAlert,
+  Shuffle,
   SquarePen,
   Unlink,
   UserCheck,
@@ -301,6 +302,13 @@ export const NAVIGATION: readonly NavSection[] = [
         icon: UserCheck,
         capability: 'examenes.gestionar',
         to: '/examenes/habilitados'
+      },
+      {
+        id: 'teacher-distribute-eligible',
+        label: 'Distribuir habilitados',
+        icon: Shuffle,
+        capability: 'examenes.gestionar',
+        to: '/examenes/distribucion'
       }
     ]
   },
