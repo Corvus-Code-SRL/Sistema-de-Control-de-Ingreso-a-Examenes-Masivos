@@ -70,6 +70,8 @@ RUN mkdir -p storage/app/evidencias/reportes storage/app/public \
 COPY --from=frontend_build /build/frontend/dist/ ./public/
 COPY deployment/docker/apache/sciem.conf \
      /etc/apache2/sites-available/000-default.conf
+COPY deployment/docker/apache/mpm-prefork.conf \
+     /etc/apache2/mods-available/mpm_prefork.conf
 COPY deployment/docker/apache/php-production.ini \
      /usr/local/etc/php/conf.d/sciem-production.ini
 RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
