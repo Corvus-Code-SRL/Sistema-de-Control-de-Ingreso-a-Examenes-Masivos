@@ -10,6 +10,7 @@ Esta configuración produce una imagen con React compilado, Laravel/PHP 8.0.30 y
 | `deployment/docker/apache/Dockerfile` | Compila frontend con Node 22.23.2/npm 10.9.8; instala backend con Composer 2.9.6 y PHP 8.0.30; incorpora Apache 2.4.62, phpredis 6.0.2 y cliente PostgreSQL 15.0. |
 | `deployment/docker/apache/sciem.conf` | Sirve React en `/` y Laravel en `/api`, conservando `Authorization`. |
 | `deployment/docker/apache/php-production.ini` | Configura errores, subida de archivos y OPcache. |
+| `deployment/docker/apache/mpm-prefork.conf` | Limita Apache a 30 procesos en paralelo, por debajo de `max_connections` (100) de PostgreSQL. |
 | `deployment/docker/postgres/init/01-sciem.sh` | Al crear un volumen PostgreSQL vacío, crea `pgcrypto`, el rol `sciem_app` y sus permisos iniciales. |
 | `deployment/docker/scripts/entrypoint.sh` | Prepara directorios y `config:cache` en cada contenedor Laravel. |
 | `deployment/docker/scripts/init-app.sh` | Aplica migraciones, ejecuta seeders normales y crea el primer administrador humano. |
@@ -17,12 +18,14 @@ Esta configuración produce una imagen con React compilado, Laravel/PHP 8.0.30 y
 | `deployment/docker/scripts/finalize-db.sh` | Revoca `CREATE` sobre la base después de las migraciones. |
 | `deployment/docker/docker-compose.yml` | Ordena infraestructura, inicialización y servicios permanentes. |
 | `deployment/docker/.env.example` | Plantilla pública del **único** `.env` privado de despliegue. |
+| `.gitattributes` en la raíz del repositorio | Fuerza fin de línea LF en los scripts, el Dockerfile y la configuración, aunque el repositorio se clone en Windows. |
 
 La configuración de desarrollo `docker-compose.dev.yml` no cambia. El build de producción usa el `.dockerignore` de la **raíz**, porque su contexto es la raíz del repositorio. `backend/.env` queda para desarrollo y no se copia en la imagen.
 
 ## Primera instalación, en una base vacía
 
-1. Instalar Docker Engine y Docker Compose. Preparar dominio, TLS y proxy inverso con infraestructura. El ejemplo publica Apache solo en `127.0.0.1:18080`, por lo que supone un proxy en el mismo host.
+1. Instalar Docker Engine y Docker Compose con soporte de **contenedores Linux**: todas las imágenes (PHP, PostgreSQL, Redis) son Linux. En Linux funciona directo; en Windows Server hace falta WSL 2 o una máquina virtual Linux (Docker Desktop no está pensado para Windows Server). Confirmarlo con infraestructura antes del deploy. Preparar dominio, TLS y proxy inverso. El ejemplo publica Apache solo en `127.0.0.1:18080`, por lo que supone un proxy en el mismo host; sin proxy, ver «Red, proxy y límites».
+   Si el repositorio se clonó en Windows, comprobar que los scripts tienen fin de línea LF: `git ls-files --eol deployment/docker/scripts deployment/docker/postgres/init` debe mostrar `w/lf` en todos. Con `w/crlf`, los scripts no arrancan dentro del contenedor; volver a clonar el repositorio después de integrar `.gitattributes`.
 2. Desde la raíz del repositorio, crear `deployment/docker/.env` copiando `.env.example`, completar todas las variables y protegerlo con `chmod 600 deployment/docker/.env`. **No subir `.env` a Git.**
 3. Usar contraseñas diferentes para `POSTGRES_PASSWORD`, `DB_PASSWORD` y `BOOTSTRAP_ADMIN_PASSWORD`. Reemplazar todos los marcadores de ejemplo. `BOOTSTRAP_ADMIN_CODE` debe ser el código real de la persona autorizada, no una cuenta de prueba.
 4. Generar `APP_KEY` una sola vez y guardarla fuera del servidor junto con los respaldos. Si hay PHP local: `php -r 'echo "base64:".base64_encode(random_bytes(32)).PHP_EOL;'`.
@@ -67,6 +70,20 @@ Los respaldos dentro del volumen `backups` no protegen contra la pérdida del se
 
 Compose crea una red interna: `DB_HOST=postgres` y `REDIS_HOST=redis`. Redis no publica puertos. PostgreSQL publica `5433` solo en `127.0.0.1` para administración local o mediante túnel SSH; no queda accesible directamente desde otras PC. Apache expone `127.0.0.1:18080`; el proxy institucional debe ofrecer HTTPS, conservar `Host` y `Authorization`, reenviar `X-Forwarded-Proto`, `X-Forwarded-For` y `X-Forwarded-Port`, y aceptar cargas de al menos 16 MB. Si el proxy está en otro servidor o contenedor, adaptar red y firewall antes de desplegar.
 
-El backend actual no configura proxies confiables mediante variables. Antes de publicar, verificar desde clientes distintos la IP que Laravel registra, límites por IP y generación de URL HTTPS. Si no se comporta correctamente, hay que coordinar un ajuste concreto de proxy o de aplicación. Este punto depende de la infraestructura real.
+Detrás del proxy, Laravel tiene que saber que puede confiar en él para tomar la IP real del cliente (límites por IP del RNF-03, bitácora) y el esquema HTTPS. Se declara con `SCIEM_PROXIES_CONFIABLES` en el `.env`:
+
+| Situación | `WEB_BIND_IP` / `WEB_PORT` | `SCIEM_PROXIES_CONFIABLES` |
+| --- | --- | --- |
+| Proxy en el mismo servidor (ejemplo por defecto) | `127.0.0.1` / `18080` | `*` (nadie más llega a Apache) |
+| Proxy en otro servidor | IP de la interfaz que ve el proxy / `18080` | IP del proxy, p. ej. `10.0.0.5` (varias separadas por coma) |
+| Sin proxy, acceso directo por HTTP | `0.0.0.0` / `80` | vacío |
+
+Nunca usar `*` si Apache es accesible directamente desde la red: un cliente podría falsificar su IP con `X-Forwarded-For`. Antes de publicar, verificar desde clientes distintos la IP que registra la bitácora y que los límites por IP funcionen.
+
+## Rendimiento
+
+- Apache atiende hasta 30 peticiones en paralelo (`apache/mpm-prefork.conf`). Un ingreso masivo de ~1.500 postulantes son unas 10 peticiones por segundo de pocos milisegundos. Subirlo solo si se ven peticiones en espera, siempre por debajo de `max_connections` (100).
+- PostgreSQL anota toda consulta de más de 500 ms y toda espera larga de lock (`command` del servicio `postgres`): revisar con `logs postgres` después de un examen. Es evidencia del RNF de rendimiento.
+- `web` tiene healthcheck: Apache sirve la SPA y Laravel responde en `/api`. `ps` lo muestra como `healthy`.
 
 Mantener las versiones fijadas en el Dockerfile y los lockfiles; no ejecutar `composer update` ni `npm update` durante el despliegue. `apt-get` se ejecuta **dentro** de la imagen PHP Debian Bullseye, no en el sistema operativo del servidor.
