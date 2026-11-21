@@ -33,6 +33,10 @@ use Illuminate\Http\Request;
 use App\Exceptions\Incidents\IncidentAlreadyReviewedException;
 use App\Exceptions\Incidents\IncidentOwnershipException;
 use App\Exceptions\Incidents\IncidentReportNotFoundException;
+use App\Exceptions\RiskCenter\ApprovingTeacherStateException;
+use App\Exceptions\RiskCenter\RectificationRequestClosedException;
+use App\Exceptions\RiskCenter\RectificationRequestOwnershipException;
+use App\Exceptions\RiskCenter\RectificationRequestPendingException;
 use App\Exceptions\RiskCenter\RiskRecordAlreadyRectifiedException;
 use Throwable;
 
@@ -77,6 +81,10 @@ class Handler extends ExceptionHandler
         IncidentOwnershipException::class,
         IncidentReportNotFoundException::class,
         RiskRecordAlreadyRectifiedException::class,
+        ApprovingTeacherStateException::class,
+        RectificationRequestClosedException::class,
+        RectificationRequestOwnershipException::class,
+        RectificationRequestPendingException::class,
     ];
 
     /**

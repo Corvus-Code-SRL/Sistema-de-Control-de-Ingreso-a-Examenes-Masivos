@@ -15,7 +15,8 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
  * activos, sus registros ya rectificados (aparte) y la ficha completa de un registro activo.
  *
  * Solo lectura. Es independiente de RiskCenterQueryService (HU-046), que nunca devuelve rectificados. Aquí los
- * rectificados se piden a propósito con RiskCenter::withVoided().
+ * rectificados se piden a propósito con RiskCenter::withVoided(). Cada registro activo trae además el resumen de
+ * sus solicitudes de rectificación (atributo `resumen_rectificacion`).
  */
 class RiskCenterRectificationQueryService
 {
@@ -26,6 +27,13 @@ class RiskCenterRectificationQueryService
     private const MAX_TERMS = 5;
 
     private const FULL_NAME = "CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno)";
+
+    private RectificationRequestQueryService $requests;
+
+    public function __construct(RectificationRequestQueryService $requests)
+    {
+        $this->requests = $requests;
+    }
 
     /**
      * Estudiantes que coinciden con el dato: el código SIS o el carnet exactos o, si no hay ninguno,
@@ -88,6 +96,8 @@ class RiskCenterRectificationQueryService
             ->orderByDesc('id_cr_estudiante')
             ->get();
 
+        $this->requests->attachSummaries($active);
+
         $voided = RiskCenter::withVoided()
             ->where('id_estudiante', $studentId)
             ->whereNotNull('rectificado_en')
@@ -122,6 +132,8 @@ class RiskCenterRectificationQueryService
         if ($record === null) {
             throw new ModelNotFoundException('No existe el registro de la Central de Riesgo indicado.');
         }
+
+        $this->requests->attachSummaries(new Collection([$record]));
 
         return $record;
     }
