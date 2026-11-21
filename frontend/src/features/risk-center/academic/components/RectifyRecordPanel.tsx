@@ -6,9 +6,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useRectifiableRecord } from '../hooks/useRectifiableRecord'
-import { useRectifyRecord } from '../hooks/useRectifyRecord'
-import type { RectifiableRecordDetail } from '../types/riskRectification.types'
-import { RectifyConfirmDialog } from './RectifyConfirmDialog'
+import { useRectifyWithoutConfirmation, useRequestRectification } from '../hooks/useRectifyRecord'
+import type { RectifiableRecordDetail, SentRectificationRequest } from '../types/riskRectification.types'
+import { rectifyModeOf } from '../utils/rectificationMode'
+import { RectificationStatusPanel } from './RectificationStatusPanel'
+import { RectifyConfirmDialog, type ConfirmMode } from './RectifyConfirmDialog'
 import { RectifyReasonForm } from './RectifyReasonForm'
 import { RectifyRecordCard } from './RectifyRecordCard'
 
@@ -16,32 +18,53 @@ interface RectifyRecordPanelProps {
   recordId: number
   /** Vuelve a la lista de registros del estudiante sin cambiar nada. */
   onBack: () => void
-  /** El registro ya quedó rectificado: la página vuelve a la lista y avisa. */
+  /** El registro ya quedó anulado (sin confirmación del docente): la página vuelve a la lista y avisa. */
   onRectified: (record: RectifiableRecordDetail) => void
+  /** La solicitud ya se envió al docente: la página vuelve a la lista y avisa. */
+  onRequested: (record: RectifiableRecordDetail, request: SentRectificationRequest) => void
 }
 
 /**
- * Un registro abierto para rectificar: arriba toda su información de solo lectura y debajo el motivo.
+ * Un registro abierto para rectificar: arriba toda su información de solo lectura, el estado de sus solicitudes
+ * y, debajo, el motivo.
  *
- * Son dos pasos: el motivo válido abre la confirmación, y solo «Sí, rectificar» envía. Cancelar en cualquiera
- * de los dos no guarda nada. No hay forma de editar ni borrar el registro desde aquí.
+ * Rectificar es pedirle al docente que aprobó el reporte que lo confirme: el registro sigue activo hasta que
+ * lo acepte. Solo si ese docente ya no es docente activo y pasó el plazo configurado se anula directamente.
+ * Son dos pasos: el motivo válido abre la confirmación y solo el botón del diálogo envía.
  */
-export function RectifyRecordPanel({ recordId, onBack, onRectified }: RectifyRecordPanelProps) {
+export function RectifyRecordPanel({ recordId, onBack, onRectified, onRequested }: RectifyRecordPanelProps) {
   const { record, status, error, reload } = useRectifiableRecord(recordId)
-  const rectification = useRectifyRecord()
+  const request = useRequestRectification()
+  const direct = useRectifyWithoutConfirmation()
   const [pendingReason, setPendingReason] = useState<string | null>(null)
 
-  async function handleConfirm() {
-    if (record === null || pendingReason === null) return
+  const mode = record === null ? null : rectifyModeOf(record.rectificacion)
+  const confirmMode: ConfirmMode | null = mode === 'request' || mode === 'direct' || mode === 'detect' ? mode : null
+  const active = confirmMode === 'request' ? request : direct
+  const failedAction = request.error !== null ? 'request' : 'direct'
+  const submitError = request.error ?? direct.error
 
-    const rectified = await rectification.submit(record.id_cr_estudiante, { motivo: pendingReason })
+  async function handleConfirm() {
+    if (record === null || pendingReason === null || confirmMode === null) return
+
+    const input = { motivo: pendingReason }
+
+    if (confirmMode === 'request') {
+      const sent = await request.submit(record.id_cr_estudiante, input)
+
+      setPendingReason(null)
+      if (sent !== null) onRequested(record, sent)
+      else reload()
+
+      return
+    }
+
+    const voided = await direct.submit(record.id_cr_estudiante, input)
 
     setPendingReason(null)
-
-    if (rectified !== null) onRectified(record)
+    if (voided !== null) onRectified(record)
+    else reload()
   }
-
-  const submitError = rectification.error
 
   return (
     <div className="space-y-4">
@@ -62,28 +85,32 @@ export function RectifyRecordPanel({ recordId, onBack, onRectified }: RectifyRec
         </Card>
       )}
 
-      {record !== null && (
-        <>
-          {submitError !== null && (
-            <Alert variant="destructive" role="alert">
-              <AlertTitle>No se pudo rectificar el registro</AlertTitle>
-              <AlertDescription>
-                <p>{submitError.message}</p>
-                {submitError.status === 409 && (
-                  <Button type="button" variant="outline" size="sm" className="mt-2" onClick={onBack}>
-                    Volver a los registros
-                  </Button>
-                )}
-              </AlertDescription>
-            </Alert>
-          )}
+      {record !== null && submitError !== null && (
+        <Alert variant="destructive" role="alert">
+          <AlertTitle>{failedAction === 'request' ? 'No se pudo enviar la solicitud' : 'No se pudo anular el registro'}</AlertTitle>
+          <AlertDescription>
+            <p>{submitError.message}</p>
+            {submitError.status === 409 && (
+              <Button type="button" variant="outline" size="sm" className="mt-2" onClick={onBack}>
+                Volver a los registros
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
+      {record !== null && confirmMode !== null && (
+        <>
           <RectifyRecordCard record={record} />
+          <RectificationStatusPanel summary={record.rectificacion} />
 
           <RectifyReasonForm
-            disabled={rectification.isSubmitting}
+            submitLabel={confirmMode === 'request' ? 'Enviar solicitud al docente' : 'Anular registro'}
+            variant={confirmMode === 'request' ? 'default' : 'danger'}
+            disabled={active.isSubmitting}
             onReview={(reason) => {
-              rectification.clearError()
+              request.clearError()
+              direct.clearError()
               setPendingReason(reason)
             }}
             onCancel={onBack}
@@ -91,11 +118,19 @@ export function RectifyRecordPanel({ recordId, onBack, onRectified }: RectifyRec
 
           <RectifyConfirmDialog
             record={record}
+            mode={confirmMode}
             reason={pendingReason}
-            isSubmitting={rectification.isSubmitting}
+            isSubmitting={active.isSubmitting}
             onConfirm={handleConfirm}
             onCancel={() => setPendingReason(null)}
           />
+        </>
+      )}
+
+      {record !== null && confirmMode === null && (
+        <>
+          <RectifyRecordCard record={record} />
+          <RectificationStatusPanel summary={record.rectificacion} />
         </>
       )}
     </div>

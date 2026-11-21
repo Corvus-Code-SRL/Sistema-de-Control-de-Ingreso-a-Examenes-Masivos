@@ -12,7 +12,7 @@ import { RectifyStudentMatches } from '../components/RectifyStudentMatches'
 import { RectifyStudentRecords } from '../components/RectifyStudentRecords'
 import { RectifyStudentSearch } from '../components/RectifyStudentSearch'
 import { useRectifiableStudentSearch } from '../hooks/useRectifiableStudentSearch'
-import type { RectifiableRecordDetail } from '../types/riskRectification.types'
+import type { RectifiableRecordDetail, SentRectificationRequest } from '../types/riskRectification.types'
 
 const BASE_PATH = '/rectificar-registro'
 
@@ -26,11 +26,13 @@ function idFrom(param: string | null | undefined): number | null {
 /**
  * Rectificar un registro de la Central de Riesgo (HU-062), solo para quien tiene `riesgo.rectificar`.
  *
- * Rectificar es retirar de la Central un registro aprobado por error; no se edita nada del registro. Tres
+ * Rectificar es pedir que se retire de la Central un registro aprobado por error: el Administrador envía una
+ * solicitud al docente que lo aprobó y el registro sigue activo hasta que este la acepte (si ese docente ya no
+ * es docente activo y pasó el plazo, se anula directamente). No se edita nada del registro. Tres
  * pasos que viven en la URL: buscar al estudiante (`/rectificar-registro`), ver sus registros activos
  * (`/rectificar-registro/:id`) y abrir uno para rectificar (`?registro=`). Si la búsqueda da un solo
- * estudiante se abre directo; si da varios, se elige. Al rectificar se vuelve a la lista con un aviso y el
- * registro pasa a «Registros rectificados».
+ * estudiante se abre directo; si da varios, se elige. Al enviar la solicitud se vuelve a la lista con un aviso y
+ * el registro queda esperando al docente; al anular sin confirmación pasa a «Registros rectificados».
  */
 export function RectifyRiskRecordPage() {
   const { id: idParam } = useParams<{ id: string }>()
@@ -70,6 +72,13 @@ export function RectifyRiskRecordPage() {
     setSearchParams({})
   }
 
+  function handleRequested(record: RectifiableRecordDetail, request: SentRectificationRequest) {
+    setNotice(
+      `Solicitud enviada a ${request.docente.nombre_completo ?? 'el docente que aprobó el reporte'}: el registro «${record.tipo_falta.nombre}» de ${record.estudiante.nombre_completo} sigue activo hasta que el docente la confirme.`
+    )
+    setSearchParams({})
+  }
+
   return (
     <AppShell
       mobileTitle="Rectificar registro"
@@ -77,7 +86,7 @@ export function RectifyRiskRecordPage() {
     >
       <PageHeader
         title="Rectificar registro de la central"
-        subtitle="Retire de la Central un registro que se aprobó por error. La rectificación no se puede deshacer y queda en la bitácora."
+        subtitle="Solicite al docente que aprobó el reporte retirar de la Central un registro aprobado por error. El registro sigue activo hasta que el docente lo confirme; todo queda en la bitácora."
       />
 
       <div className="space-y-4">
@@ -146,7 +155,12 @@ export function RectifyRiskRecordPage() {
         )}
 
         {studentId !== null && recordId !== null && (
-          <RectifyRecordPanel recordId={recordId} onBack={() => setSearchParams({})} onRectified={handleRectified} />
+          <RectifyRecordPanel
+            recordId={recordId}
+            onBack={() => setSearchParams({})}
+            onRectified={handleRectified}
+            onRequested={handleRequested}
+          />
         )}
       </div>
     </AppShell>
