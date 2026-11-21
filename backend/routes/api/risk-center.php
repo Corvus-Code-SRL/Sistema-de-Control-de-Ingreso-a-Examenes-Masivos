@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\RiskCenter\Academic\RectificationRequestController;
 use App\Http\Controllers\RiskCenter\Academic\RiskCenterEvidenceController;
 use App\Http\Controllers\RiskCenter\Academic\RiskCenterRecordController;
 use App\Http\Controllers\RiskCenter\Academic\RiskCenterRectificationController;
@@ -23,8 +24,9 @@ Route::prefix('central-riesgo')->group(function () {
 });
 
 // Rectificación de registros confirmados (HU-062): solo el Administrador. Rectificar es retirar el registro de
-// la Central. Es un prefijo aparte de central-riesgo para que esa consulta siga siendo de solo lectura. No hay
-// rutas de edición, de borrado ni de reactivación: la única escritura es rectificar un registro activo.
+// la Central: el Administrador envía una solicitud al docente que aprobó el reporte y solo si ese docente ya no
+// está activo puede retirarlo sin su confirmación. Es un prefijo aparte de central-riesgo para que esa consulta
+// siga siendo de solo lectura. No hay rutas de edición, de borrado ni de reactivación.
 Route::prefix('rectificacion-riesgo')->group(function () {
     Route::get('estudiantes', [RiskCenterRectificationController::class, 'students'])
         ->name('rectificacion-riesgo.estudiantes');
@@ -37,7 +39,44 @@ Route::prefix('rectificacion-riesgo')->group(function () {
         ->where('id', '[0-9]{1,9}')
         ->name('rectificacion-riesgo.registros.show');
 
-    Route::post('registros/{id}/rectificar', [RiskCenterRectificationController::class, 'rectify'])
+    Route::post('registros/{id}/solicitudes', [RiskCenterRectificationController::class, 'requestRectification'])
         ->where('id', '[0-9]{1,9}')
-        ->name('rectificacion-riesgo.registros.rectificar');
+        ->name('rectificacion-riesgo.registros.solicitudes');
+
+    Route::post(
+        'registros/{id}/rectificar-sin-confirmacion',
+        [RiskCenterRectificationController::class, 'rectifyWithoutConfirmation']
+    )
+        ->where('id', '[0-9]{1,9}')
+        ->name('rectificacion-riesgo.registros.rectificar-sin-confirmacion');
+
+    Route::get('solicitudes/{id}/evidencia', [RiskCenterRectificationController::class, 'rejectionEvidence'])
+        ->where('id', '[0-9]{1,9}')
+        ->name('rectificacion-riesgo.solicitudes.evidencia');
+});
+
+// Solicitudes de rectificación (HU-062): el docente que aprobó el reporte las acepta o las rechaza. Las rutas fijas
+// van antes que las de {id}.
+Route::prefix('solicitudes-rectificacion')->group(function () {
+    Route::get('/', [RectificationRequestController::class, 'index'])
+        ->name('solicitudes-rectificacion.index');
+
+    Route::get('conteo', [RectificationRequestController::class, 'count'])
+        ->name('solicitudes-rectificacion.conteo');
+
+    Route::post('{id}/aceptar', [RectificationRequestController::class, 'accept'])
+        ->where('id', '[0-9]{1,9}')
+        ->name('solicitudes-rectificacion.aceptar');
+
+    Route::post('{id}/rechazar', [RectificationRequestController::class, 'reject'])
+        ->where('id', '[0-9]{1,9}')
+        ->name('solicitudes-rectificacion.rechazar');
+
+    Route::get('{id}/evidencia-reporte', [RectificationRequestController::class, 'reportEvidence'])
+        ->where('id', '[0-9]{1,9}')
+        ->name('solicitudes-rectificacion.evidencia-reporte');
+
+    Route::get('{id}/evidencia-rechazo', [RectificationRequestController::class, 'rejectionEvidence'])
+        ->where('id', '[0-9]{1,9}')
+        ->name('solicitudes-rectificacion.evidencia-rechazo');
 });

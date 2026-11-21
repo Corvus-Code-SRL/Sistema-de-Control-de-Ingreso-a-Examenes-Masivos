@@ -8,6 +8,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * Ficha completa de un registro activo para la tarjeta de solo lectura de la vista de rectificación (HU-062):
  * estudiante, examen, hecho, falta, descripción, evidencia, quien reportó y quien aprobó. Nada de esto se edita.
  *
+ * Incluye `rectificacion`: el resumen de solicitudes que arma RectificationRequestQueryService.
+ *
  * La evidencia viaja solo con su nombre y si está disponible; el archivo se pide a GET /central-riesgo/{id}/evidencia.
  */
 class RectifiableRecordDetailResource extends JsonResource
@@ -64,6 +66,7 @@ class RectifiableRecordDetailResource extends JsonResource
                 'fecha' => $report->fecha_revision->toIso8601String(),
             ],
             'fecha_registro' => $this->fecha_registro->toIso8601String(),
+            'rectificacion' => $this->getAttribute('resumen_rectificacion'),
         ];
     }
 }
