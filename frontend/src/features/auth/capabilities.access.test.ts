@@ -153,3 +153,23 @@ describe('Control del cronómetro (HU-038)', () => {
     }
   })
 })
+
+describe('Confirmación de rectificaciones (HU-062)', () => {
+  it('solo el Docente y el Invitado tienen riesgo.confirmar_rectificacion', () => {
+    for (const role of ['Docente', 'Invitado']) {
+      expect(hasCapability(role, 'riesgo.confirmar_rectificacion')).toBe(true)
+    }
+
+    for (const role of ['Administrador', 'Auxiliar']) {
+      expect(hasCapability(role, 'riesgo.confirmar_rectificacion')).toBe(false)
+    }
+  })
+
+  it('el Invitado la tiene sin consultar la Central', () => {
+    expect(hasCapability('Invitado', 'riesgo.consultar')).toBe(false)
+  })
+
+  it('el acceso del backend a risk_rectify_confirm es Docente e Invitado', () => {
+    expect([...backendAccess().risk_rectify_confirm].sort()).toEqual(['Docente', 'Invitado'])
+  })
+})
