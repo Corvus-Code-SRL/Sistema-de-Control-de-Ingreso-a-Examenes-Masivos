@@ -50,7 +50,11 @@ import {
 } from '@/features/groups'
 import { ClassroomsPage } from '@/features/classrooms'
 import { COLLABORATOR_INVITATIONS_PATH, CollaboratorInvitationsPage } from '@/features/collaborators'
-import { RectifyRiskRecordPage, RiskCenterPage } from '@/features/risk-center/academic'
+import {
+  RectificationRequestsPage,
+  RectifyRiskRecordPage,
+  RiskCenterPage,
+} from '@/features/risk-center/academic'
 import { ExceptionalStudentPage } from '@/features/exceptional-students'
 import { RosterUploadPage } from '@/features/students'
 import {
@@ -216,6 +220,10 @@ function DocenteRoutes() {
         <Route path="/historial" element={guarded('examenes.gestionar', <ExamHistoryPage />)} />
         <Route path="/historial/:id" element={guarded('examenes.gestionar', <ExamHistorySummaryPage />)} />
         <Route path="/incidencias" element={guarded('incidencias.revisar', <IncidentsPage />)} />
+        <Route
+          path="/solicitudes-rectificacion"
+          element={guarded('riesgo.confirmar_rectificacion', <RectificationRequestsPage />)}
+        />
         <Route path={INVITATIONS_PATH} element={guarded('examenes.gestionar', <InvitationsPage />)} />
 
         <Route

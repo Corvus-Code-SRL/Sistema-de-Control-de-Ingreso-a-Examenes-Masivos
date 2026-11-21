@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { AREA_LABELS, LOGIN_PATH, useAuth, useCurrentUser } from '@/features/auth'
 import { usePendingIncidentsCount } from '@/features/incidents'
 import { usePendingInvitationsCount } from '@/features/invitations'
+import { usePendingRectificationRequestsCount } from '@/features/risk-center/academic'
 import type { NavBadge } from './navigation'
 import { findActiveItem, visibleSections } from './navigationSelectors'
 import { SidebarSection } from './SidebarSection'
@@ -133,7 +134,11 @@ export function AppSidebar({
     section.items.some((item) => item.badge === 'pendingInvitations')
   )
   const pendingInvitations = usePendingInvitationsCount(showsPendingInvitations)
-  const badges: Partial<Record<NavBadge, number>> = { pendingIncidents, pendingInvitations }
+  const showsPendingRectifications = sections.some((section) =>
+    section.items.some((item) => item.badge === 'pendingRectifications')
+  )
+  const pendingRectifications = usePendingRectificationRequestsCount(showsPendingRectifications)
+  const badges: Partial<Record<NavBadge, number>> = { pendingIncidents, pendingInvitations, pendingRectifications }
 
   async function handleLogout() {
     await cerrarSesion()
