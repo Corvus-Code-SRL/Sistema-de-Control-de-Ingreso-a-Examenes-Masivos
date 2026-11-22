@@ -7,6 +7,7 @@ use App\Services\Academic\Importers\CsvStudentRosterReader;
 use App\Services\Academic\Importers\XlsxStudentRosterReader;
 use App\Services\Security\Contracts\SisGateway;
 use App\Services\Security\FakeSisGateway;
+use App\Support\Database\SciemPostgresConnector;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
 
@@ -20,6 +21,11 @@ class AppServiceProvider extends ServiceProvider
          */
         $this->app->bind(SisGateway::class, function () {
             return new FakeSisGateway();
+        });
+
+        // RNF-14: conector propio de PostgreSQL (nombre de aplicación y límites de sesión).
+        $this->app->bind('db.connector.pgsql', function ($app) {
+            return new SciemPostgresConnector($app->runningInConsole());
         });
 
         // Los lectores de nómina no leen la configuración: reciben el tope por constructor.
