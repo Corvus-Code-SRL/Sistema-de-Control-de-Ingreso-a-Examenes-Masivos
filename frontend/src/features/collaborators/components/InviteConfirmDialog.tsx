@@ -60,8 +60,8 @@ interface InviteFormProps extends Omit<InviteConfirmDialogProps, 'teacher' | 'ex
 function InviteForm({ teacher, exam, sending, error, onConfirm, onCancel }: InviteFormProps) {
   // La opción vuelve a nacer marcada cada vez que se abre el diálogo para un docente.
   const [allowGroups, setAllowGroups] = useState(true)
-  // Lista dividida por grupo (HU-027): solo se habilita si permite agregar grupos; nace desmarcada.
-  const [listByGroup, setListByGroup] = useState(false)
+  // Lista dividida por grupo (HU-027): solo se habilita si permite agregar grupos; nace marcada.
+  const [listByGroup, setListByGroup] = useState(true)
 
   function changeAllowGroups(checked: boolean) {
     setAllowGroups(checked)
