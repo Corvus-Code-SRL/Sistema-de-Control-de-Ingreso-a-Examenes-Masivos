@@ -6,6 +6,7 @@ import type { useRoomDistribution } from '../hooks/useRoomDistribution'
 import { ChangesBanner } from './ChangesBanner'
 import { DistributionActionBar } from './DistributionActionBar'
 import { DistributionFeedback } from './DistributionFeedback'
+import { DistributionStopNotice } from './DistributionStopNotice'
 import { DistributionSummary } from './DistributionSummary'
 import { RoomCard } from './RoomCard'
 import { UnassignedStudentsCard } from './UnassignedStudentsCard'
@@ -16,9 +17,10 @@ interface Props {
   onPropose: () => void
   onDiscard: () => void
   onReload: () => void
+  onStop: () => void
 }
 
-export function DistributionWorkspace({ distribution: state, onPropose, onDiscard, onReload }: Props) {
+export function DistributionWorkspace({ distribution: state, onPropose, onDiscard, onReload, onStop }: Props) {
   if (state.loading) return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {[0, 1].map((index) => <Card key={index}><LoadingState rows={3} label="Cargando distribución" /></Card>)}
@@ -37,6 +39,7 @@ export function DistributionWorkspace({ distribution: state, onPropose, onDiscar
       <DistributionSummary data={data} summary={summary} />
       <DistributionFeedback data={data} missingSeats={summary.missingSeats} unassigned={summary.unassigned}
         error={state.actions.error} mustReload={state.actions.mustReload} busy={busy} onReload={onReload} />
+      {state.actions.canStop && <DistributionStopNotice busy={busy} onStop={onStop} />}
       <ChangesBanner count={summary.changes} isSaving={busy} onSave={() => { void state.actions.save() }}
         onDiscard={onDiscard} message={DISTRIBUTION_MESSAGES.unsaved} showActions={false} />
       <div className={cn('grid grid-cols-1 items-start gap-4 lg:grid-cols-2', summary.rooms.length >= 3 && 'xl:grid-cols-3')}>

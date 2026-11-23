@@ -36,7 +36,8 @@ export function RoomDistributionPage() {
             <DistributionWorkspace distribution={state}
               onPropose={() => leave.request('overwrite', () => { void state.actions.propose() })}
               onDiscard={() => leave.request('discard', state.discard)}
-              onReload={() => leave.request('reload', state.reload)} />
+              onReload={() => leave.request('reload', state.reload)}
+              onStop={() => leave.request('stop', () => { void state.actions.stop() }, true)} />
           </>
         )}
       </div>

@@ -21,4 +21,9 @@ export const roomDistributionService = {
   async save(examId: number, payload: SaveDistributionPayload, signal?: AbortSignal): Promise<RoomDistributionView> {
     return (await apiPut<DataResponse<RoomDistributionView>>(distributionPath(examId), payload, { signal })).data
   },
+  async stop(examId: number, signal?: AbortSignal): Promise<RoomDistributionView> {
+    return (await apiPost<DataResponse<RoomDistributionView>>(
+      `${distributionPath(examId)}/dejar-de-usar`, {}, { signal },
+    )).data
+  },
 }

@@ -12,15 +12,13 @@ describe('DistributionFeedback — estudiantes sin ambiente', () => {
       missingSeats={0} unassigned={4} error={null} mustReload={false} busy={false} onReload={vi.fn()} />)
     expect(screen.getByText(reason)).toBeInTheDocument()
     expect(screen.getByText(/consulte estos casos con el docente responsable/)).toBeInTheDocument()
-    expect(screen.queryByText(/Puede ubicarlos ahora y guardar/)).not.toBeInTheDocument()
     expect(screen.queryByText(/se ubicarán automáticamente/)).not.toBeInTheDocument()
   })
 
-  it('durante la edición conserva el aviso condicionado a lugares disponibles', () => {
+  it('durante la edición avisa que pueden ingresar por cualquier ambiente', () => {
     render(<DistributionFeedback data={distributionFixture()} missingSeats={0} unassigned={4}
       error={null} mustReload={false} busy={false} onReload={vi.fn()} />)
-    expect(screen.getByText(/si siguen existiendo lugares disponibles/)).toBeInTheDocument()
-    expect(screen.getByText(/Puede ubicarlos ahora y guardar/)).toBeInTheDocument()
+    expect(screen.getByText(/pueden ingresar por cualquier ambiente del examen/)).toBeInTheDocument()
   })
 
   it('sin capacidad no promete asignaciones futuras', () => {

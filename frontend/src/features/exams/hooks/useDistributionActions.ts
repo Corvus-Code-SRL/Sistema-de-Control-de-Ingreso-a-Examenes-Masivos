@@ -16,7 +16,7 @@ interface ActionOptions {
   commit: (data: RoomDistributionView) => void
   applyProposal: (proposal: DistributionProposal) => void
 }
-type Operation = 'proposal' | 'save'
+type Operation = 'proposal' | 'save' | 'stop'
 
 export function useDistributionActions(options: ActionOptions) {
   const { examId, snapshot, data, assignments, loading, commit, applyProposal } = options
@@ -92,10 +92,19 @@ export function useDistributionActions(options: ActionOptions) {
     })
   }, [canAct, data, examId, assignments, execute, commit])
 
+  const canStop = Boolean(data?.examen.puede_dejar_de_usar && !loading && operation === null)
+  const stop = useCallback(async (): Promise<boolean> => {
+    if (!canStop || examId === null) return false
+    return execute('stop', (signal) => roomDistributionService.stop(examId, signal), (updated) => {
+      commit(updated)
+      setNotice({ title: messages.stopped, description: messages.stoppedDescription, variant: 'success' })
+    })
+  }, [canStop, examId, execute, commit])
+
   const roomFull = useCallback((): void => {
     setNotice({ title: messages.roomFull, description: 'Seleccione otro ambiente con lugares disponibles.', variant: 'error' })
   }, [])
   const clearNotice = useCallback(() => setNotice(null), [])
   const clearValidation = useCallback(() => setError((previous) => previous?.isValidation ? null : previous), [])
-  return { operation, error, notice, mustReload, canAct, propose, save, roomFull, clearNotice, clearValidation }
+  return { operation, error, notice, mustReload, canAct, canStop, propose, save, stop, roomFull, clearNotice, clearValidation }
 }

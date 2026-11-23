@@ -16,6 +16,14 @@ export const DISTRIBUTION_MESSAGES = {
   failure: 'No se pudo completar la operación. Intente de nuevo.',
   notFound: 'No se encontró la distribución solicitada. Seleccione otro examen o vuelva a consultar.',
   unassigned: 'Sin ambiente asignado',
+  unassignedEditable: 'pueden ingresar por cualquier ambiente del examen. Si desea, ubíquelos ahora y guarde la distribución.',
+  examLabel: 'Examen',
+  inProgressSuffix: 'En curso',
+  stopTitle: 'La distribución sigue activa en el control de ingreso',
+  stopDescription: 'Ya no se puede modificar. Si deja de usarla, los estudiantes ingresarán por cualquier ambiente sin aviso.',
+  stopAction: 'Dejar de usar la distribución',
+  stopped: 'Se dejó de usar la distribución',
+  stoppedDescription: 'Los estudiantes pueden ingresar por cualquier ambiente del examen.',
   zero: 'No hay estudiantes habilitados. Puede guardar una distribución vacía para confirmar y limpiar asignaciones anteriores.',
   unassignedCapacity: 'No hay capacidad suficiente para ubicar a todos. Revise los ambientes del examen antes de guardar.',
 } as const
@@ -35,6 +43,12 @@ export const DISTRIBUTION_CONFIRMATIONS = {
     title: '¿Reemplazar los ajustes actuales?',
     description: 'La propuesta por apellido reemplazará los ajustes locales. Solo se confirmará al guardar.',
     confirm: 'Distribuir por apellido',
+  },
+  stop: {
+    title: '¿Dejar de usar la distribución?',
+    description: 'Los estudiantes podrán ingresar por cualquier ambiente del examen, sin avisos de ambiente. Esta acción no se puede deshacer.',
+    confirm: 'Dejar de usar',
+    cancel: 'Cancelar',
   },
   reload: {
     title: '¿Recargar y revisar?',

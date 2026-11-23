@@ -8,7 +8,8 @@ export const DISTRIBUTION_SAVED_VERSION = 'f7eaf845e782bb110d0696162f07f3a0fe1b1
 export function distributionExamFixture(overrides: Partial<DistributionExamOption> = {}): DistributionExamOption {
   return {
     id_examen: 12, nombre: 'Primer parcial', materia: { nombre: 'Cálculo I' },
-    fecha: '2026-12-01', hora_inicio: '10:00:00', cantidad_ambientes: 2, es_creador: true, editable: true,
+    fecha: '2026-12-01', hora_inicio: '10:00:00', estado: 'PROGRAMADO', cantidad_ambientes: 2, es_creador: true,
+    editable: true, distribucion_suspendida: false, puede_dejar_de_usar: false,
     ...overrides,
   }
 }

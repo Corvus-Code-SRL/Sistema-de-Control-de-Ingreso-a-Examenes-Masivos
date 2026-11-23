@@ -2,8 +2,8 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderApp } from '@/test/renderApp'
-import { mockDistributionBackend } from '@/test/roomDistributionBackend'
-import { distributionFixture, savedDistributionFixture } from '@/test/roomDistributionFixtures'
+import { distributionLoaded, mockDistributionBackend } from '@/test/roomDistributionBackend'
+import { distributionExamFixture, distributionFixture, savedDistributionFixture } from '@/test/roomDistributionFixtures'
 import { roomDistributionService } from '../services/roomDistributionService'
 import { DISTRIBUTION_MESSAGES } from '../utils/roomDistributionMessages'
 
@@ -11,7 +11,7 @@ const PATH = '/examenes/distribucion'
 afterEach(() => { window.localStorage.clear(); window.sessionStorage.clear(); vi.unstubAllGlobals() })
 async function ready() {
   renderApp(PATH)
-  await screen.findByRole('region', { name: 'Ambiente 691A' })
+  await distributionLoaded()
 }
 
 describe('RoomDistributionPage — ruta y estados', () => {
@@ -19,7 +19,7 @@ describe('RoomDistributionPage — ruta y estados', () => {
     const api = mockDistributionBackend({ role })
     await ready()
     expect(screen.getByRole('heading', { name: 'Distribuir habilitados' })).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: 'Examen Programado' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Examen' })).toBeInTheDocument()
     for (const label of ['Habilitados', 'No habilitados', 'Capacidad total', 'Asignados', 'Sin ambiente', 'Lugares faltantes']) {
       expect(screen.getByText(label, { selector: 'dt' })).toBeInTheDocument()
     }
@@ -190,5 +190,27 @@ describe('RoomDistributionPage — cambios locales', () => {
     const clean = new Event('beforeunload', { cancelable: true })
     window.dispatchEvent(clean)
     expect(clean.defaultPrevented).toBe(false)
+  })
+  it('con el control abierto deja de usar la distribución tras confirmar', async () => {
+    const opened = distributionExamFixture({ estado: 'EN_CURSO', editable: false, puede_dejar_de_usar: true })
+    const stopped = savedDistributionFixture({
+      editable: false, motivo_solo_lectura: 'El docente dejó de usar esta distribución.',
+      examen: distributionExamFixture({ estado: 'EN_CURSO', editable: false, distribucion_suspendida: true }),
+    })
+    const api = mockDistributionBackend({
+      exams: [opened],
+      view: () => savedDistributionFixture({ editable: false, motivo_solo_lectura: 'Solo lectura.', examen: opened }),
+      stop: () => ({ body: { data: stopped } }),
+    })
+    renderApp('/examenes/distribucion')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Dejar de usar la distribución' }))
+    const dialog = await screen.findByRole('dialog', { name: '¿Dejar de usar la distribución?' })
+    expect(api.calls.some((call) => call.url.endsWith('/dejar-de-usar'))).toBe(false)
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Dejar de usar' }))
+
+    expect(await screen.findByText('El docente dejó de usar esta distribución.')).toBeInTheDocument()
+    expect(api.calls.filter((call) => call.url.endsWith('/dejar-de-usar') && call.method === 'POST')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Dejar de usar la distribución' })).not.toBeInTheDocument()
   })
 })

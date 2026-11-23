@@ -17,7 +17,7 @@ export function DistributionConfirmDialog({ kind, busy, onCancel, onConfirm }: P
           <DialogDescription>{content.description}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" className="min-h-11" disabled={busy} onClick={onCancel}>Seguir editando</Button>
+          <Button variant="outline" className="min-h-11" disabled={busy} onClick={onCancel}>{'cancel' in content ? content.cancel : 'Seguir editando'}</Button>
           <Button className="min-h-11" disabled={busy} onClick={onConfirm}>{content.confirm}</Button>
         </DialogFooter>
       </DialogContent>

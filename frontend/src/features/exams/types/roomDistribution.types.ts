@@ -4,9 +4,12 @@ export interface DistributionExamOption {
   materia: { nombre: string } | null
   fecha: string
   hora_inicio: string
+  estado: 'PROGRAMADO' | 'EN_CURSO'
   cantidad_ambientes: number
   es_creador: boolean
   editable: boolean
+  distribucion_suspendida: boolean
+  puede_dejar_de_usar: boolean
 }
 
 export interface DistributionRoom {
@@ -52,4 +55,4 @@ export interface SaveDistributionPayload {
 }
 
 export type DistributionAssignments = ReadonlyMap<number, number | null>
-export type DistributionConfirmation = 'leave' | 'discard' | 'overwrite' | 'reload'
+export type DistributionConfirmation = 'leave' | 'discard' | 'overwrite' | 'reload' | 'stop'

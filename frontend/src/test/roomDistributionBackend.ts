@@ -1,7 +1,18 @@
+import { act, screen } from '@testing-library/react'
 import { meBody, TOKEN_STORAGE_KEY, type AccountKey } from './authFixtures'
 import { mockApiWith } from './http'
 import { distributionExamFixture, distributionFixture, distributionProposalFixture, savedDistributionFixture } from './roomDistributionFixtures'
 import type { DistributionExamOption, RoomDistributionView } from '@/features/exams/types/roomDistribution.types'
+
+/**
+ * El primer render de la app completa en un worker bloquea el hilo: bajo carga dura más que el plazo de findBy,
+ * cuyo temporizador vence apenas se libera. Se espera el estado cediendo el hilo, acotado por el timeout del test.
+ */
+export async function distributionLoaded(room = 'Ambiente 691A'): Promise<void> {
+  while (!screen.queryByLabelText(room)) {
+    await act(() => new Promise((resolve) => { setTimeout(resolve) }))
+  }
+}
 
 interface ResponseFixture { status?: number; body: unknown }
 export function mockDistributionBackend(options: {
@@ -11,6 +22,7 @@ export function mockDistributionBackend(options: {
   getError?: number
   save?: () => ResponseFixture
   proposal?: () => ResponseFixture
+  stop?: () => ResponseFixture
 } = {}) {
   const role = options.role === undefined ? 'docente' : options.role
   if (role !== null) window.localStorage.setItem(TOKEN_STORAGE_KEY, 'distribution-test-session')
@@ -27,6 +39,9 @@ export function mockDistributionBackend(options: {
     if (url.endsWith('/examenes/distribucion')) return { body: { data: options.exams ?? [distributionExamFixture()] } }
     if (url.endsWith('/distribucion/propuesta')) {
       return options.proposal?.() ?? { body: { data: distributionProposalFixture() } }
+    }
+    if (url.endsWith('/distribucion/dejar-de-usar')) {
+      return options.stop?.() ?? { body: { data: distributionFixture({ editable: false }) } }
     }
     if (/\/examenes\/\d+\/distribucion$/.test(url)) {
       if (method === 'PUT') return options.save?.() ?? { body: { data: savedDistributionFixture(), mensaje: 'Distribución guardada' } }
