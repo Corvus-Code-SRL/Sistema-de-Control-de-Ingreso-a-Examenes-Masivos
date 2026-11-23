@@ -30,6 +30,7 @@ export type AccessFeature =
   | 'invite_teachers'
   | 'audit_log'
   | 'risk_rectify'
+  | 'risk_rectify_confirm'
   | 'exam_timer'
 
 /**
@@ -38,6 +39,8 @@ export type AccessFeature =
  * auxiliares de grupo, no reporta auxiliares, no acepta casos especiales y, hasta que producto lo
  * decida, no invita a otros docentes. La bitácora (`audit_log`) y la rectificación de registros de la
  * Central de Riesgo (`risk_rectify`) son solo del Administrador: consultar la Central no la concede.
+ * Confirmar o rechazar una solicitud de rectificación (`risk_rectify_confirm`) es del Docente y del Invitado,
+ * que pueden ser quien aprobó el reporte, aunque no consulten la Central.
  */
 export const ACCESS_BY_FEATURE: Record<AccessFeature, readonly RoleName[]> = {
   teaching: ['Docente', 'Invitado'],
@@ -50,6 +53,7 @@ export const ACCESS_BY_FEATURE: Record<AccessFeature, readonly RoleName[]> = {
   invite_teachers: ['Docente'],
   audit_log: ['Administrador'],
   risk_rectify: ['Administrador'],
+  risk_rectify_confirm: ['Docente', 'Invitado'],
   exam_timer: ['Docente', 'Invitado'],
 }
 
@@ -70,6 +74,7 @@ const CAPABILITIES_BY_FEATURE = {
   invite_teachers: ['docentes.invitar'],
   audit_log: ['bitacora.consultar'],
   risk_rectify: ['riesgo.rectificar'],
+  risk_rectify_confirm: ['riesgo.confirmar_rectificacion'],
   exam_timer: ['examenes.controlar-tiempo'],
 } as const
 

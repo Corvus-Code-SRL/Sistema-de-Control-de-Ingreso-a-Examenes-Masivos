@@ -13,6 +13,7 @@ const session = vi.hoisted(() => ({
   hasSession: true,
   pending: 0,
   invitations: 0,
+  rectifications: 0,
   logout: vi.fn()
 }))
 
@@ -55,6 +56,16 @@ vi.mock('@/features/incidents', () => ({
 }))
 
 const pendingInvitationsSpy = vi.hoisted(() => vi.fn())
+
+const pendingRectificationsSpy = vi.hoisted(() => vi.fn())
+
+vi.mock('@/features/risk-center/academic', () => ({
+  usePendingRectificationRequestsCount: (enabled: boolean) => {
+    pendingRectificationsSpy(enabled)
+
+    return enabled ? session.rectifications : 0
+  }
+}))
 
 vi.mock('@/features/invitations', () => ({
   usePendingInvitationsCount: (enabled: boolean) => {
@@ -99,9 +110,11 @@ beforeEach(() => {
   session.hasSession = true
   session.pending = 0
   session.invitations = 0
+  session.rectifications = 0
   session.logout.mockReset()
   pendingIncidentsSpy.mockClear()
   pendingInvitationsSpy.mockClear()
+  pendingRectificationsSpy.mockClear()
   vi.restoreAllMocks()
 })
 
@@ -509,6 +522,7 @@ describe('AppSidebar — entradas y estado activo', () => {
       ['Reportar incidencia', '/reportar-incidencia'],
       ['Revisar reportes de incidencias', '/incidencias'],
       ['Central de riesgo', '/central-riesgo'],
+      ['Solicitudes de rectificación', '/solicitudes-rectificacion'],
       ['Historial de mis exámenes', '/historial'],
       ['Generar reporte de examen', '/examenes/reportes'],
     ])
@@ -754,6 +768,25 @@ describe('AppSidebar — contador de invitaciones (HU-027)', () => {
 
     expect(pendingInvitationsSpy).toHaveBeenCalledWith(false)
     expect(pendingInvitationsSpy).not.toHaveBeenCalledWith(true)
+  })
+})
+
+describe('AppSidebar — contador de solicitudes de rectificación (HU-062)', () => {
+  it.each(['Docente', 'Invitado'] as const)('%s: muestra las pendientes junto a la entrada', async (role) => {
+    const user = userEvent.setup()
+    session.rectifications = 3
+    renderSidebar(role, '/solicitudes-rectificacion')
+    await openAllSections(user)
+
+    expect(screen.getByRole('link', { name: /Solicitudes de rectificación/ })).toHaveTextContent('3')
+    expect(pendingRectificationsSpy).toHaveBeenCalledWith(true)
+  })
+
+  it('no se pide a quien no ve esa entrada', () => {
+    renderSidebar('Administrador', '/cuentas')
+
+    expect(pendingRectificationsSpy).toHaveBeenCalledWith(false)
+    expect(pendingRectificationsSpy).not.toHaveBeenCalledWith(true)
   })
 })
 

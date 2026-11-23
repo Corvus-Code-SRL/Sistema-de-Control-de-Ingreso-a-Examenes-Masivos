@@ -8,6 +8,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * Un registro activo en la lista de la vista de rectificación (HU-062): lo justo para reconocerlo y elegirlo.
  *
  * Requiere cargar studentReport (con incidentType, exam.subject y userReviewer).
+ * Incluye `rectificacion`: el resumen de solicitudes que arma RectificationRequestQueryService.
  */
 class RectifiableRecordResource extends JsonResource
 {
@@ -34,6 +35,7 @@ class RectifiableRecordResource extends JsonResource
                 'nombre_completo' => $reviewer->nombre_completo,
                 'fecha' => $report->fecha_revision->toIso8601String(),
             ],
+            'rectificacion' => $this->getAttribute('resumen_rectificacion'),
         ];
     }
 }

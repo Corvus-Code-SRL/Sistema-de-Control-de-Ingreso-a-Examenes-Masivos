@@ -4,6 +4,7 @@ import type {
   RectifiableStudent,
   RectificationInput,
   RectifiedRecord,
+  SentRectificationRequest,
   StudentRecords,
   StudentSearchResult,
 } from '../types/riskRectification.types'
@@ -44,12 +45,33 @@ export async function getRectifiableRecord(
   return response.data
 }
 
-/** Retira el registro de la Central (no se puede deshacer); responde el registro ya rectificado. */
-export async function rectifyRecord(recordId: number, input: RectificationInput): Promise<RectifiedRecord> {
-  const response = await apiClient<{ data: RectifiedRecord }>(`${BASE}/registros/${recordId}/rectificar`, {
+/** Envía la solicitud al docente que aprobó el reporte; el registro sigue activo hasta que la acepte. */
+export async function requestRectification(
+  recordId: number,
+  input: RectificationInput
+): Promise<SentRectificationRequest> {
+  const response = await apiClient<{ data: SentRectificationRequest }>(`${BASE}/registros/${recordId}/solicitudes`, {
     method: 'POST',
     body: input,
   })
 
   return response.data
+}
+
+/** Anula el registro sin pedir confirmación: solo si el docente aprobador ya pasó el plazo de inactividad. */
+export async function rectifyWithoutConfirmation(
+  recordId: number,
+  input: RectificationInput
+): Promise<RectifiedRecord> {
+  const response = await apiClient<{ data: RectifiedRecord }>(
+    `${BASE}/registros/${recordId}/rectificar-sin-confirmacion`,
+    { method: 'POST', body: input }
+  )
+
+  return response.data
+}
+
+/** Imagen con la que el docente rechazó una solicitud; solo se entrega con la sesión. */
+export function getRejectionEvidence(requestId: number, signal?: AbortSignal): Promise<Blob> {
+  return apiClient<Blob>(`${BASE}/solicitudes/${requestId}/evidencia`, { responseType: 'blob', signal })
 }

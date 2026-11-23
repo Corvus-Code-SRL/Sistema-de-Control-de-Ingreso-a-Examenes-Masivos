@@ -133,7 +133,9 @@ return [
     | auxiliares de grupo, no reporta auxiliares, no acepta casos especiales y, mientras no haya una
     | decisión de producto, no invita a otros docentes. La bitácora (audit_log) la consulta solo el
     | Administrador. Rectificar un registro de la Central de Riesgo (risk_rectify, HU-062) también es solo
-    | del Administrador: consultar la Central (risk_center) no lo concede.
+    | del Administrador: consultar la Central (risk_center) no lo concede. Confirmar o rechazar una solicitud
+    | de rectificación (risk_rectify_confirm) es del docente que aprobó el reporte: como el Invitado también
+    | aprueba reportes, lo ejerce igual que el Docente, aunque no consulte la Central.
     |
     */
 
@@ -148,7 +150,25 @@ return [
         'invite_teachers'  => [Role::DOCENTE],
         'audit_log'        => [Role::ADMINISTRADOR],
         'risk_rectify'     => [Role::ADMINISTRADOR],
+        'risk_rectify_confirm' => [Role::DOCENTE, Role::INVITADO],
         'exam_timer'       => [Role::DOCENTE, Role::INVITADO],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Rectificación de la Central de Riesgo (HU-062)
+    |--------------------------------------------------------------------------
+    |
+    | - dias_vencimiento: días que tiene el docente para responder una solicitud de rectificación. Se
+    |   cuentan desde que se envía; pasado ese plazo la solicitud queda VENCIDA y el registro sigue en la Central.
+    | - dias_docente_inactivo: días que deben pasar desde que el docente aprobador dejó de estar activo para que
+    |   el Administrador rectifique sus registros sin su confirmación (180 días, aproximadamente un semestre).
+    |
+    */
+
+    'rectificacion' => [
+        'dias_vencimiento' => (int) env('SCIEM_RECTIFICACION_DIAS_VENCIMIENTO', 7),
+        'dias_docente_inactivo' => (int) env('SCIEM_RECTIFICACION_DIAS_DOCENTE_INACTIVO', 180),
     ],
 
     /*
@@ -253,6 +273,10 @@ return [
             'invitacion_examen' => [
                 'modulo' => 'examenes', 'etiqueta' => 'Invitación a examen', 'claves' => ['id_invitacion'],
             ],
+            'solicitud_rectificacion' => [
+                'modulo' => 'central_riesgo', 'etiqueta' => 'Solicitud de rectificación',
+                'claves' => ['id_solicitud_rect'],
+            ],
         ],
 
         'etiquetas_accion' => [
@@ -280,6 +304,10 @@ return [
             'CAMBIAR_AMBIENTE' => 'Cambiar ambiente',
             'OBSERVAR_IDENTIDAD' => 'Observar identidad',
             'RECTIFICAR_REGISTRO' => 'Rectificar registro',
+            'SOLICITAR_RECTIFICACION' => 'Solicitar rectificación',
+            'ACEPTAR_RECTIFICACION' => 'Aceptar rectificación',
+            'RECHAZAR_RECTIFICACION' => 'Rechazar rectificación',
+            'RECTIFICAR_SIN_CONFIRMACION' => 'Rectificar sin confirmación',
             'GUARDAR_HABILITADOS' => 'Guardar habilitados',
             'INVITAR_COLABORADOR' => 'Invitar colaborador',
             'ACEPTAR_INVITACION' => 'Aceptar invitación',
@@ -308,6 +336,16 @@ return [
             'rectificado_en' => 'Fecha de rectificación',
             'id_usuario_rectificador' => 'Administrador que rectificó',
             'motivo_rectificacion' => 'Motivo de la rectificación',
+            'id_usuario_confirmador' => 'Docente que confirmó',
+            'id_usuario_docente' => 'Docente aprobador',
+            'id_usuario_docente_inactivo' => 'Docente inactivo',
+            'inactivo_desde' => 'Docente inactivo desde',
+            'fuente_inactividad' => 'Origen de la fecha de inactividad',
+            'motivo_solicitud' => 'Motivo de la solicitud',
+            'motivo_rechazo' => 'Motivo del rechazo',
+            'fecha_solicitud' => 'Fecha de la solicitud',
+            'vence_en' => 'Vencimiento de la solicitud',
+            'fecha_respuesta' => 'Fecha de respuesta',
             'permite_agregar_grupos' => 'Puede agregar sus grupos',
             'fecha_sin_efecto' => 'Fecha en que quedó sin efecto',
         ],

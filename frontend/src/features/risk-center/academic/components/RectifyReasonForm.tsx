@@ -10,14 +10,24 @@ import {
 } from '../utils/rectificationValidators'
 
 interface RectifyReasonFormProps {
+  /** Texto del botón de envío: depende de si se solicita al docente o se anula sin su confirmación. */
+  submitLabel: string
+  /** Pedir la confirmación al docente es una acción normal; anular el registro es destructiva. */
+  variant?: 'default' | 'danger'
   disabled?: boolean
   /** Primer paso: el motivo es válido (ya recortado); falta la confirmación. */
   onReview: (reason: string) => void
   onCancel: () => void
 }
 
-/** Único dato que se pide para rectificar: el motivo. «Rectificar registro» no guarda: abre la confirmación. */
-export function RectifyReasonForm({ disabled = false, onReview, onCancel }: RectifyReasonFormProps) {
+/** Único dato que se pide: el motivo. El botón de envío no guarda: abre la confirmación. */
+export function RectifyReasonForm({
+  submitLabel,
+  variant = 'default',
+  disabled = false,
+  onReview,
+  onCancel,
+}: RectifyReasonFormProps) {
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -50,7 +60,7 @@ export function RectifyReasonForm({ disabled = false, onReview, onCancel }: Rect
           />
           <p id="rectify-reason-hint" className="text-xs text-muted-foreground">
             Obligatorio, entre {MIN_REASON_LENGTH} y {MAX_REASON_LENGTH} caracteres. Explique por qué el registro
-            no correspondía; queda en la bitácora.
+            no correspondía; el docente lo verá y queda en la bitácora.
           </p>
           {error !== null && (
             <p id="rectify-reason-error" role="alert" className="text-xs text-danger-fg">
@@ -63,8 +73,8 @@ export function RectifyReasonForm({ disabled = false, onReview, onCancel }: Rect
           <Button type="button" variant="outline" size="lg" onClick={onCancel} disabled={disabled}>
             Cancelar
           </Button>
-          <Button type="submit" variant="danger" size="lg" disabled={disabled}>
-            Rectificar registro
+          <Button type="submit" variant={variant} size="lg" disabled={disabled}>
+            {submitLabel}
           </Button>
         </div>
       </form>

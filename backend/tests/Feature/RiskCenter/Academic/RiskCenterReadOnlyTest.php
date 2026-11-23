@@ -57,7 +57,7 @@ class RiskCenterReadOnlyTest extends TestCase
         $this->assertDatabaseHas('central_riesgo', ['id_cr_estudiante' => $id]);
     }
 
-    public function test_la_rectificacion_solo_expone_lecturas_y_un_unico_post(): void
+    public function test_la_rectificacion_solo_expone_lecturas_y_los_dos_posts_de_la_solicitud_y_la_via_directa(): void
     {
         $writes = [];
         $routes = $this->routesUnder('api/rectificacion-riesgo');
@@ -70,7 +70,10 @@ class RiskCenterReadOnlyTest extends TestCase
             }
         }
 
-        $this->assertSame(['POST api/rectificacion-riesgo/registros/{id}/rectificar'], $writes);
+        $this->assertSame([
+            'POST api/rectificacion-riesgo/registros/{id}/solicitudes',
+            'POST api/rectificacion-riesgo/registros/{id}/rectificar-sin-confirmacion',
+        ], $writes);
     }
 
     public function test_ninguna_ruta_de_la_api_edita_borra_o_reactiva_registros_de_la_central(): void

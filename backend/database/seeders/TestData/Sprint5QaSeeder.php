@@ -8,6 +8,7 @@ use Database\Seeders\Support\LocalDatabaseGuard;
 use Database\Seeders\TestData\TestDataIds as Ids;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Escenarios de QA del Sprint 5. Cubre HU-062 (rectificar un registro de la Central de Riesgo), HU-026
@@ -52,6 +53,20 @@ use Illuminate\Support\Facades\DB;
  *     permitir grupos; Rosario lo ve en el control de ingreso como docente.
  *   - Rechazada: «HU-027 Recuperatorio» (9823), PROGRAMADO.
  *   - Sin efecto: la de «HU-026 Final Cálculo I» (9812), que abrió el control sin respuesta.
+ *
+ * Escenario HU-062 con confirmación del docente. Marcelo Quiroga (10452) aprobó los reportes y es quien responde
+ * las solicitudes de rectificación. Los registros son de Valeria Arce Montaño (9704):
+ *   - «Solicitud pendiente» (registro 9965): enviada ayer, vence en 6 días. El reporte tiene evidencia descargable.
+ *   - «Solicitud aceptada» (9966): el registro ya salió de la Central (rectificado por la aceptación).
+ *   - «Solicitud rechazada con imagen» (9967): el docente rechazó con motivo y una imagen de evidencia.
+ *   - «Solicitud vencida» (9968): venció sin respuesta; el registro sigue en la Central.
+ *   - «Dos rechazos previos» (9969): dos solicitudes rechazadas y ninguna pendiente; sirve para enviar una nueva y
+ *     para ver el aviso «Este registro ya tuvo 2 solicitudes de rectificación rechazadas».
+ * Mauricio Terán Peña (9705) tiene dos registros cuyo docente aprobador ya no es docente activo:
+ *   - Héctor Mamani (10604) dejó de ser docente hace 60 días: aún no se puede rectificar sin su confirmación.
+ *   - Beatriz Zurita (10605) dejó de ser docente hace 400 días: ya se puede rectificar sin su confirmación.
+ * Las fechas de las solicitudes se calculan al sembrar, así que conviene volver a sembrar si pasaron días. La
+ * imagen del rechazo y la evidencia del reporte se guardan en el disco privado (storage/app/evidencias).
  *
  * Ids propios en el rango 9000–9999, sin pisar los de TestDataIds ni los de Sprint3QaSeeder.
  */
@@ -105,6 +120,45 @@ class Sprint5QaSeeder extends Seeder
     public const INVITATION_RESPONSE_REJECTED = 9976;
     public const INVITATION_RESPONSE_VOID = 9977;
 
+    // HU-062 con confirmación del docente: estudiantes, reportes, registros, docentes inactivos y solicitudes
+    public const STUDENT_VALERIA_ARCE = 9704;
+    public const STUDENT_MAURICIO_TERAN = 9705;
+
+    public const REPORT_REQUEST_PENDING = 9954;
+    public const REPORT_REQUEST_ACCEPTED = 9955;
+    public const REPORT_REQUEST_REJECTED = 9956;
+    public const REPORT_REQUEST_EXPIRED = 9957;
+    public const REPORT_REQUEST_HISTORY = 9958;
+    public const REPORT_INACTIVE_RECENT = 9959;
+    public const REPORT_INACTIVE_OLD = 9960;
+
+    public const RECORD_REQUEST_PENDING = 9965;
+    public const RECORD_REQUEST_ACCEPTED = 9966;
+    public const RECORD_REQUEST_REJECTED = 9967;
+    public const RECORD_REQUEST_EXPIRED = 9968;
+    public const RECORD_REQUEST_HISTORY = 9969;
+    public const RECORD_INACTIVE_RECENT = 9970;
+    public const RECORD_INACTIVE_OLD = 9971;
+
+    public const TEACHER_INACTIVE_RECENT = '00000000-0000-4000-8000-000000000104';
+    public const TEACHER_INACTIVE_OLD = '00000000-0000-4000-8000-000000000105';
+
+    // solicitud_rectificacion.id_solicitud_rect
+    public const REQUEST_PENDING = 9980;
+    public const REQUEST_ACCEPTED = 9981;
+    public const REQUEST_REJECTED = 9982;
+    public const REQUEST_EXPIRED = 9983;
+    public const REQUEST_HISTORY_FIRST = 9984;
+    public const REQUEST_HISTORY_SECOND = 9985;
+
+    private const REJECTION_IMAGE = 'evidencias/rectificaciones/qa-rechazo-9982.png';
+
+    private const REPORT_IMAGE = 'evidencias/reportes/qa-reporte-9954.png';
+
+    /** PNG de 1x1 píxel: la evidencia de QA solo necesita ser una imagen válida. */
+    private const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGA'
+        . 'hKmMIQAAAABJRU5ErkJggg==';
+
     private const EXAM_FINISHED = 9807;
 
     private const EXAM_ENTRY = 9805;
@@ -119,6 +173,7 @@ class Sprint5QaSeeder extends Seeder
         DB::transaction(function () {
             $this->seedStudents();
             $this->seedRecords();
+            $this->seedRectificationRequests();
             $this->seedCollaboratorInvitations();
             $this->seedInvitationResponses();
         });
@@ -402,6 +457,158 @@ class Sprint5QaSeeder extends Seeder
             $this->record(self::RECORD_CARLA_ACTIVE_TWO, self::REPORT_CARLA_ACTIVE_TWO, self::STUDENT_CARLA_CONDORI,
                 '2026-10-01 11:30:00-04'),
         ], ['id_cr_estudiante']);
+    }
+
+    /**
+     * Escenarios de la doble confirmación (HU-062). Las solicitudes se borran y se vuelven a crear (con sus fechas
+     * relativas a hoy) y los registros se reescriben, así que volver a sembrar devuelve todo al estado inicial.
+     */
+    private function seedRectificationRequests(): void
+    {
+        $types = DB::table('tipo_falta')->pluck('id_falta', 'nombre');
+        $assistant = Ids::ASSISTANT_1;
+        $approved = ReportStatus::APPROVED;
+        $teacherRoleId = DB::table('rol')->where('nombre_rol', 'Docente')->value('id_rol');
+
+        DB::table('estudiante')->upsert([
+            $this->student(self::STUDENT_VALERIA_ARCE, '202170105', '7400105', 'Valeria', 'Arce', 'Montaño'),
+            $this->student(self::STUDENT_MAURICIO_TERAN, '202170106', '7400106', 'Mauricio', 'Terán', 'Peña'),
+        ], ['id_estudiante']);
+
+        $inactive = [self::TEACHER_INACTIVE_RECENT, self::TEACHER_INACTIVE_OLD];
+        DB::table('usuario')->upsert([
+            $this->teacher(self::TEACHER_INACTIVE_RECENT, 'Héctor', 'Mamani', 'Choque', '10604', 'hector.mamani'),
+            $this->teacher(self::TEACHER_INACTIVE_OLD, 'Beatriz', 'Zurita', null, '10605', 'beatriz.zurita'),
+        ], ['id_usuario']);
+
+        DB::table('usuario_rol')->whereIn('id_usuario', $inactive)->delete();
+        DB::table('usuario_rol')->insert([
+            [
+                'id_usuario' => self::TEACHER_INACTIVE_RECENT,
+                'id_rol' => $teacherRoleId,
+                'fecha_inicio' => now()->subDays(300),
+                'fecha_fin' => now()->subDays(60),
+            ],
+            [
+                'id_usuario' => self::TEACHER_INACTIVE_OLD,
+                'id_rol' => $teacherRoleId,
+                'fecha_inicio' => now()->subDays(700),
+                'fecha_fin' => now()->subDays(400),
+            ],
+        ]);
+        DB::table('docente_inactivo_deteccion')->whereIn('id_usuario', $inactive)->delete();
+
+        $teacher = Ids::TEACHER_FIXED;
+        $reports = [
+            $this->report(self::REPORT_REQUEST_PENDING, self::STUDENT_VALERIA_ARCE, self::EXAM_FINISHED,
+                $types['Copia en examen'], $assistant, 'Usaba apuntes escondidos bajo la mesa.',
+                '2026-10-12 08:40:00-04', $approved, '2026-10-13 10:00:00-04', $teacher),
+            $this->report(self::REPORT_REQUEST_ACCEPTED, self::STUDENT_VALERIA_ARCE, self::EXAM_FINISHED,
+                $types['Conducta indebida'], $assistant, 'Habló con un compañero durante la prueba.',
+                '2026-10-12 08:50:00-04', $approved, '2026-10-13 10:10:00-04', $teacher),
+            $this->report(self::REPORT_REQUEST_REJECTED, self::STUDENT_VALERIA_ARCE, self::EXAM_FINISHED,
+                $types['Material no permitido'], $assistant, 'Tenía un celular encendido sobre la mesa.',
+                '2026-10-12 09:00:00-04', $approved, '2026-10-13 10:20:00-04', $teacher),
+            $this->report(self::REPORT_REQUEST_EXPIRED, self::STUDENT_VALERIA_ARCE, self::EXAM_FINISHED,
+                $types['Conducta indebida'], $assistant, 'Se levantó sin permiso del aula.',
+                '2026-10-12 09:10:00-04', $approved, '2026-10-13 10:30:00-04', $teacher),
+            $this->report(self::REPORT_REQUEST_HISTORY, self::STUDENT_VALERIA_ARCE, self::EXAM_FINISHED,
+                $types['Copia en examen'], $assistant, 'Intercambió hojas con otra estudiante.',
+                '2026-10-12 09:20:00-04', $approved, '2026-10-13 10:40:00-04', $teacher),
+            $this->report(self::REPORT_INACTIVE_RECENT, self::STUDENT_MAURICIO_TERAN, self::EXAM_FINISHED,
+                $types['Copia en examen'], $assistant, 'Miraba la hoja de su compañero de la derecha.',
+                '2026-02-10 08:30:00-04', $approved, '2026-02-11 09:00:00-04', self::TEACHER_INACTIVE_RECENT),
+            $this->report(self::REPORT_INACTIVE_OLD, self::STUDENT_MAURICIO_TERAN, self::EXAM_FINISHED,
+                $types['Material no permitido'], $assistant, 'Usó una calculadora programable no autorizada.',
+                '2025-08-10 08:30:00-04', $approved, '2025-08-11 09:00:00-04', self::TEACHER_INACTIVE_OLD),
+        ];
+        $reports[0]['evidencia_url'] = 'https://sciem.test/qa/evidencia-9954.png';
+        $reports[0]['evidencia_public_id'] = self::REPORT_IMAGE;
+
+        DB::table('reporte_estudiante')->upsert($reports, ['id_reporte_est']);
+
+        DB::table('central_riesgo')->upsert([
+            $this->record(self::RECORD_REQUEST_PENDING, self::REPORT_REQUEST_PENDING, self::STUDENT_VALERIA_ARCE,
+                '2026-10-13 10:00:00-04'),
+            $this->record(self::RECORD_REQUEST_ACCEPTED, self::REPORT_REQUEST_ACCEPTED, self::STUDENT_VALERIA_ARCE,
+                '2026-10-13 10:10:00-04', true),
+            $this->record(self::RECORD_REQUEST_REJECTED, self::REPORT_REQUEST_REJECTED, self::STUDENT_VALERIA_ARCE,
+                '2026-10-13 10:20:00-04'),
+            $this->record(self::RECORD_REQUEST_EXPIRED, self::REPORT_REQUEST_EXPIRED, self::STUDENT_VALERIA_ARCE,
+                '2026-10-13 10:30:00-04'),
+            $this->record(self::RECORD_REQUEST_HISTORY, self::REPORT_REQUEST_HISTORY, self::STUDENT_VALERIA_ARCE,
+                '2026-10-13 10:40:00-04'),
+            $this->record(self::RECORD_INACTIVE_RECENT, self::REPORT_INACTIVE_RECENT, self::STUDENT_MAURICIO_TERAN,
+                '2026-02-11 09:00:00-04'),
+            $this->record(self::RECORD_INACTIVE_OLD, self::REPORT_INACTIVE_OLD, self::STUDENT_MAURICIO_TERAN,
+                '2025-08-11 09:00:00-04'),
+        ], ['id_cr_estudiante']);
+
+        // La aceptada anuló su registro con el administrador solicitante y el motivo de su solicitud.
+        DB::table('central_riesgo')->where('id_cr_estudiante', self::RECORD_REQUEST_ACCEPTED)->update([
+            'rectificado_en' => now()->subDays(9),
+            'motivo_rectificacion' => 'Se solicita retirar: el reporte correspondía a otra persona de la fila.',
+        ]);
+
+        Storage::disk('local')->put(self::REPORT_IMAGE, base64_decode(self::PNG_BASE64));
+        Storage::disk('local')->put(self::REJECTION_IMAGE, base64_decode(self::PNG_BASE64));
+
+        $requestIds = [
+            self::REQUEST_PENDING, self::REQUEST_ACCEPTED, self::REQUEST_REJECTED, self::REQUEST_EXPIRED,
+            self::REQUEST_HISTORY_FIRST, self::REQUEST_HISTORY_SECOND,
+        ];
+        DB::table('solicitud_rectificacion')->whereIn('id_solicitud_rect', $requestIds)->delete();
+
+        DB::table('solicitud_rectificacion')->insert([
+            $this->request(self::REQUEST_PENDING, self::RECORD_REQUEST_PENDING, 'PENDIENTE', 1, 7,
+                'Se solicita retirar el registro: la estudiante no era quien usaba los apuntes.'),
+            $this->request(self::REQUEST_ACCEPTED, self::RECORD_REQUEST_ACCEPTED, 'ACEPTADA', 10, 7,
+                'Se solicita retirar: el reporte correspondía a otra persona de la fila.', 9),
+            $this->request(self::REQUEST_REJECTED, self::RECORD_REQUEST_REJECTED, 'RECHAZADA', 8, 7,
+                'Se solicita retirar el registro porque el celular era de la estudiante contigua.', 7,
+                'El celular estaba a nombre de la estudiante y consta en la fotografía del aula.',
+                self::REJECTION_IMAGE),
+            $this->request(self::REQUEST_EXPIRED, self::RECORD_REQUEST_EXPIRED, 'VENCIDA', 20, 7,
+                'Se solicita retirar el registro: la estudiante tenía autorización para salir.'),
+            $this->request(self::REQUEST_HISTORY_FIRST, self::RECORD_REQUEST_HISTORY, 'RECHAZADA', 60, 7,
+                'Se solicita retirar el registro: no se identificó a la estudiante con certeza.', 58,
+                'La estudiante fue identificada por el auxiliar y por la lista de asistencia.'),
+            $this->request(self::REQUEST_HISTORY_SECOND, self::RECORD_REQUEST_HISTORY, 'RECHAZADA', 30, 7,
+                'Se solicita retirar el registro: el intercambio de hojas no está comprobado.', 28,
+                'El intercambio quedó registrado por dos auxiliares; se mantiene el registro.'),
+        ]);
+    }
+
+    /**
+     * Una solicitud enviada hace `$sentDaysAgo` días. `$answeredDaysAgo` y los datos del rechazo solo aplican a las
+     * ya respondidas.
+     *
+     * @return array<string, mixed>
+     */
+    private function request(
+        int $id,
+        int $recordId,
+        string $status,
+        int $sentDaysAgo,
+        int $validDays,
+        string $reason,
+        ?int $answeredDaysAgo = null,
+        ?string $rejectionReason = null,
+        ?string $image = null
+    ): array {
+        return [
+            'id_solicitud_rect' => $id,
+            'id_cr_estudiante' => $recordId,
+            'id_usuario_solicitante' => Ids::ADMINISTRATOR,
+            'motivo_solicitud' => $reason,
+            'id_usuario_docente' => Ids::TEACHER_FIXED,
+            'estado' => $status,
+            'fecha_solicitud' => now()->subDays($sentDaysAgo),
+            'vence_en' => now()->subDays($sentDaysAgo)->addDays($validDays),
+            'fecha_respuesta' => $answeredDaysAgo === null ? null : now()->subDays($answeredDaysAgo),
+            'motivo_rechazo' => $rejectionReason,
+            'evidencia_public_id' => $image,
+        ];
     }
 
     /** @return array<string, mixed> */
