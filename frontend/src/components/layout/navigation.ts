@@ -39,7 +39,7 @@ import type { Capability } from '@/features/auth'
 export const DISABLED_REASON = 'Disponible próximamente'
 
 /** Contadores que el menú puede mostrar junto a una entrada; el valor lo aporta quien dibuja. */
-export type NavBadge = 'pendingIncidents' | 'pendingInvitations'
+export type NavBadge = 'pendingIncidents' | 'pendingInvitations' | 'pendingRectifications'
 
 export interface NavItem {
   /** Estable: lo usan el estado activo, las pruebas y los contadores; nunca el texto visible. */
@@ -392,6 +392,14 @@ export const NAVIGATION: readonly NavSection[] = [
         icon: ShieldAlert,
         capability: 'riesgo.consultar',
         to: '/central-riesgo'
+      },
+      {
+        id: 'teacher-rectification-requests',
+        label: 'Solicitudes de rectificación',
+        icon: FilePenLine,
+        capability: 'riesgo.confirmar_rectificacion',
+        to: '/solicitudes-rectificacion',
+        badge: 'pendingRectifications'
       }
     ]
   },

@@ -1,4 +1,5 @@
 import { ShieldCheck } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDate, formatPlainDate } from '../utils/format'
@@ -10,7 +11,7 @@ interface RectifyRecordListProps {
   onRectify: (record: RectifiableRecord) => void
 }
 
-/** Registros activos del estudiante, cada uno con su botón verde «Rectificar». Aquí no se borra nada. */
+/** Registros activos del estudiante, cada uno con su botón verde «Rectificar» y, si la hay, su solicitud en espera. */
 export function RectifyRecordList({ records, onRectify }: RectifyRecordListProps) {
   return (
     <Table aria-label="Registros activos del estudiante">
@@ -40,7 +41,14 @@ export function RectifyRecordList({ records, onRectify }: RectifyRecordListProps
             <TableCell>
               <FaultTypeBadge name={record.tipo_falta.nombre} />
             </TableCell>
-            <TableCell>{record.aprobador?.nombre_completo ?? 'Sin dato'}</TableCell>
+            <TableCell>
+              {record.aprobador?.nombre_completo ?? 'Sin dato'}
+              {record.rectificacion?.solicitud_pendiente != null && (
+                <Badge variant="outline" className="mt-1 block w-fit border-warn-border bg-warn-soft text-warn-fg">
+                  Esperando confirmación del docente
+                </Badge>
+              )}
+            </TableCell>
             <TableCell className="text-right">
               <Button
                 type="button"

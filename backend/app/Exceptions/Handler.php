@@ -28,17 +28,27 @@ use App\Exceptions\Security\GuestCodesExhaustedException;
 use App\Exceptions\Security\RoleNotAllowedForAccountException;
 use App\Support\ApiResponse;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Http\Exceptions\PostTooLargeException;
 use Illuminate\Http\Request;
 use App\Exceptions\Incidents\IncidentAlreadyReviewedException;
 use App\Exceptions\Incidents\IncidentOwnershipException;
 use App\Exceptions\Incidents\IncidentReportNotFoundException;
+use App\Exceptions\RiskCenter\ApprovingTeacherStateException;
+use App\Exceptions\RiskCenter\RectificationRequestClosedException;
+use App\Exceptions\RiskCenter\RectificationRequestOwnershipException;
+use App\Exceptions\RiskCenter\RectificationRequestPendingException;
 use App\Exceptions\RiskCenter\RiskRecordAlreadyRectifiedException;
 use Throwable;
 
 class Handler extends ExceptionHandler
 {
+    /** SQLSTATE de consulta cancelada por tiempo (57014) y de lock no disponible (55P03). */
+    public const BUSY_SQLSTATES = ['57014', '55P03'];
+
+    public const BUSY_MESSAGE = 'El sistema está ocupado en este momento. Intente de nuevo en unos segundos.';
+
     /**
      * Excepciones de negocio: son resultados esperados que ya responden con su propio render(), no
      * fallos. Reportarlas llena el log de trazas (algunas con nombres de personas) y tapa los
@@ -79,6 +89,10 @@ class Handler extends ExceptionHandler
         IncidentOwnershipException::class,
         IncidentReportNotFoundException::class,
         RiskRecordAlreadyRectifiedException::class,
+        ApprovingTeacherStateException::class,
+        RectificationRequestClosedException::class,
+        RectificationRequestOwnershipException::class,
+        RectificationRequestPendingException::class,
     ];
 
     /**
@@ -115,6 +129,15 @@ class Handler extends ExceptionHandler
     {
         $this->reportable(function (Throwable $e) {
             //
+        });
+
+        // RNF-14: la base cortó la consulta por statement_timeout (57014) o dejó de esperar un lock por
+        // lock_timeout (55P03). Es saturación pasajera, no un error del usuario: 503 con un mensaje
+        // para reintentar. La excepción se sigue reportando (señal operativa).
+        $this->renderable(function (QueryException $e, Request $request) {
+            if (in_array((string) $e->getCode(), self::BUSY_SQLSTATES, true)) {
+                return ApiResponse::error(self::BUSY_MESSAGE, 503);
+            }
         });
 
         // El cuerpo superó post_max_size (16 MB): PHP lo descarta y Laravel responde sin mensaje.

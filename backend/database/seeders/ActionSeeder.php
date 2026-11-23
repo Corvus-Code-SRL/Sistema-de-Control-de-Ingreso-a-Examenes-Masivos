@@ -118,6 +118,34 @@ class ActionSeeder extends Seeder
             DB::table('accion')->updateOrInsert(['operacion' => $action['operacion']], $action);
         }
 
+        // HU-062: confirmación del docente en la rectificación; al final para no mover los ids existentes.
+        $rectification = [
+            [
+                'operacion' => 'SOLICITAR_RECTIFICACION',
+                'tipo_operacion' => 'INSERT',
+                'descripcion' => 'Solicitud de rectificación de un registro de la Central de Riesgo',
+            ],
+            [
+                'operacion' => 'ACEPTAR_RECTIFICACION',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Aceptación de una solicitud de rectificación por el docente',
+            ],
+            [
+                'operacion' => 'RECHAZAR_RECTIFICACION',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Rechazo de una solicitud de rectificación por el docente',
+            ],
+            [
+                'operacion' => 'RECTIFICAR_SIN_CONFIRMACION',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Rectificación de un registro sin confirmación por docente inactivo',
+            ],
+        ];
+
+        foreach ($rectification as $action) {
+            DB::table('accion')->updateOrInsert(['operacion' => $action['operacion']], $action);
+        }
+
         DB::table('accion')->updateOrInsert(
             ['operacion' => 'GUARDAR_DISTRIBUCION'],
             [

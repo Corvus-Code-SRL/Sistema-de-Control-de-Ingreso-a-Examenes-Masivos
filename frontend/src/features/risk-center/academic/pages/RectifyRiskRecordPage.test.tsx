@@ -46,9 +46,9 @@ async function writeReason(user: User, text = REASON) {
 
 async function review(user: User, text = REASON) {
   await writeReason(user, text)
-  await user.click(screen.getByRole('button', { name: 'Rectificar registro' }))
+  await user.click(screen.getByRole('button', { name: 'Enviar solicitud al docente' }))
 
-  return screen.findByRole('dialog', { name: '¿Rectificar este registro?' })
+  return screen.findByRole('dialog', { name: '¿Enviar la solicitud de rectificación?' })
 }
 
 const REASON = 'Se retira: el reporte no tenía sustento.'
@@ -150,12 +150,14 @@ describe('RectifyRiskRecordPage — búsqueda de estudiantes', () => {
       'Tipo de falta',
       'Rectificado el',
       'Administrador',
+      'Aprobó',
       'Motivo',
     ])
     expect(rows).toHaveLength(1)
     expect(within(rows[0]).getByText('Material no permitido')).toBeInTheDocument()
     expect(within(rows[0]).getByText('05/10/2026')).toBeInTheDocument()
     expect(within(rows[0]).getByText(ADMIN_NAME)).toBeInTheDocument()
+    expect(within(rows[0]).getByText('Marcelo Quiroga Andrade')).toBeInTheDocument()
     expect(within(rows[0]).getByText(VOIDED_REASON)).toBeInTheDocument()
     expect(within(rectified).queryByRole('button')).not.toBeInTheDocument()
   })
@@ -339,7 +341,7 @@ describe('RectifyRiskRecordPage — ficha del registro', () => {
     expect(within(form).getAllByRole('textbox').map((control) => control.id)).toEqual(['rectify-reason'])
     expect(within(form).queryByRole('combobox')).not.toBeInTheDocument()
     expect(within(form).getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
-    expect(within(form).getByRole('button', { name: 'Rectificar registro' })).toBeInTheDocument()
+    expect(within(form).getByRole('button', { name: 'Enviar solicitud al docente' })).toBeInTheDocument()
   })
 
   it('un registro ya rectificado no se puede abrir: muestra el error del servidor', async () => {
@@ -365,7 +367,7 @@ describe('RectifyRiskRecordPage — motivo y confirmación en dos pasos', () => 
     renderPage('/rectificar-registro/9702?registro=9962')
 
     await screen.findByRole('form', { name: 'Rectificar registro' })
-    await user.click(screen.getByRole('button', { name: 'Rectificar registro' }))
+    await user.click(screen.getByRole('button', { name: 'Enviar solicitud al docente' }))
 
     expect(screen.getByText('El motivo es obligatorio')).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -379,7 +381,7 @@ describe('RectifyRiskRecordPage — motivo y confirmación en dos pasos', () => 
 
     await screen.findByRole('form', { name: 'Rectificar registro' })
     await writeReason(user, '            ')
-    await user.click(screen.getByRole('button', { name: 'Rectificar registro' }))
+    await user.click(screen.getByRole('button', { name: 'Enviar solicitud al docente' }))
 
     expect(screen.getByText('El motivo es obligatorio')).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -392,13 +394,13 @@ describe('RectifyRiskRecordPage — motivo y confirmación en dos pasos', () => 
 
     await screen.findByRole('form', { name: 'Rectificar registro' })
     await writeReason(user, 'corto')
-    await user.click(screen.getByRole('button', { name: 'Rectificar registro' }))
+    await user.click(screen.getByRole('button', { name: 'Enviar solicitud al docente' }))
 
     expect(screen.getByText('El motivo debe tener al menos 10 caracteres.')).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('«Rectificar registro» no guarda: abre la confirmación que nombra al estudiante y al registro y avisa que no se deshace', async () => {
+  it('«Enviar solicitud al docente» no guarda: abre la confirmación que nombra al estudiante, al registro y al docente', async () => {
     const user = userEvent.setup()
     const api = stubRectificationApi()
     renderPage('/rectificar-registro/9702?registro=9962')
@@ -410,11 +412,12 @@ describe('RectifyRiskRecordPage — motivo y confirmación en dos pasos', () => 
     expect(dialog).toHaveTextContent('Carla Condori Vega')
     expect(dialog).toHaveTextContent('«Conducta indebida»')
     expect(dialog).toHaveTextContent('«2do Parcial»')
-    expect(dialog).toHaveTextContent('dejará de figurar en la Central')
-    expect(dialog).toHaveTextContent('no se puede deshacer')
+    expect(dialog).toHaveTextContent('Marcelo Quiroga Andrade')
+    expect(dialog).toHaveTextContent('seguirá activo en la Central de Riesgo hasta que el docente la acepte')
+    expect(dialog).toHaveTextContent('vence en 7 días')
     expect(within(dialog).getByText(REASON)).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Sí, rectificar' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Sí, enviar solicitud' })).toBeInTheDocument()
     expect(api.posts()).toHaveLength(0)
   })
 
@@ -460,73 +463,208 @@ describe('RectifyRiskRecordPage — motivo y confirmación en dos pasos', () => 
     expect(api.posts()).toHaveLength(0)
   })
 
-  it('al confirmar envía solo el motivo recortado y avisa que el registro ya no figura en la Central', async () => {
+  it('al confirmar envía la solicitud con solo el motivo recortado y avisa que el registro sigue activo', async () => {
     const user = userEvent.setup()
     const api = stubRectificationApi()
     renderPage('/rectificar-registro/9702?registro=9962')
 
     await screen.findByRole('form', { name: 'Rectificar registro' })
-    await user.click(within(await review(user, `  ${REASON}  `)).getByRole('button', { name: 'Sí, rectificar' }))
+    await user.click(within(await review(user, `  ${REASON}  `)).getByRole('button', { name: 'Sí, enviar solicitud' }))
 
     expect(await screen.findByRole('status')).toHaveTextContent(
-      'Registro rectificado: «Conducta indebida» de Carla Condori Vega ya no figura en la Central de Riesgo.'
+      'Solicitud enviada a Marcelo Quiroga Andrade: el registro «Conducta indebida» de Carla Condori Vega sigue activo hasta que el docente la confirme.'
     )
     expect(api.posts()).toHaveLength(1)
+    expect(new URL(api.posts()[0].url).pathname).toMatch(/\/registros\/9962\/solicitudes$/)
     expect(api.posts()[0].body).toEqual({ motivo: REASON })
     expect(location()).toBe('/rectificar-registro/9702')
   })
 
-  it('tras confirmar, el registro sale de la lista activa y aparece en «Registros rectificados» con su fecha, administrador y motivo', async () => {
+  it('tras enviar, el registro sigue en la lista activa «Esperando confirmación del docente» y nada se rectifica', async () => {
     const user = userEvent.setup()
-    stubRectificationApi()
+    const api = stubRectificationApi()
     renderPage('/rectificar-registro/9702?registro=9962')
 
     await screen.findByRole('form', { name: 'Rectificar registro' })
-    await user.click(within(await review(user)).getByRole('button', { name: 'Sí, rectificar' }))
+    await user.click(within(await review(user)).getByRole('button', { name: 'Sí, enviar solicitud' }))
 
     const active = await screen.findByRole('table', { name: 'Registros activos del estudiante' })
-    const activeRows = within(active).getAllByRole('row').slice(1)
-    const rectifiedRows = within(screen.getByRole('table', { name: 'Registros rectificados del estudiante' }))
-      .getAllByRole('row')
-      .slice(1)
+    const rows = within(active).getAllByRole('row').slice(1)
 
-    expect(activeRows).toHaveLength(1)
-    expect(within(activeRows[0]).getByText('3er Parcial')).toBeInTheDocument()
-    expect(within(active).queryByText('Conducta indebida')).not.toBeInTheDocument()
-    expect(rectifiedRows).toHaveLength(2)
-    expect(within(rectifiedRows[0]).getByText('Conducta indebida')).toBeInTheDocument()
-    expect(within(rectifiedRows[0]).getByText('14/11/2026')).toBeInTheDocument()
-    expect(within(rectifiedRows[0]).getByText(ADMIN_NAME)).toBeInTheDocument()
-    expect(within(rectifiedRows[0]).getByText(REASON)).toBeInTheDocument()
-    expect(within(rectifiedRows[1]).getByText('Material no permitido')).toBeInTheDocument()
-  })
-
-  it('al rectificar el último registro activo, la lista activa queda vacía y el registro figura como rectificado', async () => {
-    const user = userEvent.setup()
-    stubRectificationApi()
-    renderPage('/rectificar-registro/9700?registro=9963')
-
-    await screen.findByRole('form', { name: 'Rectificar registro' })
-    await user.click(within(await review(user)).getByRole('button', { name: 'Sí, rectificar' }))
-
+    expect(rows).toHaveLength(2)
+    expect(within(active).getAllByText('Esperando confirmación del docente')).toHaveLength(1)
+    expect(api.records.get(9962)?.rectificacion).toBeNull()
     expect(
-      await screen.findByText('El estudiante no tiene registros activos en la Central de Riesgo')
-    ).toBeInTheDocument()
-    expect(screen.queryByRole('table', { name: 'Registros activos del estudiante' })).not.toBeInTheDocument()
-    expect(within(screen.getByRole('table', { name: 'Registros rectificados del estudiante' })).getAllByRole('row')).toHaveLength(2)
+      within(screen.getByRole('table', { name: 'Registros rectificados del estudiante' })).getAllByRole('row')
+    ).toHaveLength(2)
   })
 
-  it('si el registro ya había sido rectificado, muestra el conflicto, no avisa de éxito y permite volver', async () => {
+  it('si el registro ya tiene una solicitud pendiente, muestra el conflicto, no avisa de éxito y permite volver', async () => {
     const user = userEvent.setup()
     stubRectificationApi({ conflict: true })
     renderPage('/rectificar-registro/9702?registro=9962')
 
     await screen.findByRole('form', { name: 'Rectificar registro' })
-    await user.click(within(await review(user)).getByRole('button', { name: 'Sí, rectificar' }))
+    await user.click(within(await review(user)).getByRole('button', { name: 'Sí, enviar solicitud' }))
 
-    expect(await screen.findByText('Este registro ya fue rectificado y ya no está en la Central de Riesgo.')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Este registro ya tiene una solicitud de rectificación pendiente.')
+    ).toBeInTheDocument()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Volver a los registros' }).length).toBeGreaterThan(0)
+  })
+
+  it('un error del servidor al enviar muestra su mensaje y no avisa de éxito', async () => {
+    const user = userEvent.setup()
+    stubRectificationApi({ requestFail: { status: 500, message: 'No se pudo enviar la solicitud ahora.' } })
+    renderPage('/rectificar-registro/9702?registro=9962')
+
+    await screen.findByRole('form', { name: 'Rectificar registro' })
+    await user.click(within(await review(user)).getByRole('button', { name: 'Sí, enviar solicitud' }))
+
+    expect(await screen.findByText('No se pudo enviar la solicitud ahora.')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+})
+
+const INACTIVE_SINCE = '2026-01-10T12:00:00+00:00'
+
+function inactiveTeacher(overrides: { desde: string | null; puede: boolean }) {
+  return {
+    nombre_completo: 'Marcelo Quiroga Andrade',
+    activo: false,
+    inactivo_desde: overrides.desde === null ? null : INACTIVE_SINCE,
+    fuente: overrides.desde === null ? null : ('ROL_CERRADO' as const),
+    puede_rectificar_desde: overrides.desde,
+    puede_rectificar_sin_confirmacion: overrides.puede,
+  }
+}
+
+describe('RectifyRiskRecordPage — estado de las solicitudes', () => {
+  it('con una solicitud pendiente muestra «Esperando confirmación del docente» y no ofrece enviar otra', async () => {
+    stubRectificationApi({
+      summaries: {
+        9962: {
+          solicitud_pendiente: {
+            id_solicitud_rect: 9980,
+            motivo: 'Motivo ya enviado al docente.',
+            fecha_solicitud: '2026-11-20T15:00:00+00:00',
+            vence_en: '2026-11-27T15:00:00+00:00',
+            docente: { nombre_completo: 'Marcelo Quiroga Andrade' },
+          },
+        },
+      },
+    })
+    renderPage('/rectificar-registro/9702?registro=9962')
+
+    const panel = await screen.findByLabelText('Estado de la rectificación')
+
+    expect(panel).toHaveTextContent('Esperando confirmación del docente')
+    expect(panel).toHaveTextContent('Marcelo Quiroga Andrade')
+    expect(panel).toHaveTextContent('Motivo ya enviado al docente.')
+    expect(screen.queryByRole('form', { name: 'Rectificar registro' })).not.toBeInTheDocument()
+  })
+
+  it('muestra por separado los rechazos y las vencidas, y el último rechazo con su motivo y su imagen', async () => {
+    stubRectificationApi({
+      summaries: {
+        9962: {
+          rechazos: 2,
+          vencidas: 1,
+          ultimo_rechazo: {
+            id_solicitud_rect: 9970,
+            motivo: 'El registro está sustentado por dos auxiliares.',
+            fecha: '2026-11-10T15:00:00+00:00',
+            evidencia: { nombre_archivo: 'rechazo.png', tamano_bytes: 1024, disponible: true },
+          },
+        },
+      },
+    })
+    renderPage('/rectificar-registro/9702?registro=9962')
+
+    const panel = await screen.findByLabelText('Estado de la rectificación')
+
+    expect(panel).toHaveTextContent('2 solicitudes rechazadas')
+    expect(panel).toHaveTextContent('1 solicitud vencida')
+    expect(panel).toHaveTextContent('El registro está sustentado por dos auxiliares.')
+    expect(panel).toHaveTextContent('10/11/2026')
+    expect(within(panel).getByRole('button', { name: 'Descargar imagen del rechazo' })).toBeInTheDocument()
+    expect(screen.getByRole('form', { name: 'Rectificar registro' })).toBeInTheDocument()
+  })
+
+  it('tras un rechazo o un vencimiento se puede enviar una solicitud nueva', async () => {
+    const user = userEvent.setup()
+    const api = stubRectificationApi({ summaries: { 9962: { rechazos: 3, vencidas: 2 } } })
+    renderPage('/rectificar-registro/9702?registro=9962')
+
+    await screen.findByRole('form', { name: 'Rectificar registro' })
+    await user.click(within(await review(user)).getByRole('button', { name: 'Sí, enviar solicitud' }))
+
+    await waitFor(() => expect(api.posts()).toHaveLength(1))
+  })
+
+  it('docente inactivo con fecha conocida y plazo sin cumplir: informa desde cuándo y no ofrece enviar ni anular', async () => {
+    stubRectificationApi({
+      summaries: { 9962: { docente: inactiveTeacher({ desde: '2026-07-09T12:00:00+00:00', puede: false }) } },
+    })
+    renderPage('/rectificar-registro/9702?registro=9962')
+
+    const panel = await screen.findByLabelText('Estado de la rectificación')
+
+    expect(panel).toHaveTextContent('ya no es docente activo')
+    expect(panel).toHaveTextContent('No se le puede enviar la solicitud')
+    expect(panel).toHaveTextContent('09/07/2026')
+    expect(screen.queryByRole('form', { name: 'Rectificar registro' })).not.toBeInTheDocument()
+  })
+
+  it('docente inactivo pasado el plazo: anula directo con el mismo motivo y la confirmación en dos pasos', async () => {
+    const user = userEvent.setup()
+    const api = stubRectificationApi({
+      summaries: { 9962: { docente: inactiveTeacher({ desde: '2026-07-09T12:00:00+00:00', puede: true }) } },
+    })
+    renderPage('/rectificar-registro/9702?registro=9962')
+
+    await screen.findByRole('form', { name: 'Rectificar registro' })
+    await writeReason(user)
+    await user.click(screen.getByRole('button', { name: 'Anular registro' }))
+
+    const dialog = await screen.findByRole('dialog', { name: '¿Anular este registro?' })
+
+    expect(dialog).toHaveTextContent('más de 180 días')
+    expect(dialog).toHaveTextContent('no se puede deshacer')
+    expect(api.posts()).toHaveLength(0)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Sí, anular registro' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Registro rectificado: «Conducta indebida» de Carla Condori Vega ya no figura en la Central de Riesgo.'
+    )
+    expect(new URL(api.posts()[0].url).pathname).toMatch(/\/registros\/9962\/rectificar-sin-confirmacion$/)
+    expect(api.posts()[0].body).toEqual({ motivo: REASON })
+    expect(api.records.get(9962)?.rectificacion).not.toBeNull()
+  })
+
+  it('docente inactivo sin fecha conocida: avisa que se inicia el plazo y muestra el 409 con la fecha', async () => {
+    const user = userEvent.setup()
+    const api = stubRectificationApi({
+      summaries: { 9962: { docente: inactiveTeacher({ desde: null, puede: false }) } },
+    })
+    renderPage('/rectificar-registro/9702?registro=9962')
+
+    await screen.findByRole('form', { name: 'Rectificar registro' })
+    await writeReason(user)
+    await user.click(screen.getByRole('button', { name: 'Anular registro' }))
+
+    const dialog = await screen.findByRole('dialog', { name: '¿Anular este registro?' })
+
+    expect(dialog).toHaveTextContent('se iniciará el plazo de 180 días')
+    expect(dialog).toHaveTextContent('el registro no se anulará todavía')
+
+    await user.click(within(dialog).getByRole('button', { name: 'Sí, continuar' }))
+
+    expect(await screen.findByText(/podrá anular el registro desde el 20\/05\/2027/)).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(api.records.get(9962)?.rectificacion).toBeNull()
   })
 })

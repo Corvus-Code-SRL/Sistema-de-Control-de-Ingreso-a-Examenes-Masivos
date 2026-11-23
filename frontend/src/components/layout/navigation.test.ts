@@ -33,12 +33,13 @@ describe('NAVIGATION', () => {
     expect(labels).not.toContain('Inicio')
   })
 
-  it('las insignias son los contadores de invitaciones e incidencias pendientes', () => {
+  it('las insignias son los contadores de invitaciones, incidencias y solicitudes de rectificación pendientes', () => {
     const withBadge = NAVIGATION.flatMap((section) => section.items).filter((item) => item.badge)
 
     expect(withBadge.map((item) => [item.label, item.badge])).toEqual([
       ['Invitaciones recibidas', 'pendingInvitations'],
-      ['Revisar reportes de incidencias', 'pendingIncidents']
+      ['Revisar reportes de incidencias', 'pendingIncidents'],
+      ['Solicitudes de rectificación', 'pendingRectifications']
     ])
   })
 })
@@ -123,7 +124,8 @@ describe('menú por capacidades', () => {
         label: 'Central de riesgo',
         items: [
           ['Revisar reportes de incidencias', '/incidencias'],
-          ['Central de riesgo', '/central-riesgo']
+          ['Central de riesgo', '/central-riesgo'],
+          ['Solicitudes de rectificación', '/solicitudes-rectificacion']
         ]
       },
       {
@@ -187,10 +189,26 @@ describe('menú por capacidades', () => {
     )
   })
 
-  it('invitado: la única entrada de su sección de riesgo es la revisión de incidencias', () => {
+  it('invitado: su sección de riesgo tiene la revisión de incidencias y las solicitudes de rectificación', () => {
     const risk = menuOf('Invitado').find((section) => section.label === 'Central de riesgo')
 
-    expect(risk?.items).toEqual([['Revisar reportes de incidencias', '/incidencias']])
+    expect(risk?.items).toEqual([
+      ['Revisar reportes de incidencias', '/incidencias'],
+      ['Solicitudes de rectificación', '/solicitudes-rectificacion']
+    ])
+  })
+
+  it('«Solicitudes de rectificación» exige riesgo.confirmar_rectificacion', () => {
+    const entry = (capabilities: Parameters<typeof visibleSections>[0]) =>
+      visibleSections(capabilities)
+        .flatMap((section) => section.items)
+        .some((item) => item.label === 'Solicitudes de rectificación')
+
+    expect(entry(capabilitiesOf('Docente'))).toBe(true)
+    expect(entry(capabilitiesOf('Invitado'))).toBe(true)
+    expect(entry(capabilitiesOf('Administrador'))).toBe(false)
+    expect(entry(capabilitiesOf('Auxiliar'))).toBe(false)
+    expect(entry(['examenes.gestionar'])).toBe(false)
   })
 
   it('una sección sin ninguna entrada permitida no se devuelve', () => {

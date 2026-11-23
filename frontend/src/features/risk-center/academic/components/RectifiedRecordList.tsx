@@ -18,6 +18,7 @@ export function RectifiedRecordList({ records }: RectifiedRecordListProps) {
           <TableHead>Tipo de falta</TableHead>
           <TableHead>Rectificado el</TableHead>
           <TableHead>Administrador</TableHead>
+          <TableHead>Aprobó</TableHead>
           <TableHead>Motivo</TableHead>
         </TableRow>
       </TableHeader>
@@ -38,6 +39,7 @@ export function RectifiedRecordList({ records }: RectifiedRecordListProps) {
             </TableCell>
             <TableCell className="whitespace-nowrap">{formatDate(record.rectificacion.fecha)}</TableCell>
             <TableCell>{record.rectificacion.administrador.nombre_completo ?? 'Sin dato'}</TableCell>
+            <TableCell>{record.aprobador?.nombre_completo ?? 'Sin dato'}</TableCell>
             <TableCell className="max-w-xs whitespace-pre-line break-words">
               {record.rectificacion.motivo}
             </TableCell>

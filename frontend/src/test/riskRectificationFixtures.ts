@@ -4,6 +4,7 @@ import type {
   RectifiableRecordDetail,
   RectifiableStudent,
   RectifiedRecord,
+  RectificationSummary,
 } from '@/features/risk-center/academic/types/riskRectification.types'
 
 /**
@@ -52,6 +53,30 @@ export const VOIDED_REASON = 'Se confundió a la estudiante: el reporte correspo
 
 const APPROVER = { nombre_completo: 'Marcelo Quiroga Andrade' }
 
+export const REQUEST_SENT_AT = '2026-11-20T15:00:00+00:00'
+export const REQUEST_EXPIRES_AT = '2026-11-27T15:00:00+00:00'
+
+/** Resumen de un registro sin solicitudes y con el docente aprobador activo. */
+export function emptySummary(overrides: Partial<RectificationSummary> = {}): RectificationSummary {
+  return {
+    solicitud_pendiente: null,
+    rechazos: 0,
+    vencidas: 0,
+    ultimo_rechazo: null,
+    docente: {
+      nombre_completo: APPROVER.nombre_completo,
+      activo: true,
+      inactivo_desde: null,
+      fuente: null,
+      puede_rectificar_desde: null,
+      puede_rectificar_sin_confirmacion: false,
+    },
+    dias_vencimiento: 7,
+    dias_docente_inactivo: 180,
+    ...overrides,
+  }
+}
+
 function detail(
   student: RectifiableStudent,
   id: number,
@@ -73,6 +98,7 @@ function detail(
     reportante: { nombre_completo: 'Daniela Ferrufino Soliz', fecha: '2026-09-10T12:40:00+00:00' },
     aprobador: { ...APPROVER, fecha: registeredAt },
     fecha_registro: registeredAt,
+    rectificacion: emptySummary(),
     ...overrides,
   }
 }
@@ -116,8 +142,9 @@ export function initialRecords(): StubbedRecord[] {
   ]
 }
 
-function toSummary(record: RectifiableRecordDetail): RectifiableRecord {
+function toSummary(record: RectifiableRecordDetail, withSummary = true): RectifiableRecord {
   return {
+    ...(withSummary ? { rectificacion: record.rectificacion } : {}),
     id_cr_estudiante: record.id_cr_estudiante,
     fecha_registro: record.fecha_registro,
     examen: {
@@ -142,20 +169,31 @@ interface StubOptions {
   /** Fuerza la marca «hay más coincidencias». */
   hasMore?: boolean
   searchFail?: boolean
-  /** Otra persona rectificó antes: toda rectificación responde 409. */
+  /** Otra persona actuó antes: toda solicitud o anulación responde 409. */
   conflict?: boolean
+  /** Resumen de solicitudes por id de registro, sobre el resumen vacío. */
+  summaries?: Record<number, Partial<RectificationSummary>>
+  /** La solicitud falla con este mensaje y estado. */
+  requestFail?: { status: number; message: string }
 }
 
 export interface RectificationApi {
   calls: RecordedRequest[]
   records: Map<number, StubbedRecord>
-  /** Los POST de rectificación recibidos. */
+  /** Los POST recibidos (solicitudes y anulaciones). */
   posts: () => RecordedRequest[]
 }
 
 export function stubRectificationApi(options: StubOptions = {}): RectificationApi {
   const students = options.students ?? allStudents
   const records = new Map(initialRecords().map((record) => [record.detail.id_cr_estudiante, record]))
+
+  for (const [id, summary] of Object.entries(options.summaries ?? {})) {
+    const record = records.get(Number(id))
+
+    if (record) record.detail.rectificacion = emptySummary(summary)
+  }
+
   const notFound = { status: 404, body: { message: 'No existe el registro de la Central de Riesgo indicado.' } }
 
   const api = mockApiWith((request) => {
@@ -193,20 +231,67 @@ export function stubRectificationApi(options: StubOptions = {}): RectificationAp
       const rectified = own
         .filter((record) => record.rectificacion !== null)
         .sort((left, right) => right.rectificacion!.fecha.localeCompare(left.rectificacion!.fecha))
-        .map((record): RectifiedRecord => ({ ...toSummary(record.detail), rectificacion: record.rectificacion! }))
+        .map((record): RectifiedRecord => ({ ...toSummary(record.detail, false), rectificacion: record.rectificacion! }))
 
       return { body: { data: { estudiante: student, registros: active, rectificados: rectified } } }
     }
 
-    const rectify = path.match(/^\/rectificacion-riesgo\/registros\/(\d+)\/rectificar$/)
+    const requestMatch = path.match(/^\/rectificacion-riesgo\/registros\/(\d+)\/solicitudes$/)
 
-    if (rectify && request.method === 'POST') {
-      const record = records.get(Number(rectify[1]))
+    if (requestMatch && request.method === 'POST') {
+      const record = records.get(Number(requestMatch[1]))
+
+      if (!record) return notFound
+
+      if (options.requestFail) return { status: options.requestFail.status, body: { message: options.requestFail.message } }
+
+      if (options.conflict || record.rectificacion !== null || record.detail.rectificacion.solicitud_pendiente !== null) {
+        return { status: 409, body: { message: 'Este registro ya tiene una solicitud de rectificación pendiente.' } }
+      }
+
+      const motivo = (request.body as { motivo: string }).motivo
+      const teacher = record.detail.rectificacion.docente.nombre_completo
+
+      record.detail.rectificacion.solicitud_pendiente = {
+        id_solicitud_rect: 9980,
+        motivo,
+        fecha_solicitud: REQUEST_SENT_AT,
+        vence_en: REQUEST_EXPIRES_AT,
+        docente: { nombre_completo: teacher },
+      }
+
+      return {
+        status: 201,
+        body: {
+          data: {
+            id_solicitud_rect: 9980,
+            id_cr_estudiante: record.detail.id_cr_estudiante,
+            estado: 'PENDIENTE',
+            motivo,
+            docente: { nombre_completo: teacher },
+            fecha_solicitud: REQUEST_SENT_AT,
+            vence_en: REQUEST_EXPIRES_AT,
+          },
+        },
+      }
+    }
+
+    const direct = path.match(/^\/rectificacion-riesgo\/registros\/(\d+)\/rectificar-sin-confirmacion$/)
+
+    if (direct && request.method === 'POST') {
+      const record = records.get(Number(direct[1]))
 
       if (!record) return notFound
 
       if (options.conflict || record.rectificacion !== null) {
         return { status: 409, body: { message: 'Este registro ya fue rectificado y ya no está en la Central de Riesgo.' } }
+      }
+
+      if (!record.detail.rectificacion.docente.puede_rectificar_sin_confirmacion) {
+        return {
+          status: 409,
+          body: { message: 'El docente aprobador está inactivo desde hace poco: podrá anular el registro desde el 20/05/2027.' },
+        }
       }
 
       record.rectificacion = {
@@ -215,7 +300,7 @@ export function stubRectificationApi(options: StubOptions = {}): RectificationAp
         motivo: (request.body as { motivo: string }).motivo,
       }
 
-      return { status: 200, body: { data: { ...toSummary(record.detail), rectificacion: record.rectificacion } } }
+      return { status: 200, body: { data: { ...toSummary(record.detail, false), rectificacion: record.rectificacion } } }
     }
 
     const show = path.match(/^\/rectificacion-riesgo\/registros\/(\d+)$/)
