@@ -150,12 +150,14 @@ describe('RectifyRiskRecordPage — búsqueda de estudiantes', () => {
       'Tipo de falta',
       'Rectificado el',
       'Administrador',
+      'Aprobó',
       'Motivo',
     ])
     expect(rows).toHaveLength(1)
     expect(within(rows[0]).getByText('Material no permitido')).toBeInTheDocument()
     expect(within(rows[0]).getByText('05/10/2026')).toBeInTheDocument()
     expect(within(rows[0]).getByText(ADMIN_NAME)).toBeInTheDocument()
+    expect(within(rows[0]).getByText('Marcelo Quiroga Andrade')).toBeInTheDocument()
     expect(within(rows[0]).getByText(VOIDED_REASON)).toBeInTheDocument()
     expect(within(rectified).queryByRole('button')).not.toBeInTheDocument()
   })
