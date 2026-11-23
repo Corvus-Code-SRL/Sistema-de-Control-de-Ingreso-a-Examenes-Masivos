@@ -77,7 +77,8 @@ function jsonResponse({
         throw new SyntaxError('Unexpected token < in JSON at position 0')
       }
 
-      return body
+      // Como un servidor real, cada lectura entrega una copia: mutar el fixture no altera lo ya recibido.
+      return JSON.parse(JSON.stringify(body))
     },
     // Un cuerpo Blob simula la entrega de un archivo (evidencia); cualquier otro se serializa.
     blob: async () => (body instanceof Blob ? body : new Blob([JSON.stringify(body)])),
