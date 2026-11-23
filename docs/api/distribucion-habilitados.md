@@ -9,8 +9,8 @@ Todas las rutas están bajo `/api` y requieren sesión, cuenta activa y acceso a
 el PUT recibe `Content-Type: application/json`.
 
 El creador del examen puede proponer y guardar. Un colaborador con invitación ACEPTADA solo
-consulta. El selector devuelve los exámenes PROGRAMADO de ambos tipos; un control ya abierto
-permanece visible, con `editable: false`.
+consulta. El selector devuelve los exámenes PROGRAMADO de ambos tipos y los EN_CURSO con distribución
+guardada; un control ya abierto permanece visible, con `editable: false`.
 
 | Método | Ruta | HTTP de éxito | Cuerpo |
 |---|---|---|---|
@@ -18,8 +18,9 @@ permanece visible, con `editable: false`.
 | GET | `/api/examenes/{exam}/distribucion` | 200 | `{ data: DistributionView }` |
 | POST | `/api/examenes/{exam}/distribucion/propuesta` | 200 | `{ data: DistributionProposal }` |
 | PUT | `/api/examenes/{exam}/distribucion` | 200 | `{ data: DistributionView, mensaje: string }` |
+| POST | `/api/examenes/{exam}/distribucion/dejar-de-usar` | 200 | `{ data: DistributionView, mensaje: string }` |
 
-**`mensaje` solo se incluye en un PUT exitoso**, con el valor «Distribución guardada».
+**`mensaje` solo se incluye al guardar («Distribución guardada») o al dejar de usarla.**
 Los GET y el POST de propuesta omiten esa clave; no la devuelven como `null`.
 Los errores usan `message`, en singular y en inglés como nombre de clave, según el contrato compartido de SCIEM.
 
@@ -214,9 +215,9 @@ a su permiso o estado, además de los contadores de capacidad.
 ## POST /api/examenes/{exam}/distribucion/propuesta
 
 Ejemplo: `POST /api/examenes/1/distribucion/propuesta`. No requiere cuerpo.
-Ordena alfabéticamente y reparte bloques consecutivos en proporción a la capacidad de cada
-ambiente, por mayores restos y desempate por orden de ambiente. Por ejemplo, 55 habilitados
-y dos ambientes de 30 producen 28 y 27; capacidades 40/20/20 con 60 producen 30/15/15.
+Ordena alfabéticamente y reparte bloques consecutivos en partes iguales. Si un ambiente no admite
+su parte, el excedente pasa a los que aún tienen lugar; el resto va uno a uno a los primeros y nunca
+se supera la capacidad. Por ejemplo: 100 en 60/60 da 50/50; 100 en 80/40 da 60/40; 55 en 30/30 da 28/27.
 
 Si falta capacidad, el excedente queda con `id_ambiente: null` y se cuenta en `sin_asignar`.
 El POST no guarda ni genera bitácora. Respuesta real:
@@ -405,7 +406,8 @@ Se conserva la distribución confirmada. El cliente debe recargar y revisar ante
 }
 ```
 
-Ocurre cuando el examen dejó de estar PROGRAMADO o ya se abrió su control de ingreso.
+Ocurre cuando el examen dejó de estar PROGRAMADO, ya llegó su hora de apertura (inicio menos
+`minutos_apertura`, aunque el job aún no haya corrido) o ya se abrió su control de ingreso.
 
 ### 422 — versión ausente o mal formada
 
@@ -497,85 +499,59 @@ Esta limitación se conserva deliberadamente: no hay asignaciones vigentes que p
 confirmación vacía. Si luego se habilitan estudiantes, aparecen sin ambiente y el PUT vuelve a
 exigir la nómina actual completa, independientemente de que conserve la versión vacía.
 
-## Integración con el control de ingreso (A3)
+## Integración con el control de ingreso
 
-`RoomDistributionReader::assignedRooms(id_examen)` es una lectura sin escrituras ni bitácora
-adicional. Lo consumen `EntryControlSnapshotService::stage()`, `recordFor()` (también usado
-por ingreso con retraso) y `ExamInProgressQueryService`:
+La distribución es **opcional y avisa, no bloquea**. `RoomDistributionReader::assignedRooms()` es una
+lectura pura: devuelve el ambiente planificado de cada habilitado y un mapa vacío si no hay distribución
+o se dejó de usar. No reparte a nadie: un habilitado sin fila queda sin ambiente y entra por cualquiera.
 
-1. Sin filas en `distribucion_ambiente`, devuelve `null`. Los tres consumidores conservan
-   su cálculo anterior por ID y capacidades. Una confirmación vacía también devuelve `null`,
-   por la decisión de no agregar un marcador para cero habilitados.
-2. Con filas guardadas, obtiene la nómina habilitada única y ordenada de
-   `DistributionRosterQuery`, reutilizando `ExamRosterService` y `SurnameDistributor`.
-3. Consulta directamente los `CASO ESPECIAL` de `examen_estudiante` con ambiente operativo.
-   Sus ambientes prevalecen sobre el plan y reservan lugares antes de ubicar al resto.
-4. `DistributionReconciler` conserva las asignaciones guardadas válidas respecto de la
-   nómina, los ambientes actuales y su capacidad restante. Deshabilitar un estudiante libera
-   su lugar; retirar un ambiente planificado deja su asignación pendiente de reubicación.
-5. Solo los habilitados pendientes se distribuyen por apellido, proporcionalmente a los
-   lugares que siguen libres. No se redistribuye toda la nómina ni se modifica la planificación.
+`EntryRoomPolicy` es la regla común de HU-032 y HU-037:
 
-El resultado es un mapa por estudiante con `{ id_ambiente: integer, nro_aula: string }`.
-Un estudiante excedente no tiene entrada en el mapa. **Un mapa vacío no es `null`**: existe
-planificación y no se activa el cálculo anterior, que podría reemplazar silenciosamente el plan.
-GET de HU-031 sigue mostrando los nuevos habilitados sin ambiente hasta que el Docente guarde;
-la ubicación operativa al abrir no escribe filas nuevas en `distribucion_ambiente` ni avanza su versión.
+| Caso | Resultado |
+|---|---|
+| Sin distribución, suspendida o estudiante sin ambiente | Registra en cualquier ambiente del examen, sin aviso |
+| Ambiente distinto al planificado | `AUTORIZADO` con aviso `FUERA_DE_AMBIENTE` |
+| Ambiente lleno (`INGRESO` o `CON_RETRASO`, sin retirados) | Aviso `AMBIENTE_LLENO` al registrar |
+| Estudiante excepcional (HU-023) | Nunca recibe avisos |
 
-### Capacidad insuficiente después del guardado
+Verificar no consulta PostgreSQL, por lo que `avisos_ambiente` solo adelanta el ambiente distinto. Al
+registrar se recalcula todo con el examen bloqueado. Si hay avisos sin confirmar responde:
 
-La lectura conserva las asignaciones que caben, ubica pendientes solo en plazas libres y deja
-el excedente con `ambiente_asignado: null` en el snapshot y `id_ambiente: null` / `ambiente: null`
-en examen en curso. No lanza un nuevo error de apertura ni introduce otro bloqueo.
+```json
+{
+  "message": "Confirme el aviso de ambiente para registrar al estudiante.",
+  "veredicto": "AVISO_AMBIENTE",
+  "avisos_ambiente": [
+    {
+      "tipo": "FUERA_DE_AMBIENTE",
+      "mensaje": "Este estudiante tiene asignado el ambiente 691A",
+      "ambiente_asignado": { "id_ambiente": 1, "nro_aula": "691A" }
+    }
+  ]
+}
+```
 
-El contrato existente de verificación ya rechaza al estudiante sin ambiente con
-`veredicto: "AULA_NO_ASIGNADA"`, `autorizado: false` y
-`motivo: "No se pudo determinar un ambiente para el estudiante."`. La integración reutiliza
-ese contrato sin agregar códigos ni cambiar la precedencia de otros motivos de rechazo.
+con HTTP 409. Se confirma reenviando `confirmar_aviso_ambiente: true` en `confirmar-ingreso` o en
+`retrasos/solicitudes`, `retrasos/solicitudes/{solicitud}/autorizar` y `retrasos/registrar`.
+`examen_estudiante.id_ambiente` guarda el aula real; `id_ambiente_planificado` solo se llena si entró
+fuera de su ambiente. La respuesta incluye `fuera_de_ambiente` y la bitácora registra
+`INGRESO_CON_AVISO_AMBIENTE`. No se crea intento rechazado, incidencia ni registro en Central de Riesgo.
+`AULA_INCORRECTA` y `AULA_NO_ASIGNADA` ya no se emiten; se conservan para leer el historial.
 
-**La apertura ya tenía una comprobación independiente:** `RoomAssignmentService::prepare()`
-compara la capacidad con toda la nómina de grupos, incluidos NO_HABILITADO, y puede devolver
-`CAPACIDAD_INSUFICIENTE` antes de generar el snapshot. Ese comportamiento se conserva.
-Las pruebas de excedentes ejercitan `stage()` directamente para verificar el contrato de lectura;
-no eliminan ni evaden esa comprobación en el flujo real de apertura.
+### Dejar de usar la distribución
 
-Si una reducción de capacidad ya dejó más excepcionales con ambiente operativo que plazas,
-se conservan esos ambientes por A3. El lector no agrega estudiantes a ese ambiente y limita
-su capacidad disponible a cero; no traslada excepcionales ni corrige silenciosamente ese exceso
-preexistente. Su resolución corresponde al responsable del ingreso y requiere una decisión aparte.
+`POST /api/examenes/{exam}/distribucion/dejar-de-usar` no recibe cuerpo. Solo el creador puede usarlo,
+con distribución guardada y una vez cerrada la ventana de edición, en un examen PROGRAMADO o EN_CURSO.
+Es irreversible, escribe `DEJAR_USAR_DISTRIBUCION` en la bitácora y responde 409 si no corresponde.
 
-### HU-023 y ambientes operativos
+### Apertura
 
-En esta revisión del repositorio no hay un servicio de alta de HU-023. La representación
-existente es `examen_estudiante.estado_habilitacion = 'CASO ESPECIAL'` y su `id_ambiente`;
-hay fixtures y pruebas de habilitación/verificación para ese estado. El lector consulta esas
-filas directamente, sin depender de que `ExamRosterService::expected()` las incluya.
-Un CASO ESPECIAL sin ambiente operativo participa del plan como cualquier otro habilitado.
-
-Las claves foráneas actuales exigen que `examen_estudiante` pertenezca a `grupo_examen` y
-`grupo_estudiante`. Por eso un excepcional verdaderamente fuera de esos grupos no se puede
-crear con el esquema vigente. La prueba de independencia de la nómina simula únicamente su
-omisión en la consulta, manteniendo las FK activas. No se implementa un nuevo mecanismo de alta.
-La FK `fk_ingreso_examen_ambiente` también impide retirar un ambiente operativo ya referenciado;
-los casos de ambientes retirados se refieren a la planificación, que deliberadamente carece de esa FK.
-
-En examen en curso sigue prevaleciendo el `id_ambiente` operativo de `examen_estudiante` sobre
-la asignación calculada, preservando el comportamiento de ingreso y de situaciones excepcionales.
-HU-031 no modifica el registro ni la sincronización de esos cambios de ambiente.
-
-### Avisos de la vista
-
-En edición y con capacidad suficiente se advierte que los pendientes se ubicarán al abrir
-si siguen existiendo lugares. Con capacidad insuficiente no se promete su asignación.
-En solo lectura el aviso se limita a consultar los casos con el docente responsable: no ofrece
-ubicar ni guardar, ni promete una asignación futura cuando el control podría estar abierto.
+La capacidad ya no impide abrir el control: `RoomAssignmentService::prepare()` solo exige nómina y ambientes.
 
 ## Hallazgos preexistentes fuera del alcance
 
-- **A4, NO_HABILITADO:** `EntryControlSnapshotService::assignRooms()` no filtra habilitación.
-  Sin distribución guardada sigue asignando ambientes por ID a toda la nómina, consumiendo
-  plazas también para NO_HABILITADO. La verificación los rechaza posteriormente. No se cambia
-  ese cálculo. Con una distribución HU-031 el lector sí usa únicamente habilitados, como exige CA-3.
+- **HU-032, CASO ESPECIAL:** `EntryConfirmationService` escribe `HABILITADO` al confirmar el ingreso y
+  sobrescribe un `CASO ESPECIAL`. HU-037 no lo hace. Riesgo reportado al equipo; no se corrige aquí.
 - **Importación y apertura:** `StudentRosterConfirmationService` comprueba disponibilidad antes
   de la transacción; `StudentRosterConfirmer` bloquea el grupo, mientras `RoomAssignmentService`
   abre con el examen bloqueado sin bloquear sus grupos. Una importación ya autorizada puede
