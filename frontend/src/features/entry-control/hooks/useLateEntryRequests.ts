@@ -4,6 +4,7 @@ import { throttleNotice, throttleWaitSeconds } from '@/lib/throttle'
 import { LATE_ENTRY_POLL_MS } from '../constants'
 import { LATE_ENTRY_MESSAGES } from '../components/lateEntryMessages'
 import { lateEntryService } from '../services/lateEntryService'
+import { useEntryRoomWarning } from './useEntryRoomWarning'
 import {
   CONTROLLER_ROLE, LATE_ENTRY_REQUEST_STATUS, type ControllerRole, type LateEntryRequest, type LateEntryRequestStatus,
 } from '../types/late-entry.types'
@@ -49,6 +50,7 @@ export function useLateEntryRequests(examId: number, role: ControllerRole, enabl
   const [announcement, setAnnouncement] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<number | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const roomWarning = useEntryRoomWarning()
   const [throttle, setThrottle] = useState<string | null>(null)
   const previous = useRef<Statuses | null>(null)
   const pausedUntil = useRef(0)
@@ -104,18 +106,28 @@ export function useLateEntryRequests(examId: number, role: ControllerRole, enabl
     }
   }, [examId, enabled, apply])
 
-  async function resolve(requestId: number, approve: boolean, confirmOtherExam = false): Promise<boolean> {
+  async function resolve(
+    requestId: number,
+    approve: boolean,
+    confirmOtherExam = false,
+    confirmRoom = false,
+    onDone?: () => void
+  ): Promise<boolean> {
     setBusyId(requestId)
     setActionError(null)
     try {
       const updated = approve
-        ? await lateEntryService.approve(examId, requestId, confirmOtherExam)
+        ? await (confirmRoom
+          ? lateEntryService.approve(examId, requestId, confirmOtherExam, true)
+          : lateEntryService.approve(examId, requestId, confirmOtherExam))
         : await lateEntryService.reject(examId, requestId)
       previous.current?.set(updated.id_solicitud, updated.estado)
       setRequests((current) => current?.map((item) => item.id_solicitud === updated.id_solicitud ? updated : item) ?? null)
       setAnnouncement(approve ? LATE_ENTRY_MESSAGES.approved : LATE_ENTRY_MESSAGES.rejected)
+      onDone?.()
       return true
     } catch (cause) {
+      if (roomWarning.capture(cause, () => void resolve(requestId, approve, confirmOtherExam, true, onDone))) return false
       if (cause instanceof ApiError && cause.isTooManyRequests) {
         setActionError(LATE_ENTRY_MESSAGES.throttled(throttleWaitSeconds(cause)))
         return false
@@ -146,7 +158,9 @@ export function useLateEntryRequests(examId: number, role: ControllerRole, enabl
     busyId,
     actionError,
     /** `confirmOtherExam`: autoriza con la advertencia de otro examen a la vista. */
-    approve: (requestId: number, confirmOtherExam = false) => resolve(requestId, true, confirmOtherExam),
+    approve: (requestId: number, confirmOtherExam = false, onDone?: () => void) =>
+      resolve(requestId, true, confirmOtherExam, false, onDone),
+    roomWarning,
     reject: (requestId: number) => resolve(requestId, false),
     track,
     clearAnnouncement: () => setAnnouncement(null),

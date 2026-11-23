@@ -26,7 +26,7 @@ export function makeLateEntryVerification(
 ): LateEntryVerification {
   return {
     veredicto: 'AUTORIZADO',
-    motivo: 'Inscrito en un grupo del examen y asignado a este ambiente.',
+    motivo: 'Inscrito en un grupo del examen.',
     autorizado: true,
     estudiante: {
       id_estudiante: 501,
