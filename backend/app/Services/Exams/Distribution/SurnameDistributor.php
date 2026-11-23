@@ -5,7 +5,7 @@ namespace App\Services\Exams\Distribution;
 use App\Support\SisCode;
 use App\Support\Text\SpanishSortKey;
 
-/** Reparte habilitados en bloques alfabéticos proporcionales por el método de mayores restos. */
+/** Reparte habilitados en bloques alfabéticos de partes iguales, sin superar la capacidad. */
 class SurnameDistributor
 {
     /**
@@ -74,41 +74,31 @@ class SurnameDistributor
     }
 
     /**
+     * Partes iguales: lo que un ambiente no admite pasa a los que aún tienen lugar y el resto, uno a
+     * uno, a los primeros. Nunca supera la capacidad; sin lugar suficiente, llena todos.
+     *
      * @param list<array{id_ambiente:int, capacidad:int}> $rooms
      * @return list<int>
      */
     private function quotas(int $studentCount, array $rooms): array
     {
-        $totalCapacity = array_sum(array_column($rooms, 'capacidad'));
         $quotas = array_fill(0, count($rooms), 0);
+        $remaining = min($studentCount, array_sum(array_column($rooms, 'capacidad')));
+        $open = array_keys(array_filter($rooms, fn (array $room): bool => $room['capacidad'] > 0));
 
-        if ($totalCapacity === 0) {
-            return $quotas;
-        }
+        while ($remaining > 0) {
+            $share = max(1, intdiv($remaining, count($open)));
 
-        $count = min($studentCount, $totalCapacity);
-        $remainders = [];
-
-        foreach ($rooms as $index => $room) {
-            $numerator = $count * $room['capacidad'];
-            $quotas[$index] = min($room['capacidad'], intdiv($numerator, $totalCapacity));
-            $remainders[$index] = $numerator % $totalCapacity;
-        }
-
-        $order = array_keys($rooms);
-        usort($order, fn (int $left, int $right): int =>
-            ($remainders[$right] <=> $remainders[$left]) ?: ($left <=> $right));
-        $remaining = $count - array_sum($quotas);
-
-        foreach ($order as $index) {
-            if ($remaining === 0) {
-                break;
+            foreach ($open as $index) {
+                $granted = min($share, $rooms[$index]['capacidad'] - $quotas[$index], $remaining);
+                $quotas[$index] += $granted;
+                $remaining -= $granted;
             }
 
-            if ($quotas[$index] < $rooms[$index]['capacidad']) {
-                $quotas[$index]++;
-                $remaining--;
-            }
+            $open = array_values(array_filter(
+                $open,
+                fn (int $index): bool => $quotas[$index] < $rooms[$index]['capacidad']
+            ));
         }
 
         return $quotas;

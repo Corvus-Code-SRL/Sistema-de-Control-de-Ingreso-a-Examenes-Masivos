@@ -50,7 +50,12 @@ class SurnameDistributorTest extends TestCase
     {
         return [
             '55 en dos ambientes iguales' => [55, [30, 30], [28, 27], 0],
-            'capacidades desiguales' => [60, [40, 20, 20], [30, 15, 15], 0],
+            '100 en 60 y 60' => [100, [60, 60], [50, 50], 0],
+            '100 en 80 y 40: el excedente pasa al otro' => [100, [80, 40], [60, 40], 0],
+            'tres ambientes con uno chico' => [100, [50, 20, 50], [40, 20, 40], 0],
+            'excedente en cascada' => [90, [10, 20, 80], [10, 20, 60], 0],
+            'tres ambientes insuficientes' => [130, [50, 20, 50], [50, 20, 50], 10],
+            'partes iguales con capacidades desiguales' => [60, [40, 20, 20], [20, 20, 20], 0],
             'capacidad exacta' => [60, [30, 30], [30, 30], 0],
             'capacidad insuficiente' => [63, [30, 30], [30, 30], 3],
             'un ambiente' => [12, [30], [12], 0],
@@ -59,9 +64,9 @@ class SurnameDistributorTest extends TestCase
             'sin ambientes' => [3, [], [], 3],
             'capacidad remanente nula' => [3, [0, 0], [0, 0], 3],
             'un remanente nulo' => [3, [0, 4], [0, 3], 0],
-            'mayor resto gana al primer ambiente' => [4, [2, 3], [2, 2], 0],
+            'resto al primer ambiente con lugar' => [4, [2, 3], [2, 2], 0],
             'desempate por orden del ambiente' => [2, [30, 30, 30], [1, 1, 0], 0],
-            'restos diferentes' => [7, [5, 3, 2], [4, 2, 1], 0],
+            'el resto va a los primeros con lugar' => [7, [5, 3, 2], [3, 2, 2], 0],
         ];
     }
 

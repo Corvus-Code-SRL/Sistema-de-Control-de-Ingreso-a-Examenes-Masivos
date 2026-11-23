@@ -57,12 +57,12 @@ class RoomDistributionProposalTest extends TestCase
         $this->assertSame('Álvarez Ana', $response->json('data.estudiantes.0.nombre_completo'));
     }
 
-    public function test_capacidades_desiguales_reparten_30_15_15(): void
+    public function test_capacidades_desiguales_reparten_partes_iguales(): void
     {
         $exam = $this->distributionExam(60, [40, 20, 20]);
         $response = $this->postJson($this->distributionUrl($exam) . '/propuesta')->assertOk();
 
-        $this->assertSame([30, 15, 15], array_values(array_count_values(
+        $this->assertSame([20, 20, 20], array_values(array_count_values(
             array_column($response->json('data.estudiantes'), 'id_ambiente')
         )));
     }
