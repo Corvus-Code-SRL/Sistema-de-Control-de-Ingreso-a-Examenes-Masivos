@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\DB;
  * @phpstan-import-type DistributionStudent from DistributionRosterQuery
  * @phpstan-type StudentView array{id_estudiante:int, codigo_sis:string, nombre_completo:string, id_ambiente:?int}
  * @phpstan-type ExamOption array{id_examen:int, nombre:string, materia:?array{nombre:string}, fecha:string,
- *     hora_inicio:string, cantidad_ambientes:int, es_creador:bool, editable:bool}
+ *     hora_inicio:string, estado:string, cantidad_ambientes:int, es_creador:bool, editable:bool,
+ *     distribucion_suspendida:bool, puede_dejar_de_usar:bool}
  * @phpstan-type DistributionView array{examen:ExamOption, editable:bool, motivo_solo_lectura:?string,
  *     version:string, total_habilitados:int, total_no_habilitados:int, capacidad_total:int, faltan_asientos:int,
  *     ambientes:list<array{id_ambiente:int, nro_aula:string, capacidad:int, asignados:int}>,
@@ -38,12 +39,21 @@ class RoomDistributionQueryService
     {
         $this->access->assertTeacher($teacherId);
 
-        return Exam::query()->with('subject')->withCount('classrooms')
-            ->where('estado', Exam::PROGRAMADO)
+        $exams = Exam::query()->with('subject')->withCount('classrooms')
+            ->whereIn('estado', [Exam::PROGRAMADO, Exam::EN_CURSO])
             ->where(fn (Builder $query): Builder => $this->collaborators->whereTaughtBy($query, $teacherId))
-            ->orderBy('fecha')->orderBy('hora_inicio')->orderBy('id_examen')->get()
-            ->map(fn (Exam $exam): array => $this->examOption($exam, $teacherId, (int) $exam->classrooms_count))
-            ->all();
+            ->orderBy('fecha')->orderBy('hora_inicio')->orderBy('id_examen')->get();
+        $withDistribution = array_flip($this->roster->examsWithDistribution($exams->modelKeys()));
+
+        return $exams
+            ->filter(fn (Exam $exam): bool => $exam->estado === Exam::PROGRAMADO
+                || isset($withDistribution[$exam->id_examen]))
+            ->map(fn (Exam $exam): array => $this->examOption(
+                $exam,
+                $teacherId,
+                (int) $exam->classrooms_count,
+                isset($withDistribution[$exam->id_examen])
+            ))->values()->all();
     }
 
     /** @return DistributionView */
@@ -79,7 +89,7 @@ class RoomDistributionQueryService
         $occupancy = array_count_values(array_filter($assignments, fn (?int $roomId): bool => $roomId !== null));
 
         return [
-            'examen' => $this->examOption($exam, $teacherId, count($rooms)),
+            'examen' => $this->examOption($exam, $teacherId, count($rooms), $saved !== []),
             'editable' => $reason === null,
             'motivo_solo_lectura' => $reason,
             'version' => DistributionVersion::fromRows($saved),
@@ -112,7 +122,7 @@ class RoomDistributionQueryService
     }
 
     /** @return ExamOption */
-    private function examOption(Exam $exam, string $teacherId, int $roomCount): array
+    private function examOption(Exam $exam, string $teacherId, int $roomCount, bool $hasSaved): array
     {
         return [
             'id_examen' => (int) $exam->id_examen,
@@ -120,10 +130,13 @@ class RoomDistributionQueryService
             'materia' => $exam->subject === null ? null : ['nombre' => (string) $exam->subject->nombre],
             'fecha' => $exam->fecha->format('Y-m-d'),
             'hora_inicio' => (string) $exam->hora_inicio,
+            'estado' => (string) $exam->estado,
             'cantidad_ambientes' => $roomCount,
             'es_creador' => (string) $exam->id_usuario_docente === $teacherId,
             'editable' => $this->access->readOnlyReason($exam, $teacherId) === null
                 && $roomCount >= DistributionAssignmentValidator::MIN_ROOMS,
+            'distribucion_suspendida' => $exam->distribucion_suspendida_en !== null,
+            'puede_dejar_de_usar' => $this->access->canStop($exam, $teacherId, $hasSaved),
         ];
     }
 

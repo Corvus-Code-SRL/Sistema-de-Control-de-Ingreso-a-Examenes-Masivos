@@ -17,7 +17,7 @@ class RoomDistributionAccess
 {
     public function __construct(
         private ExamCollaboratorService $collaborators,
-        private ExamPreparationWindow $window,
+        private RoomDistributionWindow $window,
         private UserRoleService $roles
     ) {
     }
@@ -63,8 +63,35 @@ class RoomDistributionAccess
         }
     }
 
+    /** Bloquea el examen para suspender la distribución: solo su creador puede hacerlo. */
+    public function lockForStop(int $examId, string $teacherId): Exam
+    {
+        $exam = Exam::query()->whereKey($examId)->lockForUpdate()->firstOrFail();
+        $this->assertTeacher($teacherId);
+
+        if ((string) $exam->id_usuario_docente !== $teacherId) {
+            throw new ExamOwnershipException();
+        }
+
+        return $exam;
+    }
+
+    /** Con el control abierto ya no se edita: lo único posible es dejar de usarla. */
+    public function canStop(Exam $exam, string $teacherId, bool $hasSavedDistribution): bool
+    {
+        return $hasSavedDistribution
+            && (string) $exam->id_usuario_docente === $teacherId
+            && $exam->distribucion_suspendida_en === null
+            && in_array($exam->estado, [Exam::PROGRAMADO, Exam::EN_CURSO], true)
+            && ! $this->window->isOpen($exam);
+    }
+
     public function readOnlyReason(Exam $exam, string $teacherId): ?string
     {
+        if ($exam->distribucion_suspendida_en !== null) {
+            return DistributionMessages::SUSPENDED;
+        }
+
         if ((string) $exam->id_usuario_docente !== $teacherId) {
             return DistributionMessages::COLLABORATOR_READ_ONLY;
         }

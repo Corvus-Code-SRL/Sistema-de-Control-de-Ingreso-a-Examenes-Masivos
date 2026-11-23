@@ -11,6 +11,7 @@ use App\Http\Resources\Exams\DistributionProposalResource;
 use App\Http\Resources\Exams\RoomDistributionResource;
 use App\Services\Exams\Distribution\RoomDistributionQueryService;
 use App\Services\Exams\Distribution\RoomDistributionSaveService;
+use App\Services\Exams\Distribution\RoomDistributionStopService;
 use App\Support\ApiResponse;
 use App\Support\CurrentUser;
 use App\Support\Exams\DistributionMessages;
@@ -21,6 +22,7 @@ class RoomDistributionController extends Controller
     public function __construct(
         private RoomDistributionQueryService $query,
         private RoomDistributionSaveService $save,
+        private RoomDistributionStopService $stopper,
         private CurrentUser $currentUser
     ) {
     }
@@ -56,5 +58,13 @@ class RoomDistributionController extends Controller
         );
 
         return ApiResponse::success(new RoomDistributionResource($result), DistributionMessages::SAVED);
+    }
+
+    public function stop(ShowRoomDistributionRequest $request, int $exam): JsonResponse
+    {
+        return ApiResponse::success(
+            new RoomDistributionResource($this->stopper->stop($exam, $this->currentUser->teacherId())),
+            DistributionMessages::STOPPED
+        );
     }
 }

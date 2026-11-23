@@ -51,6 +51,7 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
             Route::get('/', [RoomDistributionController::class, 'show'])->name('show');
             Route::post('/propuesta', [RoomDistributionController::class, 'proposal'])->name('propuesta');
             Route::put('/', [RoomDistributionController::class, 'save'])->name('save');
+            Route::post('/dejar-de-usar', [RoomDistributionController::class, 'stop'])->name('dejar-de-usar');
         });
 
     Route::get('/', [ExamController::class, 'index'])

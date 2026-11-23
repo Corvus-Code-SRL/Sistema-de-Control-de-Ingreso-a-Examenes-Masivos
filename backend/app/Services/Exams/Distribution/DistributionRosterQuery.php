@@ -19,7 +19,7 @@ use stdClass;
  */
 class DistributionRosterQuery
 {
-    private const ELIGIBLE_STATES = [StudentExam::HABILITADO, 'CASO ESPECIAL'];
+    private const ELIGIBLE_STATES = [StudentExam::HABILITADO, StudentExam::CASO_ESPECIAL];
     private const INELIGIBLE_STATE = 'NO_HABILITADO';
 
     public function __construct(private ExamRosterService $roster, private SurnameDistributor $distributor)
@@ -62,6 +62,16 @@ class DistributionRosterQuery
                 'nro_aula' => (string) $row->nro_aula,
                 'capacidad' => (int) $row->capacidad,
             ])->all();
+    }
+
+    /**
+     * @param list<int> $examIds
+     * @return list<int>
+     */
+    public function examsWithDistribution(array $examIds): array
+    {
+        return RoomDistribution::query()->whereIn('id_examen', $examIds)->distinct()
+            ->pluck('id_examen')->map(fn ($examId): int => (int) $examId)->all();
     }
 
     /** @return list<SavedAssignment> */

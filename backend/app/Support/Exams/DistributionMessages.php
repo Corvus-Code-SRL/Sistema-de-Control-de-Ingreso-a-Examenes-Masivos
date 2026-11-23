@@ -23,4 +23,7 @@ final class DistributionMessages
     public const INVALID_STUDENT = 'Cada asignación debe indicar un estudiante válido.';
     public const DUPLICATE_STUDENT = 'Un estudiante no puede repetirse en la distribución.';
     public const INVALID_ROOM = 'Cada asignación debe indicar un ambiente válido.';
+    public const SUSPENDED = 'El docente dejó de usar esta distribución: los estudiantes ingresan en cualquier ambiente.';
+    public const STOPPED = 'Se dejó de usar la distribución';
+    public const CANNOT_STOP = 'Solo puede dejar de usar una distribución guardada cuando el control de ingreso ya abrió.';
 }
