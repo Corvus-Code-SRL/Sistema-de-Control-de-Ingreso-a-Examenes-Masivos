@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderApp } from '@/test/renderApp'
-import { mockDistributionBackend } from '@/test/roomDistributionBackend'
+import { distributionLoaded, mockDistributionBackend } from '@/test/roomDistributionBackend'
 import { distributionExamFixture } from '@/test/roomDistributionFixtures'
 
 afterEach(() => { window.localStorage.clear(); window.sessionStorage.clear(); vi.unstubAllGlobals() })
@@ -12,10 +12,10 @@ describe('salida de la distribución con ajustes locales', () => {
     const api = mockDistributionBackend({ exams: [distributionExamFixture(),
       distributionExamFixture({ id_examen: 13, nombre: 'Segundo parcial' })] })
     renderApp('/examenes/distribucion')
-    await screen.findByRole('region', { name: 'Ambiente 691A' })
+    await distributionLoaded()
     await userEvent.click(screen.getByRole('button', { name: 'Distribuir por apellido' }))
     await screen.findByText(/4 cambios sin guardar/)
-    await userEvent.click(screen.getByRole('combobox', { name: 'Examen Programado' }))
+    await userEvent.click(screen.getByRole('combobox', { name: 'Examen' }))
     await userEvent.click(screen.getByRole('option', { name: /Segundo parcial/ }))
     const dialog = await screen.findByRole('dialog', { name: '¿Salir sin guardar?' })
     expect(api.calls.some((call) => /\/13\/distribucion$/.test(call.url))).toBe(false)
@@ -27,7 +27,7 @@ describe('salida de la distribución con ajustes locales', () => {
   it('un enlace interno del sidebar pide confirmación y permite seguir editando', async () => {
     mockDistributionBackend()
     const app = renderApp('/examenes/distribucion')
-    await screen.findByRole('region', { name: 'Ambiente 691A' })
+    await distributionLoaded()
     await userEvent.click(screen.getByRole('button', { name: 'Distribuir por apellido' }))
     await screen.findByText(/4 cambios sin guardar/)
     await userEvent.click(screen.getByRole('button', { name: 'Grupos académicos y nóminas' }))
