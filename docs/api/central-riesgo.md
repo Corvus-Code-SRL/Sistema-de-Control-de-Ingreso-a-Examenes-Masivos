@@ -14,7 +14,7 @@ No existe ninguna ruta de escritura (POST, PUT, PATCH, DELETE) bajo `/api/centra
 
 ## Alcance: solo registros activos
 
-Un registro **rectificado** (HU-062) fue retirado de la Central por un administrador y **ya no cuenta como antecedente**. La fila sigue en `central_riesgo` (nunca se borra) pero con `rectificado_en` lleno, y toda lectura de la Central la ignora:
+Un registro **rectificado** (HU-062) fue retirado de la Central (el docente que aprobó el reporte aceptó la solicitud de un administrador o, si ese docente ya no está activo, el administrador lo retiró sin su confirmación) y **ya no cuenta como antecedente**. La fila sigue en `central_riesgo` (nunca se borra) pero con `rectificado_en` lleno, y toda lectura de la Central la ignora:
 
 | Dónde | Qué pasa con un registro rectificado |
 |---|---|

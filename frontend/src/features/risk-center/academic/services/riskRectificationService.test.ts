@@ -4,7 +4,8 @@ import { carlaCondori, initialRecords } from '@/test/riskRectificationFixtures'
 import {
   getRectifiableRecord,
   getStudentRecords,
-  rectifyRecord,
+  rectifyWithoutConfirmation,
+  requestRectification,
   searchRectifiableStudents,
 } from './riskRectificationService'
 
@@ -60,7 +61,28 @@ describe('riskRectificationService', () => {
     expect(api.calls.map((call) => call.url).join()).not.toContain('tipos-falta')
   })
 
-  it('rectifica con POST y manda solo el motivo', async () => {
+  it('envía la solicitud con POST a /solicitudes y manda solo el motivo', async () => {
+    const sent = {
+      id_solicitud_rect: 9980,
+      id_cr_estudiante: 9962,
+      estado: 'PENDIENTE',
+      motivo: 'Se retira: el reporte no tenía sustento.',
+      docente: { nombre_completo: 'Marcelo Quiroga Andrade' },
+      fecha_solicitud: '2026-11-20T15:00:00+00:00',
+      vence_en: '2026-11-27T15:00:00+00:00',
+    }
+    const api = mockApiWith(() => ({ status: 201, body: { data: sent } }))
+
+    const result = await requestRectification(9962, { motivo: 'Se retira: el reporte no tenía sustento.' })
+
+    expect(api.calls).toHaveLength(1)
+    expect(api.calls[0].method).toBe('POST')
+    expect(new URL(api.calls[0].url).pathname).toMatch(/\/rectificacion-riesgo\/registros\/9962\/solicitudes$/)
+    expect(api.calls[0].body).toEqual({ motivo: 'Se retira: el reporte no tenía sustento.' })
+    expect(result).toEqual(sent)
+  })
+
+  it('anula sin confirmación con POST a /rectificar-sin-confirmacion', async () => {
     const record = initialRecords()[1]
     const rectified = {
       ...record.detail,
@@ -68,21 +90,22 @@ describe('riskRectificationService', () => {
     }
     const api = mockApiWith(() => ({ status: 200, body: { data: rectified } }))
 
-    const result = await rectifyRecord(9962, { motivo: 'Se retira: el reporte no tenía sustento.' })
+    const result = await rectifyWithoutConfirmation(9962, { motivo: 'Se retira: el reporte no tenía sustento.' })
 
-    expect(api.calls).toHaveLength(1)
     expect(api.calls[0].method).toBe('POST')
-    expect(new URL(api.calls[0].url).pathname).toMatch(/\/rectificacion-riesgo\/registros\/9962\/rectificar$/)
+    expect(new URL(api.calls[0].url).pathname).toMatch(
+      /\/rectificacion-riesgo\/registros\/9962\/rectificar-sin-confirmacion$/
+    )
     expect(api.calls[0].body).toEqual({ motivo: 'Se retira: el reporte no tenía sustento.' })
     expect(result).toEqual(rectified)
   })
 
   it('un 409 llega como error con el mensaje del servidor', async () => {
-    mockApiWith(() => ({ status: 409, body: { message: 'Este registro ya fue rectificado.' } }))
+    mockApiWith(() => ({ status: 409, body: { message: 'Este registro ya tiene una solicitud pendiente.' } }))
 
-    await expect(rectifyRecord(9962, { motivo: 'Motivo suficiente.' })).rejects.toMatchObject({
+    await expect(requestRectification(9962, { motivo: 'Motivo suficiente.' })).rejects.toMatchObject({
       status: 409,
-      message: 'Este registro ya fue rectificado.',
+      message: 'Este registro ya tiene una solicitud pendiente.',
     })
   })
 })

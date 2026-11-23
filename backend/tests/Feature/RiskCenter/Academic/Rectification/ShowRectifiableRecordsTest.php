@@ -109,7 +109,10 @@ class ShowRectifiableRecordsTest extends TestCase
         $this->assertSame($this->context['id_tipo_falta'], $item['tipo_falta']['id_falta']);
         $this->assertSame('Docente Reportante', $item['aprobador']['nombre_completo']);
         $this->assertSame('2026-10-02T12:00:00+00:00', $item['fecha_registro']);
-        $this->assertArrayNotHasKey('rectificacion', $item);
+        $this->assertNull($item['rectificacion']['solicitud_pendiente']);
+        $this->assertSame(0, $item['rectificacion']['rechazos']);
+        $this->assertSame(0, $item['rectificacion']['vencidas']);
+        $this->assertNull($item['rectificacion']['ultimo_rechazo']);
     }
 
     public function test_los_rectificados_van_aparte_con_la_fecha_el_administrador_y_el_motivo(): void

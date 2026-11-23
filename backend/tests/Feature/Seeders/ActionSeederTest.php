@@ -17,16 +17,16 @@ class ActionSeederTest extends TestCase
         return DB::table('accion')->orderBy('id_accion')->get()->map(fn ($row) => (array) $row)->all();
     }
 
-    public function test_dos_ejecuciones_dejan_treinta_acciones_sin_duplicados(): void
+    public function test_dos_ejecuciones_dejan_treinta_y_cuatro_acciones_sin_duplicados(): void
     {
         $this->seed(ActionSeeder::class);
         $afterFirst = $this->catalog();
 
         $this->seed(ActionSeeder::class);
 
-        $this->assertCount(30, $afterFirst);
+        $this->assertCount(34, $afterFirst);
         $this->assertSame($afterFirst, $this->catalog());
-        $this->assertSame(30, DB::table('accion')->distinct()->count('operacion'));
+        $this->assertSame(34, DB::table('accion')->distinct()->count('operacion'));
     }
 
     public function test_incluye_las_acciones_de_aprobacion_y_rechazo_de_reportes(): void
@@ -108,7 +108,7 @@ class ActionSeederTest extends TestCase
                 ->value('descripcion')
         );
 
-        $this->assertSame(30, DB::table('accion')->count());
+        $this->assertSame(34, DB::table('accion')->count());
     }
 
     public function test_conserva_inicio_y_las_dos_acciones_de_situaciones(): void
@@ -128,7 +128,7 @@ class ActionSeederTest extends TestCase
                 ->pluck('tipo_operacion', 'operacion')
                 ->all()
         );
-        $this->assertSame(30, DB::table('accion')->count());
+        $this->assertSame(34, DB::table('accion')->count());
     }
 
     public function test_las_acciones_nuevas_van_al_final_del_catalogo(): void

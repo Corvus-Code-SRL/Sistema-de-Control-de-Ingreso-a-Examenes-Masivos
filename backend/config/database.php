@@ -81,6 +81,13 @@ return [
             'options' => [
                 PDO::ATTR_PERSISTENT => false,
             ],
+            // RNF-14: nombre en pg_stat_activity (el conector agrega -web o -consola) y límites de
+            // sesión en milisegundos. Vacío o 0 = sin límite. Los aplica App\Support\Database\
+            // SciemPostgresConnector, solo a las peticiones web.
+            'application_name' => env('DB_APPLICATION_NAME', 'sciem'),
+            'statement_timeout' => env('DB_STATEMENT_TIMEOUT'),
+            'lock_timeout' => env('DB_LOCK_TIMEOUT'),
+            'idle_in_transaction_session_timeout' => env('DB_IDLE_IN_TRANSACTION_TIMEOUT'),
         ],
 
         'sqlsrv' => [

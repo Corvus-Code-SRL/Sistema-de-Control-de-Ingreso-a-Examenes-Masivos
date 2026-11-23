@@ -159,7 +159,7 @@ describe('HU-026: invitar docentes colaboradores', () => {
     ).toBeInTheDocument()
   })
 
-  it('invitar abre la confirmación con la opción de grupos marcada, y cancelar no envía nada', async () => {
+  it('invitar abre la confirmación con ambas opciones marcadas, y cancelar no envía nada', async () => {
     const user = userEvent.setup()
     service.searchTeachers.mockResolvedValue([ROLANDO])
     renderPage()
@@ -175,7 +175,7 @@ describe('HU-026: invitar docentes colaboradores', () => {
       within(dialog).getByRole('checkbox', { name: 'Permitir que agregue sus grupos al examen' })
     ).toBeChecked()
     const listByGroup = within(dialog).getByRole('checkbox', { name: 'Mostrar la lista separada por grupo' })
-    expect(listByGroup).not.toBeChecked()
+    expect(listByGroup).toBeChecked()
     expect(listByGroup).toBeEnabled()
 
     await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
@@ -212,7 +212,52 @@ describe('HU-026: invitar docentes colaboradores', () => {
     expect(within(row).getByText('Ya invitado')).toBeInTheDocument()
   })
 
-  it('la lista separada por grupo solo se habilita al permitir grupos y se envía con la invitación', async () => {
+  it('con las opciones por defecto envía ambas en true', async () => {
+    const user = userEvent.setup()
+    service.searchTeachers.mockResolvedValue([ROLANDO])
+    service.sendInvitation.mockResolvedValue(invitation(1, 'PENDIENTE', ROLANDO.nombre_completo))
+    renderPage()
+
+    await chooseExam(user)
+    await searchFor(user, 'rolando')
+    await user.click(await screen.findByRole('button', { name: /Invitar/ }))
+
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Enviar invitación' }))
+
+    await waitFor(() =>
+      expect(service.sendInvitation).toHaveBeenCalledWith(9811, {
+        id_docente: 'u-rolando',
+        permite_agregar_grupos: true,
+        lista_por_grupo: true,
+      })
+    )
+  })
+
+  it('desmarcar solo la lista separada envía permite_agregar_grupos true y lista_por_grupo false', async () => {
+    const user = userEvent.setup()
+    service.searchTeachers.mockResolvedValue([ROLANDO])
+    service.sendInvitation.mockResolvedValue(invitation(1, 'PENDIENTE', ROLANDO.nombre_completo))
+    renderPage()
+
+    await chooseExam(user)
+    await searchFor(user, 'rolando')
+    await user.click(await screen.findByRole('button', { name: /Invitar/ }))
+
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Mostrar la lista separada por grupo' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Enviar invitación' }))
+
+    await waitFor(() =>
+      expect(service.sendInvitation).toHaveBeenCalledWith(9811, {
+        id_docente: 'u-rolando',
+        permite_agregar_grupos: true,
+        lista_por_grupo: false,
+      })
+    )
+  })
+
+  it('la lista separada por grupo solo se habilita al permitir grupos y se restablece al volver a permitirlos', async () => {
     const user = userEvent.setup()
     service.searchTeachers.mockResolvedValue([ROLANDO])
     service.sendInvitation.mockResolvedValue(invitation(1, 'PENDIENTE', ROLANDO.nombre_completo))
@@ -225,8 +270,6 @@ describe('HU-026: invitar docentes colaboradores', () => {
     const dialog = await screen.findByRole('dialog')
     const allowGroups = within(dialog).getByRole('checkbox', { name: 'Permitir que agregue sus grupos al examen' })
     const listByGroup = within(dialog).getByRole('checkbox', { name: 'Mostrar la lista separada por grupo' })
-
-    await user.click(listByGroup)
     expect(listByGroup).toBeChecked()
 
     // Al quitar «permitir grupos» se desmarca y deshabilita la lista separada.
@@ -235,7 +278,10 @@ describe('HU-026: invitar docentes colaboradores', () => {
     expect(listByGroup).toBeDisabled()
     expect(within(dialog).getByText('Se habilita al permitir que agregue sus grupos.')).toBeInTheDocument()
 
+    // Al volver a permitirlos queda habilitada, pero desmarcada hasta que la marque de nuevo.
     await user.click(allowGroups)
+    expect(listByGroup).toBeEnabled()
+    expect(listByGroup).not.toBeChecked()
     await user.click(listByGroup)
     await user.click(within(dialog).getByRole('button', { name: 'Enviar invitación' }))
 

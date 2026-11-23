@@ -45,7 +45,8 @@ class InvitedTeacherAccessTest extends TestCase
 
         $this->assertSame([
             'teaching', 'exam_assistants', 'incidents', 'risk_center',
-            'group_assistants', 'report_assistant', 'special_cases', 'invite_teachers', 'audit_log', 'risk_rectify', 'exam_timer',
+            'group_assistants', 'report_assistant', 'special_cases', 'invite_teachers', 'audit_log', 'risk_rectify',
+            'risk_rectify_confirm', 'exam_timer',
         ], array_keys($access));
 
         $allowed = [
@@ -64,6 +65,10 @@ class InvitedTeacherAccessTest extends TestCase
 
         // Rectificar la Central de Riesgo (HU-062) tampoco: solo el Administrador.
         $this->assertSame([Role::ADMINISTRADOR], $access['risk_rectify']);
+
+        // Responder las solicitudes de rectificación es del docente que aprobó el reporte: el Invitado también
+        // aprueba reportes, así que la ejerce igual que el Docente.
+        $this->assertSame([Role::DOCENTE, Role::INVITADO], $access['risk_rectify_confirm']);
     }
 
     public function test_invitado_registra_un_examen_propio(): void

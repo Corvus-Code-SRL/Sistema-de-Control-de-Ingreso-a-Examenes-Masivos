@@ -419,6 +419,27 @@ describe('AppRouter — Central de Riesgo por área', () => {
     expect(await screen.findByRole('table')).toBeInTheDocument()
   })
 
+  it('un Docente entra a «Solicitudes de rectificación»', async () => {
+    stubRiskCenter('docente')
+
+    const app = renderApp('/solicitudes-rectificacion')
+
+    expect(await screen.findByRole('heading', { name: 'Solicitudes de rectificación' })).toBeInTheDocument()
+    expect(app.pathname).toBe('/solicitudes-rectificacion')
+  })
+
+  it.each(['auxiliar', 'administrador'] as const)(
+    'una cuenta %s que navega a /solicitudes-rectificacion vuelve a la home de su área',
+    async (account) => {
+      stubRiskCenter(account)
+
+      const app = renderApp('/solicitudes-rectificacion')
+
+      await waitFor(() => expect(app.pathname).not.toBe('/solicitudes-rectificacion'))
+      expect(screen.queryByRole('heading', { name: 'Solicitudes de rectificación' })).not.toBeInTheDocument()
+    }
+  )
+
   it('un Auxiliar que navega a /central-riesgo vuelve a la home de su área', async () => {
     stubRiskCenter('auxiliar')
 

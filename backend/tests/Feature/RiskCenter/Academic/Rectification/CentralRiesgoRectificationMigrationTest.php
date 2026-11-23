@@ -163,12 +163,13 @@ class CentralRiesgoRectificationMigrationTest extends TestCase
 
     public function test_el_down_aborta_si_la_bitacora_usa_la_accion(): void
     {
-        $this->rectify($this->recordId)->assertOk();
-        DB::table('central_riesgo')->where('id_cr_estudiante', $this->recordId)->update([
-            'rectificado_en' => null,
-            'id_usuario_rectificador' => null,
-            'motivo_rectificacion' => null,
-        ]);
+        app(\App\Services\Security\AuditLogService::class)->registrar(
+            'RECTIFICAR_REGISTRO',
+            'central_riesgo',
+            ['id_cr_estudiante' => $this->recordId, 'estado' => 'ACTIVO'],
+            ['id_cr_estudiante' => $this->recordId, 'estado' => 'RECTIFICADO'],
+            $this->administratorId
+        );
 
         $this->expectException(RuntimeException::class);
 

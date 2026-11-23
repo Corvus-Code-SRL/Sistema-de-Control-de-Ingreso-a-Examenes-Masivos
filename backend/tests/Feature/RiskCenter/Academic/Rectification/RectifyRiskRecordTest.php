@@ -15,8 +15,10 @@ use Tests\Concerns\SeedsSecurityAccounts;
 use Tests\TestCase;
 
 /**
- * HU-062: POST /api/rectificacion-riesgo/registros/{id}/rectificar retira el registro de la Central de Riesgo.
- * Es irreversible y no edita el tipo de falta ni la descripción.
+ * HU-062: POST /api/rectificacion-riesgo/registros/{id}/rectificar-sin-confirmacion retira el registro de la Central
+ * de Riesgo cuando el docente que lo aprobó ya no está activo y pasó el plazo (`rectify()` deja ese escenario
+ * listo). Es irreversible y no edita el tipo de falta ni la descripción. La vía normal, con confirmación del
+ * docente, la cubren SendRectificationRequestTest y AnswerRectificationRequestTest.
  */
 class RectifyRiskRecordTest extends TestCase
 {
@@ -103,7 +105,7 @@ class RectifyRiskRecordTest extends TestCase
         $this->assertSame($first, $this->recordRow($this->recordId));
         $this->assertSame(1, DB::table('log')
             ->join('accion', 'accion.id_accion', '=', 'log.id_accion')
-            ->where('accion.operacion', 'RECTIFICAR_REGISTRO')->count());
+            ->where('accion.operacion', 'RECTIFICAR_SIN_CONFIRMACION')->count());
     }
 
     public function test_otro_administrador_tampoco_puede_rectificar_un_registro_ya_rectificado(): void
@@ -246,7 +248,7 @@ class RectifyRiskRecordTest extends TestCase
 
         $log = DB::table('log')
             ->join('accion', 'accion.id_accion', '=', 'log.id_accion')
-            ->where('accion.operacion', 'RECTIFICAR_REGISTRO')
+            ->where('accion.operacion', 'RECTIFICAR_SIN_CONFIRMACION')
             ->first();
 
         $this->assertNotNull($log);
@@ -276,7 +278,7 @@ class RectifyRiskRecordTest extends TestCase
     {
         $this->rectify($this->recordId)->assertOk();
 
-        $this->getJson('/api/bitacora?accion=RECTIFICAR_REGISTRO&modulo=central_riesgo')
+        $this->getJson('/api/bitacora?accion=RECTIFICAR_SIN_CONFIRMACION&modulo=central_riesgo')
             ->assertOk()
             ->assertJsonCount(1, 'data');
     }

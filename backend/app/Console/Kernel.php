@@ -5,6 +5,7 @@ namespace App\Console;
 use App\Jobs\FinalizeExpiredExamsJob;
 use App\Jobs\OpenEntryControlJob;
 use App\Services\Exams\ExamLifecycleService;
+use App\Services\RiskCenter\Academic\RectificationExpiryService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -31,6 +32,13 @@ class Kernel extends ConsoleKernel
         $schedule->call(function (): void {
             app(FinalizeExpiredExamsJob::class)->handle(app(ExamLifecycleService::class));
         })->name('finalize-expired-exams')->everyMinute()->withoutOverlapping(2);
+
+        // HU-062: las solicitudes de rectificación sin respuesta pasan a VENCIDAS. No anula registros ni escribe
+        // bitácora; las lecturas ya tratan como vencida a toda pendiente pasada de fecha, así que la frecuencia
+        // no es crítica.
+        $schedule->call(function (): void {
+            app(RectificationExpiryService::class)->expireDue();
+        })->name('expire-rectification-requests')->hourly()->withoutOverlapping(10);
 
         // Respaldo diario de la base: solo donde se encendió SCIEM_RESPALDO_DIARIO.
         if (config('sciem.respaldo.diario')) {

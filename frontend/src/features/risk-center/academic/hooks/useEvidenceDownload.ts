@@ -7,13 +7,21 @@ const REVOKE_AFTER_MS = 60_000
 /** Tipos que el navegador muestra en una pestaña; el resto se descarga. */
 const VIEWABLE_TYPE = /^(image\/(png|jpeg|gif|webp)|application\/pdf)$/
 
+/** Pide un archivo por id; por defecto, la evidencia de un registro de la Central. */
+export type EvidenceFetcher = (id: number, signal?: AbortSignal) => Promise<Blob>
+
 /**
- * Abre o descarga la evidencia de un registro.
+ * Abre o descarga una evidencia.
  *
  * El archivo solo se entrega con la sesión, así que se pide como Blob con el token y se abre desde
- * una dirección local temporal; nunca se enlaza por una URL pública.
+ * una dirección local temporal; nunca se enlaza por una URL pública. `fetcher` permite reutilizarlo para
+ * otras evidencias (la imagen de un rechazo, el adjunto de una solicitud).
  */
-export function useEvidenceDownload(recordId: number, fileName: string) {
+export function useEvidenceDownload(
+  recordId: number,
+  fileName: string,
+  fetcher: EvidenceFetcher = getRiskCenterEvidence
+) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const controller = useRef<AbortController | null>(null)
@@ -30,7 +38,7 @@ export function useEvidenceDownload(recordId: number, fileName: string) {
     setMessage(null)
 
     try {
-      const file = await getRiskCenterEvidence(recordId, current.signal)
+      const file = await fetcher(recordId, current.signal)
       const url = URL.createObjectURL(file)
       const link = document.createElement('a')
 
@@ -52,7 +60,7 @@ export function useEvidenceDownload(recordId: number, fileName: string) {
       setMessage(cause instanceof ApiError ? cause.message : 'No se pudo abrir la evidencia.')
       setStatus('error')
     }
-  }, [recordId, fileName])
+  }, [recordId, fileName, fetcher])
 
   return { open, status, message }
 }
