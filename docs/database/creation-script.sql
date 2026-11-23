@@ -2001,3 +2001,14 @@ BEGIN
             );
     END IF;
 END $$;
+
+-- Versión 20: autovacuum más frecuente en las tablas de alta escritura (RNF-14)
+--             (2026_11_19_000000_tune_autovacuum_on_high_write_tables)
+--   * examen_estudiante recibe un UPDATE por cada estudiante que ingresa; intento_ingreso y log solo crecen.
+--   * Por defecto PostgreSQL limpia una tabla con el 20 % de filas muertas y actualiza estadísticas al 10 %;
+--     aquí se baja a 5 % y 2 % para que vaya al ritmo de un día de examen.
+--   * Son parámetros de almacenamiento: no cambian columnas, datos ni consultas.
+
+ALTER TABLE public.examen_estudiante SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_analyze_scale_factor = 0.02);
+ALTER TABLE public.intento_ingreso   SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_analyze_scale_factor = 0.02);
+ALTER TABLE public.log               SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_analyze_scale_factor = 0.02);
