@@ -25,6 +25,7 @@ class StudentExam extends Pivot
 
     /** Valor de public.estado_habilitacion con el que se registra un ingreso. */
     public const HABILITADO = 'HABILITADO';
+    public const CASO_ESPECIAL = 'CASO ESPECIAL';
 
     protected $table = 'examen_estudiante';
     protected $primaryKey = null;

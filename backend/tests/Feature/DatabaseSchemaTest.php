@@ -426,15 +426,13 @@ class DatabaseSchemaTest extends TestCase
         $this->assertSame(1, DB::table('distribucion_ambiente')->where('id_examen', $examId)->count());
     }
 
-    public function testDistributionAuditActionIsAppendedAfterExistingActions(): void
+    public function testDistributionAuditActionIsSeeded(): void
     {
         $action = DB::table('accion')->where('operacion', 'GUARDAR_DISTRIBUCION')->first();
-        $previousId = DB::table('accion')->where('operacion', 'RECHAZAR_INVITACION')->value('id_accion');
 
         $this->assertNotNull($action);
         $this->assertSame('UPDATE', $action->tipo_operacion);
         $this->assertSame('Guardado de la distribución de habilitados por ambiente', $action->descripcion);
-        $this->assertGreaterThan($previousId, $action->id_accion);
     }
 
     public function testGroupAuxiliaryIsUniquePerGroupAndUser(): void

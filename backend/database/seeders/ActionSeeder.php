@@ -154,5 +154,23 @@ class ActionSeeder extends Seeder
                 'descripcion' => 'Guardado de la distribución de habilitados por ambiente',
             ]
         );
+
+        // HU-031: distribución opcional; al final para no mover los ids existentes.
+        $optionalDistribution = [
+            [
+                'operacion' => 'DEJAR_USAR_DISTRIBUCION',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'El docente deja de usar la distribución de ambientes del examen',
+            ],
+            [
+                'operacion' => 'INGRESO_CON_AVISO_AMBIENTE',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Ingreso registrado pese a un aviso de ambiente distinto o lleno',
+            ],
+        ];
+
+        foreach ($optionalDistribution as $action) {
+            DB::table('accion')->updateOrInsert(['operacion' => $action['operacion']], $action);
+        }
     }
 }

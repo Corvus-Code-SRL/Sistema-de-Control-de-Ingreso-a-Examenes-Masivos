@@ -60,6 +60,7 @@ class Exam extends Model
         'fin_real_en' => 'datetime',
         'cronometro_iniciado_en' => 'datetime',
         'cronometro_vence_en' => 'datetime',
+        'distribucion_suspendida_en' => 'datetime',
         'fin_automatico' => 'boolean',
     ];
 

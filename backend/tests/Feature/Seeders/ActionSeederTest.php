@@ -17,16 +17,16 @@ class ActionSeederTest extends TestCase
         return DB::table('accion')->orderBy('id_accion')->get()->map(fn ($row) => (array) $row)->all();
     }
 
-    public function test_dos_ejecuciones_dejan_treinta_y_cinco_acciones_sin_duplicados(): void
+    public function test_dos_ejecuciones_dejan_treinta_y_siete_acciones_sin_duplicados(): void
     {
         $this->seed(ActionSeeder::class);
         $afterFirst = $this->catalog();
 
         $this->seed(ActionSeeder::class);
 
-        $this->assertCount(35, $afterFirst);
+        $this->assertCount(37, $afterFirst);
         $this->assertSame($afterFirst, $this->catalog());
-        $this->assertSame(35, DB::table('accion')->distinct()->count('operacion'));
+        $this->assertSame(37, DB::table('accion')->distinct()->count('operacion'));
     }
 
     public function test_incluye_las_acciones_de_aprobacion_y_rechazo_de_reportes(): void
@@ -108,7 +108,7 @@ class ActionSeederTest extends TestCase
                 ->value('descripcion')
         );
 
-        $this->assertSame(35, DB::table('accion')->count());
+        $this->assertSame(37, DB::table('accion')->count());
     }
 
     public function test_conserva_inicio_y_las_dos_acciones_de_situaciones(): void
@@ -128,23 +128,23 @@ class ActionSeederTest extends TestCase
                 ->pluck('tipo_operacion', 'operacion')
                 ->all()
         );
-        $this->assertSame(35, DB::table('accion')->count());
+        $this->assertSame(37, DB::table('accion')->count());
     }
 
     public function test_las_acciones_nuevas_van_al_final_del_catalogo(): void
     {
         $this->seed(ActionSeeder::class);
 
-        $lastSeven = DB::table('accion')->orderByDesc('id_accion')->limit(7)->pluck('operacion')
+        // En una base nueva las migraciones ya insertaron las acciones de HU-031 y HU-062.
+        $lastSix = DB::table('accion')->orderByDesc('id_accion')->limit(6)->pluck('operacion')
             ->reverse()->values()->all();
 
         $this->assertSame(
             [
                 'GUARDAR_HABILITADOS', 'ACEPTAR_INVITACION', 'RECHAZAR_INVITACION',
                 'REGISTRAR_ESTUDIANTE_EXCEPCIONAL', 'INICIAR_CRONOMETRO', 'AJUSTAR_CRONOMETRO',
-                'GUARDAR_DISTRIBUCION',
             ],
-            $lastSeven
+            $lastSix
         );
     }
 

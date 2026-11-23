@@ -52,7 +52,7 @@ class ExamEligibleListService
 
     private const NO_HABILITADO  = 'NO_HABILITADO';
 
-    private const CASO_ESPECIAL  = 'CASO ESPECIAL';
+    private const CASO_ESPECIAL  = \App\Models\StudentExam::CASO_ESPECIAL;
 
     private ExamEligibleListAccess $access;
 
