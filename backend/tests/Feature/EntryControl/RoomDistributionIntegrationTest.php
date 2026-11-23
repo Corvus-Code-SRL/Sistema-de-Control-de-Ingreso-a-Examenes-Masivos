@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\EntryControl;
 
-use App\Exceptions\EntryControl\EntryOpeningException;
 use App\Models\Exam;
 use App\Models\User;
 use App\Services\EntryControl\EntryControlSnapshotService;
@@ -11,6 +10,7 @@ use App\Services\EntryControl\VerificationService;
 use App\Services\Exams\Distribution\DistributionRosterQuery;
 use App\Services\Exams\Distribution\RoomDistributionReader;
 use App\Services\Exams\ExamInProgressQueryService;
+use App\Support\Exams\EntryRoomWarning;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\SeedsRoomDistribution;
@@ -27,7 +27,7 @@ class RoomDistributionIntegrationTest extends TestCase
         $this->seedExamCatalog();
     }
 
-    public function test_control_valida_la_distribucion_guardada_y_coincide_con_examen_en_curso(): void
+    public function test_control_avisa_con_la_distribucion_guardada_y_coincide_con_examen_en_curso(): void
     {
         $exam = $this->distributionExam(4, [3, 3]);
         $this->saveDistribution($exam)->assertOk();
@@ -39,16 +39,18 @@ class RoomDistributionIntegrationTest extends TestCase
         $record = app(EntryControlSnapshotService::class)->studentById((int) $exam->id_examen, $studentId);
         $verification = app(VerificationService::class);
         $teacher = User::findOrFail($this->docenteId);
-        $this->assertSame(VerificationService::WRONG_ROOM, $verification->verify((int) $exam->id_examen, [
+        $elsewhere = $verification->verify((int) $exam->id_examen, [
             'cod_sis' => $record['estudiante']['cod_sis'], 'id_ambiente' => $this->aulaId,
-        ], $teacher)['veredicto']);
-        $this->assertSame(VerificationService::AUTHORIZED, $verification->verify((int) $exam->id_examen, [
+        ], $teacher);
+        $this->assertSame(VerificationService::AUTHORIZED, $elsewhere['veredicto']);
+        $this->assertSame(EntryRoomWarning::OUT_OF_ROOM, $elsewhere['avisos_ambiente'][0]['tipo']);
+        $this->assertSame([], $verification->verify((int) $exam->id_examen, [
             'cod_sis' => $record['estudiante']['cod_sis'], 'id_ambiente' => $this->otraAulaId,
-        ], $teacher)['veredicto']);
+        ], $teacher)['avisos_ambiente']);
         $this->getJson($this->distributionUrl($exam))->assertOk()->assertJsonPath('data.editable', false);
     }
 
-    public function test_nuevo_habilitado_recibe_lugar_al_abrir_sin_modificar_lo_guardado(): void
+    public function test_nuevo_habilitado_queda_sin_ambiente_al_abrir_sin_modificar_lo_guardado(): void
     {
         $exam = $this->distributionExam(4, [3, 3]);
         $this->saveDistribution($exam)->assertOk();
@@ -60,7 +62,7 @@ class RoomDistributionIntegrationTest extends TestCase
         app(RoomAssignmentService::class)->prepare((int) $exam->id_examen);
 
         $assigned = app(RoomDistributionReader::class)->assignedRooms((int) $exam->id_examen);
-        $this->assertArrayHasKey($newId, $assigned);
+        $this->assertArrayNotHasKey($newId, $assigned);
         $this->assertCoherentRooms($exam, $assigned);
         $this->assertSame($before, app(DistributionRosterQuery::class)->savedRows((int) $exam->id_examen));
     }
@@ -79,71 +81,42 @@ class RoomDistributionIntegrationTest extends TestCase
         $this->assertCoherentRooms($exam, $assigned);
         $record = app(EntryControlSnapshotService::class)->studentById((int) $exam->id_examen, $disabled);
         $this->assertSame(VerificationService::NOT_ENABLED,
-            app(VerificationService::class)->evaluate($record, [], $this->aulaId)['veredicto']);
+            app(VerificationService::class)->evaluate($record, [])['veredicto']);
     }
 
-    public function test_excedente_conserva_el_contrato_sin_ambiente_y_no_redistribuye_todo(): void
+    public function test_excedente_sin_ambiente_puede_ingresar_sin_aviso(): void
     {
         $exam = $this->distributionExam(4, [2, 2]);
         $this->saveDistribution($exam)->assertOk();
-        $saved = app(RoomDistributionReader::class)->assignedRooms((int) $exam->id_examen);
         $newId = $this->addDistributionStudent($exam);
-        $snapshots = app(EntryControlSnapshotService::class);
-        // stage() se prueba directamente: prepare() ya rechaza esta capacidad antes de HU-031.
-        $token = $snapshots->stage($exam);
-        $snapshots->activate((int) $exam->id_examen, $token);
-        $this->assertSame($saved, app(RoomDistributionReader::class)->assignedRooms((int) $exam->id_examen));
-        $this->assertCoherentRooms($exam, $saved);
-        $record = $snapshots->studentById((int) $exam->id_examen, $newId);
-        $result = app(VerificationService::class)->evaluate($record, [], $this->aulaId);
+        app(RoomAssignmentService::class)->prepare((int) $exam->id_examen);
+        $record = app(EntryControlSnapshotService::class)->studentById((int) $exam->id_examen, $newId);
+
+        $result = app(VerificationService::class)->evaluate($record, []);
+
         $this->assertNull($record['ambiente_asignado']);
-        $this->assertSame(VerificationService::ROOM_NOT_ASSIGNED, $result['veredicto']);
-        $this->assertFalse($result['autorizado']);
+        $this->assertTrue($result['autorizado']);
     }
 
-    public function test_apertura_conserva_su_rechazo_preexistente_por_capacidad(): void
+    public function test_apertura_ya_no_falla_por_capacidad(): void
     {
         $exam = $this->distributionExam(4, [3, 3]);
         $this->saveDistribution($exam)->assertOk();
         DB::table('ambiente')->whereIn('id_ambiente', [$this->aulaId, $this->otraAulaId])
             ->update(['capacidad' => 1]);
-        $this->expectException(EntryOpeningException::class);
-        $this->expectExceptionMessage('Capacidad 2 menor que la nómina de 4.');
 
         app(RoomAssignmentService::class)->prepare((int) $exam->id_examen);
+
+        $this->assertTrue(app(RoomAssignmentService::class)->hasPreparedSnapshot((int) $exam->id_examen));
     }
 
-    public function test_excepcional_conserva_ambiente_operativo_en_snapshot_y_examen_en_curso(): void
+    public function test_sin_distribucion_no_hay_aula_implicita(): void
     {
         $exam = $this->distributionExam(4, [3, 3]);
-        $this->saveDistribution($exam)->assertOk();
-        [$special] = $this->distributionStudentIds($exam);
-        $this->setDistributionEligibility($exam, $special, 'CASO ESPECIAL');
-        DB::table('examen_estudiante')->where('id_examen', $exam->id_examen)
-            ->where('id_estudiante', $special)->update(['id_ambiente' => $this->otraAulaId]);
         app(RoomAssignmentService::class)->prepare((int) $exam->id_examen);
 
-        $assigned = app(RoomDistributionReader::class)->assignedRooms((int) $exam->id_examen);
-        $this->assertSame($this->otraAulaId, $assigned[$special]['id_ambiente']);
-        $this->assertCoherentRooms($exam, $assigned);
-        $this->assertDatabaseHas('distribucion_ambiente', [
-            'id_examen' => $exam->id_examen, 'id_estudiante' => $special, 'id_ambiente' => $this->aulaId,
-        ]);
-    }
-
-    public function test_sin_distribucion_conserva_calculo_anterior_incluido_no_habilitado_a4(): void
-    {
-        $exam = $this->distributionExam(4, [3, 3]);
-        [$disabled] = $this->distributionStudentIds($exam);
-        $this->setDistributionEligibility($exam, $disabled, 'NO_HABILITADO');
-        $expected = EntryControlSnapshotService::assignRooms(
-            $this->distributionStudentIds($exam), app(DistributionRosterQuery::class)->rooms((int) $exam->id_examen)
-        );
-        app(RoomAssignmentService::class)->prepare((int) $exam->id_examen);
-
-        $this->assertNull(app(RoomDistributionReader::class)->assignedRooms((int) $exam->id_examen));
-        $this->assertCoherentRooms($exam, $expected);
-        $this->assertArrayHasKey($disabled, $expected);
+        $this->assertSame([], app(RoomDistributionReader::class)->assignedRooms((int) $exam->id_examen));
+        $this->assertCoherentRooms($exam, []);
     }
 
     /** @param array<int, array{id_ambiente:int, nro_aula:string}> $expected */

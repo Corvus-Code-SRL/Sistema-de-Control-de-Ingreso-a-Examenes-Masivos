@@ -3,6 +3,7 @@
 namespace Tests\Unit\Services\EntryControl;
 
 use App\Services\EntryControl\EntryControlSnapshotService;
+use App\Services\EntryControl\EntryRoomPolicy;
 use App\Services\EntryControl\IdentificationService;
 use App\Services\EntryControl\VerificationService;
 use App\Services\RiskCenter\Academic\RiskCenterQueryService;
@@ -30,7 +31,12 @@ class VerificationEvaluateTest extends TestCase
         $riskCenter = $this->createMock(RiskCenterQueryService::class);
         $riskCenter->expects($this->never())->method($this->anything());
 
-        $this->service = new VerificationService($snapshots, $identification, $riskCenter);
+        $this->service = new VerificationService(
+            $snapshots,
+            $identification,
+            $riskCenter,
+            $this->createMock(EntryRoomPolicy::class)
+        );
     }
 
     /** @param array<string, mixed> $overrides */
@@ -56,7 +62,7 @@ class VerificationEvaluateTest extends TestCase
 
     public function test_autoriza_al_estudiante_del_ambiente_de_control(): void
     {
-        $result = $this->service->evaluate($this->record(), ['ci' => '1234567'], self::ROOM_A);
+        $result = $this->service->evaluate($this->record(), ['ci' => '1234567']);
 
         $this->assertTrue($result['autorizado']);
         $this->assertSame(VerificationService::AUTHORIZED, $result['veredicto']);
@@ -64,25 +70,17 @@ class VerificationEvaluateTest extends TestCase
         $this->assertNull($result['auxiliar']);
     }
 
-    public function test_sin_ambiente_de_control_no_compara_el_ambiente(): void
+    public function test_el_ambiente_ya_no_rechaza_la_verificacion(): void
     {
-        $result = $this->service->evaluate($this->record(), [], null);
+        $result = $this->service->evaluate($this->record(), []);
 
         $this->assertTrue($result['autorizado']);
-    }
-
-    public function test_ambiente_distinto_indica_el_que_corresponde(): void
-    {
-        $result = $this->service->evaluate($this->record(), [], self::ROOM_B);
-
-        $this->assertFalse($result['autorizado']);
-        $this->assertSame(VerificationService::WRONG_ROOM, $result['veredicto']);
-        $this->assertSame('Corresponde al ambiente 691A', $result['motivo']);
+        $this->assertSame(VerificationService::AUTHORIZED, $result['veredicto']);
     }
 
     public function test_sin_grupo_no_pertenece_al_examen(): void
     {
-        $result = $this->service->evaluate($this->record(['grupo' => null]), [], self::ROOM_A);
+        $result = $this->service->evaluate($this->record(['grupo' => null]), []);
 
         $this->assertSame(VerificationService::NOT_IN_EXAM, $result['veredicto']);
         $this->assertSame('No pertenece a los grupos de este examen', $result['motivo']);
@@ -92,16 +90,14 @@ class VerificationEvaluateTest extends TestCase
     {
         $result = $this->service->evaluate(
             $this->record(['estado_habilitacion' => 'NO_HABILITADO']),
-            [],
-            self::ROOM_A
-        );
+            []);
 
         $this->assertSame(VerificationService::NOT_ENABLED, $result['veredicto']);
     }
 
     public function test_ci_distinto_no_coincide(): void
     {
-        $result = $this->service->evaluate($this->record(), ['ci' => '7654321'], self::ROOM_A);
+        $result = $this->service->evaluate($this->record(), ['ci' => '7654321']);
 
         $this->assertSame(VerificationService::CI_MISMATCH, $result['veredicto']);
         $this->assertSame('El CI no coincide con el registrado', $result['motivo']);
@@ -109,12 +105,10 @@ class VerificationEvaluateTest extends TestCase
 
     public function test_sin_ci_presentado_o_registrado_no_compara(): void
     {
-        $withoutPresented = $this->service->evaluate($this->record(), ['ci' => null], self::ROOM_A);
+        $withoutPresented = $this->service->evaluate($this->record(), ['ci' => null]);
         $withoutRegistered = $this->service->evaluate(
             $this->record(['estudiante' => array_replace($this->record()['estudiante'], ['ci' => null])]),
-            ['ci' => '7654321'],
-            self::ROOM_A
-        );
+            ['ci' => '7654321']);
 
         $this->assertTrue($withoutPresented['autorizado']);
         $this->assertTrue($withoutRegistered['autorizado']);
@@ -124,19 +118,17 @@ class VerificationEvaluateTest extends TestCase
     {
         $result = $this->service->evaluate(
             $this->record(['ingreso_previo' => ['hora_ingreso' => '10:01:33', 'nro_aula' => '691A']]),
-            [],
-            self::ROOM_A
-        );
+            []);
 
         $this->assertSame(VerificationService::DUPLICATE, $result['veredicto']);
         $this->assertSame('Ya ingresó a las 10:01 por el 691A', $result['motivo']);
     }
 
-    public function test_sin_ambiente_asignado(): void
+    public function test_sin_ambiente_asignado_tambien_autoriza(): void
     {
-        $result = $this->service->evaluate($this->record(['ambiente_asignado' => null]), [], null);
+        $result = $this->service->evaluate($this->record(['ambiente_asignado' => null]), []);
 
-        $this->assertSame(VerificationService::ROOM_NOT_ASSIGNED, $result['veredicto']);
+        $this->assertTrue($result['autorizado']);
     }
 
     public function test_respeta_el_orden_de_las_reglas(): void
@@ -149,17 +141,17 @@ class VerificationEvaluateTest extends TestCase
 
         $this->assertSame(
             VerificationService::NOT_ENABLED,
-            $this->service->evaluate($everythingWrong, ['ci' => '7654321'], self::ROOM_B)['veredicto']
+            $this->service->evaluate($everythingWrong, ['ci' => '7654321'])['veredicto']
         );
 
         $everythingWrong['estado_habilitacion'] = null;
         $this->assertSame(
             VerificationService::CI_MISMATCH,
-            $this->service->evaluate($everythingWrong, ['ci' => '7654321'], self::ROOM_B)['veredicto']
+            $this->service->evaluate($everythingWrong, ['ci' => '7654321'])['veredicto']
         );
         $this->assertSame(
             VerificationService::DUPLICATE,
-            $this->service->evaluate($everythingWrong, [], self::ROOM_B)['veredicto']
+            $this->service->evaluate($everythingWrong, [])['veredicto']
         );
     }
 
@@ -170,9 +162,7 @@ class VerificationEvaluateTest extends TestCase
                 'cantidad' => 2,
                 'detalles' => [['tipo' => 'Suplantación', 'fecha' => '2026-05-01']],
             ]]),
-            [],
-            self::ROOM_A
-        );
+            []);
 
         $this->assertSame(
             ['total' => 2, 'latest' => ['tipo_falta' => 'Suplantación', 'fecha_registro' => '2026-05-01']],
@@ -204,7 +194,8 @@ class VerificationEvaluateTest extends TestCase
             $this->createMock(EntryControlSnapshotService::class),
             $this->createMock(IdentificationService::class),
             $this->createMock(RiskCenterQueryService::class),
-        ))->evaluate($record, [], 1);
+            $this->createMock(EntryRoomPolicy::class),
+        ))->evaluate($record, []);
 
         $this->assertSame(VerificationService::AUTHORIZED, $result['veredicto']);
         $this->assertTrue($result['autorizado']);
@@ -234,7 +225,8 @@ class VerificationEvaluateTest extends TestCase
             $this->createMock(EntryControlSnapshotService::class),
             $this->createMock(IdentificationService::class),
             $this->createMock(RiskCenterQueryService::class),
-        ))->evaluate($record, [], 1);
+            $this->createMock(EntryRoomPolicy::class),
+        ))->evaluate($record, []);
 
         $this->assertSame(VerificationService::NOT_ENABLED, $result['veredicto']);
         $this->assertFalse($result['autorizado']);
@@ -265,7 +257,8 @@ class VerificationEvaluateTest extends TestCase
             $this->createMock(EntryControlSnapshotService::class),
             $this->createMock(IdentificationService::class),
             $this->createMock(RiskCenterQueryService::class),
-        ))->evaluate($record, [], 1);
+            $this->createMock(EntryRoomPolicy::class),
+        ))->evaluate($record, []);
 
         $this->assertSame(VerificationService::NOT_ENABLED, $result['veredicto']);
         $this->assertStringContainsString('Motivo: Documento pendiente', $result['motivo']);
@@ -295,7 +288,8 @@ class VerificationEvaluateTest extends TestCase
             $this->createMock(EntryControlSnapshotService::class),
             $this->createMock(IdentificationService::class),
             $this->createMock(RiskCenterQueryService::class),
-        ))->evaluate($record, [], 1);
+            $this->createMock(EntryRoomPolicy::class),
+        ))->evaluate($record, []);
 
         $this->assertSame(VerificationService::NOT_ENABLED, $result['veredicto']);
         $this->assertStringContainsString('Motivo: No figura en la lista cargada.', $result['motivo']);

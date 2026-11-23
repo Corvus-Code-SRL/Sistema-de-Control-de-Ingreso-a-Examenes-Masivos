@@ -7,11 +7,13 @@ use App\Models\Role;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\SeedsExamCatalog;
+use Tests\Concerns\PlansExamRooms;
 use Tests\TestCase;
 
 class ExamInProgressTest extends TestCase
 {
     use DatabaseTransactions;
+    use PlansExamRooms;
     use SeedsExamCatalog;
 
     protected function setUp(): void
@@ -106,6 +108,13 @@ class ExamInProgressTest extends TestCase
         DB::table('ambiente')
             ->whereIn('id_ambiente', [$this->aulaId, $this->otraAulaId])
             ->update(['capacidad' => 1]);
+
+        $studentIds = DB::table('grupo_estudiante')->where('id_grupo', $this->grupoPropioId)
+            ->orderBy('id_estudiante')->pluck('id_estudiante')->all();
+        $this->planRooms((int) $exam->id_examen, [
+            (int) $studentIds[0] => $this->aulaId,
+            (int) $studentIds[1] => $this->otraAulaId,
+        ]);
 
         return $exam;
     }

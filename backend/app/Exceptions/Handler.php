@@ -72,6 +72,7 @@ class Handler extends ExceptionHandler
         ExamAssistantNotFoundException::class,
         ExamOwnershipException::class,
         ExamStateException::class,
+        \App\Exceptions\EntryControl\EntryRoomWarningException::class,
         ExamTimerLimitException::class,
         ExamWarningsException::class,
         FinalReportUnavailableException::class,

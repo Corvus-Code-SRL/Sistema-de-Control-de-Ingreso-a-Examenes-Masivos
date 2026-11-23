@@ -64,8 +64,7 @@ class EntryControlSnapshotService
             }
             unset($membership);
         }
-        $assignedRooms = $this->distribution->assignedRooms($examId)
-            ?? self::assignRooms($this->rosterStudentIds($membersByStudent), $rooms);
+        $assignedRooms = $this->distribution->assignedRooms($examId);
         $entries = $this->entries($examId);
         $pendingReports = DB::table('reporte_estudiante')
             ->where('id_examen', $examId)
@@ -712,8 +711,7 @@ class EntryControlSnapshotService
         }
 
         $rooms = $this->rooms($examId);
-        $assignedRooms = $this->distribution->assignedRooms($examId)
-            ?? self::assignRooms($this->rosterStudentIds($membersByStudent), $rooms);
+        $assignedRooms = $this->distribution->assignedRooms($examId);
         $entry = $this->entries($examId, $studentId)[$studentId] ?? null;
 
         return $this->studentRecord(
@@ -799,7 +797,7 @@ class EntryControlSnapshotService
 
     /**
      * Aula con la que se muestra a un estudiante. Al excepcional se le respeta el aula que eligió el docente
-     * al registrarlo; a los demás, la del reparto automático.
+     * al registrarlo; a los demás, la de la distribución guardada, si existe.
      *
      * @param array<int, array{id_ambiente: int, nro_aula: string, capacidad: int}> $rooms
      * @param array<string, mixed>|null $group
@@ -818,21 +816,6 @@ class EntryControlSnapshotService
         }
 
         return $assigned;
-    }
-
-    /**
-     * Ids de los estudiantes de la nómina: el reparto automático de aulas solo los considera a ellos, para que
-     * registrar un excepcional no cambie el aula de nadie más.
-     *
-     * @param array<int, array<string, mixed>> $membersByStudent
-     * @return array<int, int>
-     */
-    private function rosterStudentIds(array $membersByStudent): array
-    {
-        return array_keys(array_filter(
-            $membersByStudent,
-            fn (array $membership): bool => ($membership['motivo_excepcional'] ?? null) === null
-        ));
     }
 
     /** @return array<int, array{id_ambiente: int, nro_aula: string, capacidad: int}> */
@@ -1060,29 +1043,6 @@ class EntryControlSnapshotService
                     ] : null,
                 ]];
             })->all();
-    }
-
-    public static function assignRooms(array $studentIds, array $rooms): array
-    {
-        sort($studentIds, SORT_NUMERIC);
-        $assigned = [];
-        $roomIndex = 0;
-        $limit = $rooms[0]['capacidad'] ?? 0;
-
-        foreach (array_values($studentIds) as $position => $studentId) {
-            while ($position + 1 > $limit && isset($rooms[$roomIndex + 1])) {
-                $roomIndex++;
-                $limit += $rooms[$roomIndex]['capacidad'];
-            }
-            if (isset($rooms[$roomIndex]) && $position + 1 <= $limit) {
-                $assigned[$studentId] = [
-                    'id_ambiente' => $rooms[$roomIndex]['id_ambiente'],
-                    'nro_aula' => $rooms[$roomIndex]['nro_aula'],
-                ];
-            }
-        }
-
-        return $assigned;
     }
 
     private function expirationFor(Exam $exam): Carbon

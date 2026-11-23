@@ -121,15 +121,7 @@ class ExamInProgressQueryService
             ->orderBy('nomina.id_estudiante')
             ->get();
 
-        // El reparto automático de aulas solo considera la nómina: el excepcional conserva el aula que se le eligió.
-        $assignedRooms = $this->distribution->assignedRooms($examId)
-            ?? EntryControlSnapshotService::assignRooms(
-            $roster->reject(fn ($student) => (bool) $student->es_excepcional)
-                ->pluck('id_estudiante')
-                ->map(fn ($id) => (int) $id)
-                ->all(),
-            $rooms
-        );
+        $assignedRooms = $this->distribution->assignedRooms($examId);
 
         $roomNames = collect($rooms)
             ->pluck('nro_aula', 'id_ambiente');
@@ -145,7 +137,8 @@ class ExamInProgressQueryService
                 ? ($assignedRooms[$studentId]['id_ambiente'] ?? null)
                 : (int) $student->id_ambiente;
 
-            if (!$isTeacher && $roomId !== $assignedRoomId) {
+            // Sin ambiente planificado puede ingresar por cualquiera: el auxiliar también lo ve como pendiente.
+            if (!$isTeacher && $roomId !== null && $roomId !== $assignedRoomId) {
                 continue;
             }
 

@@ -121,7 +121,6 @@ class StudentVerificationTest extends TestCase
     {
         foreach ([
             ['CI_NO_COINCIDE', $this->input(['ci' => '9999999999'])],
-            ['AULA_INCORRECTA', $this->input(['id_ambiente' => $this->otraAulaId])],
         ] as [$verdict, $input]) {
             $response = $this->postJson($this->url('verificar'), $input)
                 ->assertOk()->assertJsonPath('data.veredicto', $verdict);
@@ -765,13 +764,13 @@ class StudentVerificationTest extends TestCase
         ])->assertOk()->assertJsonPath('data.veredicto', 'NO_PERTENECE');
     }
 
-    public function test_aula_incorrecta_se_distingue_del_duplicado(): void
+    public function test_sin_distribucion_autoriza_en_cualquier_ambiente_sin_aviso(): void
     {
         $this->postJson($this->url('verificar'), $this->input(['id_ambiente' => $this->otraAulaId]))
             ->assertOk()
-            ->assertJsonPath('data.veredicto', 'AULA_INCORRECTA')
-            ->assertJsonPath('data.motivo', 'Corresponde al ambiente 691A')
-            ->assertJsonPath('data.ambiente_asignado.id_ambiente', $this->aulaId);
+            ->assertJsonPath('data.veredicto', 'AUTORIZADO')
+            ->assertJsonPath('data.ambiente_asignado', null)
+            ->assertJsonPath('data.avisos_ambiente', []);
     }
 
     public function test_confirma_una_vez_y_actualiza_estado_incluso_en_el_mismo_segundo(): void
@@ -1184,7 +1183,7 @@ class StudentVerificationTest extends TestCase
         $this->assertSame(0, DB::table('intento_ingreso')->count());
     }
 
-    public function test_apertura_falla_sin_capacidad_y_conserva_programado(): void
+    public function test_apertura_no_falla_por_capacidad_y_conserva_programado(): void
     {
         $other = $this->createExam(['nombre_examen' => 'Sin capacidad'], [$this->aulaId]);
         DB::table('grupo_examen')->insert([
@@ -1193,13 +1192,9 @@ class StudentVerificationTest extends TestCase
         ]);
         DB::table('ambiente')->where('id_ambiente', $this->aulaId)->update(['capacidad' => 1]);
 
-        try {
-            app(RoomAssignmentService::class)->prepare($other->id_examen);
-            $this->fail('La apertura debía fallar.');
-        } catch (\DomainException $exception) {
-            $this->assertStringContainsString('Capacidad', $exception->getMessage());
-        }
+        app(RoomAssignmentService::class)->prepare($other->id_examen);
 
+        $this->assertTrue(app(RoomAssignmentService::class)->hasPreparedSnapshot($other->id_examen));
         $this->assertSame(Exam::PROGRAMADO, $other->fresh()->estado);
         $this->assertFalse(Schema::hasTable('examen_estudiante_ambiente'));
     }
@@ -1303,7 +1298,7 @@ class StudentVerificationTest extends TestCase
         }
     }
 
-    public function test_job_abre_en_la_ventana_configurada_y_calcula_el_aula_estable(): void
+    public function test_job_abre_en_la_ventana_configurada_sin_aula_implicita(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-09-29 12:05:00', config('sciem.zona_horaria')));
         try {
@@ -1320,43 +1315,19 @@ class StudentVerificationTest extends TestCase
 
             app()->call([app(OpenEntryControlJob::class), 'handle']);
             $this->assertSame(Exam::PROGRAMADO, $other->fresh()->estado);
-            $firstRoom = app(RoomAssignmentService::class)->assignedRoomFor(
-                $other->id_examen,
-                $this->student->id_estudiante
+            $this->assertTrue(app(RoomAssignmentService::class)->hasPreparedSnapshot($other->id_examen));
+            $this->assertNull(
+                app(RoomAssignmentService::class)->assignedRoomFor($other->id_examen, $this->student->id_estudiante)
             );
-            $this->assertSame($this->aulaId, (int) $firstRoom->id_ambiente);
 
             app(RoomAssignmentService::class)->prepare($other->id_examen);
-            $this->assertSame(
-                $firstRoom->id_ambiente,
-                app(RoomAssignmentService::class)
-                    ->assignedRoomFor($other->id_examen, $this->student->id_estudiante)
-                    ->id_ambiente
+            $this->assertNull(
+                app(RoomAssignmentService::class)->assignedRoomFor($other->id_examen, $this->student->id_estudiante)
             );
             $this->assertFalse(Schema::hasTable('examen_estudiante_ambiente'));
         } finally {
             Carbon::setTestNow();
         }
-    }
-
-    public function test_aulas_derivadas_respetan_capacidades_y_orden_de_estudiantes(): void
-    {
-        $other = $this->createExam(['nombre_examen' => 'Dos ambientes'], [$this->aulaId, $this->otraAulaId]);
-        DB::table('grupo_examen')->insert([
-            'id_examen' => $other->id_examen,
-            'id_grupo' => $this->grupoPropioId,
-        ]);
-        DB::table('ambiente')->where('id_ambiente', $this->aulaId)->update(['capacidad' => 1]);
-        app(RoomAssignmentService::class)->prepare($other->id_examen);
-
-        $ids = DB::table('grupo_estudiante')
-            ->where('id_grupo', $this->grupoPropioId)
-            ->orderBy('id_estudiante')
-            ->pluck('id_estudiante');
-        $rooms = app(RoomAssignmentService::class);
-
-        $this->assertSame($this->aulaId, (int) $rooms->assignedRoomFor($other->id_examen, $ids[0])->id_ambiente);
-        $this->assertSame($this->otraAulaId, (int) $rooms->assignedRoomFor($other->id_examen, $ids[1])->id_ambiente);
     }
 
     public function test_otro_docente_no_tiene_acceso(): void

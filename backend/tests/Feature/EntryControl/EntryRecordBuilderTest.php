@@ -7,6 +7,7 @@ use App\Services\EntryControl\EntryControlSnapshotService;
 use App\Services\EntryControl\RoomAssignmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Tests\Concerns\PlansExamRooms;
 use Tests\Concerns\SeedsExamCatalog;
 use Tests\TestCase;
 
@@ -18,6 +19,7 @@ class EntryRecordBuilderTest extends TestCase
 {
     use DatabaseTransactions;
     use SeedsExamCatalog;
+    use PlansExamRooms;
 
     private Exam $exam;
     private EntryControlSnapshotService $snapshots;
@@ -63,12 +65,20 @@ class EntryRecordBuilderTest extends TestCase
         }
     }
 
-    public function test_asigna_el_mismo_ambiente_por_capacidad(): void
+    public function test_toma_el_ambiente_de_la_distribucion_guardada(): void
     {
         [$first, $second] = $this->rosterIds();
+        $this->planRooms((int) $this->exam->id_examen, [$first => $this->aulaId, $second => $this->otraAulaId]);
 
         $this->assertSame('691A', $this->snapshots->recordFor($this->exam, $first)['ambiente_asignado']['nro_aula']);
         $this->assertSame('692B', $this->snapshots->recordFor($this->exam, $second)['ambiente_asignado']['nro_aula']);
+    }
+
+    public function test_sin_distribucion_no_hay_ambiente_implicito(): void
+    {
+        [$first] = $this->rosterIds();
+
+        $this->assertNull($this->snapshots->recordFor($this->exam, $first)['ambiente_asignado']);
     }
 
     public function test_refleja_el_ingreso_previo(): void

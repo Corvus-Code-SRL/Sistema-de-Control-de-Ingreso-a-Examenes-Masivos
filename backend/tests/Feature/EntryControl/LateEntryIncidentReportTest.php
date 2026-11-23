@@ -114,9 +114,9 @@ class LateEntryIncidentReportTest extends TestCase
     {
         $this->actAsUserId($this->assistantBId);
 
-        $response = $this->verify($this->firstStudentId, $this->otraAulaId)
+        $response = $this->verify($this->secondStudentId, $this->otraAulaId, ['ci' => self::WRONG_CI])
             ->assertOk()
-            ->assertJsonPath('data.veredicto', VerificationService::WRONG_ROOM);
+            ->assertJsonPath('data.veredicto', VerificationService::CI_MISMATCH);
 
         $this->assertDatabaseHas('intento_ingreso', [
             'id_intento' => $response->json('data.id_intento'),
@@ -282,9 +282,11 @@ class LateEntryIncidentReportTest extends TestCase
     public function test_el_auxiliar_reporta_con_evidencia_solo_en_su_ambiente(): void
     {
         $this->actAsUserId($this->assistantBId);
-        $ownAttempt = (int) $this->verify($this->firstStudentId, $this->otraAulaId)->json('data.id_intento');
+        $ownAttempt = (int) $this->verify($this->firstStudentId, $this->otraAulaId, ['ci' => self::WRONG_CI])
+            ->json('data.id_intento');
         $this->actAsUserId($this->assistantAId);
-        $foreignAttempt = (int) $this->verify($this->secondStudentId, $this->aulaId)->json('data.id_intento');
+        $foreignAttempt = (int) $this->verify($this->secondStudentId, $this->aulaId, ['ci' => self::WRONG_CI])
+            ->json('data.id_intento');
 
         $this->actAsUserId($this->assistantBId);
         $this->report($foreignAttempt)
