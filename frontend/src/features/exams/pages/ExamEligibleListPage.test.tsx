@@ -80,13 +80,15 @@ function stubBackend(handler: {
   })
 }
 
+// A nivel de módulo: varios tests viven fuera del describe y el hook guarda el examen elegido en sessionStorage.
+afterEach(() => {
+  window.localStorage.clear()
+  window.sessionStorage.clear()
+})
+
 describe('ExamEligibleListPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-  })
-
-  afterEach(() => {
-    window.localStorage.clear()
   })
 
  it('muestra un estado vacío sin botón a otra HU cuando no hay exámenes', async () => {
