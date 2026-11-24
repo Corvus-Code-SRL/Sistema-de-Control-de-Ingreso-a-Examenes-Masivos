@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderApp } from '@/test/renderApp'
@@ -39,5 +39,16 @@ describe('salida de la distribución con ajustes locales', () => {
     await userEvent.click(screen.getByRole('link', { name: 'Materias' }))
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Salir sin guardar' }))
     await waitFor(() => expect(app.pathname).toBe('/materias'))
+  })
+  it('el botón atrás pide confirmación y permite seguir editando', async () => {
+    mockDistributionBackend()
+    renderApp('/examenes/distribucion')
+    await distributionLoaded()
+    await userEvent.click(screen.getByRole('button', { name: 'Distribuir por apellido' }))
+    await screen.findByText(/4 cambios sin guardar/)
+    act(() => { window.dispatchEvent(new PopStateEvent('popstate')) })
+    const dialog = await screen.findByRole('dialog', { name: '¿Salir sin guardar?' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Seguir editando' }))
+    expect(screen.getByText(/4 cambios sin guardar/)).toBeInTheDocument()
   })
 })
