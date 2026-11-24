@@ -512,7 +512,7 @@ o se dejó de usar. No reparte a nadie: un habilitado sin fila queda sin ambient
 | Sin distribución, suspendida o estudiante sin ambiente | Registra en cualquier ambiente del examen, sin aviso |
 | Ambiente distinto al planificado | `AUTORIZADO` con aviso `FUERA_DE_AMBIENTE` |
 | Ambiente lleno (`INGRESO` o `CON_RETRASO`, sin retirados) | Aviso `AMBIENTE_LLENO` al registrar |
-| Estudiante excepcional (HU-023) | Nunca recibe avisos |
+| Estudiante excepcional (HU-023) | No forma parte de la distribución; su ambiente asignado es el que se eligió al registrarlo y, si ingresa por otro, recibe el mismo aviso |
 
 Verificar no consulta PostgreSQL, por lo que `avisos_ambiente` solo adelanta el ambiente distinto. Al
 registrar se recalcula todo con el examen bloqueado. Si hay avisos sin confirmar responde:
