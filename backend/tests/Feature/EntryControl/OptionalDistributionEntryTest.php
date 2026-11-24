@@ -104,17 +104,24 @@ class OptionalDistributionEntryTest extends TestCase
         $this->assertSame([EntryRoomWarning::ROOM_FULL], $this->auditRow()['avisos']);
     }
 
-    public function test_excepcional_no_recibe_avisos(): void
+    public function test_excepcional_avisa_si_ingresa_por_otro_ambiente_que_el_elegido_al_registrarlo(): void
     {
-        $exam = $this->openExam(false, [1, 3]);
-        [$first] = $this->distributionStudentIds($exam);
-        $this->confirm($exam, $first, $this->aulaId)->assertCreated();
+        $exam = $this->openExam(false, [3, 3]);
         $room = ['id_ambiente' => $this->otraAulaId, 'nro_aula' => '692B'];
         $policy = app(EntryRoomPolicy::class);
         $record = ['autorizado' => true, 'ambiente_asignado' => $room, 'es_excepcional' => true];
 
-        $this->assertSame([], $policy->decorate((int) $exam->id_examen, $record, $this->aulaId)['avisos_ambiente']);
-        $this->assertSame([], $policy->resolve((int) $exam->id_examen, $record, $this->aulaId, false)['avisos']);
+        $decorated = $policy->decorate((int) $exam->id_examen, $record, $this->aulaId);
+        $this->assertSame(
+            ['Este estudiante tiene asignado el ambiente 692B'],
+            array_column($decorated['avisos_ambiente'], 'mensaje')
+        );
+        $this->assertSame([], $policy->decorate((int) $exam->id_examen, $record, $this->otraAulaId)['avisos_ambiente']);
+
+        $resolution = $policy->resolve((int) $exam->id_examen, $record, $this->otraAulaId, false);
+        $this->assertSame([], $resolution['avisos']);
+        $this->expectException(\App\Exceptions\EntryControl\EntryRoomWarningException::class);
+        $policy->resolve((int) $exam->id_examen, $record, $this->aulaId, false);
     }
 
     /** @param list<int> $capacities */

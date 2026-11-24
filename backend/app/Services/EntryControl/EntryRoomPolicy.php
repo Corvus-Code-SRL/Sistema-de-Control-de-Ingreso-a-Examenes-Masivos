@@ -10,7 +10,8 @@ use App\Support\Exams\EntryRoomWarning;
 
 /**
  * Regla común de ambiente para HU-032 y HU-037: la distribución y la capacidad avisan, nunca rechazan.
- * El excepcional (HU-023) no tiene ambiente planificado y no recibe avisos.
+ * El excepcional (HU-023) no está en la distribución: su ambiente asignado es el que se eligió al
+ * registrarlo y, si ingresa por otro, recibe el mismo aviso.
  *
  * @phpstan-type RoomWarning array{tipo:string, mensaje:string, ambiente_asignado?:array{id_ambiente:int,
  *     nro_aula:string}, ocupados?:int, capacidad?:int}
@@ -39,13 +40,11 @@ class EntryRoomPolicy
      */
     public function decorate(int $examId, array $verdict, int $roomId): array
     {
-        $exceptional = (bool) ($verdict['es_excepcional'] ?? false);
-
-        if (! $exceptional && $this->suspension->isMarked($examId)) {
+        if ($this->suspension->isMarked($examId)) {
             $verdict['ambiente_asignado'] = null;
         }
 
-        $verdict['avisos_ambiente'] = $verdict['autorizado'] && ! $exceptional
+        $verdict['avisos_ambiente'] = $verdict['autorizado']
             ? $this->outOfRoomWarnings($verdict['ambiente_asignado'], $roomId)
             : [];
 
@@ -61,15 +60,11 @@ class EntryRoomPolicy
      */
     public function resolve(int $examId, array $record, int $roomId, bool $confirmed): array
     {
-        $warnings = [];
-
-        if (! ($record['es_excepcional'] ?? false)) {
-            $assigned = $this->distribution->isSuspended($examId) ? null : $record['ambiente_asignado'];
-            $warnings = array_merge(
-                $this->outOfRoomWarnings($assigned, $roomId),
-                $this->fullRoomWarnings($examId, $roomId)
-            );
-        }
+        $assigned = $this->distribution->isSuspended($examId) ? null : $record['ambiente_asignado'];
+        $warnings = array_merge(
+            $this->outOfRoomWarnings($assigned, $roomId),
+            $this->fullRoomWarnings($examId, $roomId)
+        );
 
         if ($warnings !== [] && ! $confirmed) {
             throw new EntryRoomWarningException($warnings);
