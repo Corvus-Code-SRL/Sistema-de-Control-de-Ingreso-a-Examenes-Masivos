@@ -10,6 +10,8 @@ use stdClass;
 
 /**
  * Nómina única y ordenada, capacidades actuales y filas planificadas; no usa la lista editable de HU-028.
+ * Los excepcionales (HU-023) nunca forman parte de la distribución: se registran con el control ya abierto,
+ * con el ambiente que eligió el docente, y no cuentan en la capacidad ni aparecen sin ambiente.
  *
  * @phpstan-type DistributionStudent array{id_estudiante:int, apellido_paterno:string,
  *     apellido_materno:?string, nombre:string, cod_sis:string}
@@ -31,6 +33,7 @@ class DistributionRosterQuery
     {
         $rows = DB::query()
             ->fromSub($this->roster->expected($examId), 'nomina')
+            ->where('nomina.es_excepcional', false)
             ->whereIn('nomina.estado_habilitacion', self::ELIGIBLE_STATES)
             ->get()->keyBy('id_estudiante')->values()
             ->map(fn (stdClass $row): array => [
@@ -47,6 +50,7 @@ class DistributionRosterQuery
     public function ineligibleCount(int $examId): int
     {
         return (int) DB::query()->fromSub($this->roster->expected($examId), 'nomina')
+            ->where('nomina.es_excepcional', false)
             ->where('nomina.estado_habilitacion', self::INELIGIBLE_STATE)
             ->distinct()->count('nomina.id_estudiante');
     }
