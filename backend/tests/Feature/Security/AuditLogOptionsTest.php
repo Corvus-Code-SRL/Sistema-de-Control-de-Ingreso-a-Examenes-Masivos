@@ -22,15 +22,19 @@ class AuditLogOptionsTest extends TestCase
         $this->prepareAuditLog();
     }
 
-    public function test_ofrece_las_34_acciones_del_catalogo_con_su_etiqueta(): void
+    public function test_ofrece_las_37_acciones_del_catalogo_con_su_etiqueta(): void
     {
         $actions = collect($this->getJson('/api/bitacora/opciones')->assertOk()->json('data.acciones'));
 
-        $this->assertCount(34, $actions);
+        $this->assertCount(37, $actions);
+        $this->assertSame('Iniciar cronómetro', $actions->firstWhere('codigo', 'INICIAR_CRONOMETRO')['etiqueta']);
+        $this->assertSame('Ajustar cronómetro', $actions->firstWhere('codigo', 'AJUSTAR_CRONOMETRO')['etiqueta']);
+        $this->assertSame('Registrar estudiante excepcional', $actions->firstWhere('codigo', 'REGISTRAR_ESTUDIANTE_EXCEPCIONAL')['etiqueta']);
         $this->assertSame('Modificar', $actions->firstWhere('codigo', 'MODIFICAR')['etiqueta']);
         $this->assertSame('Retirar estudiante', $actions->firstWhere('codigo', 'EXPULSAR_ESTUDIANTE')['etiqueta']);
         $this->assertSame('Rectificar registro', $actions->firstWhere('codigo', 'RECTIFICAR_REGISTRO')['etiqueta']);
         $this->assertSame('Guardar habilitados', $actions->firstWhere('codigo', 'GUARDAR_HABILITADOS')['etiqueta']);
+        $this->assertSame('Guardar distribución', $actions->firstWhere('codigo', 'GUARDAR_DISTRIBUCION')['etiqueta']);
         $this->assertSame(
             'Solicitar rectificación',
             $actions->firstWhere('codigo', 'SOLICITAR_RECTIFICACION')['etiqueta']

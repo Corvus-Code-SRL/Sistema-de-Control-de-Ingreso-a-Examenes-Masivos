@@ -14,13 +14,16 @@ class EntryConfirmationService
 {
     private VerificationService $verification;
     private EntryControlSnapshotService $snapshots;
+    private EntryRoomPolicy $rooms;
 
     public function __construct(
         VerificationService $verification,
-        EntryControlSnapshotService $snapshots
+        EntryControlSnapshotService $snapshots,
+        EntryRoomPolicy $rooms
     ) {
         $this->verification = $verification;
         $this->snapshots = $snapshots;
+        $this->rooms = $rooms;
     }
 
     public function confirm(Exam $exam, array $input, User $actor): array
@@ -98,13 +101,21 @@ class EntryConfirmationService
                     ];
                 }
 
+                $roomId = (int) $input['id_ambiente'];
+                $resolution = $this->rooms->resolve(
+                    (int) $exam->id_examen,
+                    $verdict,
+                    $roomId,
+                    (bool) ($input['confirmar_aviso_ambiente'] ?? false)
+                );
                 $instant = Carbon::now('UTC');
                 $local = $instant->copy()->setTimezone(config('sciem.zona_horaria'));
                 $attributes = [
                     'estado_habilitacion' => 'HABILITADO',
                     'estado_ingreso' => 'INGRESO',
                     'hora_ingreso' => $local->format('H:i:s'),
-                    'id_ambiente' => (int) $input['id_ambiente'],
+                    'id_ambiente' => $roomId,
+                    'id_ambiente_planificado' => $resolution['id_ambiente_planificado'],
                     'id_usuario_controlador' => $actor->id_usuario,
                     'registrado_en' => $instant->format('Y-m-d H:i:sP'),
                 ];
@@ -123,11 +134,21 @@ class EntryConfirmationService
                         ->update($attributes);
                 }
 
+                $this->rooms->audit(
+                    (int) $exam->id_examen,
+                    (int) $student->id_estudiante,
+                    $roomId,
+                    $resolution,
+                    (string) $actor->id_usuario
+                );
+
                 return [
                     'creado' => true,
                     'veredicto' => 'INGRESO_REGISTRADO',
                     'id_estudiante' => (int) $student->id_estudiante,
-                    'id_ambiente' => (int) $input['id_ambiente'],
+                    'id_ambiente' => $roomId,
+                    'id_ambiente_planificado' => $resolution['id_ambiente_planificado'],
+                    'fuera_de_ambiente' => $resolution['id_ambiente_planificado'] !== null,
                     'id_usuario_controlador' => $actor->id_usuario,
                     'registrado_en' => $instant->toIso8601String(),
                     'hora_ingreso' => $local->format('H:i:s'),

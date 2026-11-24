@@ -3,6 +3,7 @@ import { ApiError } from '@/lib/api-client'
 import { entryControlService } from '../services/entryControlService'
 import type { CurrentRejectedAttempt, EntryActionInput, RejectionReason, StudentMatch, Verification, VerificationInput } from '../types/entry-control.types'
 import { CI_MAX_LENGTH, digitsOnly, isValidCi, isValidSis, SIS_LENGTH } from '../utils/identificationValidation'
+import { useEntryRoomWarning } from './useEntryRoomWarning'
 import { toManualRejection, toRejectedAttempt, withManualRejection, withReported } from '../utils/rejectedAttempt'
 
 export function useStudentVerification(examId: number, roomId: number | null, onChange: () => void) {
@@ -13,6 +14,7 @@ export function useStudentVerification(examId: number, roomId: number | null, on
   const [busy, setBusy] = useState<'verify' | 'confirm' | 'reject' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const roomWarning = useEntryRoomWarning()
 
   useEffect(() => { setResult(null); setError(null); setRejectedAttempt(null) }, [roomId])
 
@@ -96,17 +98,20 @@ export function useStudentVerification(examId: number, roomId: number | null, on
     return { id_estudiante: studentId, id_ambiente: selectedRoomId, ...(ci ? { ci } : {}) }
   }
 
-  async function confirm() {
+  async function confirm(confirmRoomWarning = false) {
     if (!result?.autorizado || !result.estudiante || !roomId) return
     setBusy('confirm')
     setError(null)
     try {
-      await entryControlService.confirm(examId, actionInput(result.estudiante.id_estudiante, roomId))
+      await entryControlService.confirm(examId, {
+        ...actionInput(result.estudiante.id_estudiante, roomId),
+        ...(confirmRoomWarning ? { confirmar_aviso_ambiente: true } : {}),
+      })
       setNotice(`Ingreso registrado: ${result.estudiante.nombre_completo}.`)
       reset()
       onChange()
     } catch (cause) {
-      await handleConfirmError(cause)
+      if (!roomWarning.capture(cause, () => void confirm(true))) await handleConfirmError(cause)
     } finally {
       setBusy(null)
     }
@@ -155,5 +160,5 @@ export function useStudentVerification(examId: number, roomId: number | null, on
     setResult((current) => withReported(current, attemptId))
   }
 
-  return { sis, ci, result, rejectedAttempt, busy, error, notice, setNotice, changeSis, changeCi, choose, verify, confirm, reject, reset, markReported }
+  return { sis, ci, result, rejectedAttempt, busy, error, notice, roomWarning, setNotice, changeSis, changeCi, choose, verify, confirm, reject, reset, markReported }
 }

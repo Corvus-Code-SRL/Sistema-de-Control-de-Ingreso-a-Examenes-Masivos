@@ -27,7 +27,7 @@ class RoomAssignmentService
     }
 
     /**
-     * Valida la capacidad antes de abrir; las aulas se calculan al verificar.
+     * Valida nómina y ambientes antes de abrir; la capacidad ya no impide abrir: solo avisa al registrar.
      */
     public function prepare(int $examId): void
     {
@@ -48,24 +48,10 @@ class RoomAssignmentService
                 );
             }
 
-            $rooms = DB::table('examen_ambiente as ea')
-                ->join('ambiente as a', 'a.id_ambiente', '=', 'ea.id_ambiente')
-                ->where('ea.id_examen', $examId)
-                ->selectRaw('count(*) as room_count, coalesce(sum(a.capacidad), 0) as capacity')
-                ->first();
-
-            if ((int) $rooms->room_count === 0) {
+            if (! DB::table('examen_ambiente')->where('id_examen', $examId)->exists()) {
                 throw new EntryOpeningException(
                     EntryOpeningException::MISSING_ROOMS,
                     'El examen no tiene ambientes asignados.'
-                );
-            }
-
-            $capacity = (int) $rooms->capacity;
-            if ($capacity < $studentCount) {
-                throw new EntryOpeningException(
-                    EntryOpeningException::INSUFFICIENT_CAPACITY,
-                    sprintf('Capacidad %d menor que la nómina de %d.', $capacity, $studentCount)
                 );
             }
 
@@ -89,9 +75,7 @@ class RoomAssignmentService
     }
 
     /**
-     * Ordena estudiantes y aulas por ID. El lugar del estudiante en la nómina
-     * determina en qué tramo de capacidades acumuladas cae, sin guardar copias.
-     * Solo se llama después de comprobar su pertenencia al examen.
+     * Ambiente planificado del estudiante según la distribución guardada; null si no tiene.
      */
     public function assignedRoomFor(int $examId, int $studentId): ?object
     {

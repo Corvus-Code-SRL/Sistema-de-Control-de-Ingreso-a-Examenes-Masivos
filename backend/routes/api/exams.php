@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Exams\ClassroomController;
 use App\Http\Controllers\Exams\FinalReportController;
 use App\Http\Controllers\Exams\ExamEligibleListController;
+use App\Http\Controllers\Exams\RoomDistributionController;
 
 // ...
 
@@ -41,6 +42,17 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
     // Debe ir antes de GET /{exam} para no chocar con el binding.
     Route::get('/habilitados', [ExamEligibleListController::class, 'exams'])
         ->name('habilitados.selector');
+
+    Route::get('/distribucion', [RoomDistributionController::class, 'exams'])
+        ->name('distribucion.selector');
+
+    Route::prefix('{exam}/distribucion')->where(['exam' => '[0-9]{1,9}'])->name('distribucion.')
+        ->group(function (): void {
+            Route::get('/', [RoomDistributionController::class, 'show'])->name('show');
+            Route::post('/propuesta', [RoomDistributionController::class, 'proposal'])->name('propuesta');
+            Route::put('/', [RoomDistributionController::class, 'save'])->name('save');
+            Route::post('/dejar-de-usar', [RoomDistributionController::class, 'stop'])->name('dejar-de-usar');
+        });
 
     Route::get('/', [ExamController::class, 'index'])
          ->name('index');

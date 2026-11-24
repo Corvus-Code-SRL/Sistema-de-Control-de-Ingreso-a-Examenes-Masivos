@@ -7,6 +7,7 @@ use App\Models\Exam;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\EntryControl\EntryControlSnapshotService;
+use App\Services\Exams\Distribution\RoomDistributionReader;
 use App\Services\Security\UserRoleService;
 use App\Services\Incidents\ExamInProgressSituationService;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -19,7 +20,8 @@ class ExamInProgressQueryService
         private ExamTimingService $timing,
         private UserRoleService $roles,
         private ExamInProgressSituationService $situations,
-        private ExamCollaboratorService $collaborators
+        private ExamCollaboratorService $collaborators,
+        private RoomDistributionReader $distribution
     ) {}
 
     public function show(Exam $exam, User $actor): array
@@ -119,14 +121,7 @@ class ExamInProgressQueryService
             ->orderBy('nomina.id_estudiante')
             ->get();
 
-        // El reparto automático de aulas solo considera la nómina: el excepcional conserva el aula que se le eligió.
-        $assignedRooms = EntryControlSnapshotService::assignRooms(
-            $roster->reject(fn ($student) => (bool) $student->es_excepcional)
-                ->pluck('id_estudiante')
-                ->map(fn ($id) => (int) $id)
-                ->all(),
-            $rooms
-        );
+        $assignedRooms = $this->distribution->assignedRooms($examId);
 
         $roomNames = collect($rooms)
             ->pluck('nro_aula', 'id_ambiente');
@@ -142,7 +137,8 @@ class ExamInProgressQueryService
                 ? ($assignedRooms[$studentId]['id_ambiente'] ?? null)
                 : (int) $student->id_ambiente;
 
-            if (!$isTeacher && $roomId !== $assignedRoomId) {
+            // Sin ambiente planificado puede ingresar por cualquiera: el auxiliar también lo ve como pendiente.
+            if (!$isTeacher && $roomId !== null && $roomId !== $assignedRoomId) {
                 continue;
             }
 

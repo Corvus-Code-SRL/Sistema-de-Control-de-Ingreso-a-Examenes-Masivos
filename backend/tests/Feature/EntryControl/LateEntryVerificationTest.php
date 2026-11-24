@@ -60,7 +60,7 @@ class LateEntryVerificationTest extends TestCase
             ->assertJsonPath('data.estudiante.cod_sis', $this->studentColumn($this->secondStudentId, 'cod_sis'))
             ->assertJsonPath('data.estudiante.foto_url', 'https://fotos.test/estudiante.webp')
             ->assertJsonPath('data.antecedentes.total', 0)
-            ->assertJsonPath('data.ambiente_asignado.nro_aula', '692B')
+            ->assertJsonPath('data.ambiente_asignado', null)
             ->assertJsonPath('data.solicitud_pendiente', null)
             ->assertJsonStructure(['data' => ['estudiante' => ['nombre_completo'], 'grupo', 'ingreso_previo']]);
     }
@@ -132,7 +132,8 @@ class LateEntryVerificationTest extends TestCase
             ->assertJsonPath('data.veredicto', VerificationService::AUTHORIZED);
         $this->verify($this->firstStudentId, ['id_ambiente' => $this->otraAulaId])
             ->assertOk()
-            ->assertJsonPath('data.veredicto', VerificationService::WRONG_ROOM);
+            ->assertJsonPath('data.veredicto', VerificationService::AUTHORIZED)
+            ->assertJsonPath('data.avisos_ambiente', []);
         $this->verify($this->secondStudentId, ['id_ambiente' => $this->aulaId])
             ->assertForbidden()
             ->assertJsonPath('message', EntryControlSnapshotService::FOREIGN_ROOM_MESSAGE);

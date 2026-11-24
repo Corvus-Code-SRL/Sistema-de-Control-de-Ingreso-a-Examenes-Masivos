@@ -17,7 +17,6 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
-use LogicException;
 
 /**
  * Ingreso con retraso de un estudiante esperado mientras el examen está EN_CURSO (HU-037).
@@ -55,6 +54,8 @@ class LateEntryService
     private ExamTimingService $timing;
     private ExamExpulsionService $expulsions;
     private EntryAttemptService $attempts;
+    private EntryRoomPolicy $rooms;
+    private LateEntryWriter $writer;
 
     public function __construct(
         LateEntryAccessService $access,
@@ -65,7 +66,9 @@ class LateEntryService
         LateEntryOtherExamService $otherExams,
         ExamTimingService $timing,
         ExamExpulsionService $expulsions,
-        EntryAttemptService $attempts
+        EntryAttemptService $attempts,
+        EntryRoomPolicy $rooms,
+        LateEntryWriter $writer
     ) {
         $this->access = $access;
         $this->snapshots = $snapshots;
@@ -76,6 +79,8 @@ class LateEntryService
         $this->timing = $timing;
         $this->expulsions = $expulsions;
         $this->attempts = $attempts;
+        $this->rooms = $rooms;
+        $this->writer = $writer;
     }
 
     /**
@@ -108,9 +113,8 @@ class LateEntryService
         $this->assertInProgress($exam);
         $this->assertBeforeEnd($exam);
         $requestedRoomId = (int) $input['id_ambiente'];
-        $roomId = $this->access->controlRoom($exam, $access, $requestedRoomId);
-        // El docente no compara ambientes al verificar (null), pero el intento queda en el que eligió.
-        $attemptRoomId = $roomId ?? $requestedRoomId;
+        $this->access->controlRoom($exam, $access, $requestedRoomId);
+        $attemptRoomId = $requestedRoomId;
 
         $studentId = Student::query()->where('cod_sis', SisCode::normalize($input['cod_sis']))->value('id_estudiante');
         $record = $studentId === null ? null : $this->recordFor($exam, (int) $studentId);
@@ -129,7 +133,11 @@ class LateEntryService
             ];
         }
 
-        $verdict = $this->verification->evaluate($this->verification->withBackground($record), $input, $roomId);
+        $verdict = $this->rooms->decorate(
+            (int) $exam->id_examen,
+            $this->verification->evaluate($this->verification->withBackground($record), $input),
+            $attemptRoomId
+        );
         $expelled = $this->expulsionMessage($exam, (int) $studentId);
         if ($expelled !== null) {
             $verdict = array_merge($verdict, [
@@ -202,8 +210,9 @@ class LateEntryService
                 $roomId = $this->access->controlRoom($locked, $access, (int) $input['id_ambiente']);
                 $studentId = (int) $input['id_estudiante'];
                 $this->assertNotExpelled($locked, $studentId);
-                $this->allowedRecord($this->recordFor($locked, $studentId), $input, $roomId);
+                $record = $this->allowedRecord($this->recordFor($locked, $studentId), $input);
                 $this->assertNoPendingRequest($locked, $studentId);
+                $this->rooms->resolve((int) $locked->id_examen, $record, $roomId, $this->confirmedRoom($input));
                 $otherExam = $this->otherExamConflict($locked, $studentId, $this->confirmed($input));
                 $this->lockEntry($locked, $studentId);
 
@@ -246,13 +255,15 @@ class LateEntryService
         Exam $exam,
         int $requestId,
         User $actor,
-        bool $confirmOtherExam = false
+        bool $confirmOtherExam = false,
+        bool $confirmRoomWarning = false
     ): LateEntryRequest {
         $request = $this->writeEntryOrConflict(function () use (
             $exam,
             $requestId,
             $actor,
-            $confirmOtherExam
+            $confirmOtherExam,
+            $confirmRoomWarning
         ): LateEntryRequest {
             $locked = $this->lockExam($exam);
             $this->access->assertTeacher($this->access->resolve($locked, $actor));
@@ -262,19 +273,23 @@ class LateEntryService
 
             $studentId = (int) $request->id_estudiante;
             $this->assertNotExpelled($locked, $studentId);
-            $record = $this->allowedRecord($this->recordFor($locked, $studentId), [], null);
+            $record = $this->allowedRecord($this->recordFor($locked, $studentId), []);
             $otherExam = $this->otherExamConflict($locked, $studentId, $confirmOtherExam);
+            $roomId = (int) $request->id_ambiente;
+            $rooms = $this->rooms->resolve((int) $locked->id_examen, $record, $roomId, $confirmRoomWarning);
             $existing = $this->lockEntry($locked, $studentId);
             $resolvedAt = Carbon::now('UTC');
-            $entryTime = $this->writeEntry(
+            $entryTime = $this->writer->write(
                 $locked,
                 $record,
                 $existing,
-                (int) $request->id_ambiente,
+                $roomId,
+                $rooms['id_ambiente_planificado'],
                 (string) $request->id_usuario_solicitante,
                 $request->solicitado_en,
                 $resolvedAt
             );
+            $this->rooms->audit((int) $locked->id_examen, $studentId, $roomId, $rooms, (string) $actor->id_usuario);
 
             $this->resolve($request, LateEntryRequest::AUTORIZADA, $actor, $resolvedAt);
             $this->auditLog->registrar(
@@ -339,13 +354,16 @@ class LateEntryService
             $this->access->assertRoomInExam($locked, $roomId);
             $studentId = (int) $input['id_estudiante'];
             $this->assertNotExpelled($locked, $studentId);
-            $record = $this->allowedRecord($this->recordFor($locked, $studentId), $input, null);
+            $record = $this->allowedRecord($this->recordFor($locked, $studentId), $input);
             $this->assertNoPendingRequest($locked, $studentId);
             $otherExam = $this->otherExamConflict($locked, $studentId, $this->confirmed($input));
+            $rooms = $this->rooms->resolve((int) $locked->id_examen, $record, $roomId, $this->confirmedRoom($input));
             $existing = $this->lockEntry($locked, $studentId);
 
             $now = Carbon::now('UTC');
-            $entryTime = $this->writeEntry($locked, $record, $existing, $roomId, $actor->id_usuario, $now, $now);
+            $planned = $rooms['id_ambiente_planificado'];
+            $entryTime = $this->writer->write($locked, $record, $existing, $roomId, $planned, $actor->id_usuario, $now, $now);
+            $this->rooms->audit((int) $locked->id_examen, $studentId, $roomId, $rooms, (string) $actor->id_usuario);
 
             $this->auditLog->registrar(self::REGISTER_ACTION, $this->entryTable(), null, [
                 'id_examen' => (int) $locked->id_examen,
@@ -360,6 +378,8 @@ class LateEntryService
                 'estado_ingreso' => StudentExam::CON_RETRASO,
                 'hora_ingreso' => $entryTime,
                 'id_ambiente' => $roomId,
+                'id_ambiente_planificado' => $planned,
+                'fuera_de_ambiente' => $planned !== null,
             ];
         });
     }
@@ -480,6 +500,12 @@ class LateEntryService
         return (bool) ($input['confirmar_otro_examen'] ?? false);
     }
 
+    /** @param array{confirmar_aviso_ambiente?: bool} $input */
+    private function confirmedRoom(array $input): bool
+    {
+        return (bool) ($input['confirmar_aviso_ambiente'] ?? false);
+    }
+
     /**
      * Lo que la bitácora guarda cuando se continuó pese a la advertencia.
      *
@@ -592,74 +618,19 @@ class LateEntryService
      *     ingreso_previo: null
      * }
      */
-    private function allowedRecord(?array $record, array $input, ?int $roomId): array
+    private function allowedRecord(?array $record, array $input): array
     {
         if ($record === null) {
             throw LateEntryException::denied(VerificationService::NOT_FOUND, VerificationService::NOT_FOUND_MESSAGE);
         }
 
-        $verdict = $this->verification->evaluate($record, $input, $roomId);
+        $verdict = $this->verification->evaluate($record, $input);
 
         if (! $verdict['autorizado']) {
             throw LateEntryException::denied($verdict['veredicto'], $verdict['motivo']);
         }
 
         return $record;
-    }
-
-    /**
-     * Escribe CON_RETRASO. Si el estudiante ya tiene fila sin ingreso, la completa; si no,
-     * la crea con el grupo del examen en que está inscrito. Devuelve la hora local guardada.
-     *
-     * @param array{
-     *     estudiante: array{id_estudiante: int, cod_sis: string, ci: string|null, ci_pendiente: bool,
-     *         nombre_completo: string, carrera: string|null, foto_url: string|null},
-     *     grupo: array{id_grupo: int, num_grupo: string}
-     * } $record
-     */
-    private function writeEntry(
-        Exam $exam,
-        array $record,
-        ?object $existing,
-        int $roomId,
-        string $controllerId,
-        Carbon $entryAt,
-        Carbon $registeredAt
-    ): string {
-        $entryTime = $entryAt->copy()->setTimezone(config('sciem.zona_horaria'))->format('H:i:s');
-        $attributes = [
-            'estado_ingreso' => StudentExam::CON_RETRASO,
-            'hora_ingreso' => $entryTime,
-            'id_ambiente' => $roomId,
-            'id_usuario_controlador' => $controllerId,
-            'registrado_en' => $registeredAt->copy()->setTimezone('UTC')->format('Y-m-d H:i:sP'),
-        ];
-        $studentId = (int) $record['estudiante']['id_estudiante'];
-
-        if ($existing === null) {
-            DB::table($this->entryTable())->insert($attributes + [
-                'id_examen' => $exam->id_examen,
-                'id_estudiante' => $studentId,
-                'id_grupo' => $record['grupo']['id_grupo'],
-                'estado_habilitacion' => StudentExam::HABILITADO,
-            ]);
-
-            return $entryTime;
-        }
-
-        // estado_ingreso es NOT NULL: la fila bloqueada sin ingreso solo puede estar en NO_INGRESO.
-        // Si no se actualiza exactamente esa fila, se revierte todo antes de resolver la solicitud.
-        $updated = DB::table($this->entryTable())
-            ->where('id_examen', $exam->id_examen)
-            ->where('id_estudiante', $studentId)
-            ->where('estado_ingreso', StudentExam::NO_INGRESO)
-            ->update($attributes);
-
-        if ($updated !== 1) {
-            throw new LogicException('No se pudo registrar el ingreso con retraso del estudiante.');
-        }
-
-        return $entryTime;
     }
 
     private function entryTable(): string
