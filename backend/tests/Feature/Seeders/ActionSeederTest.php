@@ -135,14 +135,14 @@ class ActionSeederTest extends TestCase
     {
         $this->seed(ActionSeeder::class);
 
-        // En una base nueva las migraciones ya insertaron las acciones de HU-031 y HU-062.
+        // Las acciones de HU-031 las siembra solo ActionSeeder, así que quedan al final del catálogo.
         $lastSix = DB::table('accion')->orderByDesc('id_accion')->limit(6)->pluck('operacion')
             ->reverse()->values()->all();
 
         $this->assertSame(
             [
-                'GUARDAR_HABILITADOS', 'ACEPTAR_INVITACION', 'RECHAZAR_INVITACION',
                 'REGISTRAR_ESTUDIANTE_EXCEPCIONAL', 'INICIAR_CRONOMETRO', 'AJUSTAR_CRONOMETRO',
+                'GUARDAR_DISTRIBUCION', 'DEJAR_USAR_DISTRIBUCION', 'INGRESO_CON_AVISO_AMBIENTE',
             ],
             $lastSix
         );
