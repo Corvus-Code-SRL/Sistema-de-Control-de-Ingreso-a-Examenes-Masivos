@@ -116,7 +116,7 @@ describe('ModificarRolPage — tabla', () => {
     const assign = table().getByRole('link', { name: 'Asignar rol de Laura Mendoza Rivas' })
 
     expect(assign).toHaveAttribute('data-variant', 'warning')
-    expect(assign).toHaveClass('bg-warn', 'text-warn-fg')
+    expect(assign).toHaveClass('bg-warn', 'text-on-accent')
     expect(assign).toHaveAttribute('href', `/cuentas/${withoutRole.id_usuario}`)
     expect(table().queryByRole('link', { name: /Modificar rol/ })).not.toBeInTheDocument()
   })

@@ -4,7 +4,7 @@ import { cn } from "cn"
 import { Slot } from "radix-ui"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-focus active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -14,19 +14,19 @@ const buttonVariants = cva(
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
-          "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
+          "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         destructive:
-          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
-        link: "text-primary underline-offset-4 hover:underline",
+          "bg-destructive/10 text-danger-fg hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:hover:bg-destructive/14 dark:focus-visible:ring-destructive/40",
+        link: "text-brand-fg underline-offset-4 hover:underline",
         // Nueva: botón de peligro sólido (fondo rojo, texto blanco).
         danger:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:border-destructive focus-visible:ring-destructive/40",
+          "bg-danger-solid text-on-solid hover:bg-danger-solid/90 focus-visible:border-destructive focus-visible:ring-destructive/40",
         // Acción pendiente que requiere atención (por ejemplo, asignar el rol a una cuenta sin rol).
-        warning: "bg-warn text-warn-fg hover:bg-warn/80",
+        warning: "bg-warn text-on-accent hover:bg-warn/80",
         // Acción afirmativa y destacada (rectificar un registro). Blanco sobre `ok` (≥4.5:1); al pasar el
         // cursor o presionar se oscurece a `ok-fg`, porque `ok` con transparencia no alcanza 4.5:1.
         success:
-          "bg-ok text-primary-foreground hover:bg-ok-fg active:bg-ok-fg focus-visible:border-ok focus-visible:ring-ok",
+          "bg-ok-solid text-on-solid hover:bg-ok-solid-hover active:bg-ok-solid-hover focus-visible:border-ok-solid focus-visible:ring-ok-solid",
       },
       size: {
         default:
