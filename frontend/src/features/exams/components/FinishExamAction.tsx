@@ -75,7 +75,7 @@ function FinishExamDialog({ exam }: { exam: ExamInProgress }) {
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild>
-        <Button type="button" variant="danger">
+        <Button type="button" variant="danger-outline">
           <Square aria-hidden="true" /> Terminar examen
         </Button>
       </DialogTrigger>

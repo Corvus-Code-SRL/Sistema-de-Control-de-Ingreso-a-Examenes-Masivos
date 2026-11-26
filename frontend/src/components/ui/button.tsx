@@ -22,6 +22,9 @@ const buttonVariants = cva(
         danger:
           "bg-danger-solid text-on-solid hover:bg-danger-solid/90 focus-visible:border-destructive focus-visible:ring-destructive/40",
         // Acción pendiente que requiere atención (por ejemplo, asignar el rol a una cuenta sin rol).
+        // Peligro contenido: borde y texto rojos, sin relleno (iniciar una acción irreversible).
+        "danger-outline":
+          "border-danger bg-transparent text-danger-fg hover:bg-danger-soft aria-expanded:bg-danger-soft focus-visible:border-danger focus-visible:ring-destructive/20",
         warning: "bg-warn text-on-accent hover:bg-warn/80",
         // Acción afirmativa y destacada (rectificar un registro). Blanco sobre `ok` (≥4.5:1); al pasar el
         // cursor o presionar se oscurece a `ok-fg`, porque `ok` con transparencia no alcanza 4.5:1.
