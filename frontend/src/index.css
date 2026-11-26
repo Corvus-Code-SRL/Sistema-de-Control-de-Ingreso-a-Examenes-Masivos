@@ -42,6 +42,8 @@
   --sciem-brand-deep: #05383E;
   /* Marca usada como texto (enlaces, cifras, acciones de texto). */
   --sciem-brand-fg: var(--sciem-brand);
+  /* Relleno de marca intenso para elementos seleccionados con texto blanco. */
+  --sciem-brand-strong: var(--sciem-brand-deep);
 
   /* Acento — ámbar */
   --sciem-accent: #FFCB32;
@@ -137,6 +139,8 @@
   --sciem-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, .10), 0 2px 4px -2px rgba(0, 0, 0, .10);
   --sciem-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, .10), 0 4px 6px -4px rgba(0, 0, 0, .10);
   --sciem-shadow-overlay: 0 12px 32px rgba(5, 56, 62, .16);
+  /* Barra fija inferior (acciones del login en móvil): sombra hacia arriba. */
+  --sciem-shadow-sticky: 0 -4px 12px color-mix(in srgb, var(--sciem-brand-deep) 6%, transparent);
 
   /* Radios */
   --sciem-radius-sm: 6px;
@@ -161,6 +165,7 @@
     --sciem-brand-soft: #223635;
     --sciem-brand-deep: #89BFBE;
     --sciem-brand-fg: #6BB8B9;
+    --sciem-brand-strong: var(--sciem-brand-active);
 
     --sciem-accent: #FFCB32;
     --sciem-accent-hover: #E8B720;
@@ -173,7 +178,7 @@
     --sciem-surface: #1A2322;
     --sciem-sunken: #161F1E;
     --sciem-raised: #212C2B;
-    --sciem-muted-bg: #273534;
+    --sciem-muted-bg: #2A3938;
     --sciem-border: #2F4240;
     --sciem-border-strong: #3D5653;
     --sciem-input-border: #5B7874;
@@ -237,6 +242,7 @@
     --sciem-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, .40), 0 2px 4px -2px rgba(0, 0, 0, .40);
     --sciem-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, .50), 0 4px 6px -4px rgba(0, 0, 0, .50);
     --sciem-shadow-overlay: 0 12px 32px rgba(0, 0, 0, .50);
+    --sciem-shadow-sticky: 0 -4px 12px rgba(0, 0, 0, .40);
   }
 }
 
@@ -294,6 +300,7 @@
   --color-brand-soft: var(--sciem-brand-soft);
   --color-brand-deep: var(--sciem-brand-deep);
   --color-brand-fg: var(--sciem-brand-fg);
+  --color-brand-strong: var(--sciem-brand-strong);
 
   --color-accent-brand: var(--sciem-accent);
   --color-accent-brand-hover: var(--sciem-accent-hover);
@@ -397,6 +404,7 @@
   --shadow-md: var(--sciem-shadow-md);
   --shadow-lg: var(--sciem-shadow-lg);
   --shadow-overlay: var(--sciem-shadow-overlay);
+  --shadow-sticky: var(--sciem-shadow-sticky);
 
   --radius-sm: var(--sciem-radius-sm);
   --radius-md: var(--sciem-radius-md);
