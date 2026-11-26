@@ -36,10 +36,10 @@ class UserSeeder extends Seeder
         DB::table('usuario')->updateOrInsert(
             ['id_usuario' => $id],
             [
-                'nombre'           => 'Usuario',
-                'apellido_paterno' => 'De Prueba',
-                'apellido_materno' => 'Sprint 1',
-                'correo'           => 'usuario.prueba@sciem.local',
+                'nombre'           => 'System',
+                'apellido_paterno' => '',
+                'apellido_materno' => '',
+                'correo'           => 'system@sciem.prod',
                 'contrasenia'      => self::UNUSABLE_PASSWORD_HASH,
                 'cod_sis'          => SisCode::normalize('000000000'),
                 'estado'           => 'ACTIVO',
