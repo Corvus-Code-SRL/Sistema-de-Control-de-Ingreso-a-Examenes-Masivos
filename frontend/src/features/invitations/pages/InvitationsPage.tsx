@@ -106,7 +106,7 @@ export function InvitationsPage() {
               aria-selected={active}
               onClick={() => changeTab(value)}
               className={`relative flex h-10 shrink-0 items-center gap-2 px-3.5 text-sm font-medium transition-colors ${
-                active ? 'text-brand' : 'text-muted-foreground hover:text-foreground'
+                active ? 'text-brand-fg' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               {TAB_LABEL[value]}

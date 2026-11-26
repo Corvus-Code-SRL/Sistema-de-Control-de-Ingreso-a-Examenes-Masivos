@@ -19,7 +19,7 @@ export function IncidentItem({ incident, isSelected, onSelect, showDecision }: I
       onClick={onSelect}
       className={cn(
         'flex w-full items-center gap-3 border-b border-border px-4 py-3.5 text-left transition-colors last:border-b-0',
-        isSelected ? 'bg-brand-soft shadow-[inset_3px_0_0_var(--color-brand)]' : 'hover:bg-sunken'
+        isSelected ? 'bg-brand-soft shadow-[inset_3px_0_0_var(--color-brand)]' : 'hover:bg-muted'
       )}
     >
       <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-xs font-bold text-brand-deep">

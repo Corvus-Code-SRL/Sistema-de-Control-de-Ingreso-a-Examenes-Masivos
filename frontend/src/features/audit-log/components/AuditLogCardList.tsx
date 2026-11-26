@@ -20,7 +20,7 @@ export function AuditLogCardList({ entries }: AuditLogCardListProps) {
           <Link
             to={detailLink(entry.id_log)}
             aria-label={`Ver detalle de la operación ${entry.id_log}`}
-            className="flex items-center gap-3 px-4 py-3 hover:bg-sunken focus-visible:bg-sunken"
+            className="flex items-center gap-3 px-4 py-3 hover:bg-muted focus-visible:bg-muted"
           >
             <span className="min-w-0 flex-1 space-y-1">
               <span className="sciem-tnum block text-xs text-muted-foreground">

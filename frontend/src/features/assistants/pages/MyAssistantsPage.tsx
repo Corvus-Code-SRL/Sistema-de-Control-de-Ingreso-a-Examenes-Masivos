@@ -173,7 +173,7 @@ export function MyAssistantsPage() {
                 <TableRow key={assistant.id_usuario}>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground text-xs font-medium">
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand text-on-solid text-xs font-medium">
                         {initialsOf(assistant)}
                       </span>
                       <span className="font-medium">{assistant.nombre_completo}</span>
@@ -187,7 +187,7 @@ export function MyAssistantsPage() {
                       {assistant.grupos.map((g) => (
                         <span
                           key={g.id_grupo}
-                          className="inline-flex items-center rounded-md bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand"
+                          className="inline-flex items-center rounded-md bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-fg"
                         >
                           {g.label}
                         </span>

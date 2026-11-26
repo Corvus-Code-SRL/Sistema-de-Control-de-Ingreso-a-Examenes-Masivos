@@ -90,7 +90,7 @@ export function RosterFileStep({
             htmlFor={inputId}
             className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-border-strong bg-sunken p-4 transition-colors hover:bg-muted focus-within:ring-2 focus-within:ring-ring"
           >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand-fg">
               <Upload aria-hidden="true" className="size-5" />
             </span>
 
@@ -138,7 +138,7 @@ export function RosterFileStep({
 
         {file && (
           <div className="flex items-center gap-3 rounded-xl border border-border-soft bg-surface p-4">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand-fg">
               {file.name.toLowerCase().endsWith('.xlsx') ? (
                 <FileSpreadsheet aria-hidden="true" className="size-5" />
               ) : (
@@ -164,7 +164,7 @@ export function RosterFileStep({
           <a
             href="/plantillas/nomina-plantilla.csv"
             download
-            className="mt-3 inline-flex items-center text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="mt-3 inline-flex items-center text-sm font-medium text-brand-fg underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Descargar plantilla
           </a>

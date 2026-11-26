@@ -61,7 +61,7 @@ export function AcceptInvitationDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <div className="flex items-start gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand-fg">
               <Mail className="size-5" aria-hidden="true" />
             </span>
             <DialogTitle className="flex-1 text-lg leading-tight">¿Aceptar la invitación?</DialogTitle>
