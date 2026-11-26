@@ -195,12 +195,12 @@ export function AppSidebar({
 
         <div className="flex items-center gap-2.5">
           <Avatar className="size-8">
-            <AvatarFallback className="bg-sidebar-accent text-xs font-semibold text-white">
+            <AvatarFallback className="bg-sidebar-accent text-xs font-semibold text-sidebar-accent-foreground">
               {user.iniciales}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-white">{user.nombre}</p>
+            <p className="truncate text-sm font-medium text-sidebar-accent-foreground">{user.nombre}</p>
             <p className="truncate text-xs text-sb-sub">{user.rolEtiqueta ?? AREA_LABELS[area]}</p>
           </div>
         </div>
