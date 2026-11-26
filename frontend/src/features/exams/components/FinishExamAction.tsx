@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Square } from 'lucide-react';
+import { CircleStop } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
@@ -76,13 +76,13 @@ function FinishExamDialog({ exam }: { exam: ExamInProgress }) {
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild>
         <Button type="button" variant="danger-outline">
-          <Square aria-hidden="true" /> Terminar examen
+          <CircleStop aria-hidden="true" /> Terminar examen
         </Button>
       </DialogTrigger>
       <DialogContent showCloseButton={false} className="sm:max-w-xl">
         <DialogHeader className="flex-row items-center gap-3">
           <span className="rounded-lg bg-destructive/10 p-2 text-destructive">
-            <Square className="size-5" aria-hidden="true" />
+            <CircleStop className="size-5" aria-hidden="true" />
           </span>
           <DialogTitle>¿Terminar el examen?</DialogTitle>
         </DialogHeader>
@@ -103,7 +103,7 @@ function FinishExamDialog({ exam }: { exam: ExamInProgress }) {
             Seguir en curso
           </Button>
           <Button type="button" variant="danger" disabled={pending} onClick={() => void finish()}>
-            <Square aria-hidden="true" /> {pending ? 'Terminando examen…' : 'Terminar examen'}
+            <CircleStop aria-hidden="true" /> {pending ? 'Terminando examen…' : 'Terminar examen'}
           </Button>
         </DialogFooter>
       </DialogContent>
