@@ -7,15 +7,14 @@
 @import "@fontsource/poppins/700.css";
 
 /*
- * `dark:` se ata a la clase `.dark` de <html> y solo en pantalla. Sin esto
- * Tailwind 4 seguiría a `prefers-color-scheme`, y al imprimir con el tema
- * oscuro activo las primitivas aplicarían estilos oscuros sobre papel blanco.
+ * El tema sigue la preferencia del navegador o del sistema operativo
+ * (`prefers-color-scheme`); no hay selector en la interfaz. `dark:` se limita
+ * a pantalla para que al imprimir con el sistema en modo oscuro las primitivas
+ * no apliquen estilos oscuros sobre papel blanco.
  */
 @custom-variant dark {
-  @media screen {
-    &:is(.dark *) {
-      @slot;
-    }
+  @media screen and (prefers-color-scheme: dark) {
+    @slot;
   }
 }
 
@@ -25,7 +24,7 @@
    ambos archivos sincronizados en el mismo commit).
 
    REGLA: los literales de color existen SOLO en la capa 1
-   (`--sciem-*` en `:root` y `:root.dark`). La capa 2, `@theme`,
+   (`--sciem-*` en `:root`, claro y oscuro). La capa 2, `@theme`,
    las clases y los componentes referencian tokens, nunca valores.
    Ningún componente usa utilidades por defecto de Tailwind
    (gray-500, white, black...).
@@ -53,6 +52,8 @@
   --sciem-on-accent: #2C2C2C;
 
   /* Superficies */
+  /* index.html replica este valor en <meta name="theme-color">
+     (claro), porque HTML no puede leer variables CSS. */
   --sciem-bg-app: #F3F8F8;
   --sciem-surface: #FFFFFF;
   --sciem-sunken: #F7FAFA;
@@ -146,11 +147,12 @@
 }
 
 /* ---------- 1b. Paleta cruda — tema oscuro ----------
-   Se activa con la clase `.dark` en <html> y solo en pantalla: al
-   imprimir siempre rige el tema claro. Solo se redefine la capa 1;
-   la capa 2 y `@theme` cambian por cascada. */
-@media screen {
-  :root.dark {
+   Se activa cuando el navegador o el sistema prefieren el modo
+   oscuro, y solo en pantalla: al imprimir siempre rige el tema
+   claro. Solo se redefine la capa 1; la capa 2 y `@theme` cambian
+   por cascada. */
+@media screen and (prefers-color-scheme: dark) {
+  :root {
     color-scheme: dark;
 
     --sciem-brand: #2E7F82;
@@ -166,6 +168,7 @@
     --sciem-on-solid: #FFFFFF;
     --sciem-on-accent: #2C2C2C;
 
+    /* Replicado en <meta name="theme-color"> (oscuro) de index.html. */
     --sciem-bg-app: #121817;
     --sciem-surface: #1A2322;
     --sciem-sunken: #161F1E;
