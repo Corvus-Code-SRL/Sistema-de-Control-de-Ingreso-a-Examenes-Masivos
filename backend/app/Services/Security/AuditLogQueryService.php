@@ -60,15 +60,10 @@ class AuditLogQueryService
      */
     public function paginate(array $filters): LengthAwarePaginator
     {
-        $query = AuditLog::query()
+        $query = $this->filteredQuery($filters)
             ->with(self::RELATIONS)
             ->orderByDesc('fecha_hora')
             ->orderByDesc('id_log');
-
-        $this->filterByUser($query, $filters['q'] ?? null);
-        $this->filterByAction($query, $filters['accion'] ?? null);
-        $this->filterByModule($query, $filters['modulo'] ?? null);
-        $this->filterByRange($query, $filters['desde'] ?? null, $filters['hasta'] ?? null);
 
         $page = max(1, min(self::MAX_PAGE, (int) ($filters['page'] ?? 1)));
         $logs = $query->paginate((int) config('sciem.bitacora.por_pagina', 50), ['*'], 'page', $page);
@@ -126,6 +121,85 @@ class AuditLogQueryService
         return ['acciones' => $actions, 'modulos' => $modules];
     }
 
+    /**
+     * Shared filtered query for audit log and HU-068 reports.
+     */
+    private function filteredQuery(array $filters): Builder
+    {
+        $query = AuditLog::query();
+
+        $this->filterByUser($query, $filters['q'] ?? null);
+        $this->filterByAction($query, $filters['accion'] ?? null);
+        $this->filterByModule($query, $filters['modulo'] ?? null);
+        $this->filterByRange(
+            $query,
+            $filters['desde'] ?? null,
+            $filters['hasta'] ?? null
+        );
+
+        return $query;
+    }
+
+    /**
+     * HU-068: totals across all filtered operations.
+     */
+    public function reportTotals(array $filters): array
+    {
+        $query = $this->filteredQuery($filters);
+
+        $total = (clone $query)->count();
+
+        $users = (clone $query)
+            ->distinct()
+            ->count('id_usuario');
+
+        $actions = (clone $query)
+            ->leftJoin('accion', 'log.id_accion', '=', 'accion.id_accion')
+            ->select('accion.operacion')
+            ->selectRaw('COUNT(*) AS total')
+            ->groupBy('accion.operacion')
+            ->orderByDesc('total')
+            ->orderBy('accion.operacion')
+            ->get()
+            ->map(function ($row): array {
+                $code = $row->operacion;
+
+                return [
+                    'codigo' => $code,
+                    'etiqueta' => $code === null
+                        ? 'Sin acción'
+                        : $this->actionLabel((string) $code),
+                    'total' => (int) $row->total,
+                ];
+            })
+            ->all();
+
+        return [
+            'total_operaciones' => (int) $total,
+            'total_usuarios' => (int) $users,
+            'por_accion' => $actions,
+        ];
+    }
+
+    /**
+     * HU-068: all filtered rows, without screen pagination.
+     */
+    public function reportRows(array $filters): \Generator
+    {
+        $query = $this->filteredQuery($filters)
+            ->with(self::RELATIONS)
+            ->orderByDesc('fecha_hora')
+            ->orderByDesc('id_log');
+
+        foreach ($query->lazy(500)->chunk(500) as $logs) {
+            $people = $this->peopleFor($logs->all());
+
+            foreach ($logs as $log) {
+                yield $this->present($log, $people);
+            }
+        }
+    }
+
     private function filterByUser(Builder $query, ?string $search): void
     {
         $normalized = AccentInsensitiveSearch::normalize((string) $search);
@@ -153,7 +227,7 @@ class AuditLogQueryService
             return;
         }
 
-        $query->whereIn('id_accion', Action::query()->where('operacion', $code)->select('id_accion'));
+        $query->whereIn('log.id_accion', Action::query()->where('operacion', $code)->select('id_accion'));
     }
 
     private function filterByModule(Builder $query, ?string $module): void

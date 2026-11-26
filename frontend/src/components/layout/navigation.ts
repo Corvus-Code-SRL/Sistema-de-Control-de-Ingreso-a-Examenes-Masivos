@@ -197,7 +197,8 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'admin-audit-report',
         label: 'Generar reporte de bitácora',
         icon: FileText,
-        capability: 'administracion.gestionar'
+        capability: 'administracion.gestionar',
+        to: '/reportes/bitacora'
       },
       {
         id: 'admin-alien-attempts-report',
@@ -423,7 +424,6 @@ export const NAVIGATION: readonly NavSection[] = [
         capability: 'examenes.gestionar',
         to: '/examenes/reportes',
         matches: ['/examenes/:examId/reporte-final']
-
       }
     ]
   },

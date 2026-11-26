@@ -71,6 +71,7 @@ import {
 } from '@/features/incidents'
 import { examInProgressExtensions } from './examInProgressExtensions'
 import { AlienAttemptsReportPage } from '@/features/reports/academic'
+import { AuditLogReportPage } from '@/features/reports/security'
 import { AuditLogPage } from '@/features/audit-log'
 import { INVITATIONS_PATH, InvitationsPage } from '@/features/invitations'
 
@@ -245,6 +246,10 @@ function DocenteRoutes() {
           path="/reportes/intentos"
           element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
         />
+        <Route
+          path="/reportes/bitacora"
+          element={guarded('administracion.gestionar', <AuditLogReportPage />)}
+        />
         <Route path="/bitacora" element={guarded('bitacora.consultar', <AuditLogPage />)} />
 
         <Route path="*" element={<Navigate to="/materias" replace />} />
@@ -283,6 +288,10 @@ function AuxiliarRoutes() {
         <Route
           path="/reportes/intentos"
           element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
+        />
+        <Route
+          path="/reportes/bitacora"
+          element={guarded('administracion.gestionar', <AuditLogReportPage />)}
         />
         <Route path="/bitacora" element={guarded('bitacora.consultar', <AuditLogPage />)} />
         <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
@@ -372,6 +381,10 @@ function AdministradorRoutes() {
         <Route
           path="/reportes/intentos"
           element={guarded('administracion.gestionar', <AlienAttemptsReportPage />)}
+        />
+        <Route
+          path="/reportes/bitacora"
+          element={guarded('administracion.gestionar', <AuditLogReportPage />)}
         />
         <Route path="/bitacora" element={guarded('bitacora.consultar', <AuditLogPage />)} />
 
