@@ -21,6 +21,7 @@ class VerificationService
     public const NOT_ENABLED = 'NO_HABILITADO';
     public const CI_MISMATCH = 'CI_NO_COINCIDE';
     public const DUPLICATE = 'DUPLICADO';
+    // Ya no se emiten: el ambiente solo avisa (EntryRoomPolicy). Se conservan para leer intentos históricos.
     public const ROOM_NOT_ASSIGNED = 'AULA_NO_ASIGNADA';
     public const WRONG_ROOM = 'AULA_INCORRECTA';
 
@@ -31,20 +32,23 @@ class VerificationService
     public const NOT_ENABLED_MESSAGE = 'El estudiante no está habilitado para este examen.';
     public const CI_MISMATCH_MESSAGE = 'El CI no coincide con el registrado';
     public const ROOM_NOT_ASSIGNED_MESSAGE = 'No se pudo determinar un ambiente para el estudiante.';
-    public const AUTHORIZED_MESSAGE = 'Inscrito en un grupo del examen y asignado a este ambiente.';
+    public const AUTHORIZED_MESSAGE = 'Inscrito en un grupo del examen.';
 
     private EntryControlSnapshotService $snapshots;
     private IdentificationService $identification;
     private RiskCenterQueryService $riskCenter;
+    private EntryRoomPolicy $rooms;
 
     public function __construct(
         EntryControlSnapshotService $snapshots,
         IdentificationService $identification,
-        RiskCenterQueryService $riskCenter
+        RiskCenterQueryService $riskCenter,
+        EntryRoomPolicy $rooms
     ) {
         $this->snapshots = $snapshots;
         $this->identification = $identification;
         $this->riskCenter = $riskCenter;
+        $this->rooms = $rooms;
     }
 
     public function verify(int $examId, array $input, User $actor): array
@@ -68,7 +72,11 @@ class VerificationService
             return $result;
         }
 
-        $result = $this->evaluate($this->withBackground($identified['registro']), $input, $roomId);
+        $result = $this->rooms->decorate(
+            $examId,
+            $this->evaluate($this->withBackground($identified['registro']), $input),
+            $roomId
+        );
         $result['reporte_pendiente'] = $this->snapshots->hasPendingReport(
             $examId,
             (int) $result['estudiante']['id_estudiante']
@@ -153,7 +161,7 @@ class VerificationService
      *         id_ambiente: int|null, nro_aula: string|null, controlador: string}|null
      * }
      */
-    public function evaluate(array $record, array $input, ?int $controlRoomId): array
+    public function evaluate(array $record, array $input): array
     {
         $result = $this->emptyResult(IdentificationService::IDENTIFIED);
         $result['estudiante'] = $record['estudiante'];
@@ -195,18 +203,6 @@ class VerificationService
                 self::DUPLICATE,
                 'Ya ingresó a las ' . substr((string) $record['ingreso_previo']['hora_ingreso'], 0, 5)
                     . ' por el ' . $record['ingreso_previo']['nro_aula']
-            );
-        }
-
-        if ($record['ambiente_asignado'] === null) {
-            return $this->deny($result, self::ROOM_NOT_ASSIGNED, self::ROOM_NOT_ASSIGNED_MESSAGE);
-        }
-
-        if ($controlRoomId !== null && (int) $record['ambiente_asignado']['id_ambiente'] !== $controlRoomId) {
-            return $this->deny(
-                $result,
-                self::WRONG_ROOM,
-                'Corresponde al ambiente ' . $record['ambiente_asignado']['nro_aula']
             );
         }
 

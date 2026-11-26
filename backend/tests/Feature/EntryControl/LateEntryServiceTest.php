@@ -25,8 +25,8 @@ use Tests\TestCase;
 
 /**
  * Servicios del ingreso con retraso (HU-037), llamados directamente con el actor como
- * argumento. El examen tiene dos ambientes de capacidad 1: el primer estudiante de la
- * nómina corresponde a 691A y el segundo a 692B.
+ * argumento. El examen tiene dos ambientes de capacidad 1 y no tiene distribución guardada:
+ * los estudiantes pueden ingresar por cualquiera de ellos.
  */
 class LateEntryServiceTest extends TestCase
 {
@@ -361,10 +361,10 @@ class LateEntryServiceTest extends TestCase
         );
 
         $this->assertSame(VerificationService::AUTHORIZED, $forTeacher['verificacion']['veredicto']);
-        $this->assertSame('692B', $forTeacher['verificacion']['ambiente_asignado']['nro_aula']);
+        $this->assertNull($forTeacher['verificacion']['ambiente_asignado']);
         $this->assertSame($pending->id_solicitud, $forTeacher['solicitud_pendiente']->id_solicitud);
-        $this->assertSame(VerificationService::WRONG_ROOM, $forAssistant['verificacion']['veredicto']);
-        $this->assertSame('Corresponde al ambiente 691A', $forAssistant['verificacion']['motivo']);
+        $this->assertSame(VerificationService::AUTHORIZED, $forAssistant['verificacion']['veredicto']);
+        $this->assertSame([], $forAssistant['verificacion']['avisos_ambiente']);
         $this->assertNull($forAssistant['solicitud_pendiente']);
         // El resultado de HU-032 más el intento negativo que ahora queda registrado.
         $notFound = app(VerificationService::class)->notFoundResult();
@@ -399,13 +399,11 @@ class LateEntryServiceTest extends TestCase
         $this->assertNull($this->entryOf($outsiderId));
     }
 
-    public function test_el_auxiliar_no_solicita_por_un_estudiante_de_otro_ambiente(): void
+    public function test_sin_distribucion_el_auxiliar_solicita_en_su_ambiente(): void
     {
-        $this->assertLateEntryError(VerificationService::WRONG_ROOM, 422, fn () => $this->service->request(
-            $this->exam,
-            ['id_estudiante' => $this->firstStudentId, 'id_ambiente' => $this->otraAulaId],
-            $this->assistantB
-        ));
+        $input = ['id_estudiante' => $this->firstStudentId, 'id_ambiente' => $this->otraAulaId];
+        $request = $this->service->request($this->exam, $input, $this->assistantB);
+        $this->assertSame($this->otraAulaId, (int) $request->id_ambiente);
     }
 
     public function test_un_estudiante_que_ya_ingreso_es_un_conflicto(): void

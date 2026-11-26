@@ -21,6 +21,7 @@ class StudentVerificationResource extends JsonResource
             'es_excepcional' => $this['es_excepcional'] ?? false,
             'motivo_excepcional' => $this['motivo_excepcional'] ?? null,
             'ambiente_asignado' => $this['ambiente_asignado'],
+            'avisos_ambiente' => $this['avisos_ambiente'] ?? [],
             'antecedentes' => $this['antecedentes'],
             'ingreso_previo' => $this['ingreso_previo'],
             'reporte_pendiente' => $this['reporte_pendiente'] ?? false,

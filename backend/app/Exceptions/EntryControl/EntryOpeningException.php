@@ -9,7 +9,6 @@ class EntryOpeningException extends DomainException
 {
     public const MISSING_ROSTER = 'SIN_NOMINA';
     public const MISSING_ROOMS = 'SIN_AMBIENTES';
-    public const INSUFFICIENT_CAPACITY = 'CAPACIDAD_INSUFICIENTE';
 
     private string $reason;
 

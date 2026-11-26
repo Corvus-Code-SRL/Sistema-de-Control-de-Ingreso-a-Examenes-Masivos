@@ -8,6 +8,7 @@ import type {
   LateEntryActionInput, LateEntryRequest, LateEntryVerification, LateEntryVerificationInput,
 } from '../types/late-entry.types'
 import { CI_MAX_LENGTH, digitsOnly, isValidCi, isValidSis, SIS_LENGTH } from '../utils/identificationValidation'
+import { useEntryRoomWarning } from './useEntryRoomWarning'
 import { toManualRejection, toRejectedAttempt, withManualRejection, withReported } from '../utils/rejectedAttempt'
 
 type Busy = 'verify' | 'request' | 'register' | 'reject'
@@ -44,6 +45,7 @@ export function useLateEntryVerification(
   const [busy, setBusy] = useState<Busy | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const roomWarning = useEntryRoomWarning()
 
   function clearResult() {
     setResult(null)
@@ -129,7 +131,7 @@ export function useLateEntryVerification(
     }
   }
 
-  function actionInput(roomId: number, confirmOtherExam: boolean): LateEntryActionInput | null {
+  function actionInput(roomId: number, confirmOtherExam: boolean, confirmRoom: boolean): LateEntryActionInput | null {
     const student = result?.autorizado ? result.estudiante : null
     if (!student) return null
 
@@ -138,6 +140,7 @@ export function useLateEntryVerification(
       id_ambiente: roomId,
       ...(ci ? { ci } : {}),
       ...(confirmOtherExam ? { confirmar_otro_examen: true } : {}),
+      ...(confirmRoom ? { confirmar_aviso_ambiente: true } : {}),
     }
   }
 
@@ -153,23 +156,23 @@ export function useLateEntryVerification(
    * El auxiliar pide la autorización del docente desde su ambiente. `confirmOtherExam`: la envía
    * pese a la advertencia de otro examen.
    */
-  async function request(confirmOtherExam = false) {
-    const payload = controlRoomId === null ? null : actionInput(controlRoomId, confirmOtherExam)
+  async function request(confirmOtherExam = false, confirmRoom = false) {
+    const payload = controlRoomId === null ? null : actionInput(controlRoomId, confirmOtherExam, confirmRoom)
     if (!payload) return
     setBusy('request')
     setError(null)
     try {
       setSentRequest(await lateEntryService.request(examId, payload))
     } catch (cause) {
-      await handleWriteError(cause)
+      if (!roomWarning.capture(cause, () => void request(confirmOtherExam, true))) await handleWriteError(cause)
     } finally {
       setBusy(null)
     }
   }
 
   /** El docente registra directamente en el ambiente elegido, también pese a la advertencia si la confirmó. */
-  async function register(roomId: number, confirmOtherExam = false) {
-    const payload = actionInput(roomId, confirmOtherExam)
+  async function register(roomId: number, confirmOtherExam = false, confirmRoom = false) {
+    const payload = actionInput(roomId, confirmOtherExam, confirmRoom)
     const name = result?.estudiante?.nombre_completo ?? ''
     if (!payload) return
     setBusy('register')
@@ -179,7 +182,7 @@ export function useLateEntryVerification(
       reset()
       setNotice(LATE_ENTRY_MESSAGES.registered(name, registration.hora_ingreso))
     } catch (cause) {
-      await handleWriteError(cause)
+      if (!roomWarning.capture(cause, () => void register(roomId, confirmOtherExam, true))) await handleWriteError(cause)
     } finally {
       setBusy(null)
     }
@@ -220,7 +223,7 @@ export function useLateEntryVerification(
   }
 
   return {
-    sis, ci, result, sentRequest, rejectedAttempt, busy, error, notice,
+    sis, ci, result, sentRequest, rejectedAttempt, busy, error, notice, roomWarning,
     changeSis, changeCi, choose, verify, request, register, reject, reset, setNotice, markReported,
   }
 }

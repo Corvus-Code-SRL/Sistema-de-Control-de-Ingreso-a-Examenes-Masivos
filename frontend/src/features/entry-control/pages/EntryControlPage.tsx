@@ -11,6 +11,7 @@ import { RecentRejectedAttempts } from '../components/RecentRejectedAttempts'
 import { attemptTime } from '../components/entryAttemptPresentation'
 import type { CurrentRejectedAttempt } from '../types/entry-control.types'
 import { RecentEntries } from '../components/RecentEntries'
+import { EntryRoomWarningDialog } from '../components/EntryRoomWarningDialog'
 import { VerificationResult } from '../components/VerificationResult'
 import { useEntryStatus } from '../hooks/useEntryStatus'
 import { useStudentVerification } from '../hooks/useStudentVerification'
@@ -231,6 +232,7 @@ function EntryControlContent({ examId }: { examId: number }) {
           </Tabs>}
         </div>
       </div>}
+      <EntryRoomWarningDialog gate={verification.roomWarning} busy={verification.busy !== null} />
       {open && reportContext && <ReportIncidentDialog
         key={reportContext.attemptId} context={reportContext}
         onClose={() => setReportContext(null)} onReported={reported}

@@ -2158,3 +2158,69 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_docente_inactivo_deteccion_usuario
 CREATE UNIQUE INDEX IF NOT EXISTS uq_docente_inactivo_deteccion_registro
     ON public.docente_inactivo_deteccion (id_cr_estudiante)
     WHERE id_cr_estudiante IS NOT NULL;
+
+-- Versión 22: distribución opcional de habilitados por ambiente (HU-031)
+--             (2026_11_18_000000_create_distribucion_ambiente_table y
+--              2026_11_23_000000_add_optional_distribution_tracking)
+--   * distribucion_ambiente guarda la planificación del docente y es independiente del ambiente real registrado
+--     en examen_estudiante durante el ingreso. No referencia examen_ambiente: quitar un ambiente del examen sigue
+--     permitido; la lectura concilia la planificación con los ambientes y habilitados actuales.
+--   * asignado_en conserva microsegundos para versionar guardados dentro del mismo segundo.
+--   * La distribución es una referencia: un ambiente distinto o lleno avisa y deja registrar, nunca rechaza.
+--     examen_estudiante.id_ambiente sigue siendo el aula real; id_ambiente_planificado solo se llena si el
+--     estudiante ingresó fuera del ambiente que tenía asignado.
+--   * examen.distribucion_suspendida_en: el docente creador dejó de usar la distribución; es irreversible.
+--   * Las acciones GUARDAR_DISTRIBUCION, DEJAR_USAR_DISTRIBUCION e INGRESO_CON_AVISO_AMBIENTE no van en el
+--     esquema ni en las migraciones: las siembra ActionSeeder, que debe correr después de migrar.
+
+CREATE TABLE IF NOT EXISTS public.distribucion_ambiente (
+    id_examen             integer NOT NULL,
+    id_estudiante         integer NOT NULL,
+    id_ambiente           integer NOT NULL,
+    id_usuario_asignador  uuid NOT NULL,
+    asignado_en           timestamp(6) with time zone NOT NULL,
+
+    CONSTRAINT pk_distribucion_ambiente
+        PRIMARY KEY (id_examen, id_estudiante),
+    CONSTRAINT fk_distribucion_ambiente_examen
+        FOREIGN KEY (id_examen) REFERENCES public.examen(id_examen),
+    CONSTRAINT fk_distribucion_ambiente_estudiante
+        FOREIGN KEY (id_estudiante) REFERENCES public.estudiante(id_estudiante),
+    CONSTRAINT fk_distribucion_ambiente_ambiente
+        FOREIGN KEY (id_ambiente) REFERENCES public.ambiente(id_ambiente),
+    CONSTRAINT fk_distribucion_ambiente_usuario
+        FOREIGN KEY (id_usuario_asignador) REFERENCES public.usuario(id_usuario)
+);
+
+CREATE INDEX IF NOT EXISTS idx_distribucion_ambiente_examen_ambiente
+    ON public.distribucion_ambiente(id_examen, id_ambiente);
+
+ALTER TABLE public.examen
+    ADD COLUMN IF NOT EXISTS distribucion_suspendida_en timestamp with time zone,
+    ADD COLUMN IF NOT EXISTS id_usuario_suspende_distribucion uuid;
+
+ALTER TABLE public.examen_estudiante
+    ADD COLUMN IF NOT EXISTS id_ambiente_planificado integer;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'fk_examen_usuario_suspende_distribucion'
+          AND conrelid = 'public.examen'::regclass
+    ) THEN
+        ALTER TABLE public.examen
+            ADD CONSTRAINT fk_examen_usuario_suspende_distribucion
+                FOREIGN KEY (id_usuario_suspende_distribucion) REFERENCES public.usuario(id_usuario);
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'fk_examen_estudiante_ambiente_planificado'
+          AND conrelid = 'public.examen_estudiante'::regclass
+    ) THEN
+        ALTER TABLE public.examen_estudiante
+            ADD CONSTRAINT fk_examen_estudiante_ambiente_planificado
+                FOREIGN KEY (id_ambiente_planificado) REFERENCES public.ambiente(id_ambiente);
+    END IF;
+END $$;

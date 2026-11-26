@@ -135,7 +135,7 @@ class EntryAccessService
                 'ingresados' => $entered,
                 'pendientes' => max(0, $total - $entered),
             ];
-        })->all();
+        })->values()->all();
     }
 
     public function context(Exam $exam, User $actor): array

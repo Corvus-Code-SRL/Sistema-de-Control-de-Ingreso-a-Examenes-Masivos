@@ -18,6 +18,7 @@ import { attemptTime } from '../components/entryAttemptPresentation'
 import { IdentificationForm } from '../components/IdentificationForm'
 import { LateEntryAnnouncement } from '../components/LateEntryAnnouncement'
 import { LateEntryNextButton } from '../components/LateEntryNextButton'
+import { EntryRoomWarningDialog } from '../components/EntryRoomWarningDialog'
 import { LateEntryOtherExamDialog } from '../components/LateEntryOtherExamDialog'
 import { LateEntryOtherExamNotice } from '../components/LateEntryOtherExamNotice'
 import { LateEntryRequestActions } from '../components/LateEntryRequestActions'
@@ -163,10 +164,11 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
   }
 
   async function resolveInline(requestId: number, approve: boolean) {
-    const done = approve
-      ? await requests.approve(requestId, warning !== null)
-      : await requests.reject(requestId)
-    if (done) next()
+    if (approve) {
+      await requests.approve(requestId, warning !== null, next)
+    } else if (await requests.reject(requestId)) {
+      next()
+    }
   }
 
   const roomId = selectedRoomId ?? result?.ambiente_asignado?.id_ambiente ?? exam.ambientes[0]?.id_ambiente ?? null
@@ -376,6 +378,8 @@ function LateEntryWorkspace({ exam, onConflict }: { exam: ExamInProgress; onConf
         </div>
       </div>
       {reportDialog}
+      <EntryRoomWarningDialog gate={verification.roomWarning} busy={busy !== null} />
+      <EntryRoomWarningDialog gate={requests.roomWarning} busy={requests.busyId !== null} />
       <LateEntryOtherExamDialog
         open={confirmingOtherExam}
         studentName={result?.estudiante?.nombre_completo ?? ''}

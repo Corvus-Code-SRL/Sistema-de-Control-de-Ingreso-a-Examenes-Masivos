@@ -47,10 +47,16 @@ export const lateEntryService = {
   },
 
   /** `confirmOtherExam`: el docente autoriza con la advertencia de otro examen a la vista. */
-  async approve(examId: number, requestId: number, confirmOtherExam = false): Promise<LateEntryRequest> {
-    const response = await apiPost<DataResponse<LateEntryRequest>>(
-      `${base(examId)}/solicitudes/${requestId}/autorizar`, confirmOtherExam ? { confirmar_otro_examen: true } : {}
-    )
+  async approve(
+    examId: number,
+    requestId: number,
+    confirmOtherExam = false,
+    confirmRoom = false
+  ): Promise<LateEntryRequest> {
+    const response = await apiPost<DataResponse<LateEntryRequest>>(`${base(examId)}/solicitudes/${requestId}/autorizar`, {
+      ...(confirmOtherExam ? { confirmar_otro_examen: true } : {}),
+      ...(confirmRoom ? { confirmar_aviso_ambiente: true } : {}),
+    })
     return response.data
   },
 

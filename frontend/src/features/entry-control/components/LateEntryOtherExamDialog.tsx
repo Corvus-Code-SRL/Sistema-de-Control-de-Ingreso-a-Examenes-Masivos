@@ -1,7 +1,4 @@
-import { Button } from '@/components/ui/button'
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog'
+import { EntryConfirmDialog } from './EntryConfirmDialog'
 import { LATE_ENTRY_MESSAGES } from './lateEntryMessages'
 
 interface LateEntryOtherExamDialogProps {
@@ -17,22 +14,15 @@ export function LateEntryOtherExamDialog({
   open, studentName, busy, onConfirm, onOpenChange,
 }: LateEntryOtherExamDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{LATE_ENTRY_MESSAGES.otherExamConfirmTitle}</DialogTitle>
-          <DialogDescription>{LATE_ENTRY_MESSAGES.otherExamConfirmDescription(studentName)}</DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="flex-col gap-2 sm:flex-row">
-          <Button type="button" variant="outline" className="h-11 w-full sm:w-auto" disabled={busy}
-            onClick={() => onOpenChange(false)}>
-            {LATE_ENTRY_MESSAGES.cancel}
-          </Button>
-          <Button type="button" className="h-11 w-full sm:w-auto" disabled={busy} onClick={onConfirm}>
-            {LATE_ENTRY_MESSAGES.otherExamConfirm}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <EntryConfirmDialog
+      open={open}
+      title={LATE_ENTRY_MESSAGES.otherExamConfirmTitle}
+      description={LATE_ENTRY_MESSAGES.otherExamConfirmDescription(studentName)}
+      confirmLabel={LATE_ENTRY_MESSAGES.otherExamConfirm}
+      cancelLabel={LATE_ENTRY_MESSAGES.cancel}
+      busy={busy}
+      onConfirm={onConfirm}
+      onOpenChange={onOpenChange}
+    />
   )
 }

@@ -48,6 +48,15 @@ export interface PreviousEntry {
   controlador: string | null
 }
 
+/** Aviso de ambiente: informa y deja registrar con confirmación (HU-031). */
+export interface EntryRoomWarning {
+  tipo: 'FUERA_DE_AMBIENTE' | 'AMBIENTE_LLENO'
+  mensaje: string
+  ambiente_asignado?: EntryRoom
+  ocupados?: number
+  capacidad?: number
+}
+
 export interface Verification {
   veredicto: string
   id_intento?: number | null
@@ -63,6 +72,7 @@ export interface Verification {
   es_excepcional?: boolean
   motivo_excepcional?: string | null
   ambiente_asignado: EntryRoom | null
+  avisos_ambiente?: EntryRoomWarning[]
   antecedentes: { total: number; latest: { tipo_falta: string; fecha_registro: string } | null }
   ingreso_previo: PreviousEntry | null
   reporte_pendiente?: boolean
@@ -140,6 +150,8 @@ export interface EntryActionInput {
   id_estudiante: number
   ci?: string
   id_ambiente: number
+  /** Registrar pese al aviso de ambiente distinto o lleno. */
+  confirmar_aviso_ambiente?: true
 }
 
 export interface OpenEntryExam {

@@ -196,12 +196,6 @@ class LateEntryRequestTest extends TestCase
             ->assertStatus(422)
             ->assertJsonPath('veredicto', VerificationService::CI_MISMATCH)
             ->assertJsonPath('message', VerificationService::CI_MISMATCH_MESSAGE);
-        $this->postJson($this->lateEntryUrl('solicitudes'), [
-            'id_estudiante' => $this->firstStudentId,
-            'id_ambiente' => $this->otraAulaId,
-        ])
-            ->assertStatus(422)
-            ->assertJsonPath('veredicto', VerificationService::WRONG_ROOM);
 
         $this->assertSame(0, LateEntryRequest::query()->count());
     }

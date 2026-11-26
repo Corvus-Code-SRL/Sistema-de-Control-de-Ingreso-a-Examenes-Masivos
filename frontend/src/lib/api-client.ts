@@ -18,6 +18,7 @@ interface ApiErrorExtras {
   retryAfter?: number
   codigoSugerido?: string
   cuentaExistenteId?: string | null
+  responseBody?: unknown
 }
 
 /**
@@ -49,6 +50,9 @@ export class ApiError extends Error {
   /** Cuenta que ya usa el código consultado, cuando el servidor la informa (422 de la verificación). */
   readonly cuentaExistenteId?: string | null
 
+  /** Cuerpo del error, para los flujos que reciben datos propios junto al rechazo (como un 409 con avisos). */
+  readonly responseBody?: unknown
+
   constructor(
     status: number,
     message: string,
@@ -65,6 +69,7 @@ export class ApiError extends Error {
     this.retryAfter = extras.retryAfter
     this.codigoSugerido = extras.codigoSugerido
     this.cuentaExistenteId = extras.cuentaExistenteId
+    this.responseBody = extras.responseBody
   }
 
   /** La petición nunca se completó: sin conexión o sin respuesta a tiempo. */
@@ -362,6 +367,7 @@ async function toApiError(response: Response): Promise<ApiError> {
       retryAfter: response.status === 429 ? parseRetryAfter(response.headers.get('Retry-After')) : undefined,
       codigoSugerido: body?.codigo_sugerido,
       cuentaExistenteId: body?.cuenta_existente?.id_usuario,
+      responseBody: body,
     }
   )
 }

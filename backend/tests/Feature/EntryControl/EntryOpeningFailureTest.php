@@ -58,40 +58,15 @@ class EntryOpeningFailureTest extends TestCase
         $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
     }
 
-    public function testInsufficientCapacityIncludesActualCapacityAndRoster(): void
+    public function testInsufficientCapacityNoLongerBlocksOpening(): void
     {
         $exam = $this->scheduledExam();
         $this->setCapacity(1);
         $this->runOpeningJob();
-
-        $this->assertFailure($exam, 'CAPACIDAD_INSUFICIENTE', 'Capacidad 1 menor que la nómina de 2.');
-        $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
-    }
-
-    public function testInsufficientCapacityKeepsExamEditableUntilCorrected(): void
-    {
-        $exam = $this->scheduledExam();
-        $this->setCapacity(1);
-        $this->runOpeningJob();
-        app(ExamLifecycleService::class)->startExpired();
-
-        $this->assertFailure($exam, 'CAPACIDAD_INSUFICIENTE', 'Capacidad 1 menor que la nómina de 2.');
-        $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
-
-        $this->putJson("/api/examenes/{$exam->id_examen}", $this->validPayload([
-            'fecha' => '2026-10-12',
-            'hora_inicio' => '10:00',
-            'duracion' => 90,
-            'ambientes' => [$this->aulaId, $this->otraAulaId],
-        ]))->assertOk();
-
-        $this->runOpeningJob();
-        Carbon::setTestNow(Carbon::parse('2026-10-12 10:00:00', config('sciem.zona_horaria')));
-        app(ExamLifecycleService::class)->startExpired();
 
         $this->assertNull(app(EntryOpeningFailureStore::class)->get((int) $exam->id_examen));
         $this->assertTrue(app(RoomAssignmentService::class)->hasPreparedSnapshot((int) $exam->id_examen));
-        $this->assertSame(Exam::EN_CURSO, $exam->fresh()->estado);
+        $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
     }
 
     public function testWaitingBeforeOpeningWindowHasNoFailure(): void
@@ -120,14 +95,10 @@ class EntryOpeningFailureTest extends TestCase
         $this->assertSame([], app(PresenciaControlService::class)->getConnectedUsers($exam->id_examen));
     }
 
-    public function testCorrectingCapacityClearsFailureAndPreservesStatusVersioning(): void
+    public function testOpeningWithLowCapacityPreservesStatusVersioning(): void
     {
         $exam = $this->scheduledExam();
         $this->setCapacity(1);
-        $this->runOpeningJob();
-        $this->assertNotNull(app(EntryOpeningFailureStore::class)->get($exam->id_examen));
-
-        $this->setCapacity(2);
         $this->runOpeningJob();
         $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
         $this->assertTrue(app(RoomAssignmentService::class)->hasPreparedSnapshot((int) $exam->id_examen));
@@ -161,12 +132,6 @@ class EntryOpeningFailureTest extends TestCase
         $this->assertFailure($exam, 'SIN_AMBIENTES', 'El examen no tiene ambientes asignados.');
 
         $exam->classrooms()->attach($this->aulaId);
-        $this->setCapacity(1);
-        $this->runOpeningJob();
-        $this->assertFailure($exam, 'CAPACIDAD_INSUFICIENTE', 'Capacidad 1 menor que la nómina de 2.');
-        $this->assertFailure($other, 'SIN_NOMINA', 'El examen no tiene estudiantes en su nómina.');
-
-        $this->setCapacity(2);
         $this->runOpeningJob();
         $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
         $this->assertTrue(app(RoomAssignmentService::class)->hasPreparedSnapshot((int) $exam->id_examen));
@@ -199,14 +164,13 @@ class EntryOpeningFailureTest extends TestCase
         ]);
     }
 
-    public function testTechnicalErrorDoesNotKeepStaleCapacityWarning(): void
+    public function testTechnicalErrorDoesNotKeepStaleOpeningWarning(): void
     {
-        $exam = $this->scheduledExam();
-        $this->setCapacity(1);
+        $exam = $this->scheduledExam(true, false);
         $this->runOpeningJob();
-        $this->assertFailure($exam, 'CAPACIDAD_INSUFICIENTE', 'Capacidad 1 menor que la nómina de 2.');
+        $this->assertFailure($exam, 'SIN_AMBIENTES', 'El examen no tiene ambientes asignados.');
 
-        $this->setCapacity(2);
+        $exam->classrooms()->attach($this->aulaId);
         $assignments = Mockery::mock(RoomAssignmentService::class);
         $assignments->shouldReceive('prepare')->once()->with($exam->id_examen)
             ->andThrow(new RuntimeException('Error técnico'));

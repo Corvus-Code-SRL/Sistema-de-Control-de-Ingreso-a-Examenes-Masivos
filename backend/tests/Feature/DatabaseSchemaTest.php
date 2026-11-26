@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\Exams\Distribution\DistributionVersion;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -314,6 +315,124 @@ class DatabaseSchemaTest extends TestCase
         $this->assertSame($ownClassroom, DB::table('examen_auxiliar')->value('id_ambiente'));
 
         $this->assertRejected(fn () => DB::table('examen_auxiliar')->insert($enabling));
+    }
+
+    public function testRoomDistributionHasItsCompositeKeyForeignKeysAndCapacityQueryIndex(): void
+    {
+        $this->assertTrue(Schema::hasColumns('distribucion_ambiente', [
+            'id_examen', 'id_estudiante', 'id_ambiente', 'id_usuario_asignador', 'asignado_en',
+        ]));
+        $definitions = collect(DB::select(
+            "select conname, pg_get_constraintdef(oid) as definicion from pg_constraint
+             where conrelid = 'public.distribucion_ambiente'::regclass"
+        ))->pluck('definicion', 'conname')->all();
+
+        $expected = [
+            'pk_distribucion_ambiente' => 'PRIMARY KEY (id_examen, id_estudiante)',
+            'fk_distribucion_ambiente_examen' => 'FOREIGN KEY (id_examen) REFERENCES examen(id_examen)',
+            'fk_distribucion_ambiente_estudiante' => 'FOREIGN KEY (id_estudiante) REFERENCES estudiante(id_estudiante)',
+            'fk_distribucion_ambiente_ambiente' => 'FOREIGN KEY (id_ambiente) REFERENCES ambiente(id_ambiente)',
+            'fk_distribucion_ambiente_usuario' => 'FOREIGN KEY (id_usuario_asignador) REFERENCES usuario(id_usuario)',
+        ];
+        ksort($expected);
+        ksort($definitions);
+        $this->assertSame($expected, $definitions);
+
+        $columns = DB::table('information_schema.columns')
+            ->where('table_schema', 'public')->where('table_name', 'distribucion_ambiente')
+            ->get(['column_name', 'data_type', 'is_nullable', 'datetime_precision'])->keyBy('column_name');
+
+        $this->assertSame('uuid', $columns['id_usuario_asignador']->data_type);
+        $this->assertSame('timestamp with time zone', $columns['asignado_en']->data_type);
+        $this->assertSame(6, $columns['asignado_en']->datetime_precision);
+
+        foreach ($columns as $column) {
+            $this->assertSame('NO', $column->is_nullable);
+        }
+
+        $index = DB::table('pg_indexes')->where('schemaname', 'public')
+            ->where('indexname', 'idx_distribucion_ambiente_examen_ambiente')->value('indexdef');
+        $this->assertStringContainsString('(id_examen, id_ambiente)', $index);
+
+        $script = file_get_contents(base_path('../docs/database/creation-script.sql'));
+
+        foreach (array_keys($definitions) as $name) {
+            $this->assertStringContainsString($name, $script);
+        }
+
+        $this->assertStringContainsString('idx_distribucion_ambiente_examen_ambiente', $script);
+        $this->assertMatchesRegularExpression('/asignado_en\s+timestamp\(6\) with time zone NOT NULL/', $script);
+    }
+
+    public function testDistributionVersionDistinguishesSavesWithinTheSameSecond(): void
+    {
+        $teacherId = $this->insertUser('precision');
+        $examId = $this->insertExam($teacherId);
+        $roomId = $this->insertClassroom('HU031-US');
+        $this->insertStudent('202603101', null);
+        $studentId = (int) DB::table('estudiante')->where('cod_sis', '202603101')->value('id_estudiante');
+
+        DB::table('distribucion_ambiente')->insert([
+            'id_examen' => $examId,
+            'id_estudiante' => $studentId,
+            'id_ambiente' => $roomId,
+            'id_usuario_asignador' => $teacherId,
+            'asignado_en' => '2026-11-17 10:00:00.100001+00',
+        ]);
+        $query = DB::table('distribucion_ambiente')
+            ->where('id_examen', $examId)->where('id_estudiante', $studentId);
+        $before = (array) (clone $query)->first();
+
+        $query->update(['asignado_en' => '2026-11-17 10:00:00.100002+00']);
+        $after = (array) (clone $query)->first();
+
+        $this->assertNotSame(DistributionVersion::fromRows([$before]), DistributionVersion::fromRows([$after]));
+        $this->assertSame(substr($before['asignado_en'], 0, 19), substr($after['asignado_en'], 0, 19));
+        $this->assertSame(100002, $query->selectRaw('EXTRACT(MICROSECONDS FROM asignado_en)::integer AS us')
+            ->first()->us);
+    }
+
+    public function testRemovingAnExamRoomDoesNotDeleteOrBlockItsPlannedDistribution(): void
+    {
+        $teacherId = $this->insertUser('distribucion');
+        $examId = $this->insertExam($teacherId);
+        $roomId = $this->insertClassroom('HU031');
+        $this->insertStudent('202603100', null);
+        $studentId = (int) DB::table('estudiante')->where('cod_sis', '202603100')->value('id_estudiante');
+        $row = [
+            'id_examen' => $examId,
+            'id_estudiante' => $studentId,
+            'id_ambiente' => $roomId,
+            'id_usuario_asignador' => $teacherId,
+            'asignado_en' => '2026-11-18 10:00:00+00',
+        ];
+
+        DB::table('examen_ambiente')->insert(['id_examen' => $examId, 'id_ambiente' => $roomId]);
+        DB::table('distribucion_ambiente')->insert($row);
+        $this->assertRejected(fn () => DB::table('distribucion_ambiente')->insert($row));
+
+        foreach ([
+            ['id_examen' => 2147483647],
+            ['id_estudiante' => 2147483647],
+            ['id_ambiente' => 2147483647],
+            ['id_usuario_asignador' => '99999999-9999-4999-8999-999999999999'],
+        ] as $invalid) {
+            $this->assertRejected(fn () => DB::table('distribucion_ambiente')
+                ->where('id_examen', $examId)->where('id_estudiante', $studentId)->update($invalid));
+        }
+
+        DB::table('examen_ambiente')->where('id_examen', $examId)->where('id_ambiente', $roomId)->delete();
+
+        $this->assertSame(1, DB::table('distribucion_ambiente')->where('id_examen', $examId)->count());
+    }
+
+    public function testDistributionAuditActionIsSeeded(): void
+    {
+        $action = DB::table('accion')->where('operacion', 'GUARDAR_DISTRIBUCION')->first();
+
+        $this->assertNotNull($action);
+        $this->assertSame('UPDATE', $action->tipo_operacion);
+        $this->assertSame('Guardado de la distribución de habilitados por ambiente', $action->descripcion);
     }
 
     public function testGroupAuxiliaryIsUniquePerGroupAndUser(): void

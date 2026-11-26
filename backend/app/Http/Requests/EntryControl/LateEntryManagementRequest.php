@@ -5,6 +5,7 @@ namespace App\Http\Requests\EntryControl;
 use App\Models\Role;
 use App\Services\Security\UserRoleService;
 use App\Support\CurrentUser;
+use App\Support\Exams\EntryRoomWarning;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -44,12 +45,16 @@ abstract class LateEntryManagementRequest extends FormRequest
     {
         return (new VerifyStudentRequest())->messages() + [
             'confirmar_otro_examen.boolean' => self::CONFIRM_OTHER_EXAM_MESSAGE,
+            'confirmar_aviso_ambiente.boolean' => EntryRoomWarning::CONFIRM_FIELD_MESSAGE,
         ];
     }
 
     /** Continuar pese a que el estudiante ya ingresó a otro examen abierto. */
     protected static function otherExamRules(): array
     {
-        return ['confirmar_otro_examen' => ['sometimes', 'boolean']];
+        return [
+            'confirmar_otro_examen' => ['sometimes', 'boolean'],
+            'confirmar_aviso_ambiente' => ['sometimes', 'boolean'],
+        ];
     }
 }

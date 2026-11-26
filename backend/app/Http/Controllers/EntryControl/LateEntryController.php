@@ -86,7 +86,8 @@ class LateEntryController extends Controller
                     $examen,
                     (int) $solicitud,
                     $request->user(),
-                    $request->boolean('confirmar_otro_examen')
+                    $request->boolean('confirmar_otro_examen'),
+                    $request->boolean('confirmar_aviso_ambiente')
                 )
             ),
             self::APPROVED_MESSAGE

@@ -88,6 +88,8 @@ export interface LateEntryActionInput {
   id_ambiente: number
   /** Continuar pese a la advertencia de otro examen. */
   confirmar_otro_examen?: true
+  /** Continuar pese al aviso de ambiente distinto o lleno. */
+  confirmar_aviso_ambiente?: true
 }
 
 /** Rechazo manual de un estudiante verificado, con los motivos del control de ingreso (HU-032). */

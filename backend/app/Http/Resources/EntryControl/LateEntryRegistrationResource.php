@@ -18,6 +18,8 @@ class LateEntryRegistrationResource extends JsonResource
             'estado_ingreso' => $this->resource['estado_ingreso'],
             'hora_ingreso' => ClockTime::fromTime($this->resource['hora_ingreso']),
             'id_ambiente' => $this->resource['id_ambiente'],
+            'id_ambiente_planificado' => $this->resource['id_ambiente_planificado'],
+            'fuera_de_ambiente' => $this->resource['fuera_de_ambiente'],
         ];
     }
 }

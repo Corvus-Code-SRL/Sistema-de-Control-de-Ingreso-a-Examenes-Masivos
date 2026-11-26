@@ -42,6 +42,7 @@ return [
     */
 
     'entry_control_cache_store' => env('ENTRY_CONTROL_CACHE_STORE', 'redis'),
+    'distribucion_suspendida_ttl_horas' => (int) env('SCIEM_DISTRIBUCION_SUSPENDIDA_TTL_HORAS', 24),
 
     /*
     |--------------------------------------------------------------------------
@@ -314,6 +315,9 @@ return [
             'RECHAZAR_INVITACION' => 'Rechazar invitación',
             'INICIAR_CRONOMETRO' => 'Iniciar cronómetro',
             'AJUSTAR_CRONOMETRO' => 'Ajustar cronómetro',
+            'GUARDAR_DISTRIBUCION' => 'Guardar distribución',
+            'DEJAR_USAR_DISTRIBUCION' => 'Dejar de usar distribución',
+            'INGRESO_CON_AVISO_AMBIENTE' => 'Ingreso con aviso de ambiente',
         ],
 
         'etiquetas_campo' => [
