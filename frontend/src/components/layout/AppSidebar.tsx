@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, type UIEvent } from 'react'
-import { LogIn, LogOut, PanelLeftClose } from 'lucide-react'
+import { LogIn, LogOut, PanelLeft } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { AREA_LABELS, LOGIN_PATH, useAuth, useCurrentUser } from '@/features/auth'
@@ -148,14 +148,18 @@ export function AppSidebar({
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex items-center gap-2.5 border-b border-sidebar-border px-4 py-4">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-bold text-sidebar-primary-foreground">
+      {/* Misma altura que la barra superior del contenido (`h-topbar`): una sola línea continua. */}
+      <div className="flex h-topbar shrink-0 items-center gap-2 border-b border-sidebar-border px-3">
+        {/* Espacio reservado para el logotipo definitivo del sistema. */}
+        <span
+          aria-hidden="true"
+          className="flex size-6 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-xs font-bold text-sidebar-primary-foreground"
+        >
           S
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="sciem-wordmark truncate">SCIEM</p>
-          <p className="truncate text-xs text-sb-sub">Control de Ingreso a Exámenes</p>
-        </div>
+        <p className="sciem-wordmark min-w-0 flex-1 truncate" title="SCIEM — Control de Ingreso a Exámenes">
+          SCIEM<span className="sr-only"> — Control de Ingreso a Exámenes</span>
+        </p>
 
         {onCollapse && (
           <button
@@ -164,9 +168,9 @@ export function AppSidebar({
             aria-label="Ocultar menú"
             aria-expanded={true}
             aria-controls={controlsId}
-            className="flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground outline-none hover:bg-sb-hover focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+            className="-mr-1 flex size-8 shrink-0 items-center justify-center rounded-md text-sb-sub outline-none hover:bg-sb-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
           >
-            <PanelLeftClose className="size-4" aria-hidden="true" />
+            <PanelLeft className="size-4" strokeWidth={1.75} aria-hidden="true" />
           </button>
         )}
       </div>

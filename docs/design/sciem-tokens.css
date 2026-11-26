@@ -22,6 +22,9 @@
 
 /* ============================================================
    SCIEM — Tokens de diseño (tema claro y oscuro)
+   Reglas de uso, tabla de tokens y contrastes verificados:
+   docs/design/sistema-de-color.md (actualizar sus tablas con
+   cada cambio de token; las pruebas lo verifican).
    Fuente: frontend/src/index.css (mantener
    ambos archivos sincronizados en el mismo commit).
 
@@ -159,6 +162,10 @@
   --sciem-radius-lg: 10px;
   --sciem-radius-xl: 14px;
   --sciem-radius-pill: 9999px;
+
+  /* Dimensiones: altura común de la barra superior del contenido y de la
+     cabecera del sidebar, para que formen una sola línea continua. */
+  --sciem-topbar-height: 2.5rem;
 }
 
 /* ---------- 1b. Paleta cruda — tema oscuro ----------
@@ -429,6 +436,8 @@
   --radius-xl: var(--sciem-radius-xl);
   --radius-pill: var(--sciem-radius-pill);
 
+  --spacing-topbar: var(--sciem-topbar-height);
+
   --font-sans: "Inter Variable", "Inter", system-ui, sans-serif;
   --font-brand: "Poppins", "Inter", sans-serif;
 }
@@ -530,6 +539,6 @@
 /* Wordmark del sidebar — único uso de Poppins */
 .sciem-wordmark {
   font-family: var(--font-brand);
-  font-weight: 700; font-size: 17px; line-height: 1.1;
+  font-weight: 700; font-size: 15px; line-height: 1;
   letter-spacing: .02em; color: var(--sciem-on-solid);
 }
