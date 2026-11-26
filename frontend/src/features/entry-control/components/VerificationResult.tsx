@@ -126,7 +126,7 @@ export function VerificationResult({
   const isAssistant = result.veredicto === 'AUXILIAR_EXAMEN' && result.auxiliar != null
   const canReport = !allowed && result.estudiante != null && result.veredicto !== 'AULA_NO_ASIGNADA'
   const Icon = cautious ? ShieldAlert : allowed ? CheckCircle2 : isAssistant ? UserRound : CircleX
-  const tone = cautious ? 'border-warn-border bg-warn-soft/35' : allowed ? 'border-ok/30 bg-ok-soft/35' : isAssistant ? 'border-border bg-card' : 'border-danger/25 bg-danger-soft/35'
+  const tone = cautious ? 'border-warn-border bg-warn-tint' : allowed ? 'border-ok/30 bg-ok-tint' : isAssistant ? 'border-border bg-card' : 'border-danger/25 bg-danger-tint'
   return <section aria-live="polite" aria-labelledby="entry-verdict" className={`${actionsLayout === 'card' ? '@container ' : ''}space-y-4 rounded-xl border p-4 shadow-sm sm:p-6 ${tone}`}>
     <div className="flex gap-3">
       <Icon className={`mt-0.5 size-6 shrink-0 ${cautious ? 'text-warn-fg' : allowed ? 'text-ok' : isAssistant ? 'text-brand-deep' : 'text-danger'}`} aria-hidden="true" />
