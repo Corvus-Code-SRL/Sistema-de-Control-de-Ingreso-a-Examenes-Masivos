@@ -12,12 +12,19 @@ import { Button, buttonVariants } from './button'
 
 const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
 
+/** Valor del tema claro (primera declaración del archivo), siguiendo las referencias `var(--x)`. */
 function token(name: string): string {
-  const match = css.match(new RegExp(`${name}:\\s*(#[0-9A-Fa-f]{6})`))
+  const match = css.match(new RegExp(`${name}:\\s*([^;]+);`))
 
   if (!match) throw new Error(`No se encontró el token ${name}`)
 
-  return match[1]
+  const value = match[1].trim()
+  const reference = value.match(/^var\((--[a-z0-9-]+)\)$/)
+
+  if (reference) return token(reference[1])
+  if (!/^#[0-9A-Fa-f]{6}$/.test(value)) throw new Error(`El token ${name} no es un color hex: ${value}`)
+
+  return value
 }
 
 function luminance(hex: string): number {
