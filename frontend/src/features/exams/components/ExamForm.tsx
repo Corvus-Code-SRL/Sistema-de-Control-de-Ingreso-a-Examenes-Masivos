@@ -12,10 +12,10 @@ interface Props {
 }
 
 const inputClass = (invalid: boolean, empty = false) =>
-  `h-9 w-full rounded-lg border bg-card px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring ${empty ? 'text-muted-foreground' : 'text-foreground'} ${invalid ? 'border-danger' : 'border-border-strong'}`
+  `h-9 w-full rounded-lg border bg-field px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring ${empty ? 'text-muted-foreground' : 'text-foreground'} ${invalid ? 'border-danger' : 'border-input'}`
 
 const pickerClass = (invalid: boolean) =>
-  `relative flex h-9 items-center justify-between rounded-lg border bg-card px-3 text-sm focus-within:ring-2 focus-within:ring-ring ${invalid ? 'border-danger' : 'border-border-strong'}`
+  `relative flex h-9 items-center justify-between rounded-lg border bg-field px-3 text-sm focus-within:ring-2 focus-within:ring-ring ${invalid ? 'border-danger' : 'border-input'}`
 
 export function ExamForm({ formData, subjects, errors, updateFormData }: Props) {
   const [hour, minute] = (formData.hora_inicio || '08:00').split(':').map(Number)
@@ -23,7 +23,7 @@ export function ExamForm({ formData, subjects, errors, updateFormData }: Props) 
   const displayedTime = formData.hora_inicio
     ? `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${period}`
     : 'hh:mm AM/PM'
-  const selectClass = 'h-9 rounded-lg border border-border-strong bg-card px-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring'
+  const selectClass = 'h-9 rounded-lg border border-input bg-field px-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring'
 
   const setTime = (nextHour: number, nextMinute: number) => {
     updateFormData({ hora_inicio: `${String(nextHour).padStart(2, '0')}:${String(nextMinute).padStart(2, '0')}` })
@@ -41,7 +41,7 @@ export function ExamForm({ formData, subjects, errors, updateFormData }: Props) 
             <label htmlFor="materia" className="block text-sm font-medium text-foreground">Materia <span className="text-danger">*</span></label>
             <FormSelect
               id="materia"
-              className="h-9 border-border-strong bg-card px-3 text-sm font-normal data-[size=default]:h-9"
+              className="h-9 px-3 text-sm font-normal data-[size=default]:h-9"
               value={formData.materia ? String(formData.materia.id_materia) : undefined}
               placeholder="Seleccionar materia..."
               invalid={Boolean(errors.materia)}
@@ -137,7 +137,7 @@ export function ExamForm({ formData, subjects, errors, updateFormData }: Props) 
 
         <div className="space-y-1">
           <label htmlFor="categoria" className="block text-sm font-medium text-foreground">Categoría <span className="text-danger">*</span></label>
-          <FormSelect id="categoria" className="h-9 border-border-strong bg-card px-3 text-sm font-normal data-[size=default]:h-9" value={formData.categoria} placeholder="Seleccionar categoría"
+          <FormSelect id="categoria" className="h-9 px-3 text-sm font-normal data-[size=default]:h-9" value={formData.categoria} placeholder="Seleccionar categoría"
               options={[
                 { value: 'REGULAR', label: 'REGULAR' },
                 { value: 'MESA', label: 'MESA' },

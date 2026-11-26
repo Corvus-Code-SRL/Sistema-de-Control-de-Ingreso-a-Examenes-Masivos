@@ -399,7 +399,7 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
 
               <input
                 aria-label="Buscar estudiante"
-                className="h-9 w-full rounded-lg border bg-background px-3 text-sm sm:w-56"
+                className="h-9 w-full rounded-lg border border-input bg-field px-3 text-sm sm:w-56"
                 placeholder="Nombre, SIS o CI"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}

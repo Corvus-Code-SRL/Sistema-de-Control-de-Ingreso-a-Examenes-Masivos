@@ -118,7 +118,7 @@ export function RosterFileStep({
               onChange={(event) =>
                 onSelectCareer(event.target.value === '' ? null : Number(event.target.value))
               }
-              className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              className="h-10 w-full rounded-md border border-input bg-field px-3 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
               <option value="">Según la columna «Carrera» del archivo</option>
               {careers.map((career) => (
