@@ -69,6 +69,8 @@
   --sciem-border-strong: #C7D2D3;
   /* Borde de controles de formulario: mínimo 3:1 (WCAG 1.4.11). */
   --sciem-input-border: #7A9497;
+  /* Fondo común de todos los campos (input, select, textarea, fecha y hora). */
+  --sciem-field-bg: var(--sciem-surface);
 
   /* Texto */
   --sciem-text: #2C2C2C;
@@ -126,6 +128,13 @@
   --sciem-sb-divider: #24626A;
   --sciem-sb-hover: #0B474E;
   --sciem-sb-active: #1E5A61;
+  /* Foco dentro del sidebar: teal claro legible sobre su fondo oscuro. */
+  --sciem-sb-focus: var(--sciem-sb-sub);
+
+  /* Barras de desplazamiento finas */
+  --sciem-scrollbar-thumb: var(--sciem-border-strong);
+  --sciem-scrollbar-thumb-hover: var(--sciem-input-border);
+  --sciem-scrollbar-track: transparent;
 
   /* Foco — siempre visible, mínimo 3:1 contra el fondo adyacente */
   --sciem-focus: #5E989F;
@@ -184,6 +193,7 @@
     --sciem-border: #2F4240;
     --sciem-border-strong: #3D5653;
     --sciem-input-border: #5B7874;
+    --sciem-field-bg: #151C1B;
 
     --sciem-text: #E7EFED;
     --sciem-muted: #A4B8B5;
@@ -225,15 +235,19 @@
     --sciem-dis-bg: #161F1E;
     --sciem-dis-border: #2F4240;
 
-    /* El sidebar es la superficie más oscura del tema. */
-    --sciem-sb-bg: #061517;
-    --sciem-sb-border: #12292B;
-    --sciem-sb-text: #D8ECEE;
-    --sciem-sb-sub: #8FC7CC;
-    --sciem-sb-group: #7FB0B5;
-    --sciem-sb-divider: #1E4446;
-    --sciem-sb-hover: #0E2224;
-    --sciem-sb-active: #163536;
+    /* El sidebar es la superficie más oscura del tema: mismo tono y
+       saturación que bg-app, solo más oscuro, sin tinte cian. Su texto
+       usa los mismos tokens que el contenido; el único acento fuerte es
+       el ítem activo (relleno de marca). */
+    --sciem-sb-bg: #0C100F;
+    --sciem-sb-border: #192220;
+    --sciem-sb-text: var(--sciem-text);
+    --sciem-sb-sub: var(--sciem-muted);
+    --sciem-sb-group: var(--sciem-subtle);
+    --sciem-sb-divider: #212C2A;
+    --sciem-sb-hover: #171F1D;
+    --sciem-sb-active: #1F2927;
+    --sciem-sb-focus: var(--sciem-brand-fg);
 
     --sciem-focus: #4B7B7B;
 
@@ -285,12 +299,12 @@
   /* Sidebar de shadcn */
   --sidebar: var(--sciem-sb-bg);
   --sidebar-foreground: var(--sciem-sb-text);
-  --sidebar-primary: var(--sciem-accent);
-  --sidebar-primary-foreground: var(--sciem-on-accent);
+  --sidebar-primary: var(--sciem-brand);
+  --sidebar-primary-foreground: var(--sciem-on-solid);
   --sidebar-accent: var(--sciem-sb-active);
   --sidebar-accent-foreground: var(--sciem-on-solid);
   --sidebar-border: var(--sciem-sb-border);
-  --sidebar-ring: var(--sciem-accent);
+  --sidebar-ring: var(--sciem-sb-focus);
 }
 
 /* ---------- 3. Exposición a Tailwind 4 ---------- */
@@ -314,6 +328,7 @@
   --color-surface: var(--sciem-surface);
   --color-sunken: var(--sciem-sunken);
   --color-raised: var(--sciem-raised);
+  --color-field: var(--sciem-field-bg);
   --color-border-soft: var(--sciem-border);
   --color-border-strong: var(--sciem-border-strong);
 
@@ -430,6 +445,40 @@
 
   html {
     @apply font-sans;
+  }
+
+  /*
+   * Barras de desplazamiento finas en ambos temas. Chromium y Safari usan los
+   * pseudoelementos (permiten el color de hover del pulgar); donde no existen
+   * (Firefox) se usan las propiedades estándar. Si Chromium recibiera
+   * `scrollbar-color`, ignoraría los pseudoelementos y perdería el hover.
+   */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: var(--sciem-scrollbar-track);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--sciem-scrollbar-thumb);
+    background-clip: padding-box;
+    border: 1px solid transparent;
+    border-radius: var(--sciem-radius-pill);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--sciem-scrollbar-thumb-hover);
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--sciem-scrollbar-thumb) var(--sciem-scrollbar-track);
+    }
   }
 
   body {

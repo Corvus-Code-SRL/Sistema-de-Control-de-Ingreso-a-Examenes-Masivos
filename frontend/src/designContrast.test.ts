@@ -54,6 +54,10 @@ const PAIRS: [string, string, number][] = [
   ['sb-sub', 'sb-bg', TEXT],
   ['sb-group', 'sb-bg', TEXT],
   ['on-solid', 'sb-active', TEXT],
+  ['sb-focus', 'sb-bg', UI],
+  ['text', 'field-bg', TEXT],
+  ['muted', 'field-bg', TEXT],
+  ['input-border', 'field-bg', UI],
   ['focus', 'bg-app', UI],
   ['focus', 'surface', UI],
   ['focus', 'raised', UI],
@@ -64,6 +68,22 @@ const PAIRS: [string, string, number][] = [
   ['ok', 'surface', UI],
   ['brand', 'surface', UI],
 ]
+
+/** Tono (grados) y saturación HSL de un color hex. */
+function hsl(hex: string): { hue: number; saturation: number } {
+  const [r, g, b] = [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16) / 255)
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const delta = max - min
+  const lightness = (max + min) / 2
+
+  if (delta === 0) return { hue: 0, saturation: 0 }
+
+  const saturation = lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min)
+  const sector = max === r ? (g - b) / delta + (g < b ? 6 : 0) : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4
+
+  return { hue: sector * 60, saturation }
+}
 
 const token = (theme: (typeof THEMES)[number], name: string) => color(theme, `--sciem-${name}`)
 
@@ -83,6 +103,13 @@ describe.each(THEMES)('contrastes del tema %s', (theme) => {
 describe('tema oscuro', () => {
   it('el sidebar es la superficie más oscura', () => {
     expect(luminance(token('dark', 'sb-bg'))).toBeLessThan(luminance(token('dark', 'bg-app')))
+  })
+
+  it('el sidebar pertenece a la misma familia neutra que bg-app, sin tinte cian', () => {
+    const [sidebar, app] = [token('dark', 'sb-bg'), token('dark', 'bg-app')].map(hsl)
+
+    expect(Math.abs(sidebar.hue - app.hue)).toBeLessThanOrEqual(10)
+    expect(sidebar.saturation).toBeLessThanOrEqual(app.saturation + 0.05)
   })
 
   it('el hover sutil (muted-bg) es más claro que la superficie y que las capas flotantes', () => {
