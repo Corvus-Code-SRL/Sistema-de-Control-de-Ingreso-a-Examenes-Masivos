@@ -32,7 +32,7 @@ export function ExamAmbientesForm({ classrooms, selectedRoomIds, error, updateFo
               const selected = selectedRoomIds.includes(room.id_ambiente)
               return (
                 <label key={room.id_ambiente} className={`flex h-16 min-w-0 cursor-pointer items-center gap-2 rounded-lg border-2 p-2 transition-colors ${
-                  selected ? 'border-primary bg-brand-soft' : 'border-border hover:border-primary hover:bg-sunken'
+                  selected ? 'border-primary bg-brand-soft' : 'border-border hover:border-primary hover:bg-muted'
                 }`}>
                   <input
                     type="checkbox"
@@ -44,7 +44,7 @@ export function ExamAmbientesForm({ classrooms, selectedRoomIds, error, updateFo
                     })}
                     className="size-4 shrink-0 rounded border-border-strong accent-brand"
                   />
-                  <DoorOpen aria-hidden="true" className="size-7 shrink-0 rounded-lg bg-brand-soft p-1.5 text-brand" />
+                  <DoorOpen aria-hidden="true" className="size-7 shrink-0 rounded-lg bg-brand-soft p-1.5 text-brand-fg" />
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-foreground">Aula {room.nro_aula}</span>
                     {room.ubicacion && <span className="mt-0.5 block truncate text-xs text-muted-foreground" title={room.ubicacion}>{room.ubicacion}</span>}

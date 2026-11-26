@@ -423,8 +423,8 @@ export function ExamInProgressPage({ extensions }: ExamInProgressPageProps) {
                     className={[
                       'shrink-0 rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
                       selected
-                        ? 'border-brand-deep bg-brand-deep text-white'
-                        : 'bg-background text-foreground hover:bg-sunken',
+                        ? 'border-brand-strong bg-brand-strong text-on-solid'
+                        : 'bg-background text-foreground hover:bg-muted',
                     ].join(' ')}
                   >
                     {option.label}

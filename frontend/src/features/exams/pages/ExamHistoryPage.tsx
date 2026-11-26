@@ -87,7 +87,7 @@ export function ExamHistoryPage() {
         <div className="divide-y md:hidden">{exams.map((exam) => <div key={exam.id_examen} className="space-y-3 p-4">
           <div className="flex items-start justify-between gap-3">
             <div><p className="font-semibold">{exam.nombre_examen}</p><p className="text-sm text-muted-foreground">{exam.materia ?? '—'} · {formatDate(exam.fecha)}</p></div>
-            <Link to={`/historial/${exam.id_examen}${query ? `?${query}` : ''}`} aria-label={`Ver resumen de ${exam.nombre_examen}`} className="rounded-md border border-border p-2 text-brand"><ChevronRight className="size-4" /></Link>
+            <Link to={`/historial/${exam.id_examen}${query ? `?${query}` : ''}`} aria-label={`Ver resumen de ${exam.nombre_examen}`} className="rounded-md border border-border p-2 text-brand-fg"><ChevronRight className="size-4" /></Link>
           </div>
           <p className="text-sm text-muted-foreground">Asistencia <strong className="text-foreground">{exam.presentes} / {exam.esperados}</strong><span className="mx-2">·</span>Incidencias <strong className="text-foreground">{exam.incidencias}</strong></p>
         </div>)}</div>
