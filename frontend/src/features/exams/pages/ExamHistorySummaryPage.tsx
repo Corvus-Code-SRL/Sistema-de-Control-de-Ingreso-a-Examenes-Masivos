@@ -19,8 +19,8 @@ function formatDate(value: string): string {
 }
 
 const eventStyles = {
-  apertura: { Icon: DoorOpen, color: 'bg-accent-brand text-on-accent' },
-  cierre_ingreso: { Icon: DoorClosed, color: 'bg-accent-brand text-on-accent' },
+  apertura: { Icon: DoorOpen, color: 'bg-brand-soft text-brand-deep' },
+  cierre_ingreso: { Icon: DoorClosed, color: 'bg-brand-soft text-brand-deep' },
   inicio: { Icon: Play, color: 'bg-brand text-on-solid' },
   retraso: { Icon: Clock3, color: 'bg-accent-brand text-on-accent' },
   incidencia: { Icon: Flag, color: 'bg-danger-solid text-on-solid' },
