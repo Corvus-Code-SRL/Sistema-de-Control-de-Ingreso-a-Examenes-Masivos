@@ -15,7 +15,10 @@ function menuOf(role: RoleName) {
 
 describe('NAVIGATION', () => {
   it('los ids de secciones y entradas no se repiten', () => {
-    const ids = NAVIGATION.flatMap((section) => [section.id, ...section.items.map((item) => item.id)])
+    const ids = NAVIGATION.flatMap((section) => [
+      section.id,
+      ...section.items.map((item) => item.id)
+    ])
 
     expect(new Set(ids).size).toBe(ids.length)
   })
@@ -77,7 +80,7 @@ describe('menú por capacidades', () => {
         label: 'Historial, auditoría y reportes',
         items: [
           ['Bitácora', '/bitacora'],
-          ['Generar reporte de bitácora', undefined],
+          ['Generar reporte de bitácora', '/reportes/bitacora'],
           ['Reporte intentos a exámenes ajenos', '/reportes/intentos']
         ]
       }
@@ -261,7 +264,9 @@ describe('menú por capacidades', () => {
       expect(items).toContainEqual(['Registrar situación excepcional', '/situacion-excepcional'])
     }
 
-    const adminEntries = menuOf('Administrador').flatMap((section) => section.items.map(([label]) => label))
+    const adminEntries = menuOf('Administrador').flatMap((section) =>
+      section.items.map(([label]) => label)
+    )
 
     expect(adminEntries).not.toContain('Registrar situación excepcional')
   })
@@ -295,7 +300,10 @@ describe('menú por capacidades', () => {
       (item) => item.to === '/situacion-excepcional'
     )
 
-    expect(items.map((item) => item.capability)).toEqual(['situaciones.registrar', 'situaciones.registrar'])
+    expect(items.map((item) => item.capability)).toEqual([
+      'situaciones.registrar',
+      'situaciones.registrar'
+    ])
   })
 
   it('«Reportar incidencia» es visible para Docente, Invitado y Auxiliar, no para el Administrador', () => {
@@ -305,22 +313,33 @@ describe('menú por capacidades', () => {
       expect(items).toContainEqual(['Reportar incidencia', '/reportar-incidencia'])
     }
 
-    const adminEntries = menuOf('Administrador').flatMap((section) => section.items.map(([label]) => label))
+    const adminEntries = menuOf('Administrador').flatMap((section) =>
+      section.items.map(([label]) => label)
+    )
 
     expect(adminEntries).not.toContain('Reportar incidencia')
   })
 
   it('«Reportar incidencia» no depende de un examen: solo de incidencias.registrar', () => {
-    const items = NAVIGATION.flatMap((section) => section.items).filter((item) => item.to === '/reportar-incidencia')
+    const items = NAVIGATION.flatMap((section) => section.items).filter(
+      (item) => item.to === '/reportar-incidencia'
+    )
 
-    expect(items.map((item) => item.capability)).toEqual(['incidencias.registrar', 'incidencias.registrar'])
+    expect(items.map((item) => item.capability)).toEqual([
+      'incidencias.registrar',
+      'incidencias.registrar'
+    ])
   })
 
   it.each(['Docente', 'Invitado', 'Auxiliar'] as const)(
     '%s con incidencias.registrar pero sin situaciones.registrar sigue viendo «Reportar incidencia»',
     (role) => {
-      const capabilities = capabilitiesOf(role).filter((capability) => capability !== 'situaciones.registrar')
-      const items = visibleSections(capabilities).flatMap((section) => section.items.map((item) => item.label))
+      const capabilities = capabilitiesOf(role).filter(
+        (capability) => capability !== 'situaciones.registrar'
+      )
+      const items = visibleSections(capabilities).flatMap((section) =>
+        section.items.map((item) => item.label)
+      )
 
       expect(capabilities).toContain('incidencias.registrar')
       expect(items).toContain('Reportar incidencia')
@@ -329,7 +348,10 @@ describe('menú por capacidades', () => {
   )
 
   it('«Bitácora» es visible solo para el Administrador (CA-11)', () => {
-    expect(menuOf('Administrador').flatMap((section) => section.items)).toContainEqual(['Bitácora', '/bitacora'])
+    expect(menuOf('Administrador').flatMap((section) => section.items)).toContainEqual([
+      'Bitácora',
+      '/bitacora'
+    ])
 
     for (const role of ['Docente', 'Invitado', 'Auxiliar'] as const) {
       const labels = menuOf(role).flatMap((section) => section.items.map(([label]) => label))
@@ -339,21 +361,18 @@ describe('menú por capacidades', () => {
   })
 
   it('«Bitácora» exige bitacora.consultar y no la capacidad genérica de administración', () => {
-    const items = NAVIGATION.flatMap((section) => section.items).filter((item) => item.to === '/bitacora')
+    const items = NAVIGATION.flatMap((section) => section.items).filter(
+      (item) => item.to === '/bitacora'
+    )
 
     expect(items.map((item) => item.capability)).toEqual(['bitacora.consultar'])
   })
 
   it('docente y auxiliar pueden abrir En curso', () => {
     for (const role of ['Docente', 'Auxiliar'] as const) {
-      const items = menuOf(role).flatMap(
-        (section) => section.items
-      );
+      const items = menuOf(role).flatMap((section) => section.items)
 
-      expect(items).toContainEqual([
-        'En curso',
-        '/examenes/en-curso',
-      ]);
+      expect(items).toContainEqual(['En curso', '/examenes/en-curso'])
     }
-  });
+  })
 })
