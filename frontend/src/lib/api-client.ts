@@ -340,7 +340,7 @@ function toRequestBody(body: unknown): BodyInit | undefined {
 }
 
 function buildUrl(path: string, query?: Query): string {
-  const url = new URL(`${env.apiUrl}${path}`)
+  const url = new URL(`${env.apiUrl}${path}`, window.location.origin)
 
   Object.entries(query ?? {}).forEach(([key, value]) => {
     if (value !== undefined) {
