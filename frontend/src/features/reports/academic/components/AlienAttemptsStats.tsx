@@ -22,7 +22,7 @@ export function AlienAttemptsStats({ stats }: AlienAttemptsStatsProps) {
       </Card>
       <Card className="p-4" data-testid="stat-cr">
         <p className="text-xs font-medium text-muted-foreground">Ya en la Central de Riesgo</p>
-        <p className={cn('sciem-tnum mt-1 text-2xl font-bold', values.enCentralRiesgo > 0 && 'text-[color:var(--danger)]')}>
+        <p className={cn('sciem-tnum mt-1 text-2xl font-bold', values.enCentralRiesgo > 0 && 'text-danger')}>
             {values.enCentralRiesgo}
         </p>
       </Card>

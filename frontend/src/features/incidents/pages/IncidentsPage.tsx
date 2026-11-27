@@ -224,7 +224,7 @@ function Tabs({ filter, onChange, totalPendientes, totalRevisadas }: TabsProps) 
             aria-selected={isActive}
             onClick={() => onChange(tab.value)}
             className={`relative flex h-10 shrink-0 items-center gap-2 px-3.5 text-sm font-medium transition-colors ${
-              isActive ? 'text-brand' : 'text-muted-foreground hover:text-foreground'
+              isActive ? 'text-brand-fg' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             {tab.label}

@@ -19,12 +19,12 @@ function formatDate(value: string): string {
 }
 
 const eventStyles = {
-  apertura: { Icon: DoorOpen, color: 'bg-accent-brand text-brand-deep' },
-  cierre_ingreso: { Icon: DoorClosed, color: 'bg-accent-brand text-brand-deep' },
-  inicio: { Icon: Play, color: 'bg-brand text-white' },
-  retraso: { Icon: Clock3, color: 'bg-accent-brand text-brand-deep' },
-  incidencia: { Icon: Flag, color: 'bg-danger text-white' },
-  fin: { Icon: Check, color: 'bg-neutral-fg text-white' },
+  apertura: { Icon: DoorOpen, color: 'bg-brand-soft text-brand-deep' },
+  cierre_ingreso: { Icon: DoorClosed, color: 'bg-brand-soft text-brand-deep' },
+  inicio: { Icon: Play, color: 'bg-brand text-on-solid' },
+  retraso: { Icon: Clock3, color: 'bg-accent-brand text-on-accent' },
+  incidencia: { Icon: Flag, color: 'bg-danger-solid text-on-solid' },
+  fin: { Icon: Check, color: 'bg-neutral-solid text-on-solid' },
 } as const
 
 export function ExamHistorySummaryPage() {
@@ -54,7 +54,7 @@ export function ExamHistorySummaryPage() {
     {validId && status === 'success' && data && <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <Link to={backTo} className="mb-2 inline-flex items-center gap-1.5 text-sm font-semibold text-brand"><ArrowLeft className="size-4" />Historial</Link>
+          <Link to={backTo} className="mb-2 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-fg"><ArrowLeft className="size-4" />Historial</Link>
           <h1 className="sciem-h1 break-words">{data.nombre_examen} · {data.materia ?? 'Examen'}</h1>
           <div className="mt-2 flex items-center gap-3 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-1 rounded-full bg-neutral-soft px-2.5 py-1 text-xs font-medium text-neutral-fg"><Check className="size-3" />Finalizado</span>

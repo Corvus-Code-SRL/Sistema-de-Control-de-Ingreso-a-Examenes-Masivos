@@ -158,7 +158,7 @@ export function RegistrarGrupoForm({
               disabled={isSubmitting}
               aria-invalid={Boolean(numGrupoError)}
               onChange={(event) => setNumGrupo(event.target.value)}
-              className={`h-8.5 px-3 py-1.5 text-xs bg-card text-foreground placeholder:text-muted-foreground/60 ${
+              className={`h-8.5 px-3 py-1.5 text-xs bg-field text-foreground placeholder:text-muted-foreground/60 ${
                 numGrupoError
                   ? 'border-danger-fg bg-danger-soft/20 focus-visible:ring-danger-fg'
                   : 'border-input'
@@ -188,7 +188,7 @@ export function RegistrarGrupoForm({
               <SelectTrigger
                 id="id_periodo"
                 aria-invalid={Boolean(periodoError)}
-                className={`w-full h-8.5 py-1.5 text-foreground text-xs bg-card ${
+                className={`w-full h-8.5 py-1.5 text-foreground text-xs bg-field ${
                   periodoError
                     ? 'border-danger-fg bg-danger-soft/20 focus:ring-danger-fg'
                     : 'border-input'

@@ -33,7 +33,7 @@ export function SuccessToast({ message, onDismiss }: SuccessToastProps) {
   return (
     <div
       aria-live="polite"
-      className="fixed top-20 right-4 z-40 flex w-[380px] max-w-[calc(100vw-2rem)] items-start gap-3 rounded-lg border border-l-4 border-border-soft border-l-ok bg-surface p-3.5 shadow-[var(--shadow-lg)] animate-in fade-in slide-in-from-top-4 duration-300"
+      className="fixed top-20 right-4 z-40 flex w-[380px] max-w-[calc(100vw-2rem)] items-start gap-3 rounded-lg border border-l-4 border-border-soft border-l-ok bg-surface p-3.5 shadow-overlay animate-in fade-in slide-in-from-top-4 duration-300"
     >
       <CheckCircle aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-ok" />
       <div className="flex grow flex-col">

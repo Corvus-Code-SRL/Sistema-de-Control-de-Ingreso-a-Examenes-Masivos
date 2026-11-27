@@ -82,7 +82,7 @@ export function ExceptionalStudentWorkspace({ exam, onExamChanged }: Exceptional
   return (
     <div className="space-y-4">
       {flow.success && (
-        <p role="status" className="text-sm font-medium text-brand">
+        <p role="status" className="text-sm font-medium text-brand-fg">
           {flow.success}
         </p>
       )}

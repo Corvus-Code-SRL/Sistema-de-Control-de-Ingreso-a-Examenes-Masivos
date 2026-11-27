@@ -136,7 +136,7 @@ function RoleAssignment({ account, onCancel, onAssigned }: RoleAssignmentProps) 
         >
           <span className="text-muted-foreground">{roleLabel(currentRole.nombre_rol)}</span>
           <ArrowRightLeft aria-hidden="true" className="size-4 text-subtle" />
-          <span className="text-brand">{roleLabel(selectedRole.nombre_rol)}</span>
+          <span className="text-brand-fg">{roleLabel(selectedRole.nombre_rol)}</span>
         </div>
 
         {assignments?.tiene_activas && (
@@ -185,7 +185,7 @@ function RoleAssignment({ account, onCancel, onAssigned }: RoleAssignmentProps) 
       <div className="flex items-center gap-3 rounded-lg border border-border-soft bg-sunken p-3">
         <span
           aria-hidden="true"
-          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-soft font-semibold text-brand"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-soft font-semibold text-brand-fg"
         >
           {accountInitials(account)}
         </span>
