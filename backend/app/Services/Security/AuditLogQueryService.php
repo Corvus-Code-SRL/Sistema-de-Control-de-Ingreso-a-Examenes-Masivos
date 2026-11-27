@@ -4,6 +4,7 @@ namespace App\Services\Security;
 
 use App\Models\Action;
 use App\Models\AuditLog;
+use App\Models\Session;
 use App\Models\User;
 use App\Support\Audit\AuditLogChanges;
 use App\Support\Audit\AuditLogSanitizer;
@@ -99,6 +100,7 @@ class AuditLogQueryService
 
         $entry = $this->present($log, $this->peopleFor([$log]));
         $entry['cambios'] = $this->changes->between($log->antiguo_valor, $log->nuevo_valor);
+        $entry['sesion'] = $this->sessionDetail($log->sesion);
         $entry['docente_examen'] = $entry['automatico'] ? $this->personOf($log->usuario) : null;
 
         return $entry;
@@ -318,6 +320,26 @@ class AuditLogQueryService
                 'ids' => $ids,
             ],
             'automatico' => $kind === 'automatico',
+            'id_sesion' => $log->id_sesion === null ? null : (int) $log->id_sesion,
+        ];
+    }
+
+    /** @return array<string, mixed>|null el dispositivo desde el que se hizo la operación */
+    private function sessionDetail(?Session $session): ?array
+    {
+        if ($session === null) {
+            return null;
+        }
+
+        $exit = $session->hora_salida;
+
+        return [
+            'id_sesion' => (int) $session->id_sesion,
+            'ip_direccion' => $session->ip_direccion,
+            'agente' => $session->agente,
+            'hora_ingreso' => $session->hora_ingreso->copy()->utc()->toIso8601String(),
+            'hora_salida' => $exit === null ? null : $exit->copy()->utc()->toIso8601String(),
+            'motivo_salida' => $session->motivo_salida,
         ];
     }
 

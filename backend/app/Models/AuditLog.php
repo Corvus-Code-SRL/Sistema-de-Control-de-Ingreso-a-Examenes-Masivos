@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Carbon\Carbon $fecha_hora
  * @property string $tabla_afectada
  * @property string $id_usuario
+ * @property int|null $id_sesion sesión (dispositivo) desde la que se hizo; null sin sesión
  */
 class AuditLog extends Model
 {
@@ -28,6 +29,7 @@ class AuditLog extends Model
         'antiguo_valor' => 'array',
         'nuevo_valor' => 'array',
         'fecha_hora' => 'datetime',
+        'id_sesion' => 'integer',
     ];
 
     protected $fillable = [
@@ -36,7 +38,8 @@ class AuditLog extends Model
         'nuevo_valor',
         'fecha_hora',
         'tabla_afectada',
-        'id_usuario'
+        'id_usuario',
+        'id_sesion',
     ];
 
     public function accion(): BelongsTo
@@ -47,5 +50,10 @@ class AuditLog extends Model
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(User::class, 'id_usuario', 'id_usuario');
+    }
+
+    public function sesion(): BelongsTo
+    {
+        return $this->belongsTo(Session::class, 'id_sesion', 'id_sesion');
     }
 }

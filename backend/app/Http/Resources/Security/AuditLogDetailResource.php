@@ -6,7 +6,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Detalle de una operación de la bitácora: la fila del listado más el registro afectado completo y los cambios
- * campo por campo. Los campos ocultos viajan como {campo, oculto: true}, sin valores.
+ * campo por campo. Los campos ocultos viajan como {campo, oculto: true}, sin valores. `sesion` describe el
+ * dispositivo desde el que se hizo (IP y navegador), o es null si la operación no tuvo sesión.
  */
 class AuditLogDetailResource extends JsonResource
 {
@@ -24,6 +25,8 @@ class AuditLogDetailResource extends JsonResource
             'automatico' => $entry['automatico'],
             'docente_examen' => $entry['docente_examen'],
             'cambios' => $entry['cambios'],
+            'id_sesion' => $entry['id_sesion'],
+            'sesion' => $entry['sesion'],
         ];
     }
 }

@@ -26,6 +26,8 @@ class AuditLogResource extends JsonResource
                 'descripcion' => $entry['registro']['descripcion'],
             ],
             'automatico' => $entry['automatico'],
+            // Sesión (dispositivo) desde la que se hizo; null en tareas automáticas y seeders.
+            'id_sesion' => $entry['id_sesion'],
         ];
     }
 }
