@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { CalendarX2, Lock, Upload } from 'lucide-react'
 
-import { AppShell } from '@/components/layout/AppShell'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -9,12 +8,16 @@ import { FormSelect } from '@/components/common/FormSelect'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
-import { PageHeader } from '@/components/common/PageHeader'
 
 import { useEligibleList } from '../hooks/useEligibleList'
 import { EligibleListCurrentTable } from '../components/EligibleListCurrentTable'
+import { EligibleListShell, ELIGIBLE_LIST_TITLE } from '../components/EligibleListShell'
 import { EligibleListUploadFlow } from '../components/EligibleListUploadFlow'
 import { formatDate, formatTime, readOnlyMessage } from '../utils/eligibleListUtils'
+
+const SELECT_SUBTITLE = 'Seleccione un examen y cargue el archivo con los estudiantes habilitados.'
+const REPLACE_SUBTITLE =
+  'Cargue el archivo con los estudiantes habilitados: quienes no figuren en él quedarán como no habilitados.'
 
 export function ExamEligibleListPage() {
   const eligible = useEligibleList()
@@ -44,59 +47,36 @@ export function ExamEligibleListPage() {
   // El archivo reemplaza la lista actual. El servidor lo hace en una sola transacción; aquí solo se recarga.
   const replacesCurrentList = noHabilitadosCount > 0
 
+  const readOnly =
+    eligible.listData && !eligible.listData.editable ? readOnlyMessage(eligible.listData.estado) : null
+
   const handleReplaced = (): void => {
     void eligible.reloadList()
   }
 
   if (eligible.isLoadingExams) {
     return (
-      <AppShell
-        mobileTitle="Cargar lista de habilitados"
-        breadcrumbs={[
-          { label: 'Preparación de exámenes' },
-          { label: 'Cargar lista de habilitados' },
-        ]}
-      >
+      <EligibleListShell>
         <Card className="p-0">
           <LoadingState rows={3} label="Cargando exámenes" />
         </Card>
-      </AppShell>
+      </EligibleListShell>
     )
   }
 
   if (eligible.error) {
     return (
-      <AppShell
-        mobileTitle="Cargar lista de habilitados"
-        breadcrumbs={[
-          { label: 'Preparación de exámenes' },
-          { label: 'Cargar lista de habilitados' },
-        ]}
-      >
-        <PageHeader
-          title="Cargar lista de habilitados"
-          subtitle="Seleccione un examen y cargue el archivo con los estudiantes habilitados."
-        />
+      <EligibleListShell subtitle={SELECT_SUBTITLE}>
         <Card className="p-0">
           <ErrorState error={eligible.error} onRetry={() => eligible.reloadExams()} />
         </Card>
-      </AppShell>
+      </EligibleListShell>
     )
   }
 
   if (eligible.exams.length === 0) {
     return (
-      <AppShell
-        mobileTitle="Cargar lista de habilitados"
-        breadcrumbs={[
-          { label: 'Preparación de exámenes' },
-          { label: 'Cargar lista de habilitados' },
-        ]}
-      >
-        <PageHeader
-          title="Cargar lista de habilitados"
-          subtitle="Seleccione un examen y cargue el archivo con los estudiantes habilitados."
-        />
+      <EligibleListShell subtitle={SELECT_SUBTITLE}>
         <Card className="p-0">
           <EmptyState
             icon={CalendarX2}
@@ -104,23 +84,12 @@ export function ExamEligibleListPage() {
             description="Cuando registre un examen, podrá cargar la lista de habilitados desde aquí."
           />
         </Card>
-      </AppShell>
+      </EligibleListShell>
     )
   }
 
   return (
-    <AppShell
-      mobileTitle="Cargar lista de habilitados"
-      breadcrumbs={[
-        { label: 'Preparación de exámenes' },
-        { label: 'Cargar lista de habilitados' },
-      ]}
-    >
-      <PageHeader
-        title="Cargar lista de habilitados"
-        subtitle="Cargue el archivo con los estudiantes habilitados: quienes no figuren en él quedarán como no habilitados."
-      />
-
+    <EligibleListShell subtitle={REPLACE_SUBTITLE}>
       <Card className="p-4">
         <div className="w-full space-y-2 sm:max-w-xl">
           <label htmlFor="exam-selector" className="sciem-label">
@@ -177,17 +146,13 @@ export function ExamEligibleListPage() {
 
       {!eligible.isLoadingList && eligible.listData && (
         <>
-          {!eligible.listData.editable &&
-            (() => {
-              const msg = readOnlyMessage(eligible.listData.estado)
-              return (
-                <Alert className="border-info-border bg-info-soft text-info">
-                  <Lock aria-hidden="true" />
-                  <AlertTitle>{msg.title}</AlertTitle>
-                  <AlertDescription>{msg.description}</AlertDescription>
-                </Alert>
-              )
-            })()}
+          {readOnly && (
+            <Alert className="border-info-border bg-info-soft text-info">
+              <Lock aria-hidden="true" />
+              <AlertTitle>{readOnly.title}</AlertTitle>
+              <AlertDescription>{readOnly.description}</AlertDescription>
+            </Alert>
+          )}
 
           <EligibleListCurrentTable
             students={students}
@@ -198,7 +163,7 @@ export function ExamEligibleListPage() {
                 disabled={!eligible.listData.editable}
               >
                 <Upload aria-hidden="true" className="size-4" />
-                Cargar lista de habilitados
+                {ELIGIBLE_LIST_TITLE}
               </Button>
             }
           />
@@ -212,8 +177,7 @@ export function ExamEligibleListPage() {
         onClose={() => setUploadOpen(false)}
         onReplaced={handleReplaced}
       />
-
-    </AppShell>
+    </EligibleListShell>
   )
 }
 
