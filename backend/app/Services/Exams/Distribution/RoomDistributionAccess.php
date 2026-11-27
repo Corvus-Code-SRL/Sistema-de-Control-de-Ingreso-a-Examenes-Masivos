@@ -58,7 +58,7 @@ class RoomDistributionAccess
 
     public function assertTeacher(string $teacherId): void
     {
-        if (! $this->roles->isTeacher($teacherId)) {
+        if (! $this->roles->canUse($teacherId, 'room_distribution')) {
             throw new AuthorizationException(DistributionMessages::NO_PERMISSION);
         }
     }

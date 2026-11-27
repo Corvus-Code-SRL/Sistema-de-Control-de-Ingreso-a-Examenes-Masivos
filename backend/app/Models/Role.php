@@ -48,6 +48,6 @@ class Role extends Model
     {
         return $this->belongsToMany(Permission::class, 'permiso_rol', 'id_rol', 'id_permiso')
                     ->using(RolePermission::class)
-                    ->withPivot('estado');
+                    ->withPivot('estado', 'fecha_inicio', 'fecha_fin');
     }
 }

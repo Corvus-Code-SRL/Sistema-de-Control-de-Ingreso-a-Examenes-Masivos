@@ -136,7 +136,7 @@ function SituationWorkspace({ examId, roomId, search, page, onRoom, onSearch, on
                 <p className="font-medium">{student.nombre_completo}</p>
                 <p className="text-sm text-muted-foreground">{student.cod_sis} · Ambiente {student.ambiente.nro_aula}</p>
                 <p className="text-sm">{student.estado_ingreso === 'CON_RETRASO' ? 'Presente con retraso' : 'Presente'}</p>
-                {change && <p className="text-sm text-brand">Cambio desde {change.ambiente_origen.nro_aula} · {formatSituationTime(change.registrado_en)}</p>}
+                {change && <p className="text-sm text-brand-fg">Cambio desde {change.ambiente_origen.nro_aula} · {formatSituationTime(change.registrado_en)}</p>}
                 {student.situaciones.identidad_observada && <p className="text-sm text-warn-fg">Identidad observada</p>}
               </div>
               <Button type="button" variant="outline" disabled={!canRegister || opening}

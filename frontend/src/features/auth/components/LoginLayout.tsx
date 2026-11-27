@@ -35,25 +35,25 @@ function BrandPane() {
   return (
     <aside
       className={cn(
-        'flex flex-none flex-col bg-brand-deep px-5 pt-7 pb-6 text-sidebar-foreground',
+        'flex flex-none flex-col bg-sidebar px-5 pt-7 pb-6 text-sidebar-foreground',
         'md:min-h-dvh md:w-[360px] md:justify-between md:p-9 xl:w-[560px] xl:p-14'
       )}
     >
       <div className="flex items-center gap-3.5">
         <span
           aria-hidden="true"
-          className="font-brand flex size-12 flex-none items-center justify-center rounded-xl bg-brand text-[22px] font-bold text-white"
+          className="font-brand flex size-12 flex-none items-center justify-center rounded-xl bg-brand text-[22px] font-bold text-on-solid"
         >
           S
         </span>
         <div>
-          <p className="font-brand text-[22px] leading-[1.1] font-bold tracking-[.02em] text-white">SCIEM</p>
+          <p className="font-brand text-[22px] leading-[1.1] font-bold tracking-[.02em] text-on-solid">SCIEM</p>
           <p className="mt-[3px] text-[13px] leading-[1.3] text-sb-sub">Control de Ingreso a Exámenes</p>
         </div>
       </div>
 
       <div className="hidden flex-col gap-3.5 md:flex">
-        <p className="font-brand text-[26px] leading-[34px] font-semibold tracking-[-.01em] text-white xl:text-[32px] xl:leading-10">
+        <p className="font-brand text-[26px] leading-[34px] font-semibold tracking-[-.01em] text-on-solid xl:text-[32px] xl:leading-10">
           Control de ingreso a exámenes masivos
         </p>
         <p className="text-[15px] leading-6 text-sb-sub">

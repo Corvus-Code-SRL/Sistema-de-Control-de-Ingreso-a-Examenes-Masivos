@@ -2224,3 +2224,22 @@ BEGIN
                 FOREIGN KEY (id_ambiente_planificado) REFERENCES public.ambiente(id_ambiente);
     END IF;
 END $$;
+
+-- Versión 23: vigencia de permisos por rol (RNF-01)
+--             (2026_11_26_000001_add_vigencia_to_permiso_rol)
+--   * permiso_rol guarda desde y hasta cuándo un rol tuvo un permiso, como usuario_rol con los roles.
+--     Quitar un permiso cierra la fila (fecha_fin); nunca se borra. Una sola fila abierta por par.
+--   * El rol de cada operación de la bitácora se calcula con log.fecha_hora y las fechas de usuario_rol.
+--   * permiso, permiso_rol, ui y ui_permiso los llena RolePermissionSeeder desde config/sciem.php.
+
+ALTER TABLE public.permiso_rol DROP CONSTRAINT pk_permiso_rol;
+
+ALTER TABLE public.permiso_rol
+    ADD COLUMN fecha_inicio timestamptz DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    ADD COLUMN fecha_fin timestamptz,
+    ADD CONSTRAINT pk_permiso_rol PRIMARY KEY (id_permiso, id_rol, fecha_inicio),
+    ADD CONSTRAINT chk_permiso_rol_fechas CHECK (fecha_fin IS NULL OR fecha_fin >= fecha_inicio);
+
+CREATE UNIQUE INDEX unq_permiso_rol_vigente
+    ON public.permiso_rol (id_permiso, id_rol)
+    WHERE fecha_fin IS NULL;

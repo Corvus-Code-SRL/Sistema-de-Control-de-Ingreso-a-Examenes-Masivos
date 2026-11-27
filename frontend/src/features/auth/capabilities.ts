@@ -32,6 +32,8 @@ export type AccessFeature =
   | 'risk_rectify'
   | 'risk_rectify_confirm'
   | 'exam_timer'
+  | 'eligible_list'
+  | 'room_distribution'
 
 /**
  * Qué roles ejercen cada función. El Invitado (docente sin código SIS) ejerce la docencia, habilita
@@ -55,9 +57,11 @@ export const ACCESS_BY_FEATURE: Record<AccessFeature, readonly RoleName[]> = {
   risk_rectify: ['Administrador'],
   risk_rectify_confirm: ['Docente', 'Invitado'],
   exam_timer: ['Docente', 'Invitado'],
+  eligible_list: ['Docente', 'Invitado'],
+  room_distribution: ['Docente', 'Invitado'],
 }
 
-const CAPABILITIES_BY_FEATURE = {
+export const CAPABILITIES_BY_FEATURE = {
   teaching: [
     'grupos.gestionar',
     'examenes.gestionar',
@@ -76,9 +80,11 @@ const CAPABILITIES_BY_FEATURE = {
   risk_rectify: ['riesgo.rectificar'],
   risk_rectify_confirm: ['riesgo.confirmar_rectificacion'],
   exam_timer: ['examenes.controlar-tiempo'],
+  eligible_list: ['examenes.cargar-habilitados'],
+  room_distribution: ['examenes.distribuir-habilitados'],
 } as const
 
-const ROLE_OWN_CAPABILITIES = {
+export const ROLE_OWN_CAPABILITIES = {
   Auxiliar: ['ingreso.operar', 'incidencias.registrar', 'situaciones.registrar', 'asignaciones.consultar'],
   Administrador: ['administracion.gestionar'],
   Docente: [],

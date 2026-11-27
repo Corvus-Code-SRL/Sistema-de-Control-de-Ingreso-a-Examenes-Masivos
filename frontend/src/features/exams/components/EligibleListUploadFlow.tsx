@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { AlertTriangle, CheckCircle2, FileUp, LoaderCircle, Upload, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, FileUp, LoaderCircle, Upload, XCircle } from 'lucide-react'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -19,7 +19,7 @@ import { STORED_REASON_LABELS } from '../types/eligibleList.types'
 interface EligibleListUploadFlowProps {
   open: boolean
   examId: number | null
-  /** La lista ya tiene no habilitados guardados o hay cambios sin guardar que el archivo reemplazaría. */
+  /** La lista ya tiene no habilitados guardados que el archivo reemplazaría. */
   replacesCurrentList: boolean
   onClose: () => void
   /** El servidor ya reemplazó la lista: la página debe descartar sus cambios locales y recargar. */
@@ -76,8 +76,8 @@ export function EligibleListUploadFlow({
       <SheetContent className="w-full sm:max-w-[520px] flex flex-col">
         <SheetHeader className="border-b border-border-soft p-6">
           <SheetTitle className="flex items-center gap-2">
-            <FileUp aria-hidden="true" className="size-5 text-brand" />
-              Importar desde archivo
+            <FileUp aria-hidden="true" className="size-5 text-brand-fg" />
+              Cargar lista de habilitados
           </SheetTitle>
           <SheetDescription>
             Lista de asistencia o de entregas en CSV o XLSX con los códigos SIS.
@@ -102,7 +102,7 @@ export function EligibleListUploadFlow({
                 className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-border-strong
                 bg-sunken p-8 text-center cursor-pointer hover:bg-muted"
               >
-                <span className="flex size-12 items-center justify-center rounded-full bg-brand-soft text-brand">
+                <span className="flex size-12 items-center justify-center rounded-full bg-brand-soft text-brand-fg">
                   <Upload aria-hidden="true" className="size-6" />
                 </span>
                 <span className="sciem-label">Arrastre el archivo aquí o elija uno</span>
@@ -114,16 +114,19 @@ export function EligibleListUploadFlow({
                     Elegir archivo
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                ¿No tiene el formato?{' '}
+              <div className="space-y-1">
                 <a
                   href="/plantillas/nomina-plantilla.csv"
                   download="nomina-plantilla.csv"
-                  className="font-medium text-brand underline-offset-2 hover:underline"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-fg underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
+                  <Download aria-hidden="true" className="size-4" />
                   Descargar plantilla
                 </a>
-              </p>
+                <p className="text-xs text-muted-foreground">
+                  Se compara por código SIS; los demás datos son referenciales.
+                </p>
+              </div>
               <p className="text-xs text-muted-foreground">Ningún dato cambia hasta confirmar.</p>
 
               {upload.errorMessage && (
@@ -137,7 +140,7 @@ export function EligibleListUploadFlow({
 
           {upload.step === 'previewing' && (
             <div className="flex flex-col items-center gap-3 py-12" role="status" aria-live="polite">
-              <LoaderCircle className="size-8 animate-spin text-brand" aria-hidden="true" />
+              <LoaderCircle className="size-8 animate-spin text-brand-fg" aria-hidden="true" />
               <p className="sciem-label">Procesando archivo…</p>
               {upload.file && <p className="sciem-supporting text-muted-foreground truncate max-w-full">{upload.file.name}</p>}
             </div>
@@ -205,7 +208,7 @@ export function EligibleListUploadFlow({
                 <Alert className="border-warn-border bg-warn-soft text-warn-fg">
                   <AlertTriangle aria-hidden="true" />
                   <AlertDescription>
-                    Se reemplazará la lista actual, incluidos los ajustes manuales.
+                    Se reemplazará la lista actual.
                   </AlertDescription>
                 </Alert>
               )}
@@ -234,7 +237,7 @@ export function EligibleListUploadFlow({
 
           {upload.step === 'confirming' && (
             <div className="flex flex-col items-center gap-3 py-12" role="status" aria-live="polite">
-              <LoaderCircle className="size-8 animate-spin text-brand" aria-hidden="true" />
+              <LoaderCircle className="size-8 animate-spin text-brand-fg" aria-hidden="true" />
               <p className="sciem-label">Reemplazando la lista…</p>
             </div>
           )}

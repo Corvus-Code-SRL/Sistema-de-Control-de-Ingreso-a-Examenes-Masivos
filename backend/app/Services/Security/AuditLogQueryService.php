@@ -60,7 +60,7 @@ class AuditLogQueryService
      */
     public function paginate(array $filters): LengthAwarePaginator
     {
-        $query = $this->filteredQuery($filters)
+        $query = $this->withActorRole($this->filteredQuery($filters))
             ->with(self::RELATIONS)
             ->orderByDesc('fecha_hora')
             ->orderByDesc('id_log');
@@ -84,7 +84,7 @@ class AuditLogQueryService
     {
         $log = $id < 1
             ? null
-            : AuditLog::query()
+            : $this->withActorRole(AuditLog::query())
                 ->with(self::RELATIONS)
                 ->find($id);
 
@@ -186,7 +186,7 @@ class AuditLogQueryService
      */
     public function reportRows(array $filters): \Generator
     {
-        $query = $this->filteredQuery($filters)
+        $query = $this->withActorRole($this->filteredQuery($filters))
             ->with(self::RELATIONS)
             ->orderByDesc('fecha_hora')
             ->orderByDesc('id_log');
@@ -198,6 +198,27 @@ class AuditLogQueryService
                 yield $this->present($log, $people);
             }
         }
+    }
+
+    /**
+     * Agrega `rol_autor`: el rol que el autor tenía cuando hizo la operación (RNF-01). No se guarda en
+     * `log`: se busca en usuario_rol la fila cuyo período [fecha_inicio, fecha_fin) contiene log.fecha_hora.
+     * Si en ese instante no tenía rol queda NULL.
+     */
+    private function withActorRole(Builder $query): Builder
+    {
+        return $query->select('log.*')->selectSub(function ($role) {
+            $role->from('usuario_rol as ur')
+                ->join('rol as r', 'r.id_rol', '=', 'ur.id_rol')
+                ->whereColumn('ur.id_usuario', 'log.id_usuario')
+                ->whereColumn('ur.fecha_inicio', '<=', 'log.fecha_hora')
+                ->where(function ($open) {
+                    $open->whereNull('ur.fecha_fin')->orWhereColumn('ur.fecha_fin', '>', 'log.fecha_hora');
+                })
+                ->orderByDesc('ur.fecha_inicio')
+                ->limit(1)
+                ->select('r.nombre_rol');
+        }, 'rol_autor');
     }
 
     private function filterByUser(Builder $query, ?string $search): void
@@ -351,6 +372,8 @@ class AuditLogQueryService
                 'cod_sis' => $actor === null ? null : $actor->cod_sis,
                 'tipo' => $kind,
                 'etiqueta' => $this->actorLabel($kind, $actor),
+                // Con qué rol se hizo (RNF-01), aunque hoy tenga otro.
+                'rol' => $log->rol_autor === null ? null : (string) $log->rol_autor,
             ],
             'accion' => [
                 'codigo' => $code,

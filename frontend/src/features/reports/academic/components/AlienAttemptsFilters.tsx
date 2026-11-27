@@ -95,7 +95,7 @@ export function AlienAttemptsFilters({
       {rangeError && (
         <p
           role="alert"
-          className="text-sm font-medium text-[color:var(--danger-fg)] lg:ml-2 lg:self-end lg:pb-2.5"
+          className="text-sm font-medium text-danger-fg lg:ml-2 lg:self-end lg:pb-2.5"
         >
           {rangeError}
         </p>

@@ -29,7 +29,7 @@ export function CourseHeader({ detail, enrolledCount, enrolledCountFailed = fals
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard label="Inscritos">
-        <p className="sciem-tnum text-2xl font-semibold text-brand">
+        <p className="sciem-tnum text-2xl font-semibold text-brand-fg">
           {counted === null ? (
             <>
               <span aria-hidden="true">…</span>
