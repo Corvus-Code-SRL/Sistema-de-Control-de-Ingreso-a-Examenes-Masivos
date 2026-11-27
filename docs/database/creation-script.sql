@@ -2243,3 +2243,54 @@ ALTER TABLE public.permiso_rol
 CREATE UNIQUE INDEX unq_permiso_rol_vigente
     ON public.permiso_rol (id_permiso, id_rol)
     WHERE fecha_fin IS NULL;
+
+-- Versión 24: registro de sesiones
+--             (2026_11_26_000002_rebuild_sesion_registry)
+--   * Una fila de sesion por cada inicio de sesión correcto (un token de Sanctum), con la IP y el
+--     navegador (User-Agent) del dispositivo. Se quitan pid y num_puerto: eran del proceso de PostgreSQL.
+--   * hora_salida y motivo_salida se llenan juntos al cerrar: CIERRE (la persona salió), EXPIRADA (venció el
+--     token; lo cierra la tarea horaria close-expired-sessions) o REVOCADA (cambio de contraseña o cuenta
+--     deshabilitada). La fila nunca se borra; al borrar el token, id_token queda nulo.
+--   * Las acciones de bitácora INICIO_SESION y CIERRE_SESION no van en el esquema: las siembra ActionSeeder.
+--   * personal_access_tokens no está en este script: la crea Laravel (2019_12_14_000001 y 2026_10_02_000000).
+--     En una base armada solo con este script, esas migraciones deben correr antes que este bloque.
+
+ALTER TABLE public.sesion
+    DROP COLUMN pid,
+    DROP COLUMN num_puerto,
+    ADD COLUMN id_token bigint,
+    ADD COLUMN agente varchar(255),
+    ADD COLUMN hora_salida timestamptz,
+    ADD COLUMN motivo_salida varchar(10);
+
+UPDATE public.sesion SET hora_salida = hora_ingreso, motivo_salida = 'EXPIRADA';
+
+ALTER TABLE public.sesion
+    ADD CONSTRAINT unq_sesion_token UNIQUE (id_token),
+    ADD CONSTRAINT fk_sesion_token
+        FOREIGN KEY (id_token) REFERENCES public.personal_access_tokens(id) ON DELETE SET NULL,
+    ADD CONSTRAINT chk_sesion_motivo_salida
+        CHECK (motivo_salida IN ('CIERRE', 'EXPIRADA', 'REVOCADA')),
+    ADD CONSTRAINT chk_sesion_salida_completa
+        CHECK ((hora_salida IS NULL) = (motivo_salida IS NULL)),
+    ADD CONSTRAINT chk_sesion_horas
+        CHECK (hora_salida IS NULL OR hora_salida >= hora_ingreso);
+
+CREATE INDEX idx_sesion_abierta
+    ON public.sesion (id_usuario)
+    WHERE hora_salida IS NULL;
+
+-- Versión 24 (cont.): sesión en cada operación de la bitácora, forma 2
+--             (2026_11_26_000003_add_id_sesion_to_log)
+--   * log.id_sesion: la sesión (dispositivo) desde la que se hizo la operación. Nulo en tareas programadas,
+--     seeders y comandos. La FK compuesta exige que la sesión exista y sea de la misma cuenta (id_usuario).
+--   * Las filas anteriores quedan sin sesión.
+
+ALTER TABLE public.log
+    ADD COLUMN id_sesion integer,
+    ADD CONSTRAINT fk_log_sesion
+        FOREIGN KEY (id_sesion, id_usuario) REFERENCES public.sesion(id_sesion, id_usuario);
+
+CREATE INDEX idx_log_sesion
+    ON public.log (id_sesion)
+    WHERE id_sesion IS NOT NULL;
