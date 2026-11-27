@@ -31,6 +31,7 @@ describe('AuditLogDetailPanel', () => {
     expect(await within(panel).findByText('Número de grupo')).toBeInTheDocument()
     expect(within(panel).getByText('20/10/2026 10:21')).toBeInTheDocument()
     expect(within(panel).getByText('Marcelo Quiroga Andrade')).toBeInTheDocument()
+    expect(within(panel).getByText('como Docente')).toBeInTheDocument()
     expect(within(panel).getByText('Modificar')).toBeInTheDocument()
     expect(within(panel).getByText('Grupos')).toBeInTheDocument()
     expect(within(panel).getByText('Grupo #7')).toBeInTheDocument()
