@@ -61,6 +61,44 @@ describe('EligibleListCurrentTable', () => {
     expect(screen.queryByText('Álvarez Rojas, Camila')).not.toBeInTheDocument()
   })
 
+  it('no muestra la columna «Motivo» aunque el servidor devuelva un motivo', () => {
+    render(
+      <EligibleListCurrentTable
+        students={[
+          makeStudent({
+            estado_habilitacion: 'NO_HABILITADO',
+            motivo: 'ASISTENCIA_INSUFICIENTE',
+            detalle: 'Faltó a 3 clases',
+          }),
+        ]}
+      />
+    )
+
+    expect(screen.queryByRole('columnheader', { name: 'Motivo' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Asistencia insuficiente')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Faltó a 3 clases/)).not.toBeInTheDocument()
+    expect(screen.getAllByText('No habilitado').length).toBeGreaterThan(0)
+  })
+
+  it('el buscador no coincide con el motivo, solo con nombre y código SIS', async () => {
+    const students = [
+      makeStudent({ id_estudiante: 1, nombre_completo: 'Quispe, Ana', codigo_sis: '202240019' }),
+      makeStudent({
+        id_estudiante: 2,
+        nombre_completo: 'Mamani, Luis',
+        estado_habilitacion: 'NO_HABILITADO',
+        motivo: 'ASISTENCIA_INSUFICIENTE',
+      }),
+    ]
+    const user = userEvent.setup()
+    render(<EligibleListCurrentTable students={students} />)
+
+    await user.type(screen.getByLabelText(/Buscar por nombre o código SIS/i), 'asistencia')
+
+    expect(screen.queryByText('Mamani, Luis')).not.toBeInTheDocument()
+    expect(screen.getByText('No hay estudiantes que coincidan con los filtros.')).toBeInTheDocument()
+  })
+
   it('no muestra casillas de selección', () => {
     render(<EligibleListCurrentTable students={[makeStudent()]} />)
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()

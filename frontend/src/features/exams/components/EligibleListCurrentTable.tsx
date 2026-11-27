@@ -10,7 +10,7 @@ import type {
   EligibilityFilter,
   EligibilityStatus,
 } from '../types/eligibleList.types'
-import { eligibilityLabel, motivoLabel, normalizeText } from '../utils/eligibleListUtils'
+import { eligibilityLabel, normalizeText } from '../utils/eligibleListUtils'
 
 interface EligibleListCurrentTableProps {
   students: EligibleStudent[]
@@ -94,7 +94,6 @@ export function EligibleListCurrentTable({ students, toolbar }: EligibleListCurr
               <StickyHead>Estudiante</StickyHead>
               <StickyHead>Grupo</StickyHead>
               <StickyHead>Estado</StickyHead>
-              <StickyHead>Motivo</StickyHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -105,16 +104,6 @@ export function EligibleListCurrentTable({ students, toolbar }: EligibleListCurr
                 <TableCell>{student.nombre_grupo}</TableCell>
                 <TableCell>
                   <StatusBadge estado={student.estado_habilitacion} />
-                </TableCell>
-                <TableCell>
-                  {student.motivo ? (
-                    <span className="text-sm">
-                      {motivoLabel(student.motivo)}
-                      {student.detalle && ` · ${student.detalle}`}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">—</span>
-                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -130,12 +119,6 @@ export function EligibleListCurrentTable({ students, toolbar }: EligibleListCurr
                   {student.codigo_sis}
                   {student.nombre_grupo && ` · ${student.nombre_grupo}`}
                 </p>
-                {student.motivo && (
-                  <p className="mt-1 text-sm">
-                    {motivoLabel(student.motivo)}
-                    {student.detalle && ` · ${student.detalle}`}
-                  </p>
-                )}
               </div>
               <StatusBadge estado={student.estado_habilitacion} />
             </div>
