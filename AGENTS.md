@@ -2,7 +2,7 @@
 
 Plataforma de Corvus Code S.R.L. para la Universidad Mayor de San Simón: control de ingreso, validación e incidentes en exámenes masivos.
 
-**IMPORTANTE**: responde siempre en español, sin importar el idioma de la consulta. Esto aplica solo a tus respuestas y explicaciones — el código sigue las reglas de idioma de `.Codex/rules/code-style-backend.md`.
+**IMPORTANTE**: responde siempre en español, sin importar el idioma de la consulta. Esto aplica solo a tus respuestas y explicaciones — el código sigue las reglas de idioma de `.claude/rules/code-style-backend.md`.
 
 Monorepo: `deployment/` (Docker) no es necesario para dev local.
 
@@ -46,8 +46,8 @@ Dos contextos independientes que **nunca** deben mezclarse ni referenciarse entr
 
 ## Estándares del equipo
 
-Detalle completo en `.Codex/rules/`:
-- Ramas: `<tipo>/<identificador>-<descripcion-corta>` (ej. `feature/HU-11-...`, `tech/RNF-02-...`) — antes de crear una rama, cargar el skill `git-branches` (`.Codex/skills/git-branches/SKILL.md`)
+Detalle completo en `.claude/rules/`:
+- Ramas: `<tipo>/<identificador>-<descripcion-corta>` (ej. `feature/HU-11-...`, `tech/RNF-02-...`) — antes de crear una rama, cargar el skill `git-branches` (`.claude/skills/git-branches/SKILL.md`)
 - `git-commits.md` — formato de commits
 - `code-style-backend.md` — PSR-12, idioma, nombres, capas, comentarios
 
