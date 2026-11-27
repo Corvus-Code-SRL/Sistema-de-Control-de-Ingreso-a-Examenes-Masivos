@@ -50,14 +50,14 @@ export function SidebarItem({ item, active, badgeCount, onNavigate }: SidebarIte
         ROW_CLASSES,
         'transition-colors',
         active
-          ? 'bg-brand font-semibold text-white'
+          ? 'bg-brand font-semibold text-on-solid'
           : 'font-medium text-sidebar-foreground hover:bg-sb-hover'
       )}
     >
       <item.icon className="size-4 shrink-0" aria-hidden="true" />
       <span className="min-w-0 flex-1 break-words">{item.label}</span>
       {badgeCount !== undefined && badgeCount > 0 && (
-        <span className="shrink-0 rounded-full bg-warn px-1.5 text-xs font-semibold text-warn-fg">
+        <span className="shrink-0 rounded-full bg-warn px-1.5 text-xs font-semibold text-on-accent">
           {badgeCount}
         </span>
       )}

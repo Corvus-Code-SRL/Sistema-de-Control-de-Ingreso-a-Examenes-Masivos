@@ -72,7 +72,7 @@ export function EnableAssistantExamModal({
 
         {assistant && (
           <div className="flex items-center gap-3 rounded-md border border-input bg-muted/30 px-3 py-2">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground text-xs font-medium">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand text-on-solid text-xs font-medium">
               {initialsOf(assistant)}
             </span>
             <div className="min-w-0">

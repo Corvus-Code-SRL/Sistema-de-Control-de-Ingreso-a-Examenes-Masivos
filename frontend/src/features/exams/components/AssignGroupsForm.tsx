@@ -55,7 +55,7 @@ export function AssignGroupsForm({
                   aria-pressed={selected}
                   onClick={() => onToggleGroup(group.id_grupo)}
                   className={`flex min-w-0 items-start gap-2 rounded-lg border-2 p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-55 ${
-                    selected ? 'border-primary bg-brand-soft' : 'border-border hover:border-primary hover:bg-sunken'
+                    selected ? 'border-primary bg-brand-soft' : 'border-border hover:border-primary hover:bg-muted'
                   }`}
                 >
                   <span aria-hidden="true" className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border ${selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border-strong bg-card'}`}>

@@ -9,7 +9,7 @@ interface ExceptionalMarkProps {
 export function ExceptionalMark({ reason }: ExceptionalMarkProps) {
   return (
     <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-      <Badge variant="outline" className="border-warn-border bg-warn-soft text-warn-fg">
+      <Badge variant="outline" className="border-info-border bg-info-soft text-info">
         Excepcional
       </Badge>
       {reason && <span className="text-xs text-muted-foreground">Motivo: {reason}</span>}

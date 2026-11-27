@@ -72,7 +72,10 @@ export function InProgressIncidentAction({ exam, student }: Props) {
 }
 
 export function InProgressIncidentsCount({ exam }: { exam: ExamInProgress }) {
-  return <span role="status" className="rounded-full bg-warn-soft px-3 py-1 text-xs font-medium text-warn-fg">
+  // Solo advierte cuando hay algo pendiente; en cero es un dato neutro.
+  const tone = exam.totales.incidencias_pendientes > 0 ? 'bg-warn-soft text-warn-fg' : 'bg-neutral-soft text-neutral-fg'
+
+  return <span role="status" className={`rounded-full px-3 py-1 text-xs font-medium ${tone}`}>
     Incidencias pendientes: {exam.totales.incidencias_pendientes}
   </span>
 }

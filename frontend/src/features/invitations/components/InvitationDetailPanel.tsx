@@ -316,7 +316,7 @@ function MyGroups({ invitation, selectedIds, editable, error, onToggle }: MyGrou
                 'flex items-center gap-3 rounded-[10px] border border-border px-3 py-2.5',
                 checked && 'border-brand bg-brand-soft',
                 !group.seleccionable && 'opacity-50',
-                !disabled && 'cursor-pointer hover:bg-sunken'
+                !disabled && 'cursor-pointer hover:bg-muted'
               )}
             >
               <input
