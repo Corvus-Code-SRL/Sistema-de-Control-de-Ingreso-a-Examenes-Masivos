@@ -30,12 +30,17 @@ class AuthController extends Controller
     {
         $validated = $request->validated();
 
-        $session = $this->auth->iniciarSesion($validated['cod_sis'], $validated['password'], (string) $request->ip());
+        $session = $this->auth->iniciarSesion(
+            $validated['cod_sis'],
+            $validated['password'],
+            (string) $request->ip(),
+            $request->userAgent()
+        );
 
         return (new AuthSessionResource($session))->additional(['mensaje' => 'Sesión iniciada correctamente.']);
     }
 
-    /** POST /api/auth/logout — revoca solo el token en uso. */
+    /** POST /api/auth/logout — revoca solo el token en uso y cierra su sesión. */
     public function logout(Request $request): LogoutResource
     {
         $this->auth->cerrarSesion($request->user()->currentAccessToken());

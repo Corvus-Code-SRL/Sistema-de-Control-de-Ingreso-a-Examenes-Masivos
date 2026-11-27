@@ -172,5 +172,23 @@ class ActionSeeder extends Seeder
         foreach ($optionalDistribution as $action) {
             DB::table('accion')->updateOrInsert(['operacion' => $action['operacion']], $action);
         }
+
+        // Registro de sesiones: al final para no mover los ids existentes.
+        $sessions = [
+            [
+                'operacion' => 'INICIO_SESION',
+                'tipo_operacion' => 'LOGIN',
+                'descripcion' => 'Inicio de sesión correcto desde un dispositivo',
+            ],
+            [
+                'operacion' => 'CIERRE_SESION',
+                'tipo_operacion' => 'LOGOUT',
+                'descripcion' => 'Cierre de una sesión: por la persona, por vencimiento o revocada',
+            ],
+        ];
+
+        foreach ($sessions as $action) {
+            DB::table('accion')->updateOrInsert(['operacion' => $action['operacion']], $action);
+        }
     }
 }

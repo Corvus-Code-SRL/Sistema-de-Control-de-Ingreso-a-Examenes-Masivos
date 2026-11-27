@@ -292,6 +292,9 @@ return [
             'permiso_rol' => ['modulo' => 'roles', 'etiqueta' => 'Permiso de rol', 'claves' => ['permiso', 'rol']],
             'ui' => ['modulo' => 'roles', 'etiqueta' => 'Pantalla', 'claves' => ['nombre_ui']],
             'ui_permiso' => ['modulo' => 'roles', 'etiqueta' => 'Pantalla de permiso', 'claves' => ['ui', 'permiso']],
+            'sesion' => [
+                'modulo' => 'cuentas', 'etiqueta' => 'Sesión', 'claves' => ['id_sesion'], 'persona' => true,
+            ],
             'grupo' => ['modulo' => 'grupos', 'etiqueta' => 'Grupo', 'claves' => ['id_grupo']],
             'grupo_estudiante' => ['modulo' => 'grupos', 'etiqueta' => 'Nómina de grupo', 'claves' => ['id_grupo']],
             'materia_carrera' => [
@@ -376,6 +379,8 @@ return [
             'GUARDAR_DISTRIBUCION' => 'Guardar distribución',
             'DEJAR_USAR_DISTRIBUCION' => 'Dejar de usar distribución',
             'INGRESO_CON_AVISO_AMBIENTE' => 'Ingreso con aviso de ambiente',
+            'INICIO_SESION' => 'Inicio de sesión',
+            'CIERRE_SESION' => 'Cierre de sesión',
         ],
 
         'etiquetas_campo' => [
@@ -394,6 +399,10 @@ return [
             'tipo_finalizacion' => 'Tipo de finalización',
             'inicio_real_en' => 'Inicio real',
             'ip' => 'Dirección IP',
+            'ip_direccion' => 'Dirección IP',
+            'agente' => 'Navegador o dispositivo',
+            'hora_salida' => 'Hora de salida',
+            'motivo_salida' => 'Motivo de salida',
             'motivo' => 'Motivo',
             'rectificado_en' => 'Fecha de rectificación',
             'id_usuario_rectificador' => 'Administrador que rectificó',

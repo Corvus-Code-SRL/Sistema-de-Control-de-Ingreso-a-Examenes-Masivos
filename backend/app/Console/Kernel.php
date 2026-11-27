@@ -6,6 +6,7 @@ use App\Jobs\FinalizeExpiredExamsJob;
 use App\Jobs\OpenEntryControlJob;
 use App\Services\Exams\ExamLifecycleService;
 use App\Services\RiskCenter\Academic\RectificationExpiryService;
+use App\Services\Security\SessionRegistry;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -39,6 +40,11 @@ class Kernel extends ConsoleKernel
         $schedule->call(function (): void {
             app(RectificationExpiryService::class)->expireDue();
         })->name('expire-rectification-requests')->hourly()->withoutOverlapping(10);
+
+        // Registro de sesiones: cierra como EXPIRADA las sesiones con el token vencido y borra esos tokens.
+        $schedule->call(function (): void {
+            app(SessionRegistry::class)->closeExpired();
+        })->name('close-expired-sessions')->hourly()->withoutOverlapping(10);
 
         // Respaldo diario de la base: solo donde se encendió SCIEM_RESPALDO_DIARIO.
         if (config('sciem.respaldo.diario')) {

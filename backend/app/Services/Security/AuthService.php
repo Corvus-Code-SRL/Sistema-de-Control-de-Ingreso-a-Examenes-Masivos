@@ -6,6 +6,7 @@ use App\Exceptions\Security\InactiveAccountException;
 use App\Exceptions\Security\InvalidCredentialsException;
 use App\Exceptions\Security\NoCurrentRoleException;
 use App\Models\Role;
+use App\Models\Session;
 use App\Models\User;
 use App\Support\RecordStatus;
 use App\Support\SisCode;
@@ -30,16 +31,20 @@ class AuthService
     private const DUMMY_HASH = '$2y$10$P58tp9.8/TaCQEV2DsgZ5OqXr76VkWWafQ79u7mAZ7brbjKUhw5M.';
 
     private AuditLogService $auditLog;
+    private SessionRegistry $sessions;
 
-    public function __construct(AuditLogService $auditLog)
+    public function __construct(AuditLogService $auditLog, SessionRegistry $sessions)
     {
         $this->auditLog = $auditLog;
+        $this->sessions = $sessions;
     }
 
     /**
+     * Cada inicio correcto abre una fila de `sesion` con la IP y el navegador (User-Agent) del dispositivo.
+     *
      * @return array{usuario: User, rol: Role, token: string, expira_en: ?Carbon}
      */
-    public function iniciarSesion(string $codSis, string $password, string $ip): array
+    public function iniciarSesion(string $codSis, string $password, string $ip, ?string $agent = null): array
     {
         $codSis = SisCode::normalize($codSis);
         $user = User::where('cod_sis', $codSis)->first();
@@ -80,8 +85,13 @@ class AuthService
             throw new NoCurrentRoleException();
         }
 
-        $newToken = $user->createToken(self::TOKEN_NAME);
-        $newToken->accessToken->forceFill(['password_confirmado_en' => now()])->save();
+        $newToken = DB::transaction(function () use ($user, $ip, $agent) {
+            $created = $user->createToken(self::TOKEN_NAME);
+            $created->accessToken->forceFill(['password_confirmado_en' => now()])->save();
+            $this->sessions->open($user, $created->accessToken, $ip, $agent);
+
+            return $created;
+        });
 
         $minutes = config('sanctum.expiration');
 
@@ -93,12 +103,21 @@ class AuthService
         ];
     }
 
-    /** Revoca solo el token en uso; las demás sesiones de la cuenta siguen abiertas. */
-    public function cerrarSesion($token): void
+    /**
+     * Revoca solo el token en uso y cierra su sesión; las demás sesiones de la cuenta siguen abiertas.
+     *
+     * CIERRE cuando la persona sale; REVOCADA cuando la cuenta fue deshabilitada.
+     */
+    public function cerrarSesion($token, string $reason = Session::CLOSED): void
     {
-        if ($token instanceof Model) {
-            $token->delete();
+        if (! $token instanceof Model) {
+            return;
         }
+
+        DB::transaction(function () use ($token, $reason) {
+            $this->sessions->close($token, $reason);
+            $token->delete();
+        });
     }
 
     /**
@@ -148,7 +167,7 @@ class AuthService
      * Cambia la contraseña propia (HU-001: cierre de la contraseña temporal).
      *
      * La actual debe coincidir. Al terminar se apaga `debe_cambiar_contrasenia` y se revocan las
-     * demás sesiones de la cuenta, conservando la que hizo el cambio.
+     * demás sesiones de la cuenta (REVOCADA), conservando la que hizo el cambio.
      */
     public function changePassword(User $user, string $currentPassword, string $newPassword, $token): void
     {
@@ -165,6 +184,8 @@ class AuthService
                 'contrasenia' => Hash::make($newPassword),
                 'debe_cambiar_contrasenia' => false,
             ])->save();
+
+            $this->sessions->closeOthers($user, $token instanceof Model ? $token : null, Session::REVOKED);
 
             $otherTokens = $user->tokens();
 
