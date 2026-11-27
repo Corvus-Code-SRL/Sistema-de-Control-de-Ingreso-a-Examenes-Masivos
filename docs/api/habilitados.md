@@ -20,6 +20,9 @@ docente ajeno, recibe 403.
 | POST | `/api/examenes/{exam}/habilitados/preview` | 200 | `{ data: Preview }` (multipart, campo `archivo`) |
 | POST | `/api/examenes/{exam}/habilitados/confirm` | 200 | `{ data: Resultado, mensaje }` (JSON, campo `token`) |
 
+`ExamOption` (selector): `id_examen`, `nombre`, `materia`, `carrera`, `grupos[]`, `fecha`, `hora_inicio` (hora local
+de La Paz), `estado` y `ambientes[]` (`id`, `nro_aula`, ordenados por número de aula; vacío si no tiene).
+
 ## Ventana de escritura
 
 El selector solo devuelve los exámenes del docente en estado PROGRAMADO con el control de ingreso sin abrir
@@ -63,7 +66,7 @@ Devuelve **toda** la nómina del examen en una sola respuesta, ordenada por apel
 interfaz la muestra en un contenedor con scroll. Cada estudiante trae `estado_habilitacion` (`HABILITADO`,
 `NO_HABILITADO` o `CASO_ESPECIAL`), `motivo` y `detalle`. Los motivos manuales guardados antes de retirar la edición
 manual (`ASISTENCIA_INSUFICIENTE`, `NO_ENTREGO_TRABAJO_FINAL`, `NO_CUMPLE_PRERREQUISITO`, `OTRO: detalle`) se siguen
-mostrando hasta la próxima carga.
+devolviendo hasta la próxima carga. La interfaz no muestra `motivo` ni `detalle`; se conservan para uso futuro.
 
 ## Efecto en otras vistas
 

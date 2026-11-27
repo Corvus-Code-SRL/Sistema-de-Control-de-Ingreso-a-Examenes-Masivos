@@ -286,7 +286,7 @@ class ExamEligibleListService
     {
         return $this->access->applyWritableWindow(
             Exam::query()
-                ->with(['subject', 'career', 'groups'])
+                ->with(['subject', 'career', 'groups', 'classrooms'])
                 ->where('id_usuario_docente', $teacherId)
         )
             ->orderBy('fecha')

@@ -2,9 +2,11 @@
 
 namespace Tests\Feature\Exams;
 
+use App\Models\Classroom;
 use App\Models\Exam;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\RecordStatus;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -131,5 +133,71 @@ class ExamEligibleListExamsTest extends TestCase
 
         $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $item['fecha']);
         $this->assertSame(Exam::PROGRAMADO, $item['estado']);
+    }
+
+    public function test_devuelve_los_ambientes_de_cada_examen(): void
+    {
+        $this->actAsTeacher($this->docenteId);
+
+        $conAmbientes = $this->createExam(['estado' => Exam::PROGRAMADO], [$this->otraAulaId, $this->aulaId]);
+        $sinAmbientes = $this->createExam([
+            'estado' => Exam::PROGRAMADO,
+            'nombre_examen' => 'Sin ambientes',
+            'fecha' => $this->futureDate(8),
+        ]);
+
+        $items = collect($this->getJson('/api/examenes/habilitados')->assertOk()->json('data'))
+            ->keyBy('id_examen');
+
+        $this->assertSame(
+            [
+                ['id' => $this->aulaId, 'nro_aula' => '691A'],
+                ['id' => $this->otraAulaId, 'nro_aula' => '692B'],
+            ],
+            $items[$conAmbientes->id_examen]['ambientes']
+        );
+        $this->assertSame([], $items[$sinAmbientes->id_examen]['ambientes']);
+        $this->assertArrayNotHasKey('hora_fin', $items[$conAmbientes->id_examen]);
+    }
+
+    public function test_la_cantidad_de_consultas_no_crece_con_los_examenes(): void
+    {
+        $this->actAsTeacher($this->docenteId);
+
+        $this->createExam(['estado' => Exam::PROGRAMADO], [$this->makeClassroom('601A')->id_ambiente]);
+
+        $queriesWithOne = $this->countSelectorQueries();
+
+        foreach ([8, 9, 10, 11] as $days) {
+            $this->createExam(
+                ['estado' => Exam::PROGRAMADO, 'nombre_examen' => "Examen {$days}", 'fecha' => $this->futureDate($days)],
+                [$this->makeClassroom("70{$days}A")->id_ambiente, $this->makeClassroom("80{$days}B")->id_ambiente]
+            );
+        }
+
+        $this->assertSame($queriesWithOne, $this->countSelectorQueries());
+    }
+
+    private function countSelectorQueries(): int
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $this->getJson('/api/examenes/habilitados')->assertOk();
+
+        $count = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $count;
+    }
+
+    private function makeClassroom(string $number): Classroom
+    {
+        return Classroom::create([
+            'nro_aula' => $number,
+            'capacidad' => 60,
+            'ubicacion' => 'Edificio Nuevo',
+            'estado' => RecordStatus::ACTIVE,
+        ]);
     }
 }

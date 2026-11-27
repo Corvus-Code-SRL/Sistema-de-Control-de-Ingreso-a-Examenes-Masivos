@@ -92,7 +92,7 @@ class ExamEligibleListCurrentTest extends TestCase
             ->assertJsonPath('data.estado', Exam::EN_CURSO);
     }
 
-    public function test_motivo_manual_anterior_se_sigue_mostrando(): void
+    public function test_motivo_manual_anterior_se_sigue_devolviendo(): void
     {
         $exam = $this->createExam();
         DB::table('grupo_examen')->insertOrIgnore([
@@ -102,7 +102,8 @@ class ExamEligibleListCurrentTest extends TestCase
 
         $studentId = $this->studentIdsInGroup()[0];
 
-        // Motivo manual guardado antes de quitar la edición manual: se sigue mostrando.
+        // Motivo manual guardado antes de quitar la edición manual: la API lo sigue devolviendo
+        // aunque la interfaz ya no muestre la columna.
         DB::table('examen_estudiante')->insert([
             'id_examen' => $exam->id_examen,
             'id_estudiante' => $studentId,
