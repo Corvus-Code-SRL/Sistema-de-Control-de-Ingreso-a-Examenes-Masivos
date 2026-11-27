@@ -25,6 +25,56 @@ La base guarda **desde y hasta cuándo** valió cada asignación, para poder res
 - El rol de una operación es el período de `usuario_rol` con `fecha_inicio <= log.fecha_hora` y
   `fecha_fin` nula o posterior. El instante exacto del cambio ya pertenece al rol nuevo.
 
+## Mantener sincronizadas las capacidades
+
+- El mapa `capacidades` de `config/sciem.php` debe coincidir con `CAPABILITIES_BY_FEATURE` en
+  `frontend/src/features/auth/capabilities.ts`. Si difieren, falla `capabilities.access.test.ts`.
+- Un PR que agregue o cambie capacidades debe tocar ambos archivos en el mismo cambio.
+- `RolePermissionSeeder` debe ejecutarse después de todo PR que agregue capacidades: hasta entonces
+  `permiso`, `permiso_rol`, `ui` y `ui_permiso` no tienen las filas nuevas y la base no refleja el código.
+
+## Reversión y respaldo
+
+La migración `2026_11_26_000001_add_vigencia_to_permiso_rol` es reversible en estructura, pero **no en
+datos**. Su `down()` conserva una sola fila por par permiso–rol (la más reciente) y elimina las
+columnas `fecha_inicio` y `fecha_fin`: **revertir descarta el historial de vigencia**.
+
+Por eso se respalda `permiso_rol` **antes de aplicar y antes de revertir** la migración. Los valores entre
+`<>` son placeholders; la contraseña no va en el comando (usar `PGPASSWORD` o `~/.pgpass`):
+
+```bash
+pg_dump -h <HOST> -p <PUERTO> -U <USUARIO> -d <BASE> \
+  --table=public.permiso_rol --data-only -Fc -f permiso_rol_<FECHA>.dump
+```
+
+Un volcado de solo datos depende de las columnas que tenía la tabla al generarlo, así que cómo se
+restaura depende de cuándo se tomó. Ambos procedimientos son **operaciones coordinadas**: las ejecuta
+una sola persona, avisada antes en el canal del equipo, y nunca se corren contra Supabase sin esa
+coordinación. Más sobre respaldos en `respaldo-y-restauracion.md`.
+
+### a) Respaldo tomado antes de aplicar la migración
+
+El volcado tiene la estructura antigua (sin columnas de vigencia). Se restaura sobre esa misma
+estructura:
+
+1. Dejar la base con la estructura antigua (migración no aplicada, o revertida con `down()`).
+2. Vaciar la tabla: `TRUNCATE public.permiso_rol;`
+3. Restaurar:
+
+```bash
+pg_restore -h <HOST> -p <PUERTO> -U <USUARIO> -d <BASE> \
+  --data-only --table=permiso_rol permiso_rol_<FECHA>.dump
+```
+
+### b) Respaldo tomado antes de revertir
+
+El volcado tiene `fecha_inicio` y `fecha_fin`, que `down()` elimina; restaurarlo después de revertir
+falla. Para recuperar el historial:
+
+1. Volver a aplicar la migración (`up`), para que existan de nuevo las columnas de vigencia.
+2. Vaciar la tabla: `TRUNCATE public.permiso_rol;` (descarta las filas que `up` pobló con la fecha actual).
+3. Restaurar el volcado con el mismo `pg_restore` del caso a).
+
 ## Consulta: todo lo que hizo una cuenta mientras tuvo un rol
 
 ```sql

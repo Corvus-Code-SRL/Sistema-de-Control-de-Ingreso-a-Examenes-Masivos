@@ -35,6 +35,10 @@ class AddVigenciaToPermisoRol extends Migration
         SQL);
     }
 
+    /**
+     * Reversible en estructura, no en datos: se borran las filas históricas de cada par permiso–rol
+     * y se pierde su vigencia. Respaldar permiso_rol antes (docs/database/vigencia-roles-permisos.md).
+     */
     public function down(): void
     {
         // Al volver, solo queda la fila vigente (o la última) de cada par: la clave vuelve a ser (permiso, rol).
