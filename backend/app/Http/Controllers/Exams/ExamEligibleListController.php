@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Exams;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Exams\ConfirmEligibleListRequest;
 use App\Http\Requests\Exams\PreviewEligibleListRequest;
-use App\Http\Requests\Exams\SaveEligibleListChangesRequest;
+use App\Http\Requests\Exams\ShowEligibleListRequest;
 use App\Http\Requests\Exams\ListEligibleListExamsRequest;
 use App\Http\Resources\Exams\EligibleListCurrentResource;
 use App\Http\Resources\Exams\EligibleListImportResource;
@@ -20,11 +20,7 @@ use RuntimeException;
 /**
  * Lista de habilitados de un examen (HU-028).
  *
- * Camino principal:
- * - GET /habilitados → EligibleListCurrentResource
- * - PUT /habilitados → aplica cambios en transacción
- *
- * Camino por archivo:
+ * - GET /habilitados → EligibleListCurrentResource (nómina con su estado)
  * - POST /habilitados/preview → preview del archivo
  * - POST /habilitados/confirm → reemplaza la lista en una sola transacción
  */
@@ -102,29 +98,7 @@ class ExamEligibleListController extends Controller
         );
     }
 
-    public function save(
-        SaveEligibleListChangesRequest $request,
-        int $exam
-    ): JsonResponse {
-        $teacherId = $this->currentUser->teacherId();
-
-        $validated = $request->validated();
-
-        $this->service->saveChanges(
-            $exam,
-            $validated['cambios'],
-            $teacherId
-        );
-
-        $result = $this->service->current($exam, $teacherId);
-
-        return ApiResponse::success(
-            new EligibleListCurrentResource($result),
-            'Lista de habilitados guardada correctamente.'
-        );
-    }
-
-    public function current(int $exam): JsonResponse
+    public function current(ShowEligibleListRequest $request, int $exam): JsonResponse
     {
         $teacherId = $this->currentUser->teacherId();
 

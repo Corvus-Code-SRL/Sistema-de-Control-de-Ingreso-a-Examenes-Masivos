@@ -85,6 +85,19 @@ class RoomDistributionPermissionsTest extends TestCase
         $this->saveDistribution($exam)->assertOk();
     }
 
+    public function test_la_capacidad_propia_decide_el_acceso_aunque_el_rol_ejerza_la_docencia(): void
+    {
+        $exam = $this->distributionExam();
+        config(['sciem.access.room_distribution' => [Role::ADMINISTRADOR]]);
+
+        $this->getJson('/api/examenes/distribucion')->assertForbidden();
+        $this->getJson($this->distributionUrl($exam))->assertForbidden();
+        $this->postJson($this->distributionUrl($exam) . '/propuesta')->assertForbidden();
+        $this->putJson($this->distributionUrl($exam), [
+            'version' => DistributionVersion::fromRows([]), 'asignaciones' => [],
+        ])->assertForbidden();
+    }
+
     public function test_inexistente_devuelve_404_en_lectura_propuesta_y_guardado(): void
     {
         $url = '/api/examenes/999999999/distribucion';

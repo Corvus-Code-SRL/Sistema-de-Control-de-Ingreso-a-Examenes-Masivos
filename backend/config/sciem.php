@@ -153,6 +153,8 @@ return [
         'risk_rectify'     => [Role::ADMINISTRADOR],
         'risk_rectify_confirm' => [Role::DOCENTE, Role::INVITADO],
         'exam_timer'       => [Role::DOCENTE, Role::INVITADO],
+        'eligible_list'    => [Role::DOCENTE, Role::INVITADO],
+        'room_distribution' => [Role::DOCENTE, Role::INVITADO],
     ],
 
     /*
@@ -191,6 +193,8 @@ return [
         'risk_rectify' => ['riesgo.rectificar'],
         'risk_rectify_confirm' => ['riesgo.confirmar_rectificacion'],
         'exam_timer' => ['examenes.controlar-tiempo'],
+        'eligible_list' => ['examenes.cargar-habilitados'],
+        'room_distribution' => ['examenes.distribuir-habilitados'],
     ],
 
     'permisos_propios' => [

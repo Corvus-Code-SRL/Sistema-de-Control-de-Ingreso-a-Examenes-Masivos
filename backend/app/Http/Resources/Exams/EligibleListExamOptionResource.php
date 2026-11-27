@@ -9,8 +9,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * Item del selector de exámenes de HU-028.
  *
  * Shape mínimo para el dropdown: solo lo que el docente necesita para
- * elegir el examen. No expone grupos, ambientes ni auxiliares (eso es de
- * la vista de exámenes, no de HU-028).
+ * elegir el examen y ver su contexto (grupos y ambientes). No expone
+ * auxiliares (eso es de la vista de exámenes, no de HU-028).
  */
 class EligibleListExamOptionResource extends JsonResource
 {
@@ -35,6 +35,13 @@ class EligibleListExamOptionResource extends JsonResource
             'fecha' => $this->fecha->format('Y-m-d'),
             'hora_inicio' => (string) $this->hora_inicio,
             'estado' => (string) $this->estado,
+            'ambientes' => $this->classrooms
+                ->sortBy('nro_aula')
+                ->map(static fn ($classroom): array => [
+                    'id' => (int) $classroom->id_ambiente,
+                    'nro_aula' => (string) $classroom->nro_aula,
+                ])
+                ->values(),
         ];
     }
 }

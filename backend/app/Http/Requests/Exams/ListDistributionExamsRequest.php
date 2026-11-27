@@ -12,7 +12,7 @@ class ListDistributionExamsRequest extends FormRequest
 {
     public function authorize(CurrentUser $currentUser, UserRoleService $roles): bool
     {
-        return $roles->isTeacher($currentUser->id());
+        return $roles->canUse($currentUser->id(), 'room_distribution');
     }
 
     protected function failedAuthorization(): void

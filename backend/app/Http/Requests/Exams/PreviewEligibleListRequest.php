@@ -11,7 +11,7 @@ class PreviewEligibleListRequest extends FormRequest
 {
     public function authorize(CurrentUser $currentUser, UserRoleService $roles): bool
     {
-        return $roles->isTeacher($currentUser->id());
+        return $roles->canUse($currentUser->id(), 'eligible_list');
     }
 
     protected function failedAuthorization(): void

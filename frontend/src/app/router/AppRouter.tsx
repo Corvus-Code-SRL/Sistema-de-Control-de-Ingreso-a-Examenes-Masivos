@@ -189,12 +189,12 @@ function DocenteRoutes() {
 
         <Route
           path="/examenes/habilitados"
-          element={guarded('examenes.gestionar', <ExamEligibleListPage />)}
+          element={guarded('examenes.cargar-habilitados', <ExamEligibleListPage />)}
         />
 
         <Route
           path="/examenes/distribucion"
-          element={guarded('examenes.gestionar', <RoomDistributionPage />)}
+          element={guarded('examenes.distribuir-habilitados', <RoomDistributionPage />)}
         />
 
         <Route path="/situacion-excepcional" element={guarded('situaciones.registrar', <ExamSituationsPage />)} />
