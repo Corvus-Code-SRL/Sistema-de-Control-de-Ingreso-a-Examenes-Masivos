@@ -4,8 +4,8 @@ Contrato de HU-031, con vista del Docente e integración de lectura en el contro
 
 ## Acceso y formato
 
-Todas las rutas están bajo `/api` y requieren sesión, cuenta activa y acceso a `teaching`
-(Docente o Invitado según `config('sciem.access')`). Se usa `Accept: application/json`;
+Todas las rutas están bajo `/api` y requieren sesión, cuenta activa y la capacidad `room_distribution`
+(Docente o Invitado según `config('sciem.access')`; en la interfaz, `examenes.distribuir-habilitados`). Se usa `Accept: application/json`;
 el PUT recibe `Content-Type: application/json`.
 
 El creador del examen puede proponer y guardar. Un colaborador con invitación ACEPTADA solo
