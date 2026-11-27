@@ -153,6 +153,8 @@ return [
         'risk_rectify'     => [Role::ADMINISTRADOR],
         'risk_rectify_confirm' => [Role::DOCENTE, Role::INVITADO],
         'exam_timer'       => [Role::DOCENTE, Role::INVITADO],
+        'eligible_list'    => [Role::DOCENTE, Role::INVITADO],
+        'room_distribution' => [Role::DOCENTE, Role::INVITADO],
     ],
 
     /*

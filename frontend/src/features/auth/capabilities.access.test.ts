@@ -154,6 +154,15 @@ describe('Control del cronómetro (HU-038)', () => {
   })
 })
 
+describe('Capacidades propias de HU-028 y HU-031', () => {
+  it('el Docente y el Invitado cargan y distribuyen; nadie más', () => {
+    for (const capability of ['examenes.cargar-habilitados', 'examenes.distribuir-habilitados'] as const) {
+      for (const role of ['Docente', 'Invitado']) expect(hasCapability(role, capability)).toBe(true)
+      for (const role of ['Administrador', 'Auxiliar', null]) expect(hasCapability(role, capability)).toBe(false)
+    }
+  })
+})
+
 describe('Confirmación de rectificaciones (HU-062)', () => {
   it('solo el Docente y el Invitado tienen riesgo.confirmar_rectificacion', () => {
     for (const role of ['Docente', 'Invitado']) {
