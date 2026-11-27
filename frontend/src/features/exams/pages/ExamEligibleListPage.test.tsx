@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TOKEN_STORAGE_KEY, meBody } from '@/test/authFixtures'
@@ -18,6 +18,11 @@ function examFixture() {
       fecha: '2026-10-20',
       hora_inicio: '10:00',
       estado: 'PROGRAMADO' as const,
+      grupos: ['2', '3'],
+      ambientes: [
+        { id: 1, nro_aula: '691A' },
+        { id: 2, nro_aula: '692B' },
+      ],
     },
   ]
 }
@@ -135,7 +140,7 @@ describe('ExamEligibleListPage', () => {
     renderApp('/examenes/habilitados')
 
     expect(await screen.findByText(/El control de ingreso ya se abrió/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Importar desde archivo/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Cargar lista de habilitados' })).toBeDisabled()
   })
 })
 
@@ -176,6 +181,8 @@ it('al cambiar de examen escribe ?examen=<id> en la URL', async () => {
       fecha: '2026-11-20',
       hora_inicio: '10:00',
       estado: 'PROGRAMADO' as const,
+      grupos: ['1'],
+      ambientes: [],
     },
   ]
   const api = stubBackend({
@@ -242,7 +249,7 @@ it('reemplaza la lista con el archivo en una sola petición y recarga la lista',
 
   await screen.findAllByText('Álvarez Rojas, Camila')
 
-  await user.click(screen.getByRole('button', { name: /Importar desde archivo/i }))
+  await user.click(screen.getByRole('button', { name: 'Cargar lista de habilitados' }))
   const input = document.querySelector('input[type="file"]') as HTMLInputElement
   await user.upload(input, new File(['codigo_sis\n202210443'], 'lista.csv'))
 
@@ -255,8 +262,12 @@ it('reemplaza la lista con el archivo en una sola petición y recarga la lista',
   // Solo una petición de confirmación y ningún PUT manual: el reemplazo es atómico en el servidor.
   expect(api.calls.filter((c) => c.url.endsWith('/habilitados/confirm'))).toHaveLength(1)
   expect(api.calls.some((c) => c.method === 'PUT')).toBe(false)
-  // La lista se recarga desde el servidor con el motivo fijo.
-  expect(await screen.findAllByText('No figura en la lista cargada')).not.toHaveLength(0)
+  // Tras el reemplazo la lista se vuelve a pedir al servidor.
+  await waitFor(() =>
+    expect(
+      api.calls.filter((c) => c.method === 'GET' && /\/examenes\/12\/habilitados$/.test(c.url)).length
+    ).toBeGreaterThan(1)
+  )
 })
 
 it('no ofrece edición manual: ni casillas, ni «No habilitar», ni guardar', async () => {
@@ -270,28 +281,76 @@ it('no ofrece edición manual: ni casillas, ni «No habilitar», ni guardar', as
   expect(screen.queryByRole('button', { name: /Guardar/i })).not.toBeInTheDocument()
 })
 
-it('muestra la plantilla y la nota de formato en la página, y los totales sobre la lista', async () => {
+it('no tiene sección de plantilla en la página; la plantilla vive solo en el diálogo', async () => {
+  stubBackend({ exams: examFixture, list: listFixture })
+
+  const user = userEvent.setup({ pointerEventsCheck: 0 })
+  renderApp('/examenes/habilitados')
+
+  await screen.findAllByText('Álvarez Rojas, Camila')
+  expect(screen.queryByRole('link', { name: 'Descargar plantilla' })).not.toBeInTheDocument()
+  expect(screen.queryByText('Formato del archivo')).not.toBeInTheDocument()
+  expect(screen.queryByText(/Formatos: CSV o XLSX/)).not.toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'Cargar lista de habilitados' }))
+  expect(screen.getByRole('link', { name: 'Descargar plantilla' })).toHaveAttribute(
+    'href',
+    '/plantillas/nomina-plantilla.csv'
+  )
+  expect(
+    screen.getByText('Se compara por código SIS; los demás datos son referenciales.')
+  ).toBeInTheDocument()
+})
+
+it('muestra los totales y el estado, pero no la columna «Motivo»', async () => {
   stubBackend({ exams: examFixture, list: listFixture })
 
   renderApp('/examenes/habilitados')
 
   await screen.findAllByText('Álvarez Rojas, Camila')
-  const link = screen.getByRole('link', { name: 'Descargar plantilla' })
-  expect(link).toHaveAttribute('href', '/plantillas/nomina-plantilla.csv')
-  expect(link).toHaveAttribute('download')
-  expect(
-    screen.getByText(/Se compara por código SIS; los demás datos son referenciales\. Formatos: CSV o XLSX/)
-  ).toBeInTheDocument()
   expect(screen.getByText('En la nómina del examen')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /No habilitados · 1/ })).toBeInTheDocument()
+  expect(screen.getAllByText('No habilitado').length).toBeGreaterThan(0)
+  expect(screen.queryByRole('columnheader', { name: 'Motivo' })).not.toBeInTheDocument()
+  expect(screen.queryByText('Asistencia insuficiente')).not.toBeInTheDocument()
 })
 
-it('sigue mostrando el motivo manual guardado antes del cambio', async () => {
+it('al elegir un examen muestra la tarjeta de contexto con sus datos', async () => {
   stubBackend({ exams: examFixture, list: listFixture })
 
   renderApp('/examenes/habilitados')
 
-  expect((await screen.findAllByText('Asistencia insuficiente')).length).toBeGreaterThan(0)
+  const context = await screen.findByLabelText('Contexto del examen')
+  expect(within(context).getByText('Cálculo I')).toBeInTheDocument()
+  expect(within(context).getByText('2 y 3')).toBeInTheDocument()
+  expect(within(context).getByText('20/10/2026')).toBeInTheDocument()
+  expect(within(context).getByText('10:00')).toBeInTheDocument()
+  expect(within(context).getByText('691A, 692B')).toBeInTheDocument()
+  expect(within(context).queryByText(/Programado|PROGRAMADO|Hora de fin/)).not.toBeInTheDocument()
+})
+
+it('indica «Sin ambientes» cuando el examen no tiene ambientes', async () => {
+  stubBackend({
+    exams: () => [{ ...examFixture()[0], ambientes: [] }],
+    list: listFixture,
+  })
+
+  renderApp('/examenes/habilitados')
+
+  const context = await screen.findByLabelText('Contexto del examen')
+  expect(within(context).getByText('Sin ambientes')).toBeInTheDocument()
+})
+
+it('muestra la hora de inicio como HH:MM, tal como llega del servidor', async () => {
+  stubBackend({
+    exams: () => [{ ...examFixture()[0], hora_inicio: '07:30:00' }],
+    list: listFixture,
+  })
+
+  renderApp('/examenes/habilitados')
+
+  const context = await screen.findByLabelText('Contexto del examen')
+  expect(within(context).getByText('07:30')).toBeInTheDocument()
 })
 
 it('una lista de 2000 estudiantes va en un contenedor con scroll, sin paginación', async () => {

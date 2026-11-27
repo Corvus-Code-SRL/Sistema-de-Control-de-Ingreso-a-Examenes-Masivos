@@ -33,6 +33,11 @@ export interface ExamSelectorRef {
   nombre: string
 }
 
+export interface ExamSelectorRoom {
+  id: number
+  nro_aula: string
+}
+
 export interface ExamSelectorItem {
   id_examen: number
   nombre: string
@@ -42,6 +47,7 @@ export interface ExamSelectorItem {
   hora_inicio: string
   estado: Extract<ExamStatus, 'PROGRAMADO' | 'EN_CURSO'>
   grupos: string[]
+  ambientes: ExamSelectorRoom[]
 }
 
 export interface EligibleStudent {

@@ -14,7 +14,7 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { useEligibleList } from '../hooks/useEligibleList'
 import { EligibleListCurrentTable } from '../components/EligibleListCurrentTable'
 import { EligibleListUploadFlow } from '../components/EligibleListUploadFlow'
-import { formatDate, readOnlyMessage } from '../utils/eligibleListUtils'
+import { formatDate, formatTime, readOnlyMessage } from '../utils/eligibleListUtils'
 
 export function ExamEligibleListPage() {
   const eligible = useEligibleList()
@@ -22,7 +22,7 @@ export function ExamEligibleListPage() {
 
   const examOptions = eligible.exams.map((e) => ({
     value: String(e.id_examen),
-    label: `${e.nombre} · ${e.materia.nombre} · ${formatDate(e.fecha)} · ${e.hora_inicio}`,
+    label: `${e.nombre} · ${e.materia.nombre} · ${formatDate(e.fecha)} · ${formatTime(e.hora_inicio)}`,
   }))
 
   const selectedExam = eligible.selectedExam
@@ -121,47 +121,44 @@ export function ExamEligibleListPage() {
         subtitle="Cargue el archivo con los estudiantes habilitados: quienes no figuren en él quedarán como no habilitados."
       />
 
-      {/* #1: selector + grupos en una sola card row */}
       <Card className="p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="w-full max-w-md space-y-1">
-            <label htmlFor="exam-selector" className="sciem-label">
-              Examen
-            </label>
-            <FormSelect
-              id="exam-selector"
-              value={eligible.selectedExamId ? String(eligible.selectedExamId) : ''}
-              placeholder="Seleccione un examen"
-              options={examOptions}
-              onValueChange={(v) => eligible.selectExam(Number(v))}
-              ariaLabel="Examen"
-            />
-          </div>
-          {selectedExam && (
-            <span className="text-xs font-medium text-muted-foreground sm:pb-2">
-              Grupos{' '}
-              {selectedExam.grupos && selectedExam.grupos.length > 0
-                ? selectedExam.grupos.join(' y ')
-                : '—'}
-              {selectedExam.materia && ` · ${selectedExam.materia.nombre}`}
-            </span>
-          )}
+        <div className="w-full space-y-2 sm:max-w-xl">
+          <label htmlFor="exam-selector" className="sciem-label">
+            Examen
+          </label>
+          <FormSelect
+            id="exam-selector"
+            value={eligible.selectedExamId ? String(eligible.selectedExamId) : ''}
+            placeholder="Seleccione un examen"
+            options={examOptions}
+            onValueChange={(v) => eligible.selectExam(Number(v))}
+            ariaLabel="Examen"
+            className="h-12 text-base"
+          />
         </div>
-      </Card>
 
-      <Card className="p-4">
-        <p className="sciem-label">Formato del archivo</p>
-        <p className="sciem-supporting mt-1 text-muted-foreground">
-          Columnas: Estudiante (código SIS), Apellidos, Nombres y, opcional, Carrera. Se compara por
-          código SIS; los demás datos son referenciales. Formatos: CSV o XLSX
-        </p>
-        <a
-          href="/plantillas/nomina-plantilla.csv"
-          download="nomina-plantilla.csv"
-          className="mt-3 inline-flex items-center text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          Descargar plantilla
-        </a>
+        {selectedExam && (
+          <dl
+            aria-label="Contexto del examen"
+            className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 border-t border-border-soft pt-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            <ContextItem label="Materia" value={selectedExam.materia?.nombre ?? '—'} />
+            <ContextItem
+              label="Grupos"
+              value={selectedExam.grupos?.length ? selectedExam.grupos.join(' y ') : '—'}
+            />
+            <ContextItem label="Fecha" value={formatDate(selectedExam.fecha)} />
+            <ContextItem label="Hora de inicio" value={formatTime(selectedExam.hora_inicio)} />
+            <ContextItem
+              label="Ambientes"
+              value={
+                selectedExam.ambientes?.length
+                  ? selectedExam.ambientes.map((room) => room.nro_aula).join(', ')
+                  : 'Sin ambientes'
+              }
+            />
+          </dl>
+        )}
       </Card>
 
       {eligible.listData && (
@@ -201,7 +198,7 @@ export function ExamEligibleListPage() {
                 disabled={!eligible.listData.editable}
               >
                 <Upload aria-hidden="true" className="size-4" />
-                Importar desde archivo
+                Cargar lista de habilitados
               </Button>
             }
           />
@@ -217,6 +214,15 @@ export function ExamEligibleListPage() {
       />
 
     </AppShell>
+  )
+}
+
+function ContextItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="sciem-tnum text-sm font-medium text-foreground">{value}</dd>
+    </div>
   )
 }
 

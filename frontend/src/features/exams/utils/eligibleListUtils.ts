@@ -21,6 +21,12 @@ export function formatDate(isoDate: string): string {
   return `${parts[2]}/${parts[1]}/${parts[0]}`
 }
 
+/** Hora tal como la entrega el servidor (hora local de La Paz), en formato HH:MM y sin conversión de zona. */
+export function formatTime(time: string): string {
+  const match = /^(\d{2}):(\d{2})/.exec(time)
+  return match ? `${match[1]}:${match[2]}` : time
+}
+
 /** Devuelve el mensaje del banner de solo lectura según el estado del examen. */
 export interface ReadOnlyMessage {
   title: string
