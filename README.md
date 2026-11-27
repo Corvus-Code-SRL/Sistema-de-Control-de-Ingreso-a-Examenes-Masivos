@@ -198,7 +198,8 @@ mise.toml
 ├── deployment/
 │   └── docker/                 # docker-compose, Apache, PostgreSQL, Redis
 └── docs/
-    └── architecture/           # Arquitectura, stack y decisiones (ADR)
+    ├── architecture/           # Arquitectura, stack y decisiones (ADR)
+    └── design/                 # Sistema de color, tokens de diseño y mockups
 ```
 
 Cada feature del frontend sigue esta plantilla (las subcarpetas se crean solo cuando se necesitan):
@@ -501,6 +502,7 @@ Detalle completo (idioma, PSR-12, naming, capas) en [`.claude/rules/code-style-b
 - Un feature solo importa de otro feature a través de su `index.ts`.
 - `components/ui/` se gestiona solo con el CLI de shadcn (`npm run shadcn -- add <componente>`); los componentes propios van en `components/common/`.
 - Todas las peticiones HTTP pasan por `lib/api-client.ts`.
+- Los colores salen solo de los tokens de diseño de `src/index.css` (tema claro y oscuro); nunca valores hex ni la paleta por defecto de Tailwind. Reglas, tabla completa de tokens y contrastes verificados en [`docs/design/sistema-de-color.md`](docs/design/sistema-de-color.md); las pruebas `src/design*.test.ts` lo vigilan.
 
 ### General
 

@@ -36,6 +36,7 @@ const marcelo: AuditActor = {
   cod_sis: '10452',
   tipo: 'persona',
   etiqueta: 'Marcelo Quiroga Andrade',
+  rol: 'Docente',
 }
 
 const daniela: AuditActor = {
@@ -44,6 +45,7 @@ const daniela: AuditActor = {
   cod_sis: '20240012',
   tipo: 'persona',
   etiqueta: 'Daniela Ferrufino Soliz',
+  rol: 'Auxiliar',
 }
 
 const jose: AuditActor = {
@@ -52,6 +54,7 @@ const jose: AuditActor = {
   cod_sis: '202312345',
   tipo: 'persona',
   etiqueta: 'José Luis Pérez Núñez',
+  rol: 'Administrador',
 }
 
 const automatic: AuditActor = {
@@ -60,6 +63,7 @@ const automatic: AuditActor = {
   cod_sis: null,
   tipo: 'automatico',
   etiqueta: 'Automático',
+  rol: 'Docente',
 }
 
 const system: AuditActor = {
@@ -68,6 +72,7 @@ const system: AuditActor = {
   cod_sis: null,
   tipo: 'sistema',
   etiqueta: 'Sistema',
+  rol: 'Administrador',
 }
 
 function entry(

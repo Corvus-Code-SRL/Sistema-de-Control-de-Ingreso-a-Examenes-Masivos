@@ -3,6 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      El tema sigue la preferencia del navegador o del sistema. Los colores de
+      theme-color replican --sciem-bg-app (claro y oscuro) de src/index.css:
+      HTML no puede leer variables CSS, así que se actualizan a mano junto al token.
+    -->
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#F3F8F8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#121817" media="(prefers-color-scheme: dark)" />
     <title>SCIEM</title>
   </head>
   <body>

@@ -165,7 +165,7 @@ function ProcessingState({
           aria-live="polite"
           className="flex flex-col items-center justify-center rounded-xl border border-border-soft bg-sunken px-6 py-12 text-center"
         >
-          <span className="flex size-12 items-center justify-center rounded-full bg-brand-soft text-brand">
+          <span className="flex size-12 items-center justify-center rounded-full bg-brand-soft text-brand-fg">
             <LoaderCircle
               aria-hidden="true"
               className="size-6 animate-spin"

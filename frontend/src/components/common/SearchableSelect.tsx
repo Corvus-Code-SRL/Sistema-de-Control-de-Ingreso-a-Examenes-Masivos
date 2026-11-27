@@ -91,7 +91,7 @@ export function SearchableSelect({
           aria-invalid={invalid || undefined}
           disabled={disabled}
           className={cn(
-            'w-full justify-between bg-background px-3 font-normal',
+            'w-full justify-between border-input bg-field px-3 font-normal hover:bg-field aria-expanded:bg-field dark:border-input dark:bg-field dark:hover:bg-field',
             selected === null && 'text-muted-foreground',
             className
           )}

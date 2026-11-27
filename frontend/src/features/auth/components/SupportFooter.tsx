@@ -2,7 +2,7 @@ import { SUPPORT_EMAIL, supportMailto } from '../lib/support'
 import { cn } from '@/lib/utils'
 
 export const LINK_CLASSNAME =
-  'rounded-sm font-semibold text-brand outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50'
+  'rounded-sm font-semibold text-brand-fg outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus'
 
 /** «¿Problemas para ingresar?»: la salida real para quien no puede entrar por ningún camino. */
 export function SupportFooter({ sis, className }: { sis?: string; className?: string }) {

@@ -113,7 +113,7 @@ describe('RectifyRiskRecordPage — búsqueda de estudiantes', () => {
       expect(button).toHaveTextContent('Rectificar')
       expect(button).toHaveAttribute('data-variant', 'success')
       expect(button).toHaveAttribute('data-size', 'xl')
-      expect(button).toHaveClass('bg-ok', 'text-primary-foreground', 'hover:bg-ok-fg', 'h-11')
+      expect(button).toHaveClass('bg-ok-solid', 'text-on-solid', 'hover:bg-ok-solid-hover', 'h-11')
       expect(button.querySelector('svg')).not.toBeNull()
     }
   })

@@ -26,7 +26,7 @@ export function InvitationsList({ invitations, selectedId, onSelect }: Invitatio
                 aria-current={selected ? 'true' : undefined}
                 className={cn(
                   'flex w-full items-center gap-3 border-b border-border px-4 py-3.5 text-left transition-colors',
-                  selected ? 'bg-brand-soft shadow-[inset_3px_0_0_var(--color-brand)]' : 'hover:bg-sunken'
+                  selected ? 'bg-brand-soft shadow-[inset_3px_0_0_var(--color-brand)]' : 'hover:bg-muted'
                 )}
               >
                 <span

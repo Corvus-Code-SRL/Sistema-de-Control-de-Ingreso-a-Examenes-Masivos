@@ -248,9 +248,9 @@ function EvidenceBlock({ incident }: { incident: IncidentReview }) {
         type="button"
         onClick={open}
         disabled={status === 'loading'}
-        className="flex items-center gap-3 rounded-lg border border-border px-3.5 py-3 text-left hover:bg-sunken disabled:opacity-60"
+        className="flex items-center gap-3 rounded-lg border border-border px-3.5 py-3 text-left hover:bg-muted disabled:opacity-60"
       >
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand-fg">
           <FileImage className="size-4" aria-hidden="true" />
         </span>
         <div className="flex-1 min-w-0">

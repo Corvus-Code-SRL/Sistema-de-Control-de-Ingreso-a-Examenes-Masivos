@@ -26,7 +26,7 @@ React + TS → REST API → Controller → Form Request → Service → Eloquent
 - Redis es infraestructura transversal (cache, sesiones, colas).
 - Modelos: nombre de clase en inglés, `protected $table` explícito (tabla en español, ej. `'grupo'`).
 - Rutas por módulo en `routes/api/<modulo>.php`, cargadas desde `routes/api.php`.
-- Frontend: `components/ui` (primitivas shadcn — revisar antes de crear una nueva), `components/layout`, `components/common`, `features/<nombre>/` (cada feature con components/pages/services/hooks/types propios, expuestos solo vía su `index.ts` — un feature nunca importa de rutas internas de otro). Alias `@/*` → `src/*`. Naming: `PascalCase.tsx` (componentes), `useNombre.ts` (hooks), `nombreService.ts` (servicios), `nombre.types.ts` (tipos). Toda llamada HTTP pasa por `lib/api-client.ts`.
+- Frontend: `components/ui` (primitivas shadcn — revisar antes de crear una nueva), `components/layout`, `components/common`, `features/<nombre>/` (cada feature con components/pages/services/hooks/types propios, expuestos solo vía su `index.ts` — un feature nunca importa de rutas internas de otro). Alias `@/*` → `src/*`. Naming: `PascalCase.tsx` (componentes), `useNombre.ts` (hooks), `nombreService.ts` (servicios), `nombre.types.ts` (tipos). Toda llamada HTTP pasa por `lib/api-client.ts`. Colores solo vía tokens de diseño (`src/index.css`, reglas en `docs/design/sistema-de-color.md`), nunca hex ni paleta por defecto de Tailwind.
 
 ### Módulos
 

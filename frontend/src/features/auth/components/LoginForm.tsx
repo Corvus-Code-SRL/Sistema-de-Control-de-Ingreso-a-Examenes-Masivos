@@ -253,7 +253,7 @@ export function LoginForm({ form, keyboardOpen }: LoginFormProps) {
       <div
         className={cn(
           'sticky bottom-0 z-10 -mx-4 mt-auto flex flex-col gap-2 border-t border-border-soft bg-surface px-4 pt-3',
-          'pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-4px_12px_color-mix(in_srgb,var(--sciem-brand-deep)_6%,transparent)]',
+          'pb-[max(1rem,env(safe-area-inset-bottom))] shadow-sticky',
           'md:static md:mx-0 md:mt-0 md:border-0 md:bg-transparent md:p-0 md:shadow-none'
         )}
       >

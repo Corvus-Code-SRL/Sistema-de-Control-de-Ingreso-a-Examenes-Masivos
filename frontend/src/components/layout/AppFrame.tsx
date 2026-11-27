@@ -1,5 +1,5 @@
 import { useCallback, useId, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
-import { Menu, PanelLeftOpen } from 'lucide-react'
+import { Menu, PanelLeft } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -84,19 +84,23 @@ export function AppFrame({ mode, header, mainRef, children }: AppFrameProps) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-border bg-background/95 px-4 py-2.5 backdrop-blur print:hidden">
+        <header className="sticky top-0 z-20 flex h-topbar shrink-0 items-center gap-2 border-b border-border bg-background/95 px-4 backdrop-blur print:hidden">
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
             {/*
               Sin `asChild`: las primitivas de shadcn no usan forwardRef y en React 18
               el ref de Radix no llegaría al botón. El estilo se toma de buttonVariants.
             */}
             <SheetTrigger
-              className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'lg:hidden')}
+              className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), '-ml-2 lg:hidden')}
               aria-label="Abrir menú"
             >
-              <Menu className="size-5" />
+              <Menu className="size-4" strokeWidth={1.75} />
             </SheetTrigger>
-            <SheetContent side="left" className="w-72 p-0">
+            {/* El botón de cierre se centra en la cabecera del menú, que tiene la altura de la barra superior. */}
+            <SheetContent
+              side="left"
+              className="w-72 p-0 *:data-[slot=sheet-close]:top-1.5 *:data-[slot=sheet-close]:right-2"
+            >
               <SheetTitle className="sr-only">Navegación principal</SheetTitle>
               <AppSidebar
                 onNavigate={() => setMenuOpen(false)}
@@ -115,9 +119,9 @@ export function AppFrame({ mode, header, mainRef, children }: AppFrameProps) {
               aria-expanded={false}
               aria-controls={asideId}
               onClick={sidebarLayout.toggle}
-              className="hidden lg:inline-flex"
+              className="-ml-2 hidden text-muted-foreground hover:text-foreground lg:inline-flex"
             >
-              <PanelLeftOpen className="size-5" aria-hidden="true" />
+              <PanelLeft className="size-4" strokeWidth={1.75} aria-hidden="true" />
             </Button>
           )}
 

@@ -45,7 +45,7 @@ export function PasswordInput({ groupClassName, className, ...props }: PasswordI
           onClick={() => setVisible((current) => !current)}
           className={cn(
             'size-11 text-muted-foreground md:size-10',
-            visible && 'bg-brand-soft text-brand hover:bg-brand-soft'
+            visible && 'bg-brand-soft text-brand-fg hover:bg-brand-soft'
           )}
         >
           {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}

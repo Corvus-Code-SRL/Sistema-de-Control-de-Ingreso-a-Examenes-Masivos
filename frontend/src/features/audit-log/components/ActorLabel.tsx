@@ -6,8 +6,8 @@ interface ActorLabelProps {
 }
 
 /**
- * Autor de una operación. Una persona se muestra con su nombre y su código SIS; «Sistema» y «Automático»
- * llevan icono y texto, nunca solo color.
+ * Autor de una operación. Una persona se muestra con su nombre, su código SIS y el rol con el que la hizo
+ * (aunque hoy tenga otro); «Sistema» y «Automático» llevan icono y texto, nunca solo color.
  */
 export function ActorLabel({ actor }: ActorLabelProps) {
   if (actor.tipo === 'automatico') {
@@ -32,6 +32,7 @@ export function ActorLabel({ actor }: ActorLabelProps) {
     <span className="block min-w-0">
       <span className="block truncate text-sm font-medium text-foreground">{actor.etiqueta}</span>
       {actor.cod_sis && <span className="sciem-tnum block text-xs text-muted-foreground">{actor.cod_sis}</span>}
+      {actor.rol && <span className="block text-xs text-muted-foreground">como {actor.rol}</span>}
     </span>
   )
 }

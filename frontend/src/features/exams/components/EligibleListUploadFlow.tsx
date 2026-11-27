@@ -76,7 +76,7 @@ export function EligibleListUploadFlow({
       <SheetContent className="w-full sm:max-w-[520px] flex flex-col">
         <SheetHeader className="border-b border-border-soft p-6">
           <SheetTitle className="flex items-center gap-2">
-            <FileUp aria-hidden="true" className="size-5 text-brand" />
+            <FileUp aria-hidden="true" className="size-5 text-brand-fg" />
               Cargar lista de habilitados
           </SheetTitle>
           <SheetDescription>
@@ -102,7 +102,7 @@ export function EligibleListUploadFlow({
                 className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-border-strong
                 bg-sunken p-8 text-center cursor-pointer hover:bg-muted"
               >
-                <span className="flex size-12 items-center justify-center rounded-full bg-brand-soft text-brand">
+                <span className="flex size-12 items-center justify-center rounded-full bg-brand-soft text-brand-fg">
                   <Upload aria-hidden="true" className="size-6" />
                 </span>
                 <span className="sciem-label">Arrastre el archivo aquí o elija uno</span>
@@ -118,7 +118,7 @@ export function EligibleListUploadFlow({
                 <a
                   href="/plantillas/nomina-plantilla.csv"
                   download="nomina-plantilla.csv"
-                  className="inline-flex items-center gap-1.5 text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-fg underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <Download aria-hidden="true" className="size-4" />
                   Descargar plantilla
@@ -140,7 +140,7 @@ export function EligibleListUploadFlow({
 
           {upload.step === 'previewing' && (
             <div className="flex flex-col items-center gap-3 py-12" role="status" aria-live="polite">
-              <LoaderCircle className="size-8 animate-spin text-brand" aria-hidden="true" />
+              <LoaderCircle className="size-8 animate-spin text-brand-fg" aria-hidden="true" />
               <p className="sciem-label">Procesando archivo…</p>
               {upload.file && <p className="sciem-supporting text-muted-foreground truncate max-w-full">{upload.file.name}</p>}
             </div>
@@ -237,7 +237,7 @@ export function EligibleListUploadFlow({
 
           {upload.step === 'confirming' && (
             <div className="flex flex-col items-center gap-3 py-12" role="status" aria-live="polite">
-              <LoaderCircle className="size-8 animate-spin text-brand" aria-hidden="true" />
+              <LoaderCircle className="size-8 animate-spin text-brand-fg" aria-hidden="true" />
               <p className="sciem-label">Reemplazando la lista…</p>
             </div>
           )}

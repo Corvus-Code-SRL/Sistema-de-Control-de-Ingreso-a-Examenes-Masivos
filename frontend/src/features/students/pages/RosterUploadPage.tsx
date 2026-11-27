@@ -132,7 +132,7 @@ function GroupPicker({ options, selectedId, isLoading, error, onRetry, onSelect 
         id={selectId}
         value={selectedId === null ? '' : String(selectedId)}
         onChange={(event) => onSelect(groupIdFrom(event.currentTarget.value))}
-        className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        className="h-10 w-full rounded-md border border-input bg-field px-3 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
         <option value="">Seleccione un grupo</option>
         {!listed && <option value={String(selectedId)}>Grupo seleccionado</option>}
