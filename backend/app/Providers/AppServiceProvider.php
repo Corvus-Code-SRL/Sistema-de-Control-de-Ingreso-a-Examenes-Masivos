@@ -7,6 +7,7 @@ use App\Services\Academic\Importers\CsvStudentRosterReader;
 use App\Services\Academic\Importers\XlsxStudentRosterReader;
 use App\Services\Security\Contracts\SisGateway;
 use App\Services\Security\FakeSisGateway;
+use App\Support\Audit\AuditContext;
 use App\Support\Database\SciemPostgresConnector;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
@@ -22,6 +23,9 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(SisGateway::class, function () {
             return new FakeSisGateway();
         });
+
+        // Sesión de la petición para la bitácora: una sola instancia por petición (la llena TrackAuditSession).
+        $this->app->singleton(AuditContext::class);
 
         // RNF-14: conector propio de PostgreSQL (nombre de aplicación y límites de sesión).
         $this->app->bind('db.connector.pgsql', function ($app) {

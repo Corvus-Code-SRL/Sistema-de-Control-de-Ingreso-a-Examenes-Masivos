@@ -24,8 +24,8 @@ Route::post('auth/login', [AuthController::class, 'login'])
 
 // Todo lo demás exige el token de Sanctum, una cuenta ACTIVA y la contraseña temporal ya cambiada.
 // Un módulo nuevo queda protegido sin tocar nada aquí; RoutesRequireAuthenticationTest falla si
-// alguna ruta queda fuera de este grupo.
-Route::middleware(['auth:sanctum', 'account.active', 'password.changed'])->group(function () {
+// alguna ruta queda fuera de este grupo. session.track une la bitácora con la sesión del token.
+Route::middleware(['auth:sanctum', 'session.track', 'account.active', 'password.changed'])->group(function () {
     Route::get('/user', function (Request $request) {
         return $request->user();
     });

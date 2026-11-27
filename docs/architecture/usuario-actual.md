@@ -54,6 +54,15 @@ La regla la vigila `tests/Unit/Architecture/ServicesDoNotResolveCurrentUserTest.
 
 `AuditLogService::registrar()` exige el id del autor (último parámetro, obligatorio). No hay respaldo silencioso: el Controller firma con la cuenta autenticada y los seeders con `SystemActor`.
 
+### Sesión de la bitácora: `AuditContext`
+
+Además del autor, cada fila de la bitácora puede llevar la **sesión** (el dispositivo) desde la que se hizo.
+Un Service no la busca: el middleware `TrackAuditSession` (`session.track`, justo después de `auth:sanctum`)
+entrega a `App\Support\Audit\AuditContext` el token de la petición y lo olvida al terminar. `AuditContext`
+no lee `auth()` ni la petición; busca la sesión por ese token solo si la petición escribe en la bitácora
+(una consulta como máximo). Sin token propio (tareas programadas, seeders, comandos, `Sanctum::actingAs`) la
+sesión es `null`. Una prueba fija la sesión con `forToken()` o `forSession()`.
+
 ## 2. Código SIS: una sola forma canónica
 
 `App\Support\SisCode::normalize()` es la única definición. **Recorta** los bordes, **pasa a mayúsculas** y **colapsa los espacios internos** (incluido el espacio duro que deja Excel). Nada más:
