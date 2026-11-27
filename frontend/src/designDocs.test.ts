@@ -24,7 +24,7 @@ function sectionOf(start: string, end: string): string {
 /** Celdas de las filas de tabla cuya primera columna es una propiedad personalizada en código. */
 function rows(section: string): string[][] {
   return section
-    .split('\n')
+    .split(/\r?\n/)
     .filter((line) => /^\| `--[a-z0-9-]+` \|/.test(line))
     .map((line) => line.slice(1, -1).split(' | ').map((cell) => cell.trim()))
 }
@@ -78,7 +78,7 @@ describe('docs/design/sistema-de-color.md', () => {
 
   it('la tabla de contrastes publica exactamente los pares verificados, con sus relaciones', () => {
     const published = sectionOf('## 5.', '## 6.')
-      .split('\n')
+      .split(/\r?\n/)
       .filter((line) => /^\| `[a-z0-9-]+` \| `[a-z0-9-]+` \|/.test(line))
       .map((line) => line.slice(1, -1).split(' | ').map((cell) => code(cell.trim())))
 
