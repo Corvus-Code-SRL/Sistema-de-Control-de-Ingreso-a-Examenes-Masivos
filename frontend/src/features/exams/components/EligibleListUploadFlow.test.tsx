@@ -130,7 +130,7 @@ describe('EligibleListUploadFlow', () => {
     await user.upload(input, makeFile())
 
     expect(
-      await screen.findByText('Se reemplazará la lista actual, incluidos los ajustes manuales.')
+      await screen.findByText('Se reemplazará la lista actual.')
     ).toBeInTheDocument()
   })
 

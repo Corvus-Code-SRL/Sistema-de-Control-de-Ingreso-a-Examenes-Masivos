@@ -19,7 +19,7 @@ import { STORED_REASON_LABELS } from '../types/eligibleList.types'
 interface EligibleListUploadFlowProps {
   open: boolean
   examId: number | null
-  /** La lista ya tiene no habilitados guardados o hay cambios sin guardar que el archivo reemplazaría. */
+  /** La lista ya tiene no habilitados guardados que el archivo reemplazaría. */
   replacesCurrentList: boolean
   onClose: () => void
   /** El servidor ya reemplazó la lista: la página debe descartar sus cambios locales y recargar. */
@@ -205,7 +205,7 @@ export function EligibleListUploadFlow({
                 <Alert className="border-warn-border bg-warn-soft text-warn-fg">
                   <AlertTriangle aria-hidden="true" />
                   <AlertDescription>
-                    Se reemplazará la lista actual, incluidos los ajustes manuales.
+                    Se reemplazará la lista actual.
                   </AlertDescription>
                 </Alert>
               )}

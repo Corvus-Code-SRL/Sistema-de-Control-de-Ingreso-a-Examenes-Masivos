@@ -66,18 +66,3 @@ export function eligibilityLabel(estado: EligibilityStatus): string {
     default: return String(estado)
   }
 }
-
-/** Valida el detalle cuando el motivo es OTRO. */
-export function validateOtroDetalle(detalle: string): string | null {
-  const trimmed = detalle.trim()
-  if (trimmed.length < 10) {
-    return 'El detalle debe tener al menos 10 caracteres.'
-  }
-  if (trimmed.length > 500) {
-    return 'El detalle no puede superar los 500 caracteres.'
-  }
-  if (trimmed.startsWith(':')) {
-    return 'El detalle no puede empezar con dos puntos (:).'
-  }
-  return null
-}
