@@ -112,6 +112,29 @@ describe('EligibleListUploadFlow', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('ofrece la plantilla y la nota del código SIS dentro del diálogo', () => {
+    render(
+      <EligibleListUploadFlow
+        open
+        examId={1}
+        replacesCurrentList={false}
+        onClose={vi.fn()}
+        onReplaced={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('heading', { name: 'Cargar lista de habilitados' })).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: 'Descargar plantilla' })
+    expect(link).toHaveAttribute('href', '/plantillas/nomina-plantilla.csv')
+    expect(link).toHaveAttribute('download')
+    expect(link.className).toMatch(/text-sm/)
+    expect(link.querySelector('svg')).not.toBeNull()
+    expect(
+      screen.getByText('Se compara por código SIS; los demás datos son referenciales.')
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/¿No tiene el formato\?/)).not.toBeInTheDocument()
+  })
+
   it('avisa que se reemplaza la lista actual si hay no habilitados guardados o cambios sin guardar', async () => {
     previewMock.mockResolvedValue(simplePreview())
 
