@@ -3,11 +3,11 @@ set -eu
 cd /var/www/sciem/backend
 
 if [ -z "${APP_KEY:-}" ]; then
-  echo 'Falta APP_KEY en deployment/docker/.env.' >&2
+  echo 'Falta APP_KEY en .env.' >&2
   exit 1
 fi
 if [ -z "${DB_PASSWORD:-}" ] || [ "$DB_PASSWORD" = 'REEMPLAZAR_CLAVE_APP_DB' ]; then
-  echo 'Falta la contraseña real de sciem_app en deployment/docker/.env.' >&2
+  echo 'Falta la contraseña real de sciem_app en .env.' >&2
   exit 1
 fi
 

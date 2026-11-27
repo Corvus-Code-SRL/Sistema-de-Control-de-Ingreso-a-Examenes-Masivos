@@ -16,8 +16,8 @@ Esta configuración produce una imagen con React compilado, Laravel/PHP 8.0.30 y
 | `deployment/docker/scripts/init-app.sh` | Aplica migraciones, ejecuta seeders normales y crea el primer administrador humano. |
 | `deployment/docker/scripts/bootstrap-admin.php` | Alta inicial no interactiva desde variables; usa `UserService` y omite el alta si ya hay administrador humano activo. |
 | `deployment/docker/scripts/finalize-db.sh` | Revoca `CREATE` sobre la base después de las migraciones. |
-| `deployment/docker/docker-compose.yml` | Ordena infraestructura, inicialización y servicios permanentes. |
-| `deployment/docker/.env.example` | Plantilla pública del **único** `.env` privado de despliegue. |
+| `docker-compose.yml` | Ordena infraestructura, inicialización y servicios permanentes. |
+| `.env.example` | Plantilla pública del **único** `.env` privado de despliegue. |
 | `.gitattributes` en la raíz del repositorio | Fuerza fin de línea LF en los scripts, el Dockerfile y la configuración, aunque el repositorio se clone en Windows. |
 
 La configuración de desarrollo `docker-compose.dev.yml` no cambia. El build de producción usa el `.dockerignore` de la **raíz**, porque su contexto es la raíz del repositorio. `backend/.env` queda para desarrollo y no se copia en la imagen.
@@ -26,18 +26,18 @@ La configuración de desarrollo `docker-compose.dev.yml` no cambia. El build de 
 
 1. Instalar Docker Engine y Docker Compose con soporte de **contenedores Linux**: todas las imágenes (PHP, PostgreSQL, Redis) son Linux. En Linux funciona directo; en Windows Server hace falta WSL 2 o una máquina virtual Linux (Docker Desktop no está pensado para Windows Server). Confirmarlo con infraestructura antes del deploy. Preparar dominio, TLS y proxy inverso. El ejemplo publica Apache solo en `127.0.0.1:18080`, por lo que supone un proxy en el mismo host; sin proxy, ver «Red, proxy y límites».
    Si el repositorio se clonó en Windows, comprobar que los scripts tienen fin de línea LF: `git ls-files --eol deployment/docker/scripts deployment/docker/postgres/init` debe mostrar `w/lf` en todos. Con `w/crlf`, los scripts no arrancan dentro del contenedor; volver a clonar el repositorio después de integrar `.gitattributes`.
-2. Desde la raíz del repositorio, crear `deployment/docker/.env` copiando `.env.example`, completar todas las variables y protegerlo con `chmod 600 deployment/docker/.env`. **No subir `.env` a Git.**
+2. Desde la raíz del repositorio, crear `.env` copiando `.env.example`, completar todas las variables y protegerlo con `chmod 600 .env`. **No subir `.env` a Git.**
 3. Usar contraseñas diferentes para `POSTGRES_PASSWORD`, `DB_PASSWORD` y `BOOTSTRAP_ADMIN_PASSWORD`. Reemplazar todos los marcadores de ejemplo. `BOOTSTRAP_ADMIN_CODE` debe ser el código real de la persona autorizada, no una cuenta de prueba.
 4. Generar `APP_KEY` una sola vez y guardarla fuera del servidor junto con los respaldos. Si hay PHP local: `php -r 'echo "base64:".base64_encode(random_bytes(32)).PHP_EOL;'`.
 5. Para simulación local: `APP_URL=http://localhost:18080` y `VITE_API_URL=http://localhost:18080/api`. En el servidor usar `https://dominio-real` y `https://dominio-real/api` **antes de construir**; Vite incorpora la URL al JavaScript.
 6. Validar sin imprimir secretos y ejecutar el despliegue:
 
 ```bash
-docker compose --env-file deployment/docker/.env \
-  -f deployment/docker/docker-compose.yml -p sciem-prod config --quiet
+docker compose --env-file .env \
+  -f docker-compose.yml -p sciem-prod config --quiet
 
-docker compose --env-file deployment/docker/.env \
-  -f deployment/docker/docker-compose.yml -p sciem-prod up --build -d
+docker compose --env-file .env \
+  -f docker-compose.yml -p sciem-prod up --build -d
 ```
 
 `postgres` y `redis` deben pasar sus healthchecks. PostgreSQL ejecuta `01-sciem.sh` solo cuando `pg_data` está vacío. `app-init` espera a ambos, aplica las migraciones y seeders normales, y crea el administrador inicial si aún no existe. `db-finalize` espera a `app-init`, revoca el permiso temporal y termina. Solo después arrancan `web` y `scheduler`. Si falla un paso, `web` no debe publicarse.
@@ -45,11 +45,11 @@ docker compose --env-file deployment/docker/.env \
 Verificar:
 
 ```bash
-docker compose --env-file deployment/docker/.env \
-  -f deployment/docker/docker-compose.yml -p sciem-prod ps -a
+docker compose --env-file .env \
+  -f docker-compose.yml -p sciem-prod ps -a
 
-docker compose --env-file deployment/docker/.env \
-  -f deployment/docker/docker-compose.yml -p sciem-prod logs --tail=80 app-init db-finalize web scheduler
+docker compose --env-file .env \
+  -f docker-compose.yml -p sciem-prod logs --tail=80 app-init db-finalize web scheduler
 
 curl -I http://localhost:18080/
 ```
@@ -65,8 +65,8 @@ Una base nueva no tiene ninguna gestión ni periodo. Sin un periodo **vigente**,
 Después de que `app-init` y `db-finalize` terminen en `Exited (0)`, crear el periodo vigente. El ejemplo crea la gestión 2026, el periodo 2 y lo marca como vigente; se puede repetir sin duplicar datos:
 
 ```bash
-docker compose --env-file deployment/docker/.env \
-  -f deployment/docker/docker-compose.yml -p sciem-prod \
+docker compose --env-file .env \
+  -f docker-compose.yml -p sciem-prod \
   exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' <<'SQL'
 BEGIN;
 INSERT INTO gestion (anio) VALUES (2026) ON CONFLICT (anio) DO NOTHING;

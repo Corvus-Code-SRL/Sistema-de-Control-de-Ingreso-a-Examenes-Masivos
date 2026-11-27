@@ -10,7 +10,7 @@ privilegios de superusuario** de lo que ya resuelve el deploy con Docker.
 En esta guía, `DC` es el atajo del deploy (se ejecuta desde la raíz del repositorio):
 
 ```bash
-DC="docker compose --env-file deployment/docker/.env -f deployment/docker/docker-compose.yml -p sciem-prod"
+DC="docker compose --env-file .env -f docker-compose.yml -p sciem-prod"
 ```
 
 ## Qué aplica SCIEM y qué no
@@ -33,7 +33,7 @@ sesión al conectarse, y cualquier usuario puede hacer `SET` en su sesión.
 
 ## 1. Variables de entorno
 
-En producción van en `deployment/docker/.env`, el único `.env` del deploy; Compose lo entrega a `web`,
+En producción van en `.env`, el único `.env` del deploy; Compose lo entrega a `web`,
 `scheduler` y `app-init`. En desarrollo, en `backend/.env`.
 
 ```dotenv

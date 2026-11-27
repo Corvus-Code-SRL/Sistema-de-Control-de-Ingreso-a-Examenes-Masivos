@@ -166,7 +166,7 @@ mise.toml
 
 ## Estructura del repositorio
 
-> La estructura de abajo es la **estructura objetivo** documentada en `docs/architecture/`. El scaffold actual ya cubre la mayor parte (carpetas por módulo en `Http/Controllers`, `Http/Requests`, `Services`, `routes/api/`; `deployment/docker/{apache,postgres,redis}`), pero todavía faltan por crear: el `docker-compose.yml` de despliegue y el `Dockerfile`/`sciem.conf` de Apache, `frontend/.env.example`, la configuración de ESLint del frontend, y las traducciones en `backend/resources/lang/es/`.
+> La estructura de abajo es la **estructura objetivo** documentada en `docs/architecture/`. El despliegue Docker actual se define en `docker-compose.yml` en la raíz, con sus Dockerfile y configuraciones en `deployment/docker/`.
 
 ```text
 .
