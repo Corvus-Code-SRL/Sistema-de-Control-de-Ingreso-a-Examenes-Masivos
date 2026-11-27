@@ -57,7 +57,7 @@ export const ACCESS_BY_FEATURE: Record<AccessFeature, readonly RoleName[]> = {
   exam_timer: ['Docente', 'Invitado'],
 }
 
-const CAPABILITIES_BY_FEATURE = {
+export const CAPABILITIES_BY_FEATURE = {
   teaching: [
     'grupos.gestionar',
     'examenes.gestionar',
@@ -78,7 +78,7 @@ const CAPABILITIES_BY_FEATURE = {
   exam_timer: ['examenes.controlar-tiempo'],
 } as const
 
-const ROLE_OWN_CAPABILITIES = {
+export const ROLE_OWN_CAPABILITIES = {
   Auxiliar: ['ingreso.operar', 'incidencias.registrar', 'situaciones.registrar', 'asignaciones.consultar'],
   Administrador: ['administracion.gestionar'],
   Docente: [],

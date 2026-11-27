@@ -197,8 +197,9 @@ class AuthService
     }
 
     /**
-     * Permisos del rol y las pantallas (ui) que habilitan, en una sola consulta.
-     * Una fila de permiso_rol, permiso o ui_permiso INACTIVA no concede nada.
+     * Permisos vigentes del rol y las pantallas (ui) que habilitan, en una sola consulta.
+     * Solo cuenta el tramo abierto de permiso_rol (fecha_fin nula, RNF-01); una fila de permiso_rol,
+     * permiso o ui_permiso INACTIVA tampoco concede nada.
      *
      * @return array{permisos: array<int, string>, interfaces: array<int, string>}
      */
@@ -215,6 +216,7 @@ class AuthService
                     ->whereRaw('ui.estado::text = ?', [RecordStatus::ACTIVE]);
             })
             ->where('pr.id_rol', $role->id_rol)
+            ->whereNull('pr.fecha_fin')
             ->whereRaw('pr.estado::text = ?', [RecordStatus::ACTIVE])
             ->whereRaw('p.estado::text = ?', [RecordStatus::ACTIVE])
             ->orderBy('p.nombre_permiso')
