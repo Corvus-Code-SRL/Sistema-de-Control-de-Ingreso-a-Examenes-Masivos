@@ -33,7 +33,28 @@ class EligibleListFlowTest extends TestCase
         $this->actAsTeacher($this->docenteId);
     }
 
-    public function test_flujo_crear_asignar_habilitar_rechazar(): void
+    /**
+     * Carga un archivo con los cod_sis indicados (preview + confirmación): los demás de la
+     * nómina quedan «No habilitado».
+     *
+     * @param array<int, string> $sisCodes
+     */
+    private function uploadList(int $examId, array $sisCodes): void
+    {
+        $rows = array_map(
+            static fn (string $sis): array => [$sis, 'APELLIDO', 'NOMBRE'],
+            $sisCodes
+        );
+        $token = $this->post(
+            "/api/examenes/{$examId}/habilitados/preview",
+            ['archivo' => $this->csvFile($rows)],
+            ['Accept' => 'application/json']
+        )->assertOk()->json('data.token');
+
+        $this->postJson("/api/examenes/{$examId}/habilitados/confirm", ['token' => $token])->assertOk();
+    }
+
+    public function test_flujo_crear_asignar_cargar_rechazar(): void
     {
         // 1. Crear examen con un ambiente y asignar el grupo.
         $exam = $this->createExam([], [$this->aulaId]);
@@ -51,23 +72,16 @@ class EligibleListFlowTest extends TestCase
             $this->assertSame('HABILITADO', $estudiante['estado_habilitacion']);
         }
 
-        // 3. PUT /habilitados marcando uno NO_HABILITADO con motivo.
+        // 3. Se carga un archivo que solo trae al segundo estudiante.
         $noHabilitadoId = (int) $lista[0]['id_estudiante'];
+        $this->uploadList((int) $exam->id_examen, [(string) $lista[1]['codigo_sis']]);
 
-        $this->putJson("/api/examenes/{$exam->id_examen}/habilitados", [
-            'cambios' => [[
-                'id_estudiante' => $noHabilitadoId,
-                'estado_habilitacion' => 'NO_HABILITADO',
-                'motivo' => 'ASISTENCIA_INSUFICIENTE',
-            ]],
-        ])->assertOk();
-
-        // 4. La fila existe con NO_HABILITADO.
+        // 4. La fila del primero existe con NO_HABILITADO y el motivo fijo.
         $this->assertDatabaseHas('examen_estudiante', [
             'id_examen' => $exam->id_examen,
             'id_estudiante' => $noHabilitadoId,
             'estado_habilitacion' => 'NO_HABILITADO',
-            'observacion' => 'ASISTENCIA_INSUFICIENTE',
+            'observacion' => 'NO_FIGURA_EN_LISTA',
         ]);
 
         // 5. El control de ingreso lo rechaza con el motivo.
@@ -88,7 +102,7 @@ class EligibleListFlowTest extends TestCase
         );
 
         $this->assertSame(VerificationService::NOT_ENABLED, $verdict['veredicto']);
-        $this->assertStringContainsString('Motivo: Asistencia insuficiente', $verdict['motivo']);
+        $this->assertStringContainsString('Motivo: No figura en la lista cargada', $verdict['motivo']);
     }
 
     public function test_nomina_recargada_despues_de_asignar_aparece_habilitada(): void
@@ -173,15 +187,8 @@ class EligibleListFlowTest extends TestCase
             ->json('data.estudiantes');
 
         $noHabilitadoId = (int) $lista[0]['id_estudiante'];
-        $habilitadoId = (int) $lista[1]['id_estudiante'];
 
-        $this->putJson("/api/examenes/{$exam->id_examen}/habilitados", [
-            'cambios' => [[
-                'id_estudiante' => $noHabilitadoId,
-                'estado_habilitacion' => 'NO_HABILITADO',
-                'motivo' => 'ASISTENCIA_INSUFICIENTE',
-            ]],
-        ])->assertOk();
+        $this->uploadList((int) $exam->id_examen, [(string) $lista[1]['codigo_sis']]);
 
         // Pasar a FINALIZADO directo (la foto congelada conserva las filas).
         DB::table('examen')->where('id_examen', $exam->id_examen)->update(['estado' => Exam::FINALIZADO]);
@@ -204,7 +211,7 @@ class EligibleListFlowTest extends TestCase
         $this->assertSame(0, $historial['totales']['ausentes']);
     }
 
-    public function test_flujo_completo_manual_y_archivo_hasta_los_totales(): void
+    public function test_flujo_completo_por_archivo_hasta_los_totales(): void
     {
         $this->enrollStudents($this->grupoPropioId, 2);
 
@@ -226,14 +233,10 @@ class EligibleListFlowTest extends TestCase
             ->all();
         [$manual, $porArchivo, $entra, $ausente] = $students;
 
-        // Manual: uno queda «No habilitado».
-        $this->putJson("/api/examenes/{$examId}/habilitados", ['cambios' => [[
-            'id_estudiante' => $manual->id_estudiante,
-            'estado_habilitacion' => 'NO_HABILITADO',
-            'motivo' => 'NO_ENTREGO_TRABAJO_FINAL',
-        ]]])->assertOk();
+        // Una carga previa deja fuera a los dos primeros.
+        $this->uploadList($examId, [$entra->cod_sis, $ausente->cod_sis]);
 
-        // Archivo: deja fuera al segundo y reemplaza el ajuste manual del primero (que sí figura).
+        // Archivo: el primero vuelve a figurar y el segundo queda fuera.
         $rows = array_map(
             static fn (string $sis): array => [$sis, 'APELLIDO', 'NOMBRE'],
             [$manual->cod_sis, $entra->cod_sis, $ausente->cod_sis]
@@ -248,24 +251,14 @@ class EligibleListFlowTest extends TestCase
             ->assertJsonPath('data.total_no_habilitados', 1)
             ->assertJsonPath('data.no_habilitados.0.id_estudiante', $porArchivo->id_estudiante);
 
-        // El primero vuelve a quedar «No habilitado» a mano: ahora hay dos, cada uno con su motivo.
-        $this->putJson("/api/examenes/{$examId}/habilitados", ['cambios' => [[
-            'id_estudiante' => $manual->id_estudiante,
-            'estado_habilitacion' => 'NO_HABILITADO',
-            'motivo' => 'NO_ENTREGO_TRABAJO_FINAL',
-        ]]])->assertOk();
+        // Una última carga deja fuera a los dos primeros: hay dos «No habilitado».
+        $this->uploadList($examId, [$entra->cod_sis, $ausente->cod_sis]);
 
         // Se abre el control de ingreso: el examen sigue PROGRAMADO y la lista deja de ser editable.
         app(RoomAssignmentService::class)->prepare($examId);
         $this->assertSame(Exam::PROGRAMADO, $exam->fresh()->estado);
         $this->assertNotNull($exam->fresh()->ingreso_abierto_en);
 
-        $this->putJson("/api/examenes/{$examId}/habilitados", ['cambios' => [[
-            'id_estudiante' => $entra->id_estudiante,
-            'estado_habilitacion' => 'NO_HABILITADO',
-            'motivo' => 'OTRO',
-            'detalle' => 'Ya con el control abierto',
-        ]]])->assertStatus(409);
         $this->post(
             "/api/examenes/{$examId}/habilitados/preview",
             ['archivo' => $this->csvFile($rows)],
@@ -276,7 +269,7 @@ class EligibleListFlowTest extends TestCase
         // Ambos son rechazados con su motivo; otro estudiante ingresa.
         $docente = User::query()->findOrFail($this->docenteId);
         $this->actingAs($docente);
-        $rejected = [[$manual, 'No entregó el trabajo final'], [$porArchivo, 'No figura en la lista cargada']];
+        $rejected = [[$manual, 'No figura en la lista cargada'], [$porArchivo, 'No figura en la lista cargada']];
 
         foreach ($rejected as [$student, $reason]) {
             $this->postJson("/api/control-ingreso/examenes/{$examId}/verificar", [
@@ -312,12 +305,11 @@ class EligibleListFlowTest extends TestCase
         // Llega la hora de inicio: EN_CURSO, con el ingreso ordinario todavía abierto.
         $this->assertSame(1, app(ExamLifecycleService::class)->startExpired(Carbon::now($zone)));
         $this->assertSame(Exam::EN_CURSO, $exam->fresh()->estado);
-        $this->putJson("/api/examenes/{$examId}/habilitados", ['cambios' => [[
-            'id_estudiante' => $entra->id_estudiante,
-            'estado_habilitacion' => 'NO_HABILITADO',
-            'motivo' => 'OTRO',
-            'detalle' => 'Ya en curso',
-        ]]])->assertStatus(409);
+        $this->post(
+            "/api/examenes/{$examId}/habilitados/preview",
+            ['archivo' => $this->csvFile($rows)],
+            ['Accept' => 'application/json']
+        )->assertStatus(409);
 
         $inProgress = app(ExamInProgressQueryService::class)->show($exam->fresh(), $docente)['totales'];
         $this->assertSame(1, $inProgress['a_tiempo']);

@@ -92,7 +92,7 @@ class ExamEligibleListCurrentTest extends TestCase
             ->assertJsonPath('data.estado', Exam::EN_CURSO);
     }
 
-    public function test_motivo_y_detalle_se_deserializan_de_observacion(): void
+    public function test_motivo_manual_anterior_se_sigue_mostrando(): void
     {
         $exam = $this->createExam();
         DB::table('grupo_examen')->insertOrIgnore([
@@ -102,16 +102,13 @@ class ExamEligibleListCurrentTest extends TestCase
 
         $studentId = $this->studentIdsInGroup()[0];
 
-        // La fila no existe: la creamos con el estado y la observación deseados.
+        // Motivo manual guardado antes de quitar la edición manual: se sigue mostrando.
         DB::table('examen_estudiante')->insert([
             'id_examen' => $exam->id_examen,
             'id_estudiante' => $studentId,
             'id_grupo' => $this->grupoPropioId,
             'estado_habilitacion' => 'NO_HABILITADO',
-            'observacion' => MotivoNoHabilitacion::toObservation(
-                MotivoNoHabilitacion::OTRO,
-                'Documento pendiente'
-            ),
+            'observacion' => 'OTRO: Documento pendiente',
             'estado_ingreso' => 'NO_INGRESO',
         ]);
 

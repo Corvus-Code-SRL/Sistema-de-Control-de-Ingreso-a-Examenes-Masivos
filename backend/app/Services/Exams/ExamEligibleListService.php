@@ -19,31 +19,27 @@ use App\Support\MotivoNoHabilitacion;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
 
 /**
- * Lista de habilitados de un examen (HU-028).
+ * Carga de la lista de habilitados de un examen (HU-028).
  *
- * Camino manual:
- * - current(): lista completa; editable solo dentro de la ventana de escritura
+ * - current(): nómina completa del examen con su estado; solo lectura en la
+ *   vista, "editable" indica si todavía se puede cargar un archivo
  *   (PROGRAMADO con el control de ingreso sin abrir, ver ExamEligibleListAccess).
- * - saveChanges(): PUT /habilitados, aplica cambios puntuales en una transacción.
- *
- * Camino por archivo:
  * - preview(): sube un archivo y muestra qué pasaría (no toca BD).
  * - replaceFromUpload(): confirma el preview y reemplaza la lista completa en
  *   una sola transacción, con la fila del examen bloqueada.
  *
  * Reglas:
- * - Fuera de la ventana de escritura, preview, confirm y PUT responden 409.
+ * - Fuera de la ventana de escritura, preview y confirm responden 409.
  * - current() se permite en cualquier estado (404 / 403 si no es del docente).
  * - Siempre hay un estado por estudiante. Por defecto HABILITADO.
- * - Los estudiantes que ya están en CASO ESPECIAL no se tocan: desde esta
- *   vista no se pueden cambiar (422 en el PUT, se omiten al reemplazar).
- * - El archivo solo trae cod_sis. Los del archivo quedan HABILITADO y los de la
+ * - Los estudiantes en CASO ESPECIAL no se tocan: se omiten al reemplazar.
+ * - Se compara solo por cod_sis. Los del archivo quedan HABILITADO y los de la
  *   nómina que no figuran quedan NO_HABILITADO con un motivo fijo.
+ * - Los motivos manuales de versiones anteriores se siguen mostrando en current().
  * - Archivo vacío: todos los de la nómina quedan NO_HABILITADO.
  */
 class ExamEligibleListService
@@ -206,7 +202,6 @@ class ExamEligibleListService
             $this->registerAudit(
                 $examId,
                 $teacherId,
-                'ARCHIVO',
                 $before,
                 $targets,
                 ['habilitados' => $habilitados, 'no_habilitados' => count($noHabilitados)]
@@ -231,93 +226,6 @@ class ExamEligibleListService
         }
 
         return $result;
-    }
-
-    /**
-     * Aplica cambios puntuales en una transacción.
-     *
-     * @param array<int, array{
-     *     id_estudiante: int,
-     *     estado_habilitacion: string,
-     *     motivo?: ?string,
-     *     detalle?: ?string
-     * }> $cambios
-     */
-    public function saveChanges(
-        int $examId,
-        array $cambios,
-        string $teacherId
-    ): void {
-        $this->access->getAvailableForWrite($examId, $teacherId);
-
-        if ($cambios === []) {
-            return;
-        }
-
-        DB::transaction(function () use ($examId, $cambios, $teacherId): void {
-            $this->access->lockForWrite($examId, $teacherId);
-
-            $requestedIds = array_values(array_unique(array_map(
-                static fn (array $c): int => (int) $c['id_estudiante'],
-                $cambios
-            )));
-
-            // La nómina vive en grupo_estudiante ⋈ grupo_examen: un estudiante sin fila en
-            // examen_estudiante también pertenece al examen (aparece como HABILITADO).
-            $existing = $this->roster->expected($examId)
-                ->whereIn('estudiante.id_estudiante', $requestedIds)
-                ->get([
-                    'estudiante.id_estudiante',
-                    'estado_habilitacion',
-                    'observacion',
-                    'id_grupo',
-                ])
-                ->keyBy('id_estudiante');
-
-            if (count($requestedIds) !== $existing->count()) {
-                throw ValidationException::withMessages([
-                    'cambios' => ['Uno o más estudiantes no pertenecen al examen indicado.'],
-                ]);
-            }
-
-            $hasSpecialCase = $existing->contains(
-                static fn ($row): bool => $row->estado_habilitacion === self::CASO_ESPECIAL
-            );
-
-            if ($hasSpecialCase) {
-                throw ValidationException::withMessages([
-                    'cambios' => ['No se puede modificar a un estudiante en CASO ESPECIAL desde esta vista.'],
-                ]);
-            }
-
-            $targets = [];
-            $groupIds = [];
-            $before = [];
-
-            foreach ($cambios as $cambio) {
-                $id = (int) $cambio['id_estudiante'];
-                $row = $existing[$id];
-
-                $targets[$id] = (string) $cambio['estado_habilitacion'] === self::HABILITADO
-                    ? ['estado_habilitacion' => self::HABILITADO, 'observacion' => null]
-                    : [
-                        'estado_habilitacion' => self::NO_HABILITADO,
-                        'observacion' => MotivoNoHabilitacion::toObservation(
-                            (string) ($cambio['motivo'] ?? ''),
-                            isset($cambio['detalle']) ? (string) $cambio['detalle'] : null
-                        ),
-                    ];
-                $groupIds[$id] = (int) $row->id_grupo;
-                $before[$id] = [
-                    'estado_habilitacion' => $row->estado_habilitacion,
-                    'observacion' => $row->observacion,
-                ];
-            }
-
-            $this->applyRows($examId, $targets, $groupIds);
-
-            $this->registerAudit($examId, $teacherId, 'MANUAL', $before, $targets, []);
-        });
     }
 
     public function current(int $examId, string $teacherId): EligibleListCurrentResult
@@ -417,7 +325,6 @@ class ExamEligibleListService
     private function registerAudit(
         int $examId,
         string $teacherId,
-        string $origin,
         array $before,
         array $after,
         array $counts
@@ -427,12 +334,12 @@ class ExamEligibleListService
             'examen_estudiante',
             [
                 'id_examen' => $examId,
-                'origen' => $origin,
+                'origen' => 'ARCHIVO',
                 'cambios' => $before,
             ],
             [
                 'id_examen' => $examId,
-                'origen' => $origin,
+                'origen' => 'ARCHIVO',
                 'total_cambios' => count($after),
                 'cambios' => $after,
             ] + $counts,

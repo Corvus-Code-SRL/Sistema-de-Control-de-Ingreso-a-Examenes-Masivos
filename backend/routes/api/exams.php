@@ -38,7 +38,7 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
     Route::get('/formulario', [ExamController::class, 'formOptions'])
          ->name('formulario');
 
-    // HU-028 — selector de exámenes para "Habilitar estudiantes".
+    // HU-028 — selector de exámenes para "Cargar lista de habilitados".
     // Debe ir antes de GET /{exam} para no chocar con el binding.
     Route::get('/habilitados', [ExamEligibleListController::class, 'exams'])
         ->name('habilitados.selector');
@@ -93,10 +93,6 @@ Route::prefix('examenes')->name('examenes.')->group(function () {
         Route::get('/', [ExamEligibleListController::class, 'current'])
             ->where('exam', '[0-9]{1,9}')
             ->name('current');
-
-        Route::put('/', [ExamEligibleListController::class, 'save'])
-            ->where('exam', '[0-9]{1,9}')
-            ->name('save');
 
         Route::post('/preview', [ExamEligibleListController::class, 'preview'])
             ->where('exam', '[0-9]{1,9}')

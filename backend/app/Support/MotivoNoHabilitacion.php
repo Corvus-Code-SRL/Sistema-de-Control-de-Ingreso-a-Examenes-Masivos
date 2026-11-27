@@ -3,14 +3,12 @@
 namespace App\Support;
 
 /**
- * Motivos por los que un docente deja a un estudiante como NO_HABILITADO
- * en la lista de habilitados de un examen (HU-028).
+ * Motivos de NO_HABILITADO guardados en examen_estudiante.observacion (HU-028).
  *
- * El valor se serializa en examen_estudiante.observacion como
- * "<CODIGO>" o "<CODIGO>: <detalle>" (solo si el motivo lo requiere).
- *
- * Los motivos son un catálogo corto y cerrado: el docente elige uno de
- * los existentes. "OTRO" exige detalle libre.
+ * El valor se serializa como "<CODIGO>" o "<CODIGO>: <detalle>". Desde que la
+ * lista solo se carga por archivo, el sistema escribe únicamente
+ * NO_FIGURA_EN_LISTA; los motivos manuales (all()) ya no se pueden elegir, pero
+ * las filas guardadas antes se siguen leyendo con fromObservation().
  */
 final class MotivoNoHabilitacion
 {
@@ -25,7 +23,7 @@ final class MotivoNoHabilitacion
      */
     public const NO_FIGURA_EN_LISTA       = 'NO_FIGURA_EN_LISTA';
 
-    /** @return array<int, string> motivos que el docente puede elegir a mano */
+    /** @return array<int, string> motivos manuales históricos, solo para leer filas antiguas */
     public static function all(): array
     {
         return [
@@ -34,56 +32,6 @@ final class MotivoNoHabilitacion
             self::NO_CUMPLE_PRERREQUISITO,
             self::OTRO,
         ];
-    }
-
-    public static function isValid(?string $value): bool
-    {
-        return in_array($value, self::all(), true);
-    }
-
-    /** "OTRO" exige detalle libre en la observación. */
-    public static function requiresDetail(?string $value): bool
-    {
-        return $value === self::OTRO;
-    }
-
-    /**
-     * Serializa el motivo en el formato de examen_estudiante.observacion.
-     * Si el motivo requiere detalle y el detalle es nulo o vacío, lanza
-     * InvalidArgumentException (el FormRequest ya lo valida; aquí se
-     * defiende el Service).
-     *
-     * Si el motivo no requiere detalle, el detalle se descarta aunque
-     * venga: no se concatena. Esto es intencional y se documenta en
-     * MotivoNoHabilitacionTest.
-     */
-    public static function toObservation(string $motivo, ?string $detalle): string
-    {
-        if (! self::isValid($motivo)) {
-            throw new \InvalidArgumentException(
-                "El motivo '{$motivo}' no es válido."
-            );
-        }
-
-        $detail = $detalle !== null ? trim($detalle) : null;
-
-        if ($detail !== null && str_starts_with($detail, ':')) {
-            throw new \InvalidArgumentException(
-                'El detalle no puede empezar con ":".'
-            );
-        }
-
-        if (self::requiresDetail($motivo)) {
-            if ($detail === null || $detail === '') {
-                throw new \InvalidArgumentException(
-                    'El motivo OTRO exige un detalle.'
-                );
-            }
-
-            return $motivo . ': ' . $detail;
-        }
-
-        return $motivo;
     }
 
     /**
