@@ -1,2 +1,9 @@
+# Archivos que se ejecutan o leen dentro de contenedores Linux: siempre con fin de línea LF, aunque el
+# repositorio se clone en Windows (Git para Windows convierte a CRLF por defecto con core.autocrlf=true).
+# Con CRLF, `#!/bin/sh` se lee como `/bin/sh\r` y los scripts de deployment/docker no arrancan.
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+deployment/docker/**/*.conf text eol=lf
+deployment/docker/**/*.ini  text eol=lf
 # Markdown de docs/ siempre en LF (los tests leen estos archivos)
 docs/**/*.md text eol=lf

@@ -1,0 +1,131 @@
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app: &app
+  image: sciem-app:${IMAGE_TAG:?Definir IMAGE_TAG}
+  restart: unless-stopped
+  pull_policy: never
+  init: true
+  env_file:
+    - ${SCIEM_ENV_FILE:-./.env}
+  environment:
+    POSTGRES_PASSWORD: ""
+    BOOTSTRAP_ADMIN_PASSWORD: ""
+  volumes:
+    - app_storage:/var/www/sciem/backend/storage
+    - backups:/respaldos
+  depends_on:
+    db-finalize:
+      condition: service_completed_successfully
+  logging: *logging
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?Definir POSTGRES_IMAGE}
+    restart: unless-stopped
+    # RNF-14: toda consulta de más de medio segundo y toda espera larga de lock quedan en el log
+    # (`logs postgres`). Evidencia del rendimiento con datos reales.
+    command: ["postgres", "-c", "log_min_duration_statement=500ms", "-c", "log_lock_waits=on"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Definir POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Definir POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Definir POSTGRES_PASSWORD}
+      DB_USERNAME: ${DB_USERNAME:?Definir DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD:?Definir DB_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./deployment/docker/postgres/init/01-sciem.sh:/docker-entrypoint-initdb.d/01-sciem.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -tAc "SELECT 1" >/dev/null']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    ports:
+      - "127.0.0.1:5433:5432"
+    logging: *logging
+
+  redis:
+    image: ${REDIS_IMAGE:?Definir REDIS_IMAGE}
+    command: ["redis-server", "--appendonly", "yes"]
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    logging: *logging
+
+  app-init:
+    image: sciem-app:${IMAGE_TAG:?Definir IMAGE_TAG}
+    build:
+      context: .
+      dockerfile: deployment/docker/apache/Dockerfile
+      args:
+        PHP_TAG: ${PHP_TAG:?Definir PHP_TAG}
+        NODE_TAG: ${NODE_TAG:?Definir NODE_TAG}
+        COMPOSER_TAG: ${COMPOSER_TAG:?Definir COMPOSER_TAG}
+        POSTGRES_TAG: ${POSTGRES_TAG:?Definir POSTGRES_TAG}
+        VITE_API_URL: ${VITE_API_URL:?Definir VITE_API_URL}
+    restart: "no"
+    init: true
+    env_file:
+      - ${SCIEM_ENV_FILE:-./.env}
+    environment:
+      POSTGRES_PASSWORD: ""
+    volumes:
+      - app_storage:/var/www/sciem/backend/storage
+      - backups:/respaldos
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["sh", "/usr/local/bin/sciem-init-app"]
+    logging: *logging
+
+  db-finalize:
+    image: ${POSTGRES_IMAGE:?Definir POSTGRES_IMAGE}
+    restart: "no"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Definir POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Definir POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Definir POSTGRES_PASSWORD}
+      DB_USERNAME: ${DB_USERNAME:?Definir DB_USERNAME}
+    volumes:
+      - ./deployment/docker/scripts/finalize-db.sh:/usr/local/bin/sciem-finalize-db:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      app-init:
+        condition: service_completed_successfully
+    entrypoint: ["sh", "/usr/local/bin/sciem-finalize-db"]
+    logging: *logging
+
+  web:
+    <<: *app
+    ports:
+      - "${WEB_BIND_IP:-127.0.0.1}:${WEB_PORT:-18080}:80"
+    # Apache sirve la SPA y Laravel responde en /api (una ruta inexistente devuelve 404 de Laravel;
+    # si PHP o la configuración fallan, devuelve 500 o nada).
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://localhost/ && test \"$$(curl -s -o /dev/null -w '%{http_code}' -H 'Accept: application/json' http://localhost/api/estado-salud-inexistente)\" = 404"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  scheduler:
+    <<: *app
+    command: ["php", "artisan", "schedule:work"]
+
+volumes:
+  pg_data:
+  redis_data:
+  app_storage:
+  backups:

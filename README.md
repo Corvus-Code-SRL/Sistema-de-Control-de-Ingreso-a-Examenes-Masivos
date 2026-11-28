@@ -166,7 +166,7 @@ mise.toml
 
 ## Estructura del repositorio
 
-> La estructura de abajo es la **estructura objetivo** documentada en `docs/architecture/`. El scaffold actual ya cubre la mayor parte (carpetas por módulo en `Http/Controllers`, `Http/Requests`, `Services`, `routes/api/`; `deployment/docker/{apache,postgres,redis}`), pero todavía faltan por crear: el `docker-compose.yml` de despliegue y el `Dockerfile`/`sciem.conf` de Apache, `frontend/.env.example`, la configuración de ESLint del frontend, y las traducciones en `backend/resources/lang/es/`.
+> La estructura de abajo es la **estructura objetivo** documentada en `docs/architecture/`. El despliegue Docker actual se define en `docker-compose.yml` en la raíz, con sus Dockerfile y configuraciones en `deployment/docker/`.
 
 ```text
 .
@@ -277,7 +277,7 @@ Para desarrollar sin instalar PHP ni Redis en el sistema, el backend puede ejecu
 
 Si PHP corre en Docker, el contenedor tiene que poder salir a internet por el puerto 5432 para alcanzar la base compartida, y la verificación de la conexión debe hacerse **dentro del contenedor**, no en el host.
 
-El despliegue con un solo contenedor Apache (frontend compilado + API en el mismo origen) sigue pendiente: el `docker-compose.yml` de despliegue, el `Dockerfile` de Apache y `sciem.conf` todavía no existen.
+La configuración de producción usa una imagen Apache con el frontend compilado y la API en el mismo origen, más servicios de PostgreSQL, Redis y scheduler. Archivos, variables, primera instalación y comprobaciones: [`deployment/docker/PRODUCCION.md`](deployment/docker/PRODUCCION.md). La versión para compartir con el equipo está en [`output/pdf/guia-produccion-sciem.pdf`](output/pdf/guia-produccion-sciem.pdf).
 
 ---
 

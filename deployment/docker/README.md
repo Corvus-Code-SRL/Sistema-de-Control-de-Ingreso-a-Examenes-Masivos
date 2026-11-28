@@ -4,8 +4,8 @@ Entorno **opcional** para ejecutar el backend de SCIEM sin instalar PHP en el si
 Reproduce las versiones fijadas en el README principal. El frontend se sigue ejecutando
 fuera de Docker (Node 22.23.2 y npm 10.9.8).
 
-Este entorno es solo para **desarrollo local**. El despliegue con Apache se documentará
-por separado.
+Este entorno es solo para **desarrollo local**. El despliegue completo con Apache,
+PostgreSQL, Redis y scheduler está en [PRODUCCION.md](PRODUCCION.md). También está disponible la [guía PDF](../../output/pdf/guia-produccion-sciem.pdf).
 
 ## Servicios
 
@@ -122,9 +122,10 @@ $DC build app                                       # reconstruir la imagen tras
 - **UID distinto de 1000:** la imagen crea un usuario con UID/GID 1000 para que los archivos
   generados no queden a nombre de root. Si `id -u` devuelve otro valor, construir con
   `$DC build --build-arg UID=$(id -u) --build-arg GID=$(id -g) app`.
-- **Debian 11:** PHP 8.0.30 solo existe sobre Debian 11 (bullseye), ya retirado. El Dockerfile
-  instala paquetes desde `archive.debian.org` y omite el repositorio de seguridad, que ya
-  no está disponible. Es aceptable para desarrollo local, no para producción.
+- **Base Debian 11:** este Dockerfile de desarrollo usa PHP 8.0.30 sobre Bullseye y requiere
+  paquetes desde `archive.debian.org`. La imagen de producción usa también Bullseye
+  (`apache/Dockerfile`) para conservar las versiones acordadas; por eso el aviso de paquetes
+  archivados aplica a ambas imágenes. No cambiar la versión base sin coordinarlo.
 - **Credenciales:** `sciem_dev` es una contraseña solo para desarrollo local.
 - **Nuevas extensiones:** si un paquete nuevo exige una extensión, `composer install` falla.
   Se verifica con `$DC exec app composer check-platform-reqs`, se agrega la extensión al
