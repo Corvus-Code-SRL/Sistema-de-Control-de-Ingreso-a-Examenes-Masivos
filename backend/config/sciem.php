@@ -318,6 +318,7 @@ return [
             'GUARDAR_DISTRIBUCION' => 'Guardar distribución',
             'DEJAR_USAR_DISTRIBUCION' => 'Dejar de usar distribución',
             'INGRESO_CON_AVISO_AMBIENTE' => 'Ingreso con aviso de ambiente',
+            'DESVINCULAR_MATERIA_CARRERA' => 'Desvincular materia de carrera',
         ],
 
         'etiquetas_campo' => [
