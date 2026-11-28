@@ -2,6 +2,7 @@ import type { ExamStatus } from './exams.types'
 
 export type EligibilityStatus = 'HABILITADO' | 'NO_HABILITADO' | 'CASO_ESPECIAL'
 
+/** Motivos manuales de versiones anteriores: ya no se pueden elegir, pero se siguen mostrando. */
 export type NoEligibleReason =
   | 'ASISTENCIA_INSUFICIENTE'
   | 'NO_ENTREGO_TRABAJO_FINAL'
@@ -32,6 +33,11 @@ export interface ExamSelectorRef {
   nombre: string
 }
 
+export interface ExamSelectorRoom {
+  id: number
+  nro_aula: string
+}
+
 export interface ExamSelectorItem {
   id_examen: number
   nombre: string
@@ -41,6 +47,7 @@ export interface ExamSelectorItem {
   hora_inicio: string
   estado: Extract<ExamStatus, 'PROGRAMADO' | 'EN_CURSO'>
   grupos: string[]
+  ambientes: ExamSelectorRoom[]
 }
 
 export interface EligibleStudent {
@@ -59,19 +66,6 @@ export interface EligibleListData {
   editable: boolean
   estado: ExamStatus
   estudiantes: EligibleStudent[]
-}
-
-// --- API Payloads ---
-
-export interface EligibleChange {
-  id_estudiante: number
-  estado_habilitacion: EligibilityStatus
-  motivo?: NoEligibleReason
-  detalle?: string
-}
-
-export interface UpdateEligibleListPayload {
-  cambios: EligibleChange[]
 }
 
 // --- File Upload Types ---
@@ -116,9 +110,5 @@ export interface UploadConfirmData {
 }
 
 // --- Client-side State Types ---
-
-export type PendingChange = Omit<EligibleChange, 'id_estudiante'>
-
-export type PendingChangesMap = Map<number, PendingChange>
 
 export type EligibilityFilter = 'todos' | 'habilitados' | 'no_habilitados'

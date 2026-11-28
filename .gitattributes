@@ -1,0 +1,2 @@
+# Markdown de docs/ siempre en LF (los tests leen estos archivos)
+docs/**/*.md text eol=lf

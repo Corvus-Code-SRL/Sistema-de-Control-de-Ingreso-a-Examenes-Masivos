@@ -42,7 +42,7 @@ export function CourseCard({ course }: CourseCardProps) {
         <div className="flex items-baseline gap-1.5 text-sm">
           {hasRoster(group) ? (
             <>
-              <span className="sciem-tnum text-lg font-semibold text-brand">
+              <span className="sciem-tnum text-lg font-semibold text-brand-fg">
                 {group.cantidad_estudiantes}
               </span>
               <span className="text-muted-foreground">

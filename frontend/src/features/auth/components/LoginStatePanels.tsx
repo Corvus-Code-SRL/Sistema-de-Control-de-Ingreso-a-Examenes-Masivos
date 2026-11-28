@@ -38,7 +38,7 @@ export function InactiveAccountPanel({ sis, onReset }: AccountPanelProps) {
         <Button asChild variant="outline" className={ACTION_CLASSNAME}>
           <a href={inactiveAccountMailto(sis)}>Escribir al Administrador</a>
         </Button>
-        <Button type="button" variant="ghost" onClick={onReset} className={`${ACTION_CLASSNAME} text-brand`}>
+        <Button type="button" variant="ghost" onClick={onReset} className={`${ACTION_CLASSNAME} text-brand-fg`}>
           Usar otra cuenta
         </Button>
       </div>
@@ -71,7 +71,7 @@ export function RoleMissingPanel({ sis, onReset }: AccountPanelProps) {
         <Button asChild className={ACTION_CLASSNAME}>
           <a href={roleRequestMailto(sis, new Date())}>Solicitar la asignación de rol</a>
         </Button>
-        <Button type="button" variant="ghost" onClick={onReset} className={`${ACTION_CLASSNAME} text-brand`}>
+        <Button type="button" variant="ghost" onClick={onReset} className={`${ACTION_CLASSNAME} text-brand-fg`}>
           Volver
         </Button>
       </div>

@@ -161,7 +161,7 @@ export function ActualizarGrupoForm({
               disabled={isDisabled}
               aria-invalid={Boolean(numGrupoError)}
               onChange={(e) => setNumGrupo(e.target.value)}
-              className={`h-8.5 px-3 py-1.5 text-xs bg-card text-foreground ${
+              className={`h-8.5 px-3 py-1.5 text-xs bg-field text-foreground ${
                 numGrupoError
                   ? 'border-danger-fg bg-danger-soft/20 focus-visible:ring-danger-fg'
                   : 'border-input'

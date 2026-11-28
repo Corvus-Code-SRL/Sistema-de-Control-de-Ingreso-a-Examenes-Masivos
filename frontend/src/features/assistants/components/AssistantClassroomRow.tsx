@@ -77,7 +77,7 @@ export function AssistantClassroomRow({
           >
             <SelectTrigger
               aria-label={`Ambiente de ${assistant.nombre_completo}`}
-              className="w-full bg-card hover:bg-muted/50 data-[size=default]:h-12 sm:w-60 sm:data-[size=default]:h-10"
+              className="w-full bg-card hover:bg-muted/50 dark:hover:bg-muted data-[size=default]:h-12 sm:w-60 sm:data-[size=default]:h-10"
             >
               <SelectValue placeholder="Sin asignar" />
             </SelectTrigger>

@@ -7,46 +7,76 @@
 @import "@fontsource/poppins/700.css";
 
 /*
- * Los tokens solo definen el tema claro, así que `dark:` se ata a una clase que
- * nadie aplica. Sin esto volvería a su comportamiento por defecto en Tailwind 4
- * —`prefers-color-scheme`— y las primitivas mezclarían estilos oscuros con una
- * paleta clara en cuanto el sistema operativo estuviera en modo oscuro.
+ * El tema sigue la preferencia del navegador o del sistema operativo
+ * (`prefers-color-scheme`); no hay selector en la interfaz. `dark:` se limita
+ * a pantalla para que al imprimir con el sistema en modo oscuro las primitivas
+ * no apliquen estilos oscuros sobre papel blanco.
  */
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark {
+  @media screen and (prefers-color-scheme: dark) {
+    @slot;
+  }
+}
 
 /* ============================================================
-   SCIEM — Tokens de diseño
-   Fuente: docs/design/sciem-tokens.css (mockups aprobados).
+   SCIEM — Tokens de diseño (tema claro y oscuro)
+   Reglas de uso, tabla de tokens y contrastes verificados:
+   docs/design/sistema-de-color.md (actualizar sus tablas con
+   cada cambio de token; las pruebas lo verifican).
+   Copia de referencia: docs/design/sciem-tokens.css (mantener
+   ambos archivos sincronizados en el mismo commit).
 
-   REGLA: ningún componente usa colores literales ni utilidades
-   por defecto de Tailwind (gray-500, slate-800, etc.).
-   Todo color sale de estos tokens.
+   REGLA: los literales de color existen SOLO en la capa 1
+   (`--sciem-*` en `:root`, claro y oscuro). La capa 2, `@theme`,
+   las clases y los componentes referencian tokens, nunca valores.
+   Ningún componente usa utilidades por defecto de Tailwind
+   (gray-500, white, black...).
    ============================================================ */
 
-/* ---------- 1. Paleta cruda ---------- */
+/* ---------- 1. Paleta cruda — tema claro ---------- */
 :root {
+  color-scheme: light;
+
   /* Marca — teal institucional */
   --sciem-brand: #005E68;
   --sciem-brand-hover: #00555E;
   --sciem-brand-active: #004B53;
   --sciem-brand-soft: #D8ECEE;
   --sciem-brand-deep: #05383E;
+  /* Marca usada como texto (enlaces, cifras, acciones de texto). */
+  --sciem-brand-fg: var(--sciem-brand);
+  /* Relleno de marca intenso para elementos seleccionados con texto blanco. */
+  --sciem-brand-strong: var(--sciem-brand-deep);
 
   /* Acento — ámbar */
   --sciem-accent: #FFCB32;
   --sciem-accent-hover: #E8B720;
 
+  /* Texto sobre rellenos: blanco sobre sólidos, oscuro sobre ámbar */
+  --sciem-on-solid: #FFFFFF;
+  --sciem-on-accent: #2C2C2C;
+
   /* Superficies */
+  /* index.html replica este valor en <meta name="theme-color">
+     (claro), porque HTML no puede leer variables CSS. */
   --sciem-bg-app: #F3F8F8;
   --sciem-surface: #FFFFFF;
   --sciem-sunken: #F7FAFA;
+  /* Capas flotantes: popover, menú, diálogo, panel lateral. */
+  --sciem-raised: var(--sciem-surface);
+  /* Fondo sutil de shadcn (`bg-muted`): hover, skeleton, lista de pestañas. */
+  --sciem-muted-bg: var(--sciem-sunken);
   --sciem-border: #DDDDDD;
   --sciem-border-strong: #C7D2D3;
+  /* Borde de controles de formulario: mínimo 3:1 (WCAG 1.4.11). */
+  --sciem-input-border: #7A9497;
+  /* Fondo común de todos los campos (input, select, textarea, fecha y hora). */
+  --sciem-field-bg: var(--sciem-surface);
 
   /* Texto */
   --sciem-text: #2C2C2C;
-  --sciem-muted: #6C757D;
-  --sciem-subtle: #8A969B;
+  --sciem-muted: #616971;
+  --sciem-subtle: #677479;
 
   /* Estado: éxito */
   --sciem-ok: #15803D;
@@ -54,18 +84,24 @@
   --sciem-ok-fg: #0F5C2C;
   --sciem-ok-border: #B6DEC6;
   --sciem-ok-mid: #C5E6D2;
+  --sciem-ok-solid: var(--sciem-ok);
+  --sciem-ok-solid-hover: var(--sciem-ok-fg);
+  --sciem-ok-tint: color-mix(in oklab, var(--sciem-ok-soft) 35%, transparent);
 
   /* Estado: error */
   --sciem-danger: #D92D20;
   --sciem-danger-soft: #FDE2E1;
   --sciem-danger-fg: #A21B12;
   --sciem-danger-border: #F4B7B1;
+  --sciem-danger-solid: var(--sciem-danger);
+  --sciem-danger-tint: color-mix(in oklab, var(--sciem-danger-soft) 35%, transparent);
 
   /* Estado: advertencia */
   --sciem-warn: #FFCB32;
   --sciem-warn-soft: #FFF4D6;
   --sciem-warn-border: #F5DC8C;
   --sciem-warn-fg: #7A5B00;
+  --sciem-warn-tint: color-mix(in oklab, var(--sciem-warn-soft) 35%, transparent);
 
   /* Estado: información */
   --sciem-info: #1D4E89;
@@ -77,13 +113,14 @@
   --sciem-neutral-soft: #F3F5F5;
   --sciem-neutral-mid: #E3E7E8;
   --sciem-neutral-fg: #4F5B62;
+  --sciem-neutral-solid: var(--sciem-neutral-fg);
 
   /* Deshabilitado */
   --sciem-dis-text: #AAB8BA;
   --sciem-dis-bg: #F3F8F8;
   --sciem-dis-border: #DDDDDD;
 
-  /* Sidebar (fondo oscuro) */
+  /* Sidebar (fondo oscuro en ambos temas) */
   --sciem-sb-bg: #05383E;
   --sciem-sb-border: #0F4A51;
   --sciem-sb-text: #D8ECEE;
@@ -92,29 +129,147 @@
   --sciem-sb-divider: #24626A;
   --sciem-sb-hover: #0B474E;
   --sciem-sb-active: #1E5A61;
+  /* Foco dentro del sidebar: teal claro legible sobre su fondo oscuro. */
+  --sciem-sb-focus: var(--sciem-sb-sub);
 
-  /* Scrim de modales */
-  --sciem-scrim: rgba(16, 28, 30, .55);
+  /* Barras de desplazamiento finas */
+  --sciem-scrollbar-thumb: var(--sciem-border-strong);
+  --sciem-scrollbar-thumb-hover: var(--sciem-input-border);
+  --sciem-scrollbar-track: transparent;
+
+  /* Foco — siempre visible, mínimo 3:1 contra el fondo adyacente */
+  --sciem-focus: #5E989F;
+  --focus-ring: 0 0 0 2px var(--sciem-surface), 0 0 0 4px var(--sciem-focus);
+
+  /* Scrim de modales y paneles laterales */
+  --sciem-scrim: rgba(0, 0, 0, .10);
+
+  /* Sombras: reproducen las sombras por defecto de Tailwind que la
+     interfaz usa hoy; `overlay` es la elevación de avisos flotantes. */
+  --sciem-shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, .05);
+  --sciem-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, .10), 0 1px 2px -1px rgba(0, 0, 0, .10);
+  --sciem-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, .10), 0 2px 4px -2px rgba(0, 0, 0, .10);
+  --sciem-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, .10), 0 4px 6px -4px rgba(0, 0, 0, .10);
+  --sciem-shadow-overlay: 0 12px 32px rgba(5, 56, 62, .16);
+  /* Barra fija inferior (acciones del login en móvil): sombra hacia arriba. */
+  --sciem-shadow-sticky: 0 -4px 12px color-mix(in srgb, var(--sciem-brand-deep) 6%, transparent);
 
   /* Radios */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
-  --radius-pill: 9999px;
+  --sciem-radius-sm: 6px;
+  --sciem-radius-md: 8px;
+  --sciem-radius-lg: 10px;
+  --sciem-radius-xl: 14px;
+  --sciem-radius-pill: 9999px;
 
-  /* Sombras */
-  --shadow-sm: 0 1px 2px rgba(5, 56, 62, .06);
-  --shadow-md: 0 4px 12px rgba(5, 56, 62, .10);
-  --shadow-lg: 0 12px 32px rgba(5, 56, 62, .16);
+  /* Dimensiones: altura común de la barra superior del contenido y de la
+     cabecera del sidebar, para que formen una sola línea continua. */
+  --sciem-topbar-height: 2.5rem;
+}
 
-  /* Foco — siempre visible, nunca outline:none sin reemplazo */
-  --focus-ring: 0 0 0 2px #fff, 0 0 0 4px rgba(0, 94, 104, .30);
+/* ---------- 1b. Paleta cruda — tema oscuro ----------
+   Se activa cuando el navegador o el sistema prefieren el modo
+   oscuro, y solo en pantalla: al imprimir siempre rige el tema
+   claro. Solo se redefine la capa 1; la capa 2 y `@theme` cambian
+   por cascada. */
+@media screen and (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --sciem-brand: #2E7F82;
+    --sciem-brand-hover: #2A7376;
+    --sciem-brand-active: #25686B;
+    --sciem-brand-soft: #223635;
+    --sciem-brand-deep: #89BFBE;
+    --sciem-brand-fg: #6BB8B9;
+    --sciem-brand-strong: var(--sciem-brand-active);
+
+    --sciem-accent: #FFCB32;
+    --sciem-accent-hover: #E8B720;
+
+    --sciem-on-solid: #FFFFFF;
+    --sciem-on-accent: #2C2C2C;
+
+    /* Replicado en <meta name="theme-color"> (oscuro) de index.html. */
+    --sciem-bg-app: #121817;
+    --sciem-surface: #1A2322;
+    --sciem-sunken: #161F1E;
+    --sciem-raised: #212C2B;
+    --sciem-muted-bg: #2A3938;
+    --sciem-border: #2F4240;
+    --sciem-border-strong: #3D5653;
+    --sciem-input-border: #5B7874;
+    --sciem-field-bg: #151C1B;
+
+    --sciem-text: #E7EFED;
+    --sciem-muted: #A4B8B5;
+    --sciem-subtle: #849A97;
+
+    --sciem-ok: #64A883;
+    --sciem-ok-soft: #233A2D;
+    --sciem-ok-fg: #89BFA1;
+    --sciem-ok-border: #365944;
+    --sciem-ok-mid: #2B4535;
+    --sciem-ok-solid: #2F7D57;
+    --sciem-ok-solid-hover: #286C4A;
+    --sciem-ok-tint: var(--sciem-ok-soft);
+
+    --sciem-danger: #E07A7A;
+    --sciem-danger-soft: #352222;
+    --sciem-danger-fg: #E08A8A;
+    --sciem-danger-border: #563232;
+    --sciem-danger-solid: #B54848;
+    --sciem-danger-tint: var(--sciem-danger-soft);
+
+    --sciem-warn: #FFCB32;
+    --sciem-warn-soft: #322916;
+    --sciem-warn-border: #4D3F24;
+    --sciem-warn-fg: #D9AE5C;
+    --sciem-warn-tint: var(--sciem-warn-soft);
+
+    --sciem-info: #89A2BF;
+    --sciem-info-soft: #232E3B;
+    --sciem-info-border: #364659;
+    --sciem-info-mid: #2B3747;
+
+    --sciem-neutral-soft: #212E2C;
+    --sciem-neutral-mid: #2F4240;
+    --sciem-neutral-fg: #A4B8B5;
+    --sciem-neutral-solid: #5A6E6B;
+
+    --sciem-dis-text: #4F6461;
+    --sciem-dis-bg: #161F1E;
+    --sciem-dis-border: #2F4240;
+
+    /* El sidebar es la superficie más oscura del tema: mismo tono y
+       saturación que bg-app, solo más oscuro, sin tinte cian. Su texto
+       usa los mismos tokens que el contenido; el único acento fuerte es
+       el ítem activo (relleno de marca). */
+    --sciem-sb-bg: #0C100F;
+    --sciem-sb-border: #192220;
+    --sciem-sb-text: var(--sciem-text);
+    --sciem-sb-sub: var(--sciem-muted);
+    --sciem-sb-group: var(--sciem-subtle);
+    --sciem-sb-divider: #212C2A;
+    --sciem-sb-hover: #171F1D;
+    --sciem-sb-active: #1F2927;
+    --sciem-sb-focus: var(--sciem-brand-fg);
+
+    --sciem-focus: #4B7B7B;
+
+    --sciem-scrim: rgba(0, 0, 0, .65);
+
+    --sciem-shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, .25);
+    --sciem-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, .30), 0 1px 2px -1px rgba(0, 0, 0, .30);
+    --sciem-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, .40), 0 2px 4px -2px rgba(0, 0, 0, .40);
+    --sciem-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, .50), 0 4px 6px -4px rgba(0, 0, 0, .50);
+    --sciem-shadow-overlay: 0 12px 32px rgba(0, 0, 0, .50);
+    --sciem-shadow-sticky: 0 -4px 12px rgba(0, 0, 0, .40);
+  }
 }
 
 /* ---------- 2. Mapeo a las variables semánticas de shadcn ---------- */
 /* shadcn lee estos nombres. Sin este bloque los componentes salen
-   en la escala de grises por defecto. */
+   en la escala de grises por defecto. Solo referencias a la capa 1. */
 :root {
   --background: var(--sciem-bg-app);
   --foreground: var(--sciem-text);
@@ -122,56 +277,63 @@
   --card: var(--sciem-surface);
   --card-foreground: var(--sciem-text);
 
-  --popover: var(--sciem-surface);
+  --popover: var(--sciem-raised);
   --popover-foreground: var(--sciem-text);
 
   --primary: var(--sciem-brand);
-  --primary-foreground: #FFFFFF;
+  --primary-foreground: var(--sciem-on-solid);
 
   --secondary: var(--sciem-brand-soft);
   --secondary-foreground: var(--sciem-brand-deep);
 
-  --muted: var(--sciem-sunken);
+  --muted: var(--sciem-muted-bg);
   --muted-foreground: var(--sciem-muted);
 
   --accent: var(--sciem-accent);
-  --accent-foreground: #2C2C2C;
+  --accent-foreground: var(--sciem-on-accent);
 
   --destructive: var(--sciem-danger);
-  --destructive-foreground: #FFFFFF;
+  --destructive-foreground: var(--sciem-on-solid);
 
   --border: var(--sciem-border);
-  --input: var(--sciem-border-strong);
-  --ring: var(--sciem-brand);
+  --input: var(--sciem-input-border);
+  --ring: var(--sciem-brand-fg);
 
-  --radius: var(--radius-md);
+  --radius: var(--sciem-radius-md);
 
   /* Sidebar de shadcn */
   --sidebar: var(--sciem-sb-bg);
   --sidebar-foreground: var(--sciem-sb-text);
-  --sidebar-primary: var(--sciem-accent);
-  --sidebar-primary-foreground: var(--sciem-brand-deep);
+  --sidebar-primary: var(--sciem-brand);
+  --sidebar-primary-foreground: var(--sciem-on-solid);
   --sidebar-accent: var(--sciem-sb-active);
-  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-accent-foreground: var(--sciem-on-solid);
   --sidebar-border: var(--sciem-sb-border);
-  --sidebar-ring: var(--sciem-accent);
+  --sidebar-ring: var(--sciem-sb-focus);
 }
 
 /* ---------- 3. Exposición a Tailwind 4 ---------- */
-/* Habilita utilidades como bg-brand, text-muted, border-strong. */
+/* Habilita utilidades como bg-brand, text-brand-fg, border-strong. */
 @theme inline {
   --color-brand: var(--sciem-brand);
   --color-brand-hover: var(--sciem-brand-hover);
   --color-brand-active: var(--sciem-brand-active);
   --color-brand-soft: var(--sciem-brand-soft);
   --color-brand-deep: var(--sciem-brand-deep);
+  --color-brand-fg: var(--sciem-brand-fg);
+  --color-brand-strong: var(--sciem-brand-strong);
 
   --color-accent-brand: var(--sciem-accent);
   --color-accent-brand-hover: var(--sciem-accent-hover);
 
+  --color-on-solid: var(--sciem-on-solid);
+  --color-on-accent: var(--sciem-on-accent);
+
   --color-bg-app: var(--sciem-bg-app);
   --color-surface: var(--sciem-surface);
   --color-sunken: var(--sciem-sunken);
+  --color-raised: var(--sciem-raised);
+  --color-field: var(--sciem-field-bg);
   --color-border-soft: var(--sciem-border);
   --color-border-strong: var(--sciem-border-strong);
 
@@ -180,10 +342,10 @@
 
   /*
    * `muted` es el único nombre que significa dos cosas distintas: en la paleta
-   * es el gris de texto (#6C757D) y en shadcn es la superficie sutil (#F7FAFA).
-   * Tailwind genera `bg-muted` y `text-muted` de un solo token, así que aquí se
-   * reserva para la superficie —que es lo que esperan button, badge y avatar— y
-   * el gris de texto se usa como `text-muted-foreground`, ya mapeado arriba.
+   * es el gris de texto y en shadcn es la superficie sutil. Tailwind genera
+   * `bg-muted` y `text-muted` de un solo token, así que aquí se reserva para la
+   * superficie —que es lo que esperan button, badge y avatar— y el gris de
+   * texto se usa como `text-muted-foreground`, ya mapeado arriba.
    */
   --color-muted: var(--muted);
 
@@ -192,16 +354,22 @@
   --color-ok-fg: var(--sciem-ok-fg);
   --color-ok-border: var(--sciem-ok-border);
   --color-ok-mid: var(--sciem-ok-mid);
+  --color-ok-solid: var(--sciem-ok-solid);
+  --color-ok-solid-hover: var(--sciem-ok-solid-hover);
+  --color-ok-tint: var(--sciem-ok-tint);
 
   --color-danger: var(--sciem-danger);
   --color-danger-soft: var(--sciem-danger-soft);
   --color-danger-fg: var(--sciem-danger-fg);
   --color-danger-border: var(--sciem-danger-border);
+  --color-danger-solid: var(--sciem-danger-solid);
+  --color-danger-tint: var(--sciem-danger-tint);
 
   --color-warn: var(--sciem-warn);
   --color-warn-soft: var(--sciem-warn-soft);
   --color-warn-border: var(--sciem-warn-border);
   --color-warn-fg: var(--sciem-warn-fg);
+  --color-warn-tint: var(--sciem-warn-tint);
 
   --color-info: var(--sciem-info);
   --color-info-soft: var(--sciem-info-soft);
@@ -211,6 +379,7 @@
   --color-neutral-soft: var(--sciem-neutral-soft);
   --color-neutral-mid: var(--sciem-neutral-mid);
   --color-neutral-fg: var(--sciem-neutral-fg);
+  --color-neutral-solid: var(--sciem-neutral-solid);
 
   --color-sb-sub: var(--sciem-sb-sub);
   --color-sb-group: var(--sciem-sb-group);
@@ -220,6 +389,9 @@
   --color-dis-text: var(--sciem-dis-text);
   --color-dis-bg: var(--sciem-dis-bg);
   --color-dis-border: var(--sciem-dis-border);
+
+  --color-focus: var(--sciem-focus);
+  --color-scrim: var(--sciem-scrim);
 
   /* Nombres que shadcn usa para generar sus utilidades de color. */
   --color-background: var(--background);
@@ -249,10 +421,20 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
+  --shadow-xs: var(--sciem-shadow-xs);
+  --shadow-sm: var(--sciem-shadow-sm);
+  --shadow-md: var(--sciem-shadow-md);
+  --shadow-lg: var(--sciem-shadow-lg);
+  --shadow-overlay: var(--sciem-shadow-overlay);
+  --shadow-sticky: var(--sciem-shadow-sticky);
+
+  --radius-sm: var(--sciem-radius-sm);
+  --radius-md: var(--sciem-radius-md);
+  --radius-lg: var(--sciem-radius-lg);
+  --radius-xl: var(--sciem-radius-xl);
+  --radius-pill: var(--sciem-radius-pill);
+
+  --spacing-topbar: var(--sciem-topbar-height);
 
   --font-sans: "Inter Variable", "Inter", system-ui, sans-serif;
   --font-brand: "Poppins", "Inter", sans-serif;
@@ -265,11 +447,45 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-focus;
   }
 
   html {
     @apply font-sans;
+  }
+
+  /*
+   * Barras de desplazamiento finas en ambos temas. Chromium y Safari usan los
+   * pseudoelementos (permiten el color de hover del pulgar); donde no existen
+   * (Firefox) se usan las propiedades estándar. Si Chromium recibiera
+   * `scrollbar-color`, ignoraría los pseudoelementos y perdería el hover.
+   */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: var(--sciem-scrollbar-track);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--sciem-scrollbar-thumb);
+    background-clip: padding-box;
+    border: 1px solid transparent;
+    border-radius: var(--sciem-radius-pill);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--sciem-scrollbar-thumb-hover);
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--sciem-scrollbar-thumb) var(--sciem-scrollbar-track);
+    }
   }
 
   body {
@@ -321,6 +537,6 @@
 /* Wordmark del sidebar — único uso de Poppins */
 .sciem-wordmark {
   font-family: var(--font-brand);
-  font-weight: 700; font-size: 17px; line-height: 1.1;
-  letter-spacing: .02em; color: #FFFFFF;
+  font-weight: 700; font-size: 15px; line-height: 1;
+  letter-spacing: .02em; color: var(--sciem-on-solid);
 }

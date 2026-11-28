@@ -46,13 +46,14 @@ class InvitedTeacherAccessTest extends TestCase
         $this->assertSame([
             'teaching', 'exam_assistants', 'incidents', 'risk_center',
             'group_assistants', 'report_assistant', 'special_cases', 'invite_teachers', 'audit_log', 'risk_rectify',
-            'risk_rectify_confirm', 'exam_timer',
+            'risk_rectify_confirm', 'exam_timer', 'eligible_list', 'room_distribution',
         ], array_keys($access));
 
         $allowed = [
             'teaching' => true, 'exam_assistants' => true, 'incidents' => true, 'risk_center' => false,
             'group_assistants' => false, 'report_assistant' => false, 'special_cases' => false,
-            'invite_teachers' => false, 'exam_timer' => true,
+            'invite_teachers' => false, 'exam_timer' => true, 'eligible_list' => true,
+            'room_distribution' => true,
         ];
 
         foreach ($allowed as $feature => $invitedCan) {
