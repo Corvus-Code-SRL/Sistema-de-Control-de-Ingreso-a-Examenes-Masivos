@@ -1,4 +1,4 @@
-import { CircleSlash, CircleX } from 'lucide-react'
+import { CircleSlash, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { UnassignableSubject } from '../types/unassignSubject.types'
@@ -8,9 +8,10 @@ interface UnassignSubjectsTableProps {
   subjects: UnassignableSubject[]
   /** Etiqueta del período, para el encabezado «Grupos en 2/2026». */
   periodLabel: string
-  /** Solo el período vigente admite desvincular; los demás son de consulta. */
-  canUnassign: boolean
-  onAction: (subject: UnassignableSubject) => void
+  /** Solo el período vigente admite cambios; los demás son de consulta. */
+  canChange: boolean
+  onUnassign: (subject: UnassignableSubject) => void
+  onReactivate: (subject: UnassignableSubject) => void
 }
 
 function UnassignedBadge() {
@@ -44,14 +45,16 @@ function CircleCrossIcon() {
 }
 
 /**
- * Tabla de la vista Desvincular. El botón de una materia con grupos queda enfocable pero marcado
- * como deshabilitado (`aria-disabled`): al pulsarlo la página explica por qué no se puede.
+ * Tabla de la vista Desvincular / Reactivar. Una oferta ACTIVA solo ofrece «Desvincular» (enfocable
+ * pero `aria-disabled` si tiene grupos: al pulsarlo la página explica por qué no se puede); una
+ * INACTIVA solo ofrece «Reactivar». En un período anterior no hay acciones.
  */
 export function UnassignSubjectsTable({
   subjects,
   periodLabel,
-  canUnassign,
-  onAction,
+  canChange,
+  onUnassign,
+  onReactivate,
 }: UnassignSubjectsTableProps) {
   const headerCell =
     'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground'
@@ -123,13 +126,25 @@ export function UnassignSubjectsTable({
 
                 {/* Acción */}
                 <td className="p-0 md:table-cell md:whitespace-nowrap md:px-4 md:py-3 md:text-right">
-                  {unassigned || !canUnassign ? (
+                  {!canChange ? (
                     <span
                       className="text-xs text-muted-foreground"
                       aria-label="Sin acción disponible"
                     >
                       —
                     </span>
+                  ) : unassigned ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-label={`Reactivar ${subject.nombre}`}
+                      className="w-full justify-center md:w-auto"
+                      onClick={() => onReactivate(subject)}
+                    >
+                      <RotateCcw className="size-4 shrink-0" aria-hidden="true" />
+                      Reactivar
+                    </Button>
                   ) : (
                     <Button
                       type="button"
@@ -141,7 +156,7 @@ export function UnassignSubjectsTable({
                         'w-full justify-center md:w-auto',
                         hasGroups && 'cursor-not-allowed opacity-50'
                       )}
-                      onClick={() => onAction(subject)}
+                      onClick={() => onUnassign(subject)}
                     >
                       <CircleCrossIcon />
                       Desvincular

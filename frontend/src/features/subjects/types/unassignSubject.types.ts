@@ -38,3 +38,8 @@ export interface UnassignSubjectResult {
   estado: OfferingStatus
   grupos_count: number
 }
+
+/** HU-008: reactivar usa el mismo cuerpo que desvincular. */
+export type ReactivateSubjectPayload = UnassignSubjectPayload
+
+export type ReactivateSubjectResult = UnassignSubjectResult

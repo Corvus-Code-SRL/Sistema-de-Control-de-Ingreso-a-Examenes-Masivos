@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api-client'
 import { mockApiWith } from '@/test/http'
-import { UNASSIGN_PER_PAGE, getUnassignableSubjects, unassignSubject } from './unassignSubjectService'
+import { UNASSIGN_PER_PAGE, getUnassignableSubjects, unassignSubject, reactivateSubject } from './unassignSubjectService'
 
 const request = { careerId: 1, periodId: 2, search: '', page: 1, perPage: UNASSIGN_PER_PAGE }
 
@@ -91,4 +91,30 @@ describe('unassignSubjectService', () => {
     expect(error.isValidation).toBe(true)
     expect(error.errors.id_materia[0]).toBe('La materia tiene 2 grupos.')
   })
+})
+
+it('reactivateSubject envía el POST a la ruta de reactivar y devuelve la oferta activa', async () => {
+  const payload = { id_carrera: 1, id_periodo: 2, id_materia: 12 }
+  const { calls } = mockApiWith(() => ({
+    body: { ...payload, estado: 'ACTIVO', grupos_count: 0 },
+  }))
+
+  const result = await reactivateSubject(payload)
+
+  expect(calls[0].method).toBe('POST')
+  expect(new URL(calls[0].url).pathname.endsWith('/catalogo/reactivar-materia')).toBe(true)
+  expect(calls[0].body).toEqual(payload)
+  expect(result.estado).toBe('ACTIVO')
+})
+
+it('reactivateSubject: un 422 conserva los errores por campo', async () => {
+  mockApiWith(() => ({
+    status: 422,
+    body: { message: 'invalid', errors: { id_periodo: ['Solo se puede reactivar en el período vigente.'] } },
+  }))
+
+  const error = await reactivateSubject({ id_carrera: 1, id_periodo: 1, id_materia: 12 }).catch((e) => e)
+
+  expect(error).toBeInstanceOf(ApiError)
+  expect(error.errors.id_periodo[0]).toBe('Solo se puede reactivar en el período vigente.')
 })

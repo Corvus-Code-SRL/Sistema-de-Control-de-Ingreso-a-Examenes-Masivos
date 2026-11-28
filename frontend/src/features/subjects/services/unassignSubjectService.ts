@@ -4,11 +4,14 @@ import type {
   UnassignableSubjectsResponse,
   UnassignSubjectPayload,
   UnassignSubjectResult,
+  ReactivateSubjectPayload,
+  ReactivateSubjectResult,
 } from '../types/unassignSubject.types'
 
 export const UNASSIGN_PER_PAGE = 7
 
 const PATH = '/catalogo/desvincular-materia'
+const REACTIVATE_PATH = '/catalogo/reactivar-materia'
 
 /** HU-008: ofertas de una carrera en un período, con conteo de grupos. Búsqueda y paginación son del servidor. */
 export async function getUnassignableSubjects(
@@ -42,4 +45,12 @@ export async function unassignSubject(
   signal?: AbortSignal
 ): Promise<UnassignSubjectResult> {
   return apiPost<UnassignSubjectResult>(PATH, payload, { signal })
+}
+
+/** HU-008: devuelve una oferta desvinculada al estado ACTIVO, solo en el período vigente. */
+export async function reactivateSubject(
+  payload: ReactivateSubjectPayload,
+  signal?: AbortSignal
+): Promise<ReactivateSubjectResult> {
+  return apiPost<ReactivateSubjectResult>(REACTIVATE_PATH, payload, { signal })
 }

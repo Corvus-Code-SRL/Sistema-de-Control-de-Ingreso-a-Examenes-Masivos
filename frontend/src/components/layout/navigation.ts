@@ -144,7 +144,7 @@ export const NAVIGATION: readonly NavSection[] = [
       },
       {
         id: 'admin-disable-subject',
-        label: 'Deshabilitar materia de carrera',
+        label: 'Deshabilitar/Reactivar materia de carrera',
         icon: Unlink,
         capability: 'administracion.gestionar',
         to: '/catalogo/deshabilitar-materia'

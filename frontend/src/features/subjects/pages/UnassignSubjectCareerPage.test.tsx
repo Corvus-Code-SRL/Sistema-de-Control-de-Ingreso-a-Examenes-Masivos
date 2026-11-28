@@ -31,6 +31,14 @@ function backend(options: { subjects?: Subject[]; postStatus?: number; postBody?
     if (url.includes('/administracion/carreras')) return { body: { data: [CAREER] } }
     if (url.includes('/periodos')) return { body: { data: PERIODS, meta: { id_periodo_activo: 2 } } }
 
+    if (url.includes('/catalogo/reactivar-materia')) {
+    if (options.postStatus) return { status: options.postStatus, body: options.postBody }
+
+    const { id_materia } = body as { id_materia: number }
+    const row = subjects.find((s) => s.id_materia === id_materia)
+    if (row) row.estado = 'ACTIVO'
+      return { body: { id_carrera: 1, id_materia, id_periodo: 2, estado: 'ACTIVO', grupos_count: 0 } }
+    }
     if (url.includes('/catalogo/desvincular-materia')) {
       if (method === 'POST') {
         if (options.postStatus) return { status: options.postStatus, body: options.postBody }
@@ -56,6 +64,9 @@ const listCalls = (calls: RecordedRequest[]) =>
 
 const postCalls = (calls: RecordedRequest[]) => calls.filter((c) => c.method === 'POST')
 
+/** La tabla dibuja cada fila dos veces (móvil y escritorio): se espera por el botón, que es único. */
+const waitForRow = (name: string) => screen.findByRole('button', { name })
+
 describe('HU-008 · Desvincular materia de carrera', () => {
   afterEach(() => {
     window.localStorage.clear()
@@ -73,9 +84,9 @@ describe('HU-008 · Desvincular materia de carrera', () => {
     const { calls } = backend()
     renderApp(`${PATH}?carrera=1`)
 
-    expect(await screen.findByText('Cálculo I')).toBeInTheDocument()
-    expect(screen.getByText('3 grupos')).toBeInTheDocument()
-    expect(screen.getByText('Desvinculada')).toBeInTheDocument()
+    expect(await waitForRow('Desvincular Cálculo I')).toBeInTheDocument()
+    expect(screen.getAllByText('3 grupos').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('Desvinculada').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText(/1–3 de 3 materias/)).toBeInTheDocument()
 
     const url = new URL(listCalls(calls)[0].url)
@@ -90,7 +101,7 @@ describe('HU-008 · Desvincular materia de carrera', () => {
     const { calls } = backend()
     renderApp(`${PATH}?carrera=1`)
 
-    await screen.findByText('Cálculo I')
+    await waitForRow('Desvincular Cálculo I')
     await user.type(screen.getByLabelText('Buscar'), 'simulacion')
 
     await waitFor(() =>
@@ -103,13 +114,14 @@ describe('HU-008 · Desvincular materia de carrera', () => {
     const { calls } = backend()
     renderApp(`${PATH}?carrera=1`)
 
-    await screen.findByText('Programación')
+    await waitForRow('Desvincular Programación')
     await user.click(screen.getByRole('button', { name: 'Desvincular Programación' }))
 
     const dialog = await screen.findByRole('dialog')
 
+    expect(within(dialog).getByText('¿Desvincular Programación?')).toBeInTheDocument()
     expect(
-      within(dialog).getByText('¿Desvincular Programación de Ingeniería de Sistemas (2/2026)?')
+      within(dialog).getByText('2008054 · Ingeniería de Sistemas · período 2/2026')
     ).toBeInTheDocument()
 
     await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
@@ -123,7 +135,7 @@ describe('HU-008 · Desvincular materia de carrera', () => {
     const { calls } = backend()
     renderApp(`${PATH}?carrera=1`)
 
-    await screen.findByText('Programación')
+    await waitForRow('Desvincular Programación')
     await user.click(screen.getByRole('button', { name: 'Desvincular Programación' }))
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Desvincular' }))
 
@@ -132,7 +144,7 @@ describe('HU-008 · Desvincular materia de carrera', () => {
     expect(postCalls(calls)[0].body).toEqual({ id_carrera: 1, id_periodo: 2, id_materia: 11 })
 
     await waitFor(() => expect(screen.getAllByText('Desvinculada')).toHaveLength(2))
-    expect(screen.getByText('Programación')).toBeInTheDocument()
+    expect(screen.getAllByText('Programación').length).toBeGreaterThanOrEqual(1)
   })
 
   it('CA-5: una materia con grupos explica el bloqueo y no abre el diálogo', async () => {
@@ -140,7 +152,7 @@ describe('HU-008 · Desvincular materia de carrera', () => {
     const { calls } = backend()
     renderApp(`${PATH}?carrera=1`)
 
-    await screen.findByText('Cálculo I')
+    await waitForRow('Desvincular Cálculo I')
     await user.click(screen.getByRole('button', { name: 'Desvincular Cálculo I' }))
 
     expect(
@@ -159,7 +171,7 @@ describe('HU-008 · Desvincular materia de carrera', () => {
     })
     renderApp(`${PATH}?carrera=1`)
 
-    await screen.findByText('Programación')
+    await waitForRow('Desvincular Programación')
     await user.click(screen.getByRole('button', { name: 'Desvincular Programación' }))
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Desvincular' }))
 
@@ -173,9 +185,9 @@ describe('HU-008 · Desvincular materia de carrera', () => {
     renderApp(`${PATH}?carrera=1&periodo=1`)
 
     expect(await screen.findByText('Período anterior: solo consulta')).toBeInTheDocument()
-    expect(screen.getByText('Solo se puede desvincular en el período vigente (2/2026).')).toBeInTheDocument()
-    expect(screen.getByText('Cálculo I')).toBeInTheDocument()
+    expect(screen.getByText('Solo se puede desvincular o reactivar en el período vigente (2/2026).')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Desvincular / })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Reactivar / })).not.toBeInTheDocument()
   })
 
   it('CA-8: una carrera sin materias lo dice con el período', async () => {
@@ -191,5 +203,62 @@ describe('HU-008 · Desvincular materia de carrera', () => {
 
     expect(await screen.findByText('Elija una carrera', { selector: 'p' })).toBeInTheDocument()
     expect(listCalls(calls)).toHaveLength(0)
+  })
+
+    it('Reactivar: abre la confirmación y Cancelar no envía nada', async () => {
+    const user = userEvent.setup()
+    const { calls } = backend()
+    renderApp(`${PATH}?carrera=1`)
+
+    await waitForRow('Reactivar Inglés I')
+    await user.click(screen.getByRole('button', { name: 'Reactivar Inglés I' }))
+
+    const dialog = await screen.findByRole('dialog')
+
+    expect(within(dialog).getByText('¿Reactivar Inglés I?')).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(postCalls(calls)).toHaveLength(0)
+  })
+
+  it('Reactivar: confirmar envía el POST, avisa y la fila vuelve a «Activo»', async () => {
+    const user = userEvent.setup()
+    const { calls } = backend()
+    renderApp(`${PATH}?carrera=1`)
+
+    await waitForRow('Reactivar Inglés I')
+    await user.click(screen.getByRole('button', { name: 'Reactivar Inglés I' }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Reactivar' }))
+
+    expect(await screen.findByText('Materia reactivada')).toBeInTheDocument()
+    expect(screen.getByText('Inglés I vuelve a ofertarse en Ingeniería de Sistemas en 2/2026.')).toBeInTheDocument()
+
+    const post = postCalls(calls)[0]
+
+    expect(new URL(post.url).pathname.endsWith('/catalogo/reactivar-materia')).toBe(true)
+    expect(post.body).toEqual({ id_carrera: 1, id_periodo: 2, id_materia: 12 })
+
+    await waitFor(() => expect(screen.queryByText('Desvinculada')).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Desvincular Inglés I' })).toBeInTheDocument()
+  })
+
+  it('Reactivar: un 422 del servidor se muestra tal cual y recarga la lista', async () => {
+    const user = userEvent.setup()
+    const message = 'No se puede reactivar: la materia o su asignación a la carrera está inactiva.'
+    const { calls } = backend({
+      postStatus: 422,
+      postBody: { message: 'The given data was invalid.', errors: { id_materia: [message] } },
+    })
+    renderApp(`${PATH}?carrera=1`)
+
+    await waitForRow('Reactivar Inglés I')
+    await user.click(screen.getByRole('button', { name: 'Reactivar Inglés I' }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Reactivar' }))
+
+    expect(await screen.findByText(message)).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await waitFor(() => expect(listCalls(calls).length).toBeGreaterThan(1))
   })
 })

@@ -16,10 +16,11 @@ import { Toast } from '@/components/ui/toast'
 import { ApiError } from '@/lib/api-client'
 import { UnassignSubjectDialog } from '../components/UnassignSubjectDialog'
 import { UnassignSubjectsTable } from '../components/UnassignSubjectsTable'
+import { ReactivateSubjectDialog } from '../components/ReactivateSubjectDialog'
 import { useAcademicPeriods } from '../hooks/useAcademicPeriods'
 import { useAdminCareers } from '../hooks/useAdminCareers'
 import { useUnassignableSubjects } from '../hooks/useUnassignableSubjects'
-import { unassignSubject } from '../services/unassignSubjectService'
+import { reactivateSubject, unassignSubject } from '../services/unassignSubjectService'
 import type { UnassignableSubject } from '../types/unassignSubject.types'
 
 const CAREER_PARAM = 'carrera'
@@ -79,6 +80,9 @@ export function UnassignSubjectCareerPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [page, setPage] = useState(1)
   const [target, setTarget] = useState<UnassignableSubject | null>(null)
+  const [reactivateTarget, setReactivateTarget] = useState<UnassignableSubject | null>(null)
+  const [reactivating, setReactivating] = useState(false)
+  const [reactivateError, setReactivateError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [dialogError, setDialogError] = useState<string | null>(null)
   const [blocked, setBlocked] = useState<Notice | null>(null)
@@ -204,11 +208,58 @@ export function UnassignSubjectCareerPage() {
     }
   }
 
+  const handleReactivate = (subject: UnassignableSubject) => {
+    setBlocked(null)
+    setReactivateError(null)
+    setReactivateTarget(subject)
+  }
+
+  const cancelReactivate = () => {
+    setReactivateTarget(null)
+    setReactivateError(null)
+  }
+
+  const confirmReactivate = async () => {
+    if (reactivateTarget === null || career === null || period === null) return
+
+    setReactivating(true)
+    setReactivateError(null)
+
+    try {
+      await reactivateSubject({
+        id_carrera: career.id_carrera,
+        id_periodo: period.id_periodo,
+        id_materia: reactivateTarget.id_materia,
+      })
+
+      setReactivateTarget(null)
+      setToast({
+        title: 'Materia reactivada',
+        description: `${reactivateTarget.nombre} vuelve a ofertarse en ${career.nombre} en ${period.etiqueta}.`,
+      })
+      reload()
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.isValidation) {
+        const message = cause.errors.id_materia?.[0] ?? cause.errors.id_periodo?.[0] ?? cause.message
+
+        setReactivateTarget(null)
+        setBlocked({
+          title: message,
+          description: `${reactivateTarget.nombre} en ${career.nombre} (${period.etiqueta}).`,
+        })
+        reload()
+      } else {
+        setReactivateError(cause instanceof ApiError ? cause.message : 'No se pudo reactivar. Intente de nuevo.')
+      }
+    } finally {
+      setReactivating(false)
+    }
+  }
+
   const header = (
     <PageHeader
-      title="Desvincular materia de carrera"
-      subtitle="Quite una materia de la oferta de una carrera en el período vigente. No se borra: queda «Desvinculada» con su historial."
-    />
+      title="Desvincular/Reactivar materia de carrera"
+      subtitle="Quite una materia de la oferta de una carrera en el período vigente, o vuelva a ofertarla. Nada se borra."    />
   )
 
   let body: JSX.Element
@@ -297,8 +348,8 @@ export function UnassignSubjectCareerPage() {
             <AlertTitle>Período anterior: solo consulta</AlertTitle>
             <AlertDescription>
               {currentPeriod === null
-                ? 'No hay un período vigente, así que no es posible desvincular materias.'
-                : `Solo se puede desvincular en el período vigente (${currentPeriod.etiqueta}).`}
+                ? 'No hay un período vigente, así que no es posible desvincular ni reactivar materias.'
+                : `Solo se puede desvincular o reactivar en el período vigente (${currentPeriod.etiqueta}).`}
             </AlertDescription>
           </Alert>
         )}
@@ -345,8 +396,9 @@ export function UnassignSubjectCareerPage() {
               <UnassignSubjectsTable
                 subjects={subjects}
                 periodLabel={period.etiqueta}
-                canUnassign={canUnassign}
-                onAction={handleAction}
+                canChange={canUnassign}
+                onUnassign={handleAction}
+                onReactivate={handleReactivate}
               />
 
               <DataPagination
@@ -377,13 +429,23 @@ export function UnassignSubjectCareerPage() {
           onCancel={cancelDialog}
           onConfirm={confirm}
         />
+
+        <ReactivateSubjectDialog
+          subject={reactivateTarget}
+          careerName={career?.nombre ?? ''}
+          periodLabel={period.etiqueta}
+          submitting={reactivating}
+          error={reactivateError}
+          onCancel={cancelReactivate}
+          onConfirm={confirmReactivate}
+        />
       </div>
     )
   }
 
   return (
     <AppShell
-      mobileTitle="Desvincular materia"
+      mobileTitle="Desvincular/Reactivar materia"
       breadcrumbs={[
         { label: 'Catálogo académico' },
         { label: 'Desvincular materia de carrera' },

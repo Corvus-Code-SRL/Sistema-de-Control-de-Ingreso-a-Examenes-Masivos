@@ -548,12 +548,12 @@ describe('AppSidebar — entradas y estado activo', () => {
     }
   )
 
-  it('administrador: «Deshabilitar materia de carrera» lleva a su ruta y se resalta en ella', async () => {
+  it('administrador: «Deshabilitar/Reactivar materia de carrera» lleva a su ruta y se resalta en ella', async () => {
     const user = userEvent.setup()
     renderSidebar('Administrador', '/catalogo/deshabilitar-materia')
     await openAllSections(user)
 
-    const link = screen.getByRole('link', { name: 'Deshabilitar materia de carrera' })
+    const link = screen.getByRole('link', { name: 'Deshabilitar/Reactivar materia de carrera' })
 
     expect(link).toHaveAttribute('href', '/catalogo/deshabilitar-materia')
     expect(link).toHaveAttribute('aria-current', 'page')
