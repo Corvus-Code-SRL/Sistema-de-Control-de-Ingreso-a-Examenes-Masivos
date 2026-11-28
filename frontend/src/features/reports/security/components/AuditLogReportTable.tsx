@@ -7,10 +7,9 @@ import {
   TableRow,
 } from '@/components/ui/table'
 
-import { ActorLabel } from '@/features/audit-log/components/ActorLabel'
-import { formatDateTime } from '@/features/audit-log/utils/format'
+import { ActorLabel, formatDateTime } from '@/features/audit-log'
 
-import type { AuditLogEntry } from '@/features/audit-log/types/auditLog.types'
+import type { AuditLogEntry } from '@/features/audit-log'
 
 interface AuditLogReportTableProps {
   entries: AuditLogEntry[]

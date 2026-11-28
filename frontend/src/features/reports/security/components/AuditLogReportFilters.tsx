@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { FormSelect } from '@/components/common/FormSelect'
 
-import type { AuditLogOptions } from '@/features/audit-log/types/auditLog.types'
+import type { AuditLogOptions } from '@/features/audit-log'
 import type { AuditLogReportExportFilters } from '../types/auditLogReport.types'
 
 const ALL = 'todos'

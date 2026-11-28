@@ -1,4 +1,4 @@
-import type { AuditLogEntry, AuditLogListResponse } from '@/features/audit-log/types/auditLog.types'
+import type { AuditLogEntry, AuditLogListResponse } from '@/features/audit-log'
 
 /** HU-068: filtros del reporte de bitacora. */
 export interface AuditLogReportFilters {

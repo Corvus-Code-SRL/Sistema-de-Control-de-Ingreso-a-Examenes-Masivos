@@ -35,7 +35,7 @@ import { AuditLogReportPage } from './AuditLogReportPage'
 
 import type {
   AuditLogEntry,
-} from '@/features/audit-log/types/auditLog.types'
+} from '@/features/audit-log'
 
 const REPORT_PATH = '/reportes/bitacora'
 
