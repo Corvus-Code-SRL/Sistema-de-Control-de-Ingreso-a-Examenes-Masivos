@@ -172,5 +172,16 @@ class ActionSeeder extends Seeder
         foreach ($optionalDistribution as $action) {
             DB::table('accion')->updateOrInsert(['operacion' => $action['operacion']], $action);
         }
+
+        // HU-008: desvincular una materia de una carrera en el período vigente.
+        // Al final para no mover los ids existentes.
+        DB::table('accion')->updateOrInsert(
+            ['operacion' => 'DESVINCULAR_MATERIA_CARRERA'],
+            [
+                'operacion' => 'DESVINCULAR_MATERIA_CARRERA',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Desvincular materia de carrera',
+            ]
+        );
     }
 }
