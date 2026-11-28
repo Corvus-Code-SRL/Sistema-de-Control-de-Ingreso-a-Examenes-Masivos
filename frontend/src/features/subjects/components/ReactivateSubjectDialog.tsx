@@ -56,7 +56,7 @@ export function ReactivateSubjectDialog({
             </ul>
 
             {error && (
-              <p role="alert" className="text-sm font-medium text-[color:var(--danger-fg)]">
+              <p role="alert" className="text-sm font-medium text-danger-fg">
                 {error}
               </p>
             )}

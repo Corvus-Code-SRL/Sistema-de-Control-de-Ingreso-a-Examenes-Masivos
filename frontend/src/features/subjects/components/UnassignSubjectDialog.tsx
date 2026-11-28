@@ -1,3 +1,4 @@
+import { XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -20,56 +21,6 @@ interface UnassignSubjectDialogProps {
   onConfirm: () => void
 }
 
-function DialogDangerIcon() {
-  return (
-    <span
-      style={{
-        width: 40,
-        height: 40,
-        backgroundColor: 'var(--danger-soft, #FDE2E1)',
-        color: 'var(--danger, #D92D20)',
-      }}
-      className="flex shrink-0 items-center justify-center rounded-full"
-    >
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <circle cx="12" cy="12" r="10" />
-        <path d="m15 9-6 6" />
-        <path d="m9 9 6 6" />
-      </svg>
-    </span>
-  )
-}
-
-function ConfirmButtonIcon() {
-  return (
-    <svg
-      width="17"
-      height="17"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <path d="m15 9-6 6" />
-      <path d="m9 9 6 6" />
-    </svg>
-  )
-}
-
 /** CA-3: confirmación antes de desvincular. Cancelar cierra sin pedir nada al servidor. */
 export function UnassignSubjectDialog({
   subject,
@@ -89,7 +40,12 @@ export function UnassignSubjectDialog({
         {subject && (
           <>
             <DialogHeader className="flex-row items-start gap-3 space-y-0 text-left">
-              <DialogDangerIcon />
+              <span
+                aria-hidden="true"
+                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-danger-soft text-danger"
+              >
+                <XCircle className="size-[18px]" />
+              </span>
               <div className="space-y-1">
                 <DialogTitle className="leading-snug">
                   ¿Desvincular {subject.nombre}?
@@ -107,7 +63,7 @@ export function UnassignSubjectDialog({
             </ul>
 
             {error && (
-              <p role="alert" className="text-sm font-medium text-[color:var(--danger-fg)]">
+              <p role="alert" className="text-sm font-medium text-danger-fg">
                 {error}
               </p>
             )}
@@ -127,7 +83,7 @@ export function UnassignSubjectDialog({
                 disabled={submitting}
                 onClick={onConfirm}
               >
-                <ConfirmButtonIcon />
+                <XCircle className="size-[17px]" />
                 {submitting ? 'Desvinculando…' : 'Desvincular'}
               </Button>
             </DialogFooter>
