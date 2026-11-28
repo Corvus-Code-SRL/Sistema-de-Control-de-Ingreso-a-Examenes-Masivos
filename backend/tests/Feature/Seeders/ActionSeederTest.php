@@ -17,16 +17,16 @@ class ActionSeederTest extends TestCase
         return DB::table('accion')->orderBy('id_accion')->get()->map(fn ($row) => (array) $row)->all();
     }
 
-    public function test_dos_ejecuciones_dejan_treinta_y_siete_acciones_sin_duplicados(): void
+    public function test_dos_ejecuciones_dejan_treinta_y_ocho_acciones_sin_duplicados(): void
     {
         $this->seed(ActionSeeder::class);
         $afterFirst = $this->catalog();
 
         $this->seed(ActionSeeder::class);
 
-        $this->assertCount(37, $afterFirst);
+        $this->assertCount(38, $afterFirst);
         $this->assertSame($afterFirst, $this->catalog());
-        $this->assertSame(37, DB::table('accion')->distinct()->count('operacion'));
+        $this->assertSame(38, DB::table('accion')->distinct()->count('operacion'));
     }
 
     public function test_incluye_las_acciones_de_aprobacion_y_rechazo_de_reportes(): void
@@ -108,7 +108,7 @@ class ActionSeederTest extends TestCase
                 ->value('descripcion')
         );
 
-        $this->assertSame(37, DB::table('accion')->count());
+        $this->assertSame(38, DB::table('accion')->count());
     }
 
     public function test_conserva_inicio_y_las_dos_acciones_de_situaciones(): void
@@ -128,23 +128,24 @@ class ActionSeederTest extends TestCase
                 ->pluck('tipo_operacion', 'operacion')
                 ->all()
         );
-        $this->assertSame(37, DB::table('accion')->count());
+        $this->assertSame(38, DB::table('accion')->count());
     }
 
     public function test_las_acciones_nuevas_van_al_final_del_catalogo(): void
     {
         $this->seed(ActionSeeder::class);
 
-        // Las acciones de HU-031 las siembra solo ActionSeeder, así que quedan al final del catálogo.
-        $lastSix = DB::table('accion')->orderByDesc('id_accion')->limit(6)->pluck('operacion')
+        // Las acciones de HU-038, HU-031 y HU-008 las siembra solo ActionSeeder: quedan al final del catálogo.
+       $lastSeven = DB::table('accion')->orderByDesc('id_accion')->limit(7)->pluck('operacion')
             ->reverse()->values()->all();
 
         $this->assertSame(
             [
                 'REGISTRAR_ESTUDIANTE_EXCEPCIONAL', 'INICIAR_CRONOMETRO', 'AJUSTAR_CRONOMETRO',
                 'GUARDAR_DISTRIBUCION', 'DEJAR_USAR_DISTRIBUCION', 'INGRESO_CON_AVISO_AMBIENTE',
+                'DESVINCULAR_MATERIA_CARRERA',
             ],
-            $lastSix
+            $lastSeven
         );
     }
 
