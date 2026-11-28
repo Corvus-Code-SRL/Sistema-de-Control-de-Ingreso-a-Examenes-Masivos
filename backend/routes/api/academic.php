@@ -10,6 +10,7 @@ use App\Http\Controllers\Academic\SubjectController;
 use App\Http\Controllers\Academic\SubjectGroupController;
 use App\Http\Controllers\Academic\SubjectCareerAssignmentController;
 use App\Http\Controllers\Academic\FacultyController;
+use App\Http\Controllers\Academic\UnassignSubjectCareerController;
 use Illuminate\Support\Facades\Route;
 
 // Rutas del módulo: academic
@@ -105,3 +106,10 @@ Route::prefix('docente')->group(function () {
         ->where('id_examen', '[0-9]{1,9}')
         ->whereUuid('id_usuario');
 });
+
+// HU-008: desvincular una materia de una carrera en el período vigente.
+// GET lista ofertas del período con conteo de grupos; POST cambia estado a INACTIVO.
+Route::get('catalogo/desvincular-materia', [UnassignSubjectCareerController::class, 'index'])
+    ->where(['carrera' => '[0-9]{1,9}', 'periodo' => '[0-9]{1,9}']);
+Route::post('catalogo/desvincular-materia', [UnassignSubjectCareerController::class, 'unassign']);
+Route::post('catalogo/reactivar-materia', [UnassignSubjectCareerController::class, 'reactivate']);

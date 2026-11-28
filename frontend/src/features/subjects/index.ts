@@ -5,6 +5,7 @@ export { AdminSubjectCatalogPage } from './pages/AdminSubjectCatalogPage'
 export { useSubjectCatalog } from './hooks/useSubjectCatalog'
 export { getSubjectCatalog, DEFAULT_PER_PAGE } from './services/subjectsService'
 export { subjectCareerKey } from './types/subject.types'
+export { UnassignSubjectCareerPage } from './pages/UnassignSubjectCareerPage'
 export type {
   Career,
   SubjectCareer,

@@ -62,7 +62,7 @@ describe('menú por capacidades', () => {
           ['Registrar carrera', undefined],
           ['Registrar materia', undefined],
           ['Asignar materia a carrera', '/materias/asignaciones'],
-          ['Deshabilitar materia de carrera', undefined],
+          ['Deshabilitar/Reactivar materia de carrera', '/catalogo/deshabilitar-materia'],
           ['Registrar ambiente', '/ambientes']
         ]
       },

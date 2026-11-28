@@ -22,11 +22,11 @@ class AuditLogOptionsTest extends TestCase
         $this->prepareAuditLog();
     }
 
-    public function test_ofrece_las_37_acciones_del_catalogo_con_su_etiqueta(): void
+    public function test_ofrece_las_39_acciones_del_catalogo_con_su_etiqueta(): void
     {
         $actions = collect($this->getJson('/api/bitacora/opciones')->assertOk()->json('data.acciones'));
 
-        $this->assertCount(37, $actions);
+        $this->assertCount(39, $actions);
         $this->assertSame('Iniciar cronómetro', $actions->firstWhere('codigo', 'INICIAR_CRONOMETRO')['etiqueta']);
         $this->assertSame('Ajustar cronómetro', $actions->firstWhere('codigo', 'AJUSTAR_CRONOMETRO')['etiqueta']);
         $this->assertSame('Registrar estudiante excepcional', $actions->firstWhere('codigo', 'REGISTRAR_ESTUDIANTE_EXCEPCIONAL')['etiqueta']);
@@ -42,6 +42,14 @@ class AuditLogOptionsTest extends TestCase
         $this->assertSame(
             'Rectificar sin confirmación',
             $actions->firstWhere('codigo', 'RECTIFICAR_SIN_CONFIRMACION')['etiqueta']
+        );
+        $this->assertSame(
+            'Desvincular materia de carrera',
+            $actions->firstWhere('codigo', 'DESVINCULAR_MATERIA_CARRERA')['etiqueta']
+        );
+        $this->assertSame(
+            'Reactivar materia de carrera',
+            $actions->firstWhere('codigo', 'REACTIVAR_MATERIA_CARRERA')['etiqueta']
         );
     }
 

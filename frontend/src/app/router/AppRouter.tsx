@@ -62,6 +62,7 @@ import {
   AdminSubjectAssignmentsPage,
   AdminSubjectCatalogPage,
   SubjectsPage,
+  UnassignSubjectCareerPage,
 } from '@/features/subjects'
 import { CuentaDetallePage, ModificarRolPage, RegistrarCuentaPage } from '@/features/users'
 import {
@@ -360,6 +361,10 @@ function AdministradorRoutes() {
         <Route
           path="/materias/catalogo"
           element={guarded('administracion.gestionar', <AdminSubjectCatalogPage />)}
+        />
+        <Route
+          path="/catalogo/deshabilitar-materia"
+          element={guarded('administracion.gestionar', <UnassignSubjectCareerPage />)}
         />
         <Route
           path="/central-riesgo/:id?"

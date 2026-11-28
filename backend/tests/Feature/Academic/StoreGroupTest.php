@@ -423,4 +423,82 @@ $this->assertSame(
 
         return $cases;
     }
+
+    /**
+     * HU-008 (integración HU-018): una oferta con estado INACTIVO (desvinculada) no permite
+     * registrar un grupo. GroupService::assertPairIsOffered filtra estado = ACTIVO y responde 422
+     * sobre id_periodo. El texto del mensaje (pairNotOfferedException) es copy de backend: acá
+     * solo se verifica el comportamiento, no el texto.
+     *
+     * El estado es INACTIVO (no DESVINCULADA); la UI muestra "Desvinculada". No hay migración.
+     */
+    public function test_no_permite_registrar_grupo_en_una_oferta_inactiva(): void
+    {
+        $this->seedExtraPairs(1);
+        $subjectId = (int) DB::table('materia')->where('codigo', 'REL-1')->value('id_materia');
+
+        // El par y la oferta los crea seedExtraPairs() como ACTIVO; se desvincula la oferta.
+        DB::table('oferta_academica')
+            ->where('id_carrera', $this->sistemasId)
+            ->where('id_materia', $subjectId)
+            ->where('id_gestion_periodo', $this->periodoActivoId)
+            ->update(['estado' => RecordStatus::INACTIVE]);
+
+        $this->postJson('/api/grupos', $this->payload([
+            'id_materia' => $subjectId,
+            'num_grupo' => 'IN',
+        ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['id_periodo']);
+
+        $this->assertDatabaseMissing('grupo', [
+            'id_carrera' => $this->sistemasId,
+            'id_materia' => $subjectId,
+            'num_grupo' => 'IN',
+            'id_gestion_periodo' => $this->periodoActivoId,
+        ]);
+
+        // El intento fallido no reactivó la oferta.
+        $this->assertSame(
+            RecordStatus::INACTIVE,
+            DB::table('oferta_academica')
+                ->where('id_carrera', $this->sistemasId)
+                ->where('id_materia', $subjectId)
+                ->where('id_gestion_periodo', $this->periodoActivoId)
+                ->value('estado')
+        );
+    }
+
+    /**
+     * Control positivo del test anterior: con la oferta ACTIVO (estado por defecto de
+     * seedExtraPairs) el mismo par sí permite registrar el grupo. Aísla el dato en REL-1
+     * para no depender del catálogo compartido.
+     */
+    public function test_permite_registrar_grupo_en_una_oferta_activa(): void
+    {
+        $this->seedExtraPairs(1);
+        $subjectId = (int) DB::table('materia')->where('codigo', 'REL-1')->value('id_materia');
+
+        $this->assertSame(
+            RecordStatus::ACTIVE,
+            DB::table('oferta_academica')
+                ->where('id_carrera', $this->sistemasId)
+                ->where('id_materia', $subjectId)
+                ->where('id_gestion_periodo', $this->periodoActivoId)
+                ->value('estado')
+        );
+
+        $this->postJson('/api/grupos', $this->payload([
+            'id_materia' => $subjectId,
+            'num_grupo' => 'AC',
+        ]))->assertStatus(201);
+
+        $this->assertDatabaseHas('grupo', [
+            'id_carrera' => $this->sistemasId,
+            'id_materia' => $subjectId,
+            'num_grupo' => 'AC',
+            'id_gestion_periodo' => $this->periodoActivoId,
+            'id_usuario_docente' => $this->docenteId,
+        ]);
+    }
 }
