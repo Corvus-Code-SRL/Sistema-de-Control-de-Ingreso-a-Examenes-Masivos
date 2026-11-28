@@ -248,7 +248,7 @@ function DocenteRoutes() {
         />
         <Route
           path="/reportes/bitacora"
-          element={guarded('administracion.gestionar', <AuditLogReportPage />)}
+          element={guarded('bitacora.consultar', <AuditLogReportPage />)}
         />
         <Route path="/bitacora" element={guarded('bitacora.consultar', <AuditLogPage />)} />
 
@@ -291,7 +291,7 @@ function AuxiliarRoutes() {
         />
         <Route
           path="/reportes/bitacora"
-          element={guarded('administracion.gestionar', <AuditLogReportPage />)}
+          element={guarded('bitacora.consultar', <AuditLogReportPage />)}
         />
         <Route path="/bitacora" element={guarded('bitacora.consultar', <AuditLogPage />)} />
         <Route path="*" element={<Navigate to="/mis-examenes" replace />} />
@@ -384,7 +384,7 @@ function AdministradorRoutes() {
         />
         <Route
           path="/reportes/bitacora"
-          element={guarded('administracion.gestionar', <AuditLogReportPage />)}
+          element={guarded('bitacora.consultar', <AuditLogReportPage />)}
         />
         <Route path="/bitacora" element={guarded('bitacora.consultar', <AuditLogPage />)} />
 

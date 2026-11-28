@@ -3,27 +3,14 @@
 namespace App\Http\Requests\Reports\Security;
 
 use App\Http\Requests\Security\ListAuditLogRequest;
-use App\Models\Role;
-use App\Services\Security\UserRoleService;
-use App\Support\CurrentUser;
 
 /**
- * HU-068: validacion de filtros del reporte de bitacora.
- * El rango de fechas es obligatorio y el acceso es exclusivo
- * del administrador.
+ * HU-068: validación de filtros del reporte de bitácora.
+ * El rango de fechas es obligatorio y la autorización se
+ * hereda de la consulta de bitácora.
  */
 class AuditLogReportRequest extends ListAuditLogRequest
 {
-    public function authorize(
-        CurrentUser $currentUser,
-        UserRoleService $roles
-    ): bool {
-        return $roles->hasAnyActiveRole(
-            $currentUser->id(),
-            [Role::ADMINISTRADOR]
-        );
-    }
-
     public function rules(): array
     {
         $rules = parent::rules();

@@ -368,6 +368,39 @@ describe('menú por capacidades', () => {
     expect(items.map((item) => item.capability)).toEqual(['bitacora.consultar'])
   })
 
+  it('el reporte de bitacora exige la capacidad especifica', () => {
+    const items = NAVIGATION.flatMap((section) => section.items).filter(
+      (item) => item.to === '/reportes/bitacora'
+    )
+
+    expect(items.map((item) => item.capability)).toEqual(['bitacora.consultar'])
+  })
+
+  it('la capacidad generica de administracion no concede el reporte de bitacora', () => {
+    const items = visibleSections(['administracion.gestionar']).flatMap((section) => section.items)
+
+    expect(items.some((item) => item.to === '/reportes/bitacora')).toBe(false)
+  })
+
+  it('el administrador con permiso de bitacora puede ver el reporte', () => {
+    const items = visibleSections(['administracion.gestionar', 'bitacora.consultar']).flatMap(
+      (section) => section.items
+    )
+
+    expect(items.some((item) => item.to === '/reportes/bitacora')).toBe(true)
+  })
+
+  it('retirar el permiso de bitacora oculta el reporte al administrador', () => {
+    const capabilities = capabilitiesOf('Administrador').filter(
+      (capability) => capability !== 'bitacora.consultar'
+    )
+
+    const items = visibleSections(capabilities).flatMap((section) => section.items)
+
+    expect(items.some((item) => item.to === '/reportes/bitacora')).toBe(false)
+    expect(items.some((item) => item.to === '/reportes/intentos')).toBe(true)
+  })
+
   it('docente y auxiliar pueden abrir En curso', () => {
     for (const role of ['Docente', 'Auxiliar'] as const) {
       const items = menuOf(role).flatMap((section) => section.items)

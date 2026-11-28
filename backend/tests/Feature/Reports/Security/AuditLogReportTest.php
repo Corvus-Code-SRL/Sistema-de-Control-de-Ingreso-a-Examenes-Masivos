@@ -187,6 +187,35 @@ class AuditLogReportTest extends TestCase
         );
     }
 
+    public function test_administrator_without_audit_permission_cannot_access_report(): void
+    {
+        config(['sciem.access.audit_log' => []]);
+
+        $this->seedOperations();
+
+        foreach (['', '/pdf', '/excel'] as $suffix) {
+            $url = '/api/reportes/bitacora' . $suffix
+                . '?desde=2026-11-01&hasta=2026-11-30';
+
+            $this->getJson($url)->assertForbidden();
+        }
+    }
+
+    public function test_teacher_with_configured_audit_permission_can_access_report(): void
+    {
+        config(['sciem.access.audit_log' => [Role::DOCENTE]]);
+
+        $this->seedOperations();
+        $this->actAs($this->firstUser);
+
+        foreach (['', '/pdf', '/excel'] as $suffix) {
+            $url = '/api/reportes/bitacora' . $suffix
+                . '?desde=2026-11-01&hasta=2026-11-30';
+
+            $this->getJson($url)->assertOk();
+        }
+    }
+
     public function test_both_dates_are_required(): void
     {
         $this->getJson('/api/reportes/bitacora')
