@@ -548,6 +548,17 @@ describe('AppSidebar — entradas y estado activo', () => {
     }
   )
 
+  it('administrador: «Deshabilitar materia de carrera» lleva a su ruta y se resalta en ella', async () => {
+    const user = userEvent.setup()
+    renderSidebar('Administrador', '/catalogo/deshabilitar-materia')
+    await openAllSections(user)
+
+    const link = screen.getByRole('link', { name: 'Deshabilitar materia de carrera' })
+
+    expect(link).toHaveAttribute('href', '/catalogo/deshabilitar-materia')
+    expect(link).toHaveAttribute('aria-current', 'page')
+  })
+
   it('el Administrador no ve «Registrar situación excepcional»', async () => {
     const user = userEvent.setup()
     renderSidebar('Administrador', '/cuentas/roles')
