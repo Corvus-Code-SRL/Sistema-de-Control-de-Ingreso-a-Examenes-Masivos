@@ -63,4 +63,25 @@ class UnassignSubjectCareerController extends Controller
             'grupos_count' => 0,
         ]);
     }
+
+    /** POST /api/catalogo/reactivar-materia — estado → ACTIVO. */
+    public function reactivate(UnassignSubjectCareerRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+
+        $oferta = $this->service->reactivate(
+            (int) $validated['id_carrera'],
+            (int) $validated['id_periodo'],
+            (int) $validated['id_materia'],
+            (string) $this->currentUser->id()
+        );
+
+        return response()->json([
+            'id_carrera' => (int) $oferta->id_carrera,
+            'id_materia' => (int) $oferta->id_materia,
+            'id_periodo' => (int) $oferta->id_gestion_periodo,
+            'estado' => $oferta->estado,
+            'grupos_count' => (int) $oferta->grupos_count,
+        ]);
+    }
 }

@@ -112,3 +112,4 @@ Route::prefix('docente')->group(function () {
 Route::get('catalogo/desvincular-materia', [UnassignSubjectCareerController::class, 'index'])
     ->where(['carrera' => '[0-9]{1,9}', 'periodo' => '[0-9]{1,9}']);
 Route::post('catalogo/desvincular-materia', [UnassignSubjectCareerController::class, 'unassign']);
+Route::post('catalogo/reactivar-materia', [UnassignSubjectCareerController::class, 'reactivate']);

@@ -381,6 +381,7 @@ return [
             'DEJAR_USAR_DISTRIBUCION' => 'Dejar de usar distribución',
             'INGRESO_CON_AVISO_AMBIENTE' => 'Ingreso con aviso de ambiente',
             'DESVINCULAR_MATERIA_CARRERA' => 'Desvincular materia de carrera',
+            'REACTIVAR_MATERIA_CARRERA' => 'Reactivar materia de carrera',
         ],
 
         'etiquetas_campo' => [

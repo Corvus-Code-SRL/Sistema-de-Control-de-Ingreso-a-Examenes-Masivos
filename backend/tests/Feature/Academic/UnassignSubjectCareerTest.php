@@ -8,6 +8,7 @@ use App\Models\Group;
 use App\Models\Role;
 use App\Models\SubjectCareer;
 use App\Models\User;
+use App\Models\Subject;
 use App\Services\Security\AuditLogService;
 use App\Support\RecordStatus;
 use Database\Seeders\ActionSeeder;
@@ -26,6 +27,7 @@ class UnassignSubjectCareerTest extends TestCase
     use SeedsAcademicCatalog;
 
     private const URL = '/api/catalogo/desvincular-materia';
+    private const REACTIVATE_URL = '/api/catalogo/reactivar-materia';
 
     private User $adminUser;
     private User $teacherUser;
@@ -342,5 +344,196 @@ class UnassignSubjectCareerTest extends TestCase
         $this->postJson($this->unassignUrl(), $this->unassignPayload($this->materiaInactivaId))
             ->assertOk()
             ->assertJsonPath('estado', RecordStatus::INACTIVE);
+    }   
+
+    // ---------- Reactivar ----------
+    private function inactivateOffer(int $carreraId, int $materiaId, ?int $periodoId = null): void
+    {
+        DB::table('oferta_academica')
+            ->where('id_carrera', $carreraId)
+            ->where('id_materia', $materiaId)
+            ->where('id_gestion_periodo', $periodoId ?? $this->periodoActivoId)
+            ->update(['estado' => RecordStatus::INACTIVE]);
+    }
+
+    private function createOfferedSubject(string $code): int
+    {
+        $id = Subject::create([
+            'nombre' => "Materia {$code}", 'codigo' => $code, 'estado' => RecordStatus::ACTIVE,
+        ])->id_materia;
+        SubjectCareer::create([
+            'id_carrera' => $this->sistemasId, 'id_materia' => $id, 'estado' => RecordStatus::ACTIVE,
+        ]);
+        DB::table('oferta_academica')->insert([
+            'id_carrera' => $this->sistemasId,
+            'id_materia' => $id,
+            'id_gestion_periodo' => $this->periodoActivoId,
+            'estado' => RecordStatus::ACTIVE,
+        ]);
+
+        return $id;
+    }
+
+    public function test_reactiva_cambia_estado_solo_de_esa_oferta_y_audita(): void
+    {
+        $this->inactivateOffer($this->sistemasId, $this->basesDatosId);
+        $this->actingAs($this->adminUser);
+
+        $this->postJson(self::REACTIVATE_URL, $this->unassignPayload($this->basesDatosId))
+            ->assertOk()
+            ->assertJsonPath('id_materia', $this->basesDatosId)
+            ->assertJsonPath('id_periodo', $this->periodoActivoId)
+            ->assertJsonPath('estado', RecordStatus::ACTIVE)
+            ->assertJsonPath('grupos_count', 1); // Base de Datos I tiene 1 grupo activo en Sistemas
+
+        $this->assertDatabaseHas('oferta_academica', [
+            'id_carrera' => $this->sistemasId,
+            'id_materia' => $this->basesDatosId,
+            'id_gestion_periodo' => $this->periodoActivoId,
+            'estado' => RecordStatus::ACTIVE,
+        ]);
+
+        $log = AuditLog::query()->where('tabla_afectada', 'oferta_academica')->firstOrFail();
+        $this->assertSame($this->adminUser->id_usuario, $log->id_usuario);
+        $this->assertSame('REACTIVAR_MATERIA_CARRERA', $log->accion->operacion);
+        $this->assertSame(RecordStatus::INACTIVE, $log->antiguo_valor['estado']);
+        $this->assertSame(RecordStatus::ACTIVE, $log->nuevo_valor['estado']);
+    }
+
+    public function test_reactivar_no_toca_las_demas_ofertas(): void
+    {
+        $this->inactivateOffer($this->sistemasId, $this->basesDatosId);
+        $this->inactivateOffer($this->sistemasId, $this->materiaInactivaId);
+        $this->actingAs($this->adminUser);
+
+        $this->postJson(self::REACTIVATE_URL, $this->unassignPayload($this->basesDatosId))->assertOk();
+
+        $this->assertDatabaseHas('oferta_academica', [
+            'id_carrera' => $this->sistemasId,
+            'id_materia' => $this->materiaInactivaId,
+            'id_gestion_periodo' => $this->periodoActivoId,
+            'estado' => RecordStatus::INACTIVE,
+        ]);
+    }
+
+    public function test_reactivar_una_oferta_ya_activa_da_422(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        $this->postJson(self::REACTIVATE_URL, $this->unassignPayload())
+            ->assertStatus(422)
+            ->assertJsonPath('errors.id_materia.0', 'La materia ya está activa en este período.');
+    }
+
+    public function test_reactivar_en_periodo_no_vigente_da_422(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        $this->postJson(self::REACTIVATE_URL, $this->unassignPayload($this->calculoId, $this->periodoAnteriorId))
+            ->assertStatus(422)
+            ->assertJsonPath('errors.id_periodo.0', 'Solo se puede reactivar en el período vigente.');
+    }
+
+    public function test_reactivar_una_oferta_inexistente_da_422(): void
+    {
+        $materiaSinOferta = Subject::create([
+            'nombre' => 'Sin oferta', 'codigo' => 'NOF-001', 'estado' => RecordStatus::ACTIVE,
+        ])->id_materia;
+        $this->actingAs($this->adminUser);
+
+        $this->postJson(self::REACTIVATE_URL, $this->unassignPayload($materiaSinOferta))
+            ->assertStatus(422)
+            ->assertJsonPath('errors.id_materia.0', 'La materia no está asignada a esta carrera en este período.');
+    }
+
+    public function test_reactivar_con_la_materia_inactiva_da_422(): void
+    {
+        // Materia Archivada: materia INACTIVA con par ACTIVO.
+        $this->inactivateOffer($this->sistemasId, $this->materiaInactivaId);
+        $this->actingAs($this->adminUser);
+
+        $this->postJson(self::REACTIVATE_URL, $this->unassignPayload($this->materiaInactivaId))
+            ->assertStatus(422)
+            ->assertJsonPath(
+                'errors.id_materia.0',
+                'No se puede reactivar: la materia o su asignación a la carrera está inactiva.'
+            );
+    }
+
+    public function test_reactivar_con_el_par_inactivo_da_422(): void
+    {
+        // Informática + Base de Datos I: materia ACTIVA con par INACTIVO.
+        $this->inactivateOffer($this->informaticaId, $this->basesDatosId);
+        $this->actingAs($this->adminUser);
+
+        $this->postJson(self::REACTIVATE_URL, [
+            'id_carrera' => $this->informaticaId,
+            'id_periodo' => $this->periodoActivoId,
+            'id_materia' => $this->basesDatosId,
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath(
+                'errors.id_materia.0',
+                'No se puede reactivar: la materia o su asignación a la carrera está inactiva.'
+            );
+    }
+
+    public function test_solo_administrador_puede_reactivar(): void
+    {
+        $this->inactivateOffer($this->sistemasId, $this->basesDatosId);
+
+        foreach ([$this->teacherUser, $this->auxiliarUser] as $user) {
+            $this->actingAs($user);
+            $this->postJson(self::REACTIVATE_URL, $this->unassignPayload($this->basesDatosId))->assertForbidden();
+        }
+    }
+
+    public function test_rollback_al_reactivar_si_audit_falla(): void
+    {
+        $materia = $this->createOfferedSubject('REA-001');
+        $this->inactivateOffer($this->sistemasId, $materia);
+        $this->actingAs($this->adminUser);
+        $this->withoutExceptionHandling();
+
+        $mock = Mockery::mock(AuditLogService::class);
+        $mock->shouldReceive('registrar')->andThrow(new LogicException('audit falló'));
+        $this->app->instance(AuditLogService::class, $mock);
+
+        try {
+            $this->postJson(self::REACTIVATE_URL, $this->unassignPayload($materia));
+            $this->fail('Se esperaba que el audit lanzara.');
+        } catch (LogicException $e) {
+            $this->assertSame('audit falló', $e->getMessage());
+        }
+
+        $this->assertDatabaseHas('oferta_academica', [
+            'id_carrera' => $this->sistemasId,
+            'id_materia' => $materia,
+            'id_gestion_periodo' => $this->periodoActivoId,
+            'estado' => RecordStatus::INACTIVE,
+        ]);
+    }
+
+    public function test_ciclo_completo_desvincular_y_reactivar(): void
+    {
+        $materia = $this->createOfferedSubject('CIC-001');
+        $this->actingAs($this->adminUser);
+
+        $this->postJson(self::URL, $this->unassignPayload($materia))
+            ->assertOk()->assertJsonPath('estado', RecordStatus::INACTIVE);
+        $this->postJson(self::REACTIVATE_URL, $this->unassignPayload($materia))
+            ->assertOk()->assertJsonPath('estado', RecordStatus::ACTIVE);
+
+        $this->assertDatabaseHas('oferta_academica', [
+            'id_carrera' => $this->sistemasId,
+            'id_materia' => $materia,
+            'id_gestion_periodo' => $this->periodoActivoId,
+            'estado' => RecordStatus::ACTIVE,
+        ]);
+        $this->assertSame(
+            ['DESVINCULAR_MATERIA_CARRERA', 'REACTIVAR_MATERIA_CARRERA'],
+            AuditLog::query()->where('tabla_afectada', 'oferta_academica')->orderBy('id_log')->get()
+                ->map(fn ($log) => $log->accion->operacion)->all()
+        );
     }   
 }

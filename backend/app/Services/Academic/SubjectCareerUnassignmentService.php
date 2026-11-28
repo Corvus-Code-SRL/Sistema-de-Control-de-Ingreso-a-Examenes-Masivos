@@ -6,6 +6,7 @@ use App\Http\Resources\Academic\UnassignableSubjectResource;
 use App\Models\AcademicOffering;
 use App\Models\Group;
 use App\Models\Period;
+use App\Models\Subject;
 use App\Services\Security\AuditLogService;
 use App\Support\Database\AccentInsensitiveSearch;
 use App\Support\RecordStatus;
@@ -165,6 +166,96 @@ class SubjectCareerUnassignmentService
         });
     }
 
+    /**
+     * HU-008: reactiva una oferta desvinculada (estado → ACTIVO) en el período vigente y audita.
+     *
+     * @throws ValidationException
+     */
+    public function reactivate(int $carreraId, int $periodoId, int $materiaId, string $actorId): AcademicOffering
+    {
+        return DB::transaction(function () use ($carreraId, $periodoId, $materiaId, $actorId) {
+            $period = Period::query()->sharedLock()->find($periodoId);
+            $this->assertPeriodIsActive($period);
+            $this->assertPeriodIsCurrent($period, 'reactivar');
+
+            $oferta = AcademicOffering::query()
+                ->where('id_carrera', $carreraId)
+                ->where('id_materia', $materiaId)
+                ->where('id_gestion_periodo', $periodoId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($oferta === null) {
+                throw ValidationException::withMessages([
+                    'id_materia' => ['La materia no está asignada a esta carrera en este período.'],
+                ]);
+            }
+
+            if ($oferta->estado === RecordStatus::ACTIVE) {
+                throw ValidationException::withMessages([
+                    'id_materia' => ['La materia ya está activa en este período.'],
+                ]);
+            }
+
+            // Una oferta no puede volver si la materia o su asignación a la carrera están deshabilitadas.
+            $subjectIsActive = Subject::query()
+                ->where('id_materia', $materiaId)
+                ->whereRaw('estado::text = ?', [RecordStatus::ACTIVE])
+                ->exists();
+            $pairIsActive = DB::table('materia_carrera')
+                ->where('id_carrera', $carreraId)
+                ->where('id_materia', $materiaId)
+                ->whereRaw('estado::text = ?', [RecordStatus::ACTIVE])
+                ->exists();
+
+            if (! $subjectIsActive || ! $pairIsActive) {
+                throw ValidationException::withMessages([
+                    'id_materia' => ['No se puede reactivar: la materia o su asignación a la carrera está inactiva.'],
+                ]);
+            }
+
+            $antes = [
+                'id_carrera' => $carreraId,
+                'id_materia' => $materiaId,
+                'id_gestion_periodo' => $periodoId,
+                'estado' => $oferta->estado,
+            ];
+
+            // Por clave compuesta: la tabla no tiene clave primaria y save() actualizaría todas las ofertas.
+            AcademicOffering::query()
+                ->where('id_carrera', $carreraId)
+                ->where('id_materia', $materiaId)
+                ->where('id_gestion_periodo', $periodoId)
+                ->update(['estado' => RecordStatus::ACTIVE]);
+
+            $oferta->estado = RecordStatus::ACTIVE;
+
+            $despues = [
+                'id_carrera' => $carreraId,
+                'id_materia' => $materiaId,
+                'id_gestion_periodo' => $periodoId,
+                'estado' => $oferta->estado,
+            ];
+
+            $this->auditLog->registrar(
+                'REACTIVAR_MATERIA_CARRERA',
+                'oferta_academica',
+                $antes,
+                $despues,
+                $actorId
+            );
+
+            $oferta->grupos_count = Group::query()
+                ->where('id_carrera', $carreraId)
+                ->where('id_materia', $materiaId)
+                ->where('id_gestion_periodo', $periodoId)
+                ->where('estado', RecordStatus::ACTIVE)
+                ->count();
+
+            return $oferta;
+        });
+    }
+
     private function assertPeriodIsActive(?Period $period): void
     {
         if ($period !== null && $period->estado === RecordStatus::ACTIVE) {
@@ -176,14 +267,14 @@ class SubjectCareerUnassignmentService
         ]);
     }
 
-    private function assertPeriodIsCurrent(Period $period): void
+    private function assertPeriodIsCurrent(Period $period, string $verb = 'desvincular'): void
     {
         if ($period->vigente) {
             return;
         }
 
         throw ValidationException::withMessages([
-            'id_periodo' => ['Solo se puede desvincular en el período vigente.'],
+            'id_periodo' => ["Solo se puede {$verb} en el período vigente."],
         ]);
     }
 }

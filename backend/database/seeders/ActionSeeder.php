@@ -183,5 +183,15 @@ class ActionSeeder extends Seeder
                 'descripcion' => 'Desvincular materia de carrera',
             ]
         );
+
+        // HU-008: reactivar una oferta desvinculada. Al final para no mover los ids existentes.
+        DB::table('accion')->updateOrInsert(
+            ['operacion' => 'REACTIVAR_MATERIA_CARRERA'],
+            [
+                'operacion' => 'REACTIVAR_MATERIA_CARRERA',
+                'tipo_operacion' => 'UPDATE',
+                'descripcion' => 'Reactivar materia de carrera',
+            ]
+        );
     }
 }
