@@ -119,7 +119,7 @@ export function SidebarResizeHandle({
       onPointerCancel={(event) => finishDrag(event, false)}
       onDoubleClick={onReset}
       onKeyDown={handleKeyDown}
-      className="absolute inset-y-0 right-0 z-30 w-1.5 cursor-col-resize touch-none bg-transparent outline-none transition-colors hover:bg-sidebar-ring/50 focus-visible:bg-sidebar-ring motion-reduce:transition-none"
+      className="absolute inset-y-0 right-0 z-30 w-1.5 cursor-col-resize touch-none bg-transparent outline-none after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border after:transition-[width,background-color] hover:after:w-0.5 hover:after:bg-brand-fg focus-visible:after:w-0.5 focus-visible:after:bg-brand-fg in-data-[resizing=true]:after:w-0.5 in-data-[resizing=true]:after:bg-brand-fg motion-reduce:after:transition-none"
     />
   )
 }

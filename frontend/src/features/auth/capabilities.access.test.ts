@@ -1,7 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { ACCESS_BY_FEATURE, hasCapability, type AccessFeature } from './capabilities'
+import {
+  ACCESS_BY_FEATURE,
+  CAPABILITIES_BY_FEATURE,
+  ROLE_OWN_CAPABILITIES,
+  hasCapability,
+  type AccessFeature,
+} from './capabilities'
 
 /**
  * El mapa de acceso por función vive en dos lugares: `config('sciem.access')` del backend y
@@ -54,6 +60,74 @@ describe('mapa de acceso: backend e interfaz', () => {
 
   it.each(Object.keys(ACCESS_BY_FEATURE) as AccessFeature[])('%s: los mismos roles', (feature) => {
     expect([...ACCESS_BY_FEATURE[feature]].sort()).toEqual([...backend[feature]].sort())
+  })
+})
+
+/** Lista de cadenas `'a.b'` dentro de un trozo de PHP. */
+function phpStrings(fragment: string): string[] {
+  return [...fragment.matchAll(/'([a-z_.-]+)'/g)].map((match) => match[1])
+}
+
+/** `config('sciem.capacidades')`: función → pantallas (RNF-01, lo usa RolePermissionSeeder). */
+function backendCapabilities(): Record<string, string[]> {
+  const source = readFileSync(resolve(BACKEND, 'config/sciem.php'), 'utf8')
+  const block = /'capacidades'\s*=>\s*\[([\s\S]*?)\n\s{4}\],/.exec(source)
+
+  if (!block) throw new Error("No se encontró el bloque 'capacidades' en backend/config/sciem.php")
+
+  const capabilities: Record<string, string[]> = {}
+
+  for (const entry of block[1].matchAll(/\n\s{8}'([a-z_]+)'\s*=>\s*\[([^\]]*)\]/g)) {
+    capabilities[entry[1]] = phpStrings(entry[2])
+  }
+
+  return capabilities
+}
+
+/** `config('sciem.permisos_propios')`: rol → pantallas propias (sin pasar por una función). */
+function backendOwnCapabilities(): Record<string, string[]> {
+  const source = readFileSync(resolve(BACKEND, 'config/sciem.php'), 'utf8')
+  const block = /'permisos_propios'\s*=>\s*\[([\s\S]*?)\n\s{4}\],/.exec(source)
+
+  if (!block) throw new Error("No se encontró el bloque 'permisos_propios' en backend/config/sciem.php")
+
+  const constants = backendRoleConstants()
+  const own: Record<string, string[]> = {}
+  const pattern = /'rol'\s*=>\s*Role::([A-Z_]+),\s*'capacidades'\s*=>\s*\[([^\]]*)\]/g
+
+  for (const entry of block[1].matchAll(pattern)) {
+    const role = constants[entry[1]]
+
+    if (!role) throw new Error(`Role::${entry[1]} no existe en app/Models/Role.php`)
+
+    own[role] = phpStrings(entry[2])
+  }
+
+  return own
+}
+
+describe('pantallas por permiso: backend e interfaz (RNF-01)', () => {
+  const backend = backendCapabilities()
+
+  it('declaran las mismas funciones', () => {
+    expect(Object.keys(CAPABILITIES_BY_FEATURE).sort()).toEqual(Object.keys(backend).sort())
+  })
+
+  it.each(Object.keys(CAPABILITIES_BY_FEATURE) as AccessFeature[])('%s: las mismas pantallas', (feature) => {
+    expect([...CAPABILITIES_BY_FEATURE[feature]].sort()).toEqual([...backend[feature]].sort())
+  })
+
+  it('las pantallas propias de cada rol coinciden', () => {
+    const own = backendOwnCapabilities()
+    const frontend = Object.fromEntries(
+      Object.entries(ROLE_OWN_CAPABILITIES)
+        .filter(([, screens]) => screens.length > 0)
+        .map(([role, screens]) => [role, [...screens].sort()]),
+    )
+
+    expect(Object.fromEntries(Object.entries(own).map(([role, screens]) => [role, [...screens].sort()]))).toEqual(
+      frontend,
+    )
   })
 })
 
@@ -150,6 +224,15 @@ describe('Control del cronómetro (HU-038)', () => {
     }
     for (const role of ['Administrador', 'Auxiliar', null]) {
       expect(hasCapability(role, 'examenes.controlar-tiempo')).toBe(false)
+    }
+  })
+})
+
+describe('Capacidades propias de HU-028 y HU-031', () => {
+  it('el Docente y el Invitado cargan y distribuyen; nadie más', () => {
+    for (const capability of ['examenes.cargar-habilitados', 'examenes.distribuir-habilitados'] as const) {
+      for (const role of ['Docente', 'Invitado']) expect(hasCapability(role, capability)).toBe(true)
+      for (const role of ['Administrador', 'Auxiliar', null]) expect(hasCapability(role, capability)).toBe(false)
     }
   })
 })

@@ -10,6 +10,8 @@ export interface AuditActor {
   tipo: AuditActorKind
   /** Lo que se muestra: el nombre, «Sistema» o «Automático». */
   etiqueta: string
+  /** Rol con el que hizo la operación (RNF-01); null si no tenía rol vigente en ese momento. */
+  rol: string | null
 }
 
 export interface AuditAction {

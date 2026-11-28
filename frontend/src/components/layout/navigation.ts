@@ -300,14 +300,14 @@ export const NAVIGATION: readonly NavSection[] = [
         id: 'teacher-upload-eligible',
         label: 'Cargar lista de habilitados',
         icon: UserCheck,
-        capability: 'examenes.gestionar',
+        capability: 'examenes.cargar-habilitados',
         to: '/examenes/habilitados'
       },
       {
         id: 'teacher-distribute-eligible',
         label: 'Distribuir habilitados',
         icon: Shuffle,
-        capability: 'examenes.gestionar',
+        capability: 'examenes.distribuir-habilitados',
         to: '/examenes/distribucion'
       }
     ]

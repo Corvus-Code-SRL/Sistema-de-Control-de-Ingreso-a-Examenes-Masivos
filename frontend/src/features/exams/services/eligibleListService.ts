@@ -1,8 +1,7 @@
-import { apiClient, apiPost, apiPut } from '@/lib/api-client'
+import { apiClient, apiPost } from '@/lib/api-client'
 import type {
   EligibleListData,
   ExamSelectorItem,
-  UpdateEligibleListPayload,
   UploadConfirmData,
   UploadPreviewData,
 } from '../types/eligibleList.types'
@@ -24,19 +23,6 @@ export const eligibleListService = {
   async getEligibleList(examId: number, signal?: AbortSignal): Promise<EligibleListData> {
     const response = await apiClient<DataResponse<EligibleListData>>(
       `/examenes/${examId}/habilitados`,
-      { signal }
-    )
-    return response.data
-  },
-
-  async updateEligibleList(
-    examId: number,
-    payload: UpdateEligibleListPayload,
-    signal?: AbortSignal
-  ): Promise<EligibleListData> {
-    const response = await apiPut<DataResponse<EligibleListData>>(
-      `/examenes/${examId}/habilitados`,
-      payload,
       { signal }
     )
     return response.data

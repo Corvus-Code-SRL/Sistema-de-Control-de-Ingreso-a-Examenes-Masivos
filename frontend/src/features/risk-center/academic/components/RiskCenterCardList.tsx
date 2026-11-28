@@ -21,7 +21,7 @@ export function RiskCenterCardList({ records }: RiskCenterCardListProps) {
         <li key={record.id_cr_estudiante} className="border-b border-border last:border-b-0">
           <Link
             to={detailLink(record.id_cr_estudiante)}
-            className="flex items-center gap-3 px-4 py-3 hover:bg-sunken focus-visible:bg-sunken"
+            className="flex items-center gap-3 px-4 py-3 hover:bg-muted focus-visible:bg-muted"
           >
             <Avatar className="size-9 shrink-0">
               <AvatarFallback className="bg-brand-soft text-xs font-semibold text-brand-deep" aria-hidden="true">

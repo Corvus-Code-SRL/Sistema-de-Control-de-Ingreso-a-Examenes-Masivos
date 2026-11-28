@@ -153,6 +153,64 @@ return [
         'risk_rectify'     => [Role::ADMINISTRADOR],
         'risk_rectify_confirm' => [Role::DOCENTE, Role::INVITADO],
         'exam_timer'       => [Role::DOCENTE, Role::INVITADO],
+        'eligible_list'    => [Role::DOCENTE, Role::INVITADO],
+        'room_distribution' => [Role::DOCENTE, Role::INVITADO],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pantallas (ui) que habilita cada permiso (RNF-01)
+    |--------------------------------------------------------------------------
+    |
+    | Registro histórico, no deciden el acceso: RolePermissionSeeder lleva estos mapas a las tablas
+    | permiso, permiso_rol, ui y ui_permiso, y /yo los devuelve en `navegacion`.
+    |
+    | - capacidades: las pantallas de cada función de `access` (un permiso por función).
+    | - permisos_propios: lo que un rol puede por sí mismo, fuera de `access` (el Administrador gestiona
+    |   cuentas; el Auxiliar opera el ingreso). Cada clave es un permiso con su rol y sus pantallas.
+    |
+    | DEBEN mantenerse iguales que CAPABILITIES_BY_FEATURE y ROLE_OWN_CAPABILITIES de
+    | frontend/src/features/auth/capabilities.ts: capabilities.access.test.ts falla si difieren.
+    |
+    */
+
+    'capacidades' => [
+        'teaching' => [
+            'grupos.gestionar',
+            'examenes.gestionar',
+            'ingreso.operar',
+            'incidencias.registrar',
+            'situaciones.registrar',
+        ],
+        'exam_assistants' => ['auxiliares.examen'],
+        'incidents' => ['incidencias.revisar'],
+        'risk_center' => ['riesgo.consultar'],
+        'group_assistants' => ['auxiliares.gestionar'],
+        'report_assistant' => ['auxiliares.reportar'],
+        'special_cases' => ['casos-especiales.gestionar'],
+        'invite_teachers' => ['docentes.invitar'],
+        'audit_log' => ['bitacora.consultar'],
+        'risk_rectify' => ['riesgo.rectificar'],
+        'risk_rectify_confirm' => ['riesgo.confirmar_rectificacion'],
+        'exam_timer' => ['examenes.controlar-tiempo'],
+        'eligible_list' => ['examenes.cargar-habilitados'],
+        'room_distribution' => ['examenes.distribuir-habilitados'],
+    ],
+
+    'permisos_propios' => [
+        'own_auxiliar' => [
+            'rol' => Role::AUXILIAR,
+            'capacidades' => [
+                'ingreso.operar',
+                'incidencias.registrar',
+                'situaciones.registrar',
+                'asignaciones.consultar',
+            ],
+        ],
+        'own_administrador' => [
+            'rol' => Role::ADMINISTRADOR,
+            'capacidades' => ['administracion.gestionar'],
+        ],
     ],
 
     /*
@@ -234,6 +292,10 @@ return [
             'usuario_rol' => [
                 'modulo' => 'roles', 'etiqueta' => 'Rol de cuenta', 'claves' => ['id_usuario'], 'persona' => true,
             ],
+            'permiso' => ['modulo' => 'roles', 'etiqueta' => 'Permiso', 'claves' => ['nombre_permiso']],
+            'permiso_rol' => ['modulo' => 'roles', 'etiqueta' => 'Permiso de rol', 'claves' => ['permiso', 'rol']],
+            'ui' => ['modulo' => 'roles', 'etiqueta' => 'Pantalla', 'claves' => ['nombre_ui']],
+            'ui_permiso' => ['modulo' => 'roles', 'etiqueta' => 'Pantalla de permiso', 'claves' => ['ui', 'permiso']],
             'grupo' => ['modulo' => 'grupos', 'etiqueta' => 'Grupo', 'claves' => ['id_grupo']],
             'grupo_estudiante' => ['modulo' => 'grupos', 'etiqueta' => 'Nómina de grupo', 'claves' => ['id_grupo']],
             'materia_carrera' => [

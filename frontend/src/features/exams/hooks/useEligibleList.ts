@@ -2,15 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ApiError } from '@/lib/api-client'
 import { eligibleListService } from '../services/eligibleListService'
-import type {
-  EligibleChange,
-  EligibleListData,
-  EligibleStudent,
-  ExamSelectorItem,
-  NoEligibleReason,
-  PendingChange,
-  PendingChangesMap,
-} from '../types/eligibleList.types'
+import type { EligibleListData, ExamSelectorItem } from '../types/eligibleList.types'
 
 export const EXAM_QUERY_PARAM = 'examen'
 
@@ -45,18 +37,10 @@ export interface UseEligibleListResult {
   listData: EligibleListData | null
   isLoadingExams: boolean
   isLoadingList: boolean
-  isSaving: boolean
   error: ApiError | null
-  pendingChanges: PendingChangesMap
-  hasPendingChanges: boolean
   selectExam: (examId: number) => void
-  applyDisable: (ids: number[], motivo: NoEligibleReason, detalle?: string) => void
-  applyEnable: (ids: number[]) => void
-  discardChanges: () => void
-  saveChanges: () => Promise<boolean>
   reloadList: () => Promise<void>
   reloadExams: () => Promise<void>
-  studentsWithPending: EligibleStudent[]
 }
 
 export function useEligibleList(): UseEligibleListResult {
@@ -68,10 +52,8 @@ export function useEligibleList(): UseEligibleListResult {
     examIdFromUrl ?? readStoredExamId()
   )
   const [listData, setListData] = useState<EligibleListData | null>(null)
-  const [pendingChanges, setPendingChanges] = useState<PendingChangesMap>(new Map())
   const [isLoadingExams, setIsLoadingExams] = useState(true)
   const [isLoadingList, setIsLoadingList] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<ApiError | null>(null)
 
   const listAbortRef = useRef<AbortController | null>(null)
@@ -125,7 +107,6 @@ export function useEligibleList(): UseEligibleListResult {
     if (fallback === selectedExamId) return
 
     setSelectedExamId(fallback)
-    setPendingChanges(new Map())
     writeStoredExamId(fallback)
 
     setSearchParams(
@@ -157,7 +138,6 @@ export function useEligibleList(): UseEligibleListResult {
         // { data: [] }) no debe dejar listData en un shape que rompa el render.
         if (data && Array.isArray((data as { estudiantes?: unknown }).estudiantes)) {
           setListData(data)
-          setPendingChanges(new Map())
         } else {
           setListData(null)
         }
@@ -178,7 +158,6 @@ export function useEligibleList(): UseEligibleListResult {
     (examId: number): void => {
       if (examId === selectedExamId) return
       setSelectedExamId(examId)
-      setPendingChanges(new Map())
       writeStoredExamId(examId)
       setSearchParams(
         (prev) => {
@@ -198,75 +177,6 @@ export function useEligibleList(): UseEligibleListResult {
     if (selectedExamId === null) return
     void loadList(selectedExamId)
   }, [selectedExamId, loadList])
-
-  const applyDisable = useCallback(
-    (ids: number[], motivo: NoEligibleReason, detalle?: string): void => {
-      setPendingChanges((prev) => {
-        const next = new Map(prev)
-        for (const id of ids) {
-          const change: PendingChange = {
-            estado_habilitacion: 'NO_HABILITADO',
-            motivo,
-          }
-          if (motivo === 'OTRO' && detalle !== undefined) {
-            change.detalle = detalle
-          }
-          next.set(id, change)
-        }
-        return next
-      })
-    },
-    []
-  )
-
-  const applyEnable = useCallback((ids: number[]): void => {
-    setPendingChanges((prev) => {
-      const next = new Map(prev)
-      for (const id of ids) {
-        next.set(id, { estado_habilitacion: 'HABILITADO' })
-      }
-      return next
-    })
-  }, [])
-
-  const discardChanges = useCallback((): void => {
-    setPendingChanges(new Map())
-  }, [])
-
-  const saveChanges = useCallback(async (): Promise<boolean> => {
-    if (selectedExamId === null || pendingChanges.size === 0 || isSaving) return false
-
-    setIsSaving(true)
-    setError(null)
-
-    const cambios: EligibleChange[] = Array.from(pendingChanges.entries()).map(
-      ([id_estudiante, change]) => {
-        const payload: EligibleChange = {
-          id_estudiante,
-          estado_habilitacion: change.estado_habilitacion,
-        }
-        if (change.motivo !== undefined) payload.motivo = change.motivo
-        if (change.detalle !== undefined) payload.detalle = change.detalle
-        return payload
-      }
-    )
-
-    try {
-      const updated = await eligibleListService.updateEligibleList(selectedExamId, { cambios })
-      if (mountedRef.current) {
-        setListData(updated)
-        setPendingChanges(new Map())
-      }
-      return true
-    } catch (cause) {
-      if (mountedRef.current) {
-        setError(toApiError(cause))
-      }
-      return false
-    } finally {
-      if (mountedRef.current) setIsSaving(false)
-    }
-  }, [selectedExamId, pendingChanges, isSaving])
 
   const reloadList = useCallback(async (): Promise<void> => {
     if (selectedExamId !== null) {
@@ -296,20 +206,6 @@ export function useEligibleList(): UseEligibleListResult {
     [exams, selectedExamId]
   )
 
-  const studentsWithPending = useMemo((): EligibleStudent[] => {
-    if (!listData || !Array.isArray(listData.estudiantes)) return []
-    return listData.estudiantes.map((student) => {
-      const pending = pendingChanges.get(student.id_estudiante)
-      if (!pending) return student
-      return {
-        ...student,
-        estado_habilitacion: pending.estado_habilitacion,
-        motivo: pending.motivo ?? null,
-        detalle: pending.detalle ?? null,
-      }
-    })
-  }, [listData, pendingChanges])
-
   return {
     exams,
     selectedExamId,
@@ -317,18 +213,10 @@ export function useEligibleList(): UseEligibleListResult {
     listData,
     isLoadingExams,
     isLoadingList,
-    isSaving,
     error,
-    pendingChanges,
-    hasPendingChanges: pendingChanges.size > 0,
     selectExam,
-    applyDisable,
-    applyEnable,
-    discardChanges,
-    saveChanges,
     reloadList,
     reloadExams,
-    studentsWithPending,
   }
 }
 

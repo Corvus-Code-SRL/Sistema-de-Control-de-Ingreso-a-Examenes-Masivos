@@ -26,7 +26,7 @@ export function WizardSteps({ steps, current }: WizardStepsProps) {
               aria-hidden="true"
               className={cn(
                 'flex size-6 items-center justify-center rounded-full border text-xs font-semibold',
-                isCurrent && 'border-brand bg-brand text-white',
+                isCurrent && 'border-brand bg-brand text-on-solid',
                 isDone && 'border-brand bg-brand-soft text-brand-deep',
                 !isCurrent && !isDone && 'border-border-strong text-muted-foreground'
               )}

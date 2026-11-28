@@ -1,14 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
-import {
-  CalendarX2,
-  CheckCircle2,
-  Info,
-  Lock,
-  Upload,
-  XCircle,
-} from 'lucide-react'
+import { useState } from 'react'
+import { CalendarX2, Lock, Upload } from 'lucide-react'
 
-import { AppShell } from '@/components/layout/AppShell'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -16,38 +8,24 @@ import { FormSelect } from '@/components/common/FormSelect'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
-import { PageHeader } from '@/components/common/PageHeader'
-import { Toast } from '@/components/ui/toast'
 
 import { useEligibleList } from '../hooks/useEligibleList'
-import { ChangesBanner } from '../components/ChangesBanner'
-import { DisableStudentsDialog } from '../components/DisableStudentsDialog'
 import { EligibleListCurrentTable } from '../components/EligibleListCurrentTable'
+import { EligibleListShell, ELIGIBLE_LIST_TITLE } from '../components/EligibleListShell'
 import { EligibleListUploadFlow } from '../components/EligibleListUploadFlow'
-import type { NoEligibleReason } from '../types/eligibleList.types'
-import { formatDate, readOnlyMessage } from '../utils/eligibleListUtils'
+import { formatDate, formatTime, readOnlyMessage } from '../utils/eligibleListUtils'
 
-interface ToastState {
-  title: string
-  description: string
-}
+const SELECT_SUBTITLE = 'Seleccione un examen y cargue el archivo con los estudiantes habilitados.'
+const REPLACE_SUBTITLE =
+  'Cargue el archivo con los estudiantes habilitados: quienes no figuren en él quedarán como no habilitados.'
 
 export function ExamEligibleListPage() {
   const eligible = useEligibleList()
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
-  const [disableOpen, setDisableOpen] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
-  const [toast, setToast] = useState<ToastState | null>(null)
-
-  const resetSelection = useCallback(() => setSelectedIds(new Set()), [])
-
-  useEffect(() => {
-    resetSelection()
-  }, [eligible.selectedExamId, resetSelection])
 
   const examOptions = eligible.exams.map((e) => ({
     value: String(e.id_examen),
-    label: `${e.nombre} · ${e.materia.nombre} · ${formatDate(e.fecha)} · ${e.hora_inicio}`,
+    label: `${e.nombre} · ${e.materia.nombre} · ${formatDate(e.fecha)} · ${formatTime(e.hora_inicio)}`,
   }))
 
   const selectedExam = eligible.selectedExam
@@ -64,188 +42,94 @@ export function ExamEligibleListPage() {
       (s) => s.estado_habilitacion === 'NO_HABILITADO'
     ).length ?? 0
 
-  const students = eligible.studentsWithPending
-  const selectedStudents = students.filter((s) => selectedIds.has(s.id_estudiante))
-  const selectedNonSpecial = selectedStudents.filter((s) => !s.caso_especial)
-  const selectedNoEligible = selectedNonSpecial.filter(
-    (s) => s.estado_habilitacion === 'NO_HABILITADO'
-  )
-  const selectedEligible = selectedNonSpecial.filter(
-    (s) => s.estado_habilitacion === 'HABILITADO'
-  )
+  const students = eligible.listData?.estudiantes ?? []
 
-  // Un estudiante es "habilitable" si está seleccionado, no es caso especial,
-  // y su estado pendiente (o actual, si no hay pending) no es ya HABILITADO.
-  // - Sin pending y estado HABILITADO → ya está habilitado, no ofrecer de nuevo.
-  // - Sin pending y estado NO_HABILITADO → ofrecer "Habilitar".
-  // - Con pending HABILITADO → ya está pendiente, no ofrecer de nuevo.
-  // - Con pending NO_HABILITADO → ofrecer "Habilitar" (para revertir).
-  const selectedHabilitable = selectedNonSpecial.filter((s) => {
-    const pending = eligible.pendingChanges.get(s.id_estudiante)
-    const effectiveEstado = pending?.estado_habilitacion ?? s.estado_habilitacion
-    return effectiveEstado !== 'HABILITADO'
-  })
+  // El archivo reemplaza la lista actual. El servidor lo hace en una sola transacción; aquí solo se recarga.
+  const replacesCurrentList = noHabilitadosCount > 0
 
-  const handleSave = async (): Promise<void> => {
-    const count = eligible.pendingChanges.size
-    const ok = await eligible.saveChanges()
-    if (ok) {
-      setToast({
-        title: 'Lista de habilitados guardada',
-        description: `${count} ${
-          count === 1 ? 'cambio aplicado' : 'cambios aplicados'
-        } correctamente.`,
-      })
-    }
-  }
-
-  const handleDiscard = (): void => {
-    eligible.discardChanges()
-    resetSelection()
-  }
-
-  const handleApplyDisable = (motivo: NoEligibleReason, detalle?: string): void => {
-    eligible.applyDisable(
-      selectedNonSpecial.map((s) => s.id_estudiante),
-      motivo,
-      detalle
-    )
-    setDisableOpen(false)
-    resetSelection()
-  }
-
-  const handleApplyEnable = (): void => {
-    eligible.applyEnable(selectedHabilitable.map((s) => s.id_estudiante))
-    resetSelection()
-  }
-
-  // CA-9: el archivo reemplaza la lista actual, incluidos los ajustes manuales. El servidor lo hace en
-  // una sola transacción; aquí solo se descartan los cambios locales y se recarga la lista guardada.
-  const replacesCurrentList = noHabilitadosCount > 0 || eligible.pendingChanges.size > 0
+  const readOnly =
+    eligible.listData && !eligible.listData.editable ? readOnlyMessage(eligible.listData.estado) : null
 
   const handleReplaced = (): void => {
-    resetSelection()
     void eligible.reloadList()
   }
 
   if (eligible.isLoadingExams) {
     return (
-      <AppShell
-        mobileTitle="Habilitar estudiantes"
-        breadcrumbs={[
-          { label: 'Preparación de exámenes' },
-          { label: 'Habilitar estudiantes' },
-        ]}
-      >
+      <EligibleListShell>
         <Card className="p-0">
           <LoadingState rows={3} label="Cargando exámenes" />
         </Card>
-      </AppShell>
+      </EligibleListShell>
     )
   }
 
   if (eligible.error) {
     return (
-      <AppShell
-        mobileTitle="Habilitar estudiantes"
-        breadcrumbs={[
-          { label: 'Preparación de exámenes' },
-          { label: 'Habilitar estudiantes' },
-        ]}
-      >
-        <PageHeader
-          title="Habilitar estudiantes"
-          subtitle="Seleccione un examen para gestionar la lista de habilitados."
-        />
+      <EligibleListShell subtitle={SELECT_SUBTITLE}>
         <Card className="p-0">
           <ErrorState error={eligible.error} onRetry={() => eligible.reloadExams()} />
         </Card>
-      </AppShell>
+      </EligibleListShell>
     )
   }
 
   if (eligible.exams.length === 0) {
     return (
-      <AppShell
-        mobileTitle="Habilitar estudiantes"
-        breadcrumbs={[
-          { label: 'Preparación de exámenes' },
-          { label: 'Habilitar estudiantes' },
-        ]}
-      >
-        <PageHeader
-          title="Habilitar estudiantes"
-          subtitle="Seleccione un examen para gestionar la lista de habilitados."
-        />
+      <EligibleListShell subtitle={SELECT_SUBTITLE}>
         <Card className="p-0">
           <EmptyState
             icon={CalendarX2}
             title="Aún no tiene exámenes disponibles"
-            description="Cuando registre un examen, podrá habilitar a los estudiantes de sus grupos desde aquí."
+            description="Cuando registre un examen, podrá cargar la lista de habilitados desde aquí."
           />
         </Card>
-      </AppShell>
+      </EligibleListShell>
     )
   }
 
   return (
-    <AppShell
-      mobileTitle="Habilitar estudiantes"
-      breadcrumbs={[
-        { label: 'Preparación de exámenes' },
-        { label: 'Habilitar estudiantes' },
-      ]}
-    >
-      <PageHeader
-        title="Habilitar estudiantes"
-        subtitle="Por defecto todos los estudiantes de los grupos del examen están habilitados. Marque a quienes no cumplen un requisito."
-      />
-
-      {/* #1: selector + grupos en una sola card row */}
+    <EligibleListShell subtitle={REPLACE_SUBTITLE}>
       <Card className="p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="w-full max-w-md space-y-1">
-            <label htmlFor="exam-selector" className="sciem-label">
-              Examen
-            </label>
-            <FormSelect
-              id="exam-selector"
-              value={eligible.selectedExamId ? String(eligible.selectedExamId) : ''}
-              placeholder="Seleccione un examen"
-              options={examOptions}
-              onValueChange={(v) => eligible.selectExam(Number(v))}
-              ariaLabel="Examen"
-            />
-          </div>
-          {selectedExam && (
-            <span className="text-xs font-medium text-muted-foreground sm:pb-2">
-              Grupos{' '}
-              {selectedExam.grupos && selectedExam.grupos.length > 0
-                ? selectedExam.grupos.join(' y ')
-                : '—'}
-              {selectedExam.materia && ` · ${selectedExam.materia.nombre}`}
-            </span>
-          )}
+        <div className="w-full space-y-2 sm:max-w-xl">
+          <label htmlFor="exam-selector" className="sciem-label">
+            Examen
+          </label>
+          <FormSelect
+            id="exam-selector"
+            value={eligible.selectedExamId ? String(eligible.selectedExamId) : ''}
+            placeholder="Seleccione un examen"
+            options={examOptions}
+            onValueChange={(v) => eligible.selectExam(Number(v))}
+            ariaLabel="Examen"
+            className="h-12 text-base"
+          />
         </div>
+
+        {selectedExam && (
+          <dl
+            aria-label="Contexto del examen"
+            className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 border-t border-border-soft pt-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            <ContextItem label="Materia" value={selectedExam.materia?.nombre ?? '—'} />
+            <ContextItem
+              label="Grupos"
+              value={selectedExam.grupos?.length ? selectedExam.grupos.join(' y ') : '—'}
+            />
+            <ContextItem label="Fecha" value={formatDate(selectedExam.fecha)} />
+            <ContextItem label="Hora de inicio" value={formatTime(selectedExam.hora_inicio)} />
+            <ContextItem
+              label="Ambientes"
+              value={
+                selectedExam.ambientes?.length
+                  ? selectedExam.ambientes.map((room) => room.nro_aula).join(', ')
+                  : 'Sin ambientes'
+              }
+            />
+          </dl>
+        )}
       </Card>
 
-      {/* #2: aviso "todos habilitados" arriba de las 3 cards */}
-      {eligible.listData &&
-        eligible.listData.editable &&
-        eligible.listData.estudiantes.length > 0 &&
-        eligible.listData.estudiantes.every(
-          (s) => s.estado_habilitacion === 'HABILITADO'
-        ) && (
-          <Alert className="border-ok-border bg-ok-soft text-ok-fg">
-            <Info aria-hidden="true" />
-            <AlertTitle>Todos los estudiantes de los grupos están habilitados</AlertTitle>
-            <AlertDescription>
-              Si nadie tiene que quedar fuera, no necesita hacer nada.
-            </AlertDescription>
-          </Alert>
-        )}
-
-      {/* #4: 3 cards de resumen */}
       {eligible.listData && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <SummaryCard label="En la nómina del examen" value={totalNomina} />
@@ -262,59 +146,16 @@ export function ExamEligibleListPage() {
 
       {!eligible.isLoadingList && eligible.listData && (
         <>
-          {!eligible.listData.editable &&
-            (() => {
-              const msg = readOnlyMessage(eligible.listData.estado)
-              return (
-                <Alert className="border-info-border bg-info-soft text-info">
-                  <Lock aria-hidden="true" />
-                  <AlertTitle>{msg.title}</AlertTitle>
-                  <AlertDescription>{msg.description}</AlertDescription>
-                </Alert>
-              )
-            })()}
-
-          <ChangesBanner
-            count={eligible.pendingChanges.size}
-            isSaving={eligible.isSaving}
-            onSave={() => void handleSave()}
-            onDiscard={handleDiscard}
-          />
-
-          {/* #4 (cont.): card de selección ARRIBA de la tabla,
-              con los dos botones a la derecha */}
-          {selectedIds.size > 0 && eligible.listData.editable && (
-            <div className="flex flex-col gap-2 rounded-lg border border-border-soft bg-brand-soft px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-sm font-medium text-brand-deep">
-                {selectedIds.size} seleccionado{selectedIds.size === 1 ? '' : 's'}
-              </span>
-              <div className="flex flex-wrap items-center gap-2">
-                {selectedHabilitable.length > 0 && (
-                  <Button size="sm" variant="outline" onClick={handleApplyEnable}>
-                    <CheckCircle2 aria-hidden="true" className="size-4" />
-                    Habilitar
-                  </Button>
-                )}
-                {selectedNonSpecial.length > 0 && (
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => setDisableOpen(true)}
-                  >
-                    <XCircle aria-hidden="true" className="size-4" />
-                    No habilitar…
-                  </Button>
-                )}
-              </div>
-            </div>
+          {readOnly && (
+            <Alert className="border-info-border bg-info-soft text-info">
+              <Lock aria-hidden="true" />
+              <AlertTitle>{readOnly.title}</AlertTitle>
+              <AlertDescription>{readOnly.description}</AlertDescription>
+            </Alert>
           )}
 
           <EligibleListCurrentTable
             students={students}
-            selectedIds={selectedIds}
-            onSelectionChange={setSelectedIds}
-            editable={eligible.listData.editable}
-            hasPendingChange={(id) => eligible.pendingChanges.has(id)}
             toolbar={
               <Button
                 variant="outline"
@@ -322,28 +163,12 @@ export function ExamEligibleListPage() {
                 disabled={!eligible.listData.editable}
               >
                 <Upload aria-hidden="true" className="size-4" />
-                Importar desde archivo
+                {ELIGIBLE_LIST_TITLE}
               </Button>
             }
           />
-
-          {selectedNoEligible.length > 0 &&
-            selectedHabilitable.length === 0 &&
-            selectedNonSpecial.length === selectedNoEligible.length && (
-              <p className="text-xs text-muted-foreground">
-                Los {selectedNoEligible.length} seleccionados ya están no habilitados.
-                Puede habilitarlos o cambiar el motivo.
-              </p>
-            )}
         </>
       )}
-
-      <DisableStudentsDialog
-        open={disableOpen}
-        studentCount={selectedNonSpecial.length}
-        onClose={() => setDisableOpen(false)}
-        onApply={handleApplyDisable}
-      />
 
       <EligibleListUploadFlow
         open={uploadOpen}
@@ -352,15 +177,16 @@ export function ExamEligibleListPage() {
         onClose={() => setUploadOpen(false)}
         onReplaced={handleReplaced}
       />
+    </EligibleListShell>
+  )
+}
 
-      {toast && (
-        <Toast
-          title={toast.title}
-          description={toast.description}
-          onClose={() => setToast(null)}
-        />
-      )}
-    </AppShell>
+function ContextItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="sciem-tnum text-sm font-medium text-foreground">{value}</dd>
+    </div>
   )
 }
 

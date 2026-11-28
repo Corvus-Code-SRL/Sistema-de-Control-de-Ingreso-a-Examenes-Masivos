@@ -101,7 +101,7 @@ export const CreateExamContainer: React.FC<{ initialGroupId?: number }> = ({ ini
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[350px] gap-3 text-muted-foreground">
-        <Loader2 className="h-7 w-7 animate-spin text-primary" />
+        <Loader2 className="h-7 w-7 animate-spin text-brand-fg" />
         <p className="text-xs font-medium">Cargando formulario y catálogo de materias...</p>
       </div>
     );

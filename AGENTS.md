@@ -2,7 +2,7 @@
 
 Plataforma de Corvus Code S.R.L. para la Universidad Mayor de San Simón: control de ingreso, validación e incidentes en exámenes masivos.
 
-**IMPORTANTE**: responde siempre en español, sin importar el idioma de la consulta. Esto aplica solo a tus respuestas y explicaciones — el código sigue las reglas de idioma de `.Codex/rules/code-style-backend.md`.
+**IMPORTANTE**: responde siempre en español, sin importar el idioma de la consulta. Esto aplica solo a tus respuestas y explicaciones — el código sigue las reglas de idioma de `.claude/rules/code-style-backend.md`.
 
 Monorepo: `deployment/` (Docker) no es necesario para dev local.
 
@@ -26,7 +26,7 @@ React + TS → REST API → Controller → Form Request → Service → Eloquent
 - Redis es infraestructura transversal (cache, sesiones, colas).
 - Modelos: nombre de clase en inglés, `protected $table` explícito (tabla en español, ej. `'grupo'`).
 - Rutas por módulo en `routes/api/<modulo>.php`, cargadas desde `routes/api.php`.
-- Frontend: `components/ui` (primitivas shadcn — revisar antes de crear una nueva), `components/layout`, `components/common`, `features/<nombre>/` (cada feature con components/pages/services/hooks/types propios, expuestos solo vía su `index.ts` — un feature nunca importa de rutas internas de otro). Alias `@/*` → `src/*`. Naming: `PascalCase.tsx` (componentes), `useNombre.ts` (hooks), `nombreService.ts` (servicios), `nombre.types.ts` (tipos). Toda llamada HTTP pasa por `lib/api-client.ts`.
+- Frontend: `components/ui` (primitivas shadcn — revisar antes de crear una nueva), `components/layout`, `components/common`, `features/<nombre>/` (cada feature con components/pages/services/hooks/types propios, expuestos solo vía su `index.ts` — un feature nunca importa de rutas internas de otro). Alias `@/*` → `src/*`. Naming: `PascalCase.tsx` (componentes), `useNombre.ts` (hooks), `nombreService.ts` (servicios), `nombre.types.ts` (tipos). Toda llamada HTTP pasa por `lib/api-client.ts`. Colores solo vía tokens de diseño (`src/index.css`, reglas en `docs/design/sistema-de-color.md`), nunca hex ni paleta por defecto de Tailwind.
 
 ### Módulos
 
@@ -46,8 +46,8 @@ Dos contextos independientes que **nunca** deben mezclarse ni referenciarse entr
 
 ## Estándares del equipo
 
-Detalle completo en `.Codex/rules/`:
-- Ramas: `<tipo>/<identificador>-<descripcion-corta>` (ej. `feature/HU-11-...`, `tech/RNF-02-...`) — antes de crear una rama, cargar el skill `git-branches` (`.Codex/skills/git-branches/SKILL.md`)
+Detalle completo en `.claude/rules/`:
+- Ramas: `<tipo>/<identificador>-<descripcion-corta>` (ej. `feature/HU-11-...`, `tech/RNF-02-...`) — antes de crear una rama, cargar el skill `git-branches` (`.claude/skills/git-branches/SKILL.md`)
 - `git-commits.md` — formato de commits
 - `code-style-backend.md` — PSR-12, idioma, nombres, capas, comentarios
 

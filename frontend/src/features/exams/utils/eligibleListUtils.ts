@@ -21,6 +21,12 @@ export function formatDate(isoDate: string): string {
   return `${parts[2]}/${parts[1]}/${parts[0]}`
 }
 
+/** Hora tal como la entrega el servidor (hora local de La Paz), en formato HH:MM y sin conversión de zona. */
+export function formatTime(time: string): string {
+  const match = /^(\d{2}):(\d{2})/.exec(time)
+  return match ? `${match[1]}:${match[2]}` : time
+}
+
 /** Devuelve el mensaje del banner de solo lectura según el estado del examen. */
 export interface ReadOnlyMessage {
   title: string
@@ -65,19 +71,4 @@ export function eligibilityLabel(estado: EligibilityStatus): string {
     case 'CASO_ESPECIAL': return 'Caso especial'
     default: return String(estado)
   }
-}
-
-/** Valida el detalle cuando el motivo es OTRO. */
-export function validateOtroDetalle(detalle: string): string | null {
-  const trimmed = detalle.trim()
-  if (trimmed.length < 10) {
-    return 'El detalle debe tener al menos 10 caracteres.'
-  }
-  if (trimmed.length > 500) {
-    return 'El detalle no puede superar los 500 caracteres.'
-  }
-  if (trimmed.startsWith(':')) {
-    return 'El detalle no puede empezar con dos puntos (:).'
-  }
-  return null
 }

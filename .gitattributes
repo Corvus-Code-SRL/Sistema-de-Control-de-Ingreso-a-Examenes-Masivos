@@ -5,3 +5,5 @@
 Dockerfile  text eol=lf
 deployment/docker/**/*.conf text eol=lf
 deployment/docker/**/*.ini  text eol=lf
+# Markdown de docs/ siempre en LF (los tests leen estos archivos)
+docs/**/*.md text eol=lf

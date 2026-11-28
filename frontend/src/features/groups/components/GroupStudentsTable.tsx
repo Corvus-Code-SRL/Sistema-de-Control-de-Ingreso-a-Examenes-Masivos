@@ -100,7 +100,7 @@ export function GroupStudentsTable({
                   onCareerChange(event.target.value === '' ? null : Number(event.target.value))
                 }
                 aria-label="Filtrar por carrera"
-                className="h-11 rounded-md border border-input bg-card px-3 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:w-64"
+                className="h-11 rounded-md border border-input bg-field px-3 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:w-64"
               >
                 <option value="">Todas las carreras</option>
                 {careers.map((career) => (

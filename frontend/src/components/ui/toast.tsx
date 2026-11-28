@@ -42,14 +42,14 @@ export function Toast({
     <div
       className={cn(
         'fixed top-20 inset-x-4 z-50 flex items-start gap-3 bg-card text-card-foreground p-3.5 rounded-lg border border-border shadow-lg animate-in fade-in slide-in-from-top-2 duration-200 sm:inset-x-auto sm:right-8 sm:w-[380px]',
-        isError && 'border-l-4 border-l-[color:var(--danger)]'
+        isError && 'border-l-4 border-l-danger'
       )}
       role="status"
       aria-live="polite"
     >
       {/* Ícono de éxito OK */}
       <svg
-        className={cn('size-5 shrink-0 mt-0.5', isError ? 'text-[color:var(--danger-fg)]' : 'text-[#008A52]')}
+        className={cn('size-5 shrink-0 mt-0.5', isError ? 'text-danger-fg' : 'text-ok')}
         width="20"
         height="20"
         viewBox="0 0 24 24"
@@ -75,13 +75,13 @@ export function Toast({
 
       {/* Contenido principal */}
       <div className="flex-1 min-w-0 pr-1">
-        <div className="text-sm font-semibold text-[#2C2C2C]">{title}</div>
+        <div className="text-sm font-semibold text-foreground">{title}</div>
         <div className="text-xs text-muted-foreground mt-0.5 leading-normal">{description}</div>
         {action && (
           <Link
             to={action.to}
             onClick={onClose}
-            className="mt-2 inline-flex text-xs font-medium text-brand underline underline-offset-2 hover:text-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="mt-2 inline-flex text-xs font-medium text-brand-fg underline underline-offset-2 hover:text-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {action.label}
           </Link>
@@ -92,7 +92,7 @@ export function Toast({
       <button
         type="button"
         onClick={onClose}
-        className="text-[#8A969B] hover:text-foreground transition-colors p-0.5 rounded-sm"
+        className="text-subtle hover:text-foreground transition-colors p-0.5 rounded-sm"
         aria-label="Cerrar notificación"
       >
         <svg

@@ -44,7 +44,7 @@ export function FormSelect({
         id={id}
         aria-label={ariaLabel}
         aria-invalid={invalid || undefined}
-        className={cn('h-11 w-full bg-background px-3.5 text-left text-xs font-medium', className)}
+        className={cn('h-11 w-full bg-field px-3.5 text-left text-xs font-medium', className)}
       >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
