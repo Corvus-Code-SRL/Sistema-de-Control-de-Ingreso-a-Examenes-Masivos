@@ -122,7 +122,7 @@ class AuditLogQueryService
     }
 
     /**
-     * Shared filtered query for audit log and HU-068 reports.
+     * Consulta filtrada compartida por la bitácora y los reportes de la HU-068.
      */
     private function filteredQuery(array $filters): Builder
     {
@@ -141,7 +141,7 @@ class AuditLogQueryService
     }
 
     /**
-     * HU-068: totals across all filtered operations.
+     * HU-068: totales de todas las operaciones filtradas.
      */
     public function reportTotals(array $filters): array
     {
@@ -182,7 +182,7 @@ class AuditLogQueryService
     }
 
     /**
-     * HU-068: all filtered rows, without screen pagination.
+     * HU-068: todos los registros filtrados, sin paginación de pantalla.
      */
     public function reportRows(array $filters): \Generator
     {

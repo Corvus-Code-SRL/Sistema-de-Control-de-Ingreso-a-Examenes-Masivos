@@ -11,7 +11,7 @@ use Tests\Concerns\SeedsSecurityAccounts;
 use Tests\TestCase;
 
 /**
- * HU-068: audit log report endpoint tests.
+ * HU-068: pruebas de los puntos de acceso del reporte de bitácora.
  */
 class AuditLogReportTest extends TestCase
 {

@@ -7,7 +7,7 @@ use App\Services\Security\AuditLogQueryService;
 use Illuminate\Validation\ValidationException;
 
 /**
- * HU-068: audit log report.
+ * HU-068: generación del reporte de bitácora.
  */
 class AuditLogReportService
 {
@@ -19,7 +19,7 @@ class AuditLogReportService
     }
 
     /**
-     * Generate the paginated report and its global totals.
+     * Genera el reporte paginado y sus totales globales.
      */
     public function generate(array $filters): array
     {
@@ -34,7 +34,7 @@ class AuditLogReportService
     }
 
     /**
-     * Generate report data without screen pagination.
+     * Genera los datos del reporte sin la paginación de pantalla.
      */
     public function export(array $filters, string $actorId): array
     {
@@ -90,7 +90,7 @@ class AuditLogReportService
     }
 
     /**
-     * Keep only the supported report filters.
+     * Conserva únicamente los filtros admitidos por el reporte.
      */
     private function reportFilters(array $filters): array
     {

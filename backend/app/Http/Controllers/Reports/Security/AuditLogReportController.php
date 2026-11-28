@@ -13,7 +13,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * HU-068: audit log report endpoints.
+ * HU-068: puntos de acceso del reporte de bitácora.
  */
 class AuditLogReportController extends Controller
 {
@@ -32,7 +32,7 @@ class AuditLogReportController extends Controller
     }
 
     /**
-     * Return the paginated audit log report.
+     * Devuelve el reporte de bitácora paginado.
      */
     public function index(
         AuditLogReportRequest $request

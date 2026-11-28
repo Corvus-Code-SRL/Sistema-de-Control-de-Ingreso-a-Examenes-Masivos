@@ -16,7 +16,7 @@ use Tests\Concerns\SeedsSecurityAccounts;
 use Tests\TestCase;
 
 /**
- * HU-068: audit log PDF and Excel export tests.
+ * HU-068: pruebas de exportación de bitácora en PDF y Excel.
  */
 class AuditLogReportExportTest extends TestCase
 {

@@ -10,7 +10,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 /**
- * HU-068: render the audit log report as Excel.
+ * HU-068: genera el reporte de bitácora en formato Excel.
  */
 class AuditLogReportExcelService
 {
@@ -224,7 +224,7 @@ class AuditLogReportExcelService
         Worksheet $sheet,
         int $column,
         int $row,
-        mixed $value,
+        string|int|float|null $value,
         bool $bold = false
     ): void {
         $coordinate = Coordinate::stringFromColumnIndex($column)

@@ -5,7 +5,7 @@ namespace App\Services\Reports\Security;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 /**
- * HU-068: render the audit log report as PDF.
+ * HU-068: genera el reporte de bitácora en formato PDF.
  */
 class AuditLogReportPdfService
 {
