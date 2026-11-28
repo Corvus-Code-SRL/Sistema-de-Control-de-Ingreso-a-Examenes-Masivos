@@ -104,7 +104,7 @@ export function AuditLogReportStats({
                   </div>
 
                   <div
-                    className="h-2 overflow-hidden rounded-full bg-sunken"
+                    className="h-2 overflow-hidden rounded-full bg-muted"
                     aria-hidden="true"
                   >
                     <div
